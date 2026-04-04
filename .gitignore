@@ -1,0 +1,31 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE and general editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.*
+*.local
+
+# Node modules (just in case they appear at root)
+node_modules/
+
+# Logs
+*.log
+
+# Private files
+PROJECT_SPEC.md
+setup.sh
