@@ -58,42 +58,66 @@ func main() {
 	}{
 		{
 			Name: "Netflix", Category: "streaming", Icon: "🎬", Color: "#C8E6F5", Popular: true,
-			Prices: []struct{ Duration int; AccountType string; Price int64 }{
+			Prices: []struct {
+				Duration    int
+				AccountType string
+				Price       int64
+			}{
 				{1, "shared", 25000}, {3, "shared", 65000}, {6, "shared", 120000}, {12, "shared", 220000},
 				{1, "private", 55000}, {3, "private", 150000}, {6, "private", 280000}, {12, "private", 520000},
 			},
 		},
 		{
 			Name: "Spotify Premium", Category: "music", Icon: "🎵", Color: "#DDD5F3", Popular: true,
-			Prices: []struct{ Duration int; AccountType string; Price int64 }{
+			Prices: []struct {
+				Duration    int
+				AccountType string
+				Price       int64
+			}{
 				{1, "shared", 15000}, {3, "shared", 40000}, {6, "shared", 75000}, {12, "shared", 135000},
 				{1, "private", 35000}, {3, "private", 95000}, {6, "private", 175000}, {12, "private", 330000},
 			},
 		},
 		{
 			Name: "Disney+", Category: "streaming", Icon: "✨", Color: "#FAE88A", Popular: true,
-			Prices: []struct{ Duration int; AccountType string; Price int64 }{
+			Prices: []struct {
+				Duration    int
+				AccountType string
+				Price       int64
+			}{
 				{1, "shared", 20000}, {3, "shared", 55000}, {6, "shared", 100000}, {12, "shared", 180000},
 				{1, "private", 45000}, {3, "private", 120000}, {6, "private", 220000}, {12, "private", 400000},
 			},
 		},
 		{
 			Name: "YouTube Premium", Category: "streaming", Icon: "📺", Color: "#C8E6F5", Popular: true,
-			Prices: []struct{ Duration int; AccountType string; Price int64 }{
+			Prices: []struct {
+				Duration    int
+				AccountType string
+				Price       int64
+			}{
 				{1, "shared", 15000}, {3, "shared", 40000}, {6, "shared", 70000}, {12, "shared", 130000},
 				{1, "private", 30000}, {3, "private", 80000}, {6, "private", 150000}, {12, "private", 280000},
 			},
 		},
 		{
 			Name: "Canva Pro", Category: "design", Icon: "🎨", Color: "#E5D5F5", Popular: false,
-			Prices: []struct{ Duration int; AccountType string; Price int64 }{
+			Prices: []struct {
+				Duration    int
+				AccountType string
+				Price       int64
+			}{
 				{1, "shared", 20000}, {3, "shared", 50000}, {6, "shared", 90000}, {12, "shared", 160000},
 				{1, "private", 45000}, {3, "private", 120000}, {6, "private", 220000}, {12, "private", 400000},
 			},
 		},
 		{
 			Name: "Xbox Game Pass", Category: "gaming", Icon: "🎮", Color: "#FDDAC8", Popular: false,
-			Prices: []struct{ Duration int; AccountType string; Price int64 }{
+			Prices: []struct {
+				Duration    int
+				AccountType string
+				Price       int64
+			}{
 				{1, "shared", 25000}, {3, "shared", 65000}, {6, "shared", 120000}, {12, "shared", 220000},
 				{1, "private", 50000}, {3, "private", 135000}, {6, "private", 250000}, {12, "private", 470000},
 			},
@@ -103,13 +127,13 @@ func main() {
 	for _, p := range products {
 		slug := generateSlug(p.Name)
 		product := model.Product{
-			Name:      p.Name,
-			Slug:      slug,
-			Category:  p.Category,
-			Icon:      p.Icon,
-			Color:     p.Color,
-			IsPopular: p.Popular,
-			IsActive:  true,
+			Name:        p.Name,
+			Slug:        slug,
+			Category:    p.Category,
+			Icon:        p.Icon,
+			Color:       p.Color,
+			IsPopular:   p.Popular,
+			IsActive:    true,
 			Description: fmt.Sprintf("Akun %s premium dengan garansi 30 hari. Tersedia pilihan shared dan private account.", p.Name),
 		}
 		db.FirstOrCreate(&product, model.Product{Slug: slug})

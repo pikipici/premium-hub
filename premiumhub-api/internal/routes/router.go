@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"strings"
+
 	"premiumhub-api/config"
 	"premiumhub-api/internal/handler"
 	"premiumhub-api/internal/middleware"
@@ -22,6 +24,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	orderRepo := repository.NewOrderRepo(db)
 	claimRepo := repository.NewClaimRepo(db)
 	notifRepo := repository.NewNotificationRepo(db)
+	walletRepo := repository.NewWalletRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg)
@@ -31,12 +34,14 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	stockSvc := service.NewStockService(stockRepo)
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
 	paymentSvc := service.NewPaymentService(orderRepo, orderSvc)
+	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
 	productHandler := handler.NewProductHandler(productSvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
+	walletHandler := handler.NewWalletHandler(walletSvc)
 	claimHandler := handler.NewClaimHandler(claimSvc)
 	stockHandler := handler.NewStockHandler(stockSvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
@@ -74,7 +79,16 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	protected.POST("/payment/create", paymentHandler.Create)
 	protected.GET("/payment/status/:orderId", paymentHandler.GetStatus)
-	protected.POST("/payment/simulate/:orderId", paymentHandler.SimulatePayment) // DEV only
+	if strings.ToLower(cfg.AppEnv) != "production" {
+		protected.POST("/payment/simulate/:orderId", paymentHandler.SimulatePayment) // DEV only
+	}
+
+	protected.GET("/wallet/balance", walletHandler.Balance)
+	protected.GET("/wallet/ledger", walletHandler.ListLedger)
+	protected.POST("/wallet/topups", walletHandler.CreateTopup)
+	protected.GET("/wallet/topups", walletHandler.ListTopups)
+	protected.GET("/wallet/topups/:id", walletHandler.GetTopup)
+	protected.POST("/wallet/topups/:id/check", walletHandler.CheckTopup)
 
 	protected.POST("/claims", claimHandler.Create)
 	protected.GET("/claims", claimHandler.List)
@@ -107,6 +121,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	admin.GET("/users", adminHandler.ListUsers)
 	admin.PUT("/users/:id/block", adminHandler.BlockUser)
+	admin.POST("/wallet/topups/reconcile", walletHandler.ReconcilePending)
 
 	return r
 }

@@ -31,7 +31,7 @@ func (r *OrderRepo) FindByUserID(userID uuid.UUID, page, limit int) ([]model.Ord
 	q := r.db.Model(&model.Order{}).Where("user_id = ?", userID)
 	q.Count(&total)
 	err := q.Preload("Price").Preload("Stock").
-		Offset((page-1)*limit).Limit(limit).
+		Offset((page - 1) * limit).Limit(limit).
 		Order("created_at DESC").
 		Find(&orders).Error
 	return orders, total, err
@@ -50,7 +50,7 @@ func (r *OrderRepo) AdminList(status string, page, limit int) ([]model.Order, in
 	}
 	q.Count(&total)
 	err := q.Preload("User").Preload("Price").Preload("Stock").
-		Offset((page-1)*limit).Limit(limit).
+		Offset((page - 1) * limit).Limit(limit).
 		Order("created_at DESC").
 		Find(&orders).Error
 	return orders, total, err

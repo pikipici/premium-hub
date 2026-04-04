@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dokumentasi API - Neticon Pay</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Tema Prism Tomorrow (Dark) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { primary: '#ffffff', secondary: '#f8fafc', accent: '#4f46e5', brand: '#283593' },
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'], mono: ['"JetBrains Mono"', 'monospace'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f8fafc; color: #334155; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        .sidebar { width: 280px; height: 100vh; position: fixed; top: 0; left: 0; background: #ffffff; border-right: 1px solid #e2e8f0; overflow-y: auto; z-index: 50; }
+        .content { margin-left: 280px; padding: 40px; max-width: 1000px; }
+        
+        .nav-link { display: flex; align-items: center; gap: 12px; padding: 10px 16px; color: #64748b; font-size: 13px; font-weight: 600; border-radius: 8px; transition: all 0.2s; margin-bottom: 4px; }
+        .nav-link:hover, .nav-link.active { background: #eef2ff; color: #4f46e5; }
+        
+        .code-block { border-radius: 12px; overflow: hidden; margin: 16px 0; border: 1px solid #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); background: #1e293b; position: relative; }
+        .code-header { background: #0f172a; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #334155; }
+        
+        /* Tombol Copy Modern */
+        .copy-btn { background: rgba(255,255,255,0.05); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); padding: 6px 14px; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; font-weight: bold; }
+        .copy-btn:hover { background: #4f46e5; color: white; border-color: #4f46e5; }
+        .copy-btn.copied { background: #10b981; border-color: #10b981; color: white; }
+        
+        pre { margin: 0 !important; padding: 20px !important; background: transparent !important; font-size: 13px !important; }
+        code { font-family: 'JetBrains Mono', monospace !important; }
+        
+        .method-badge { font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
+        .method-post { background: #10b981; color: white; }
+        
+        .api-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
+        .api-table th { text-align: left; padding: 12px; border-bottom: 2px solid #e2e8f0; color: #475569; }
+        .api-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+        .api-table tr:last-child td { border-bottom: none; }
+        
+        @media (max-width: 1024px) { .sidebar { display: none; } .content { margin-left: 0; padding: 20px; } }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar p-6">
+        <div class="flex items-center gap-3 mb-10">
+            <div class="w-10 h-10 bg-brand rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-brand/30">N</div>
+            <div>
+                <h1 class="text-base font-black text-slate-800 leading-tight">Neticon<span class="text-indigo-600">Dev</span></h1>
+                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">H2H API Docs</p>
+            </div>
+        </div>
+        
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3 mb-3">Pendahuluan</p>
+        <a href="#intro" class="nav-link active"><i class="fa-solid fa-book-open w-5"></i> Pengantar</a>
+        <a href="#security" class="nav-link"><i class="fa-solid fa-shield-halved w-5"></i> Pedoman Keamanan</a>
+        
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3 mt-8 mb-3">API Reference</p>
+        <a href="#api-request" class="nav-link"><i class="fa-solid fa-file-invoice-dollar w-5"></i> 1. Buat Tagihan</a>
+        <a href="#api-status" class="nav-link"><i class="fa-solid fa-check-double w-5 text-green-500"></i> 2. Validasi Pembayaran</a>
+        
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3 mt-8 mb-3">Integrasi Cepat</p>
+        <a href="#checkout-script" class="nav-link text-indigo-600 bg-indigo-50"><i class="fa-brands fa-php w-5"></i> Skrip PHP (Aman)</a>
+        
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-3 mt-8 mb-3">Referensi</p>
+        <a href="#errors" class="nav-link"><i class="fa-solid fa-triangle-exclamation w-5 text-red-400"></i> Kode Error</a>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="content">
+        
+        <!-- INTRO -->
+        <section id="intro" class="mb-20 pt-4">
+            <div class="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
+                <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span> Production Ready
+            </div>
+            <h1 class="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">Dokumentasi API H2H</h1>
+            <p class="text-slate-600 text-base leading-relaxed mb-6">
+                Selamat datang di Dokumentasi Resmi API Host-to-Host (H2H) <b>Neticon Pay</b>. Infrastruktur API kami dirancang secara profesional untuk membantu Anda mengotomatisasi pembuatan tagihan QRIS Dinamis serta memvalidasi pembayaran secara <i>real-time</i> langsung ke dalam ekosistem sistem Anda (Website/Aplikasi).
+            </p>
+
+            <!-- HIGHLIGHT SALDO MASUK KE MY QRIS -->
+            <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 mb-8 flex gap-4 items-start shadow-sm">
+                <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+                <div>
+                    <h3 class="text-indigo-900 font-bold text-sm mb-1.5">Sinkronisasi Saldo Terpusat (My Qris)</h3>
+                    <p class="text-indigo-700 text-[13px] leading-relaxed">
+                        Kami menjamin keamanan tingkat tinggi untuk setiap aset Anda. Seluruh dana dari transaksi H2H yang berhasil divalidasi melalui API ini akan <b>secara otomatis masuk dan terakumulasi secara utuh ke dalam saldo aplikasi My Qris Anda</b>. Anda dapat memantau mutasi, mengunduh laporan audit, serta melakukan pencairan dana kapan saja melalui satu pintu <i>dashboard</i> utama yang aman.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="bg-white border border-slate-200 shadow-sm rounded-2xl p-5">
+                <p class="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Base Endpoint URL</p>
+                <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <code id="base-url" class="text-indigo-600 font-mono text-sm flex-1">https://qris.neticonpay.my.id/qris.php</code>
+                    <button onclick="copyTextDirect(this, 'base-url')" class="copy-btn text-slate-500 !bg-white border-slate-300 hover:!bg-indigo-600 hover:text-white">
+                        <i class="fa-solid fa-copy"></i> Salin URL
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECURITY & BEST PRACTICES -->
+        <section id="security" class="mb-20">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">Pedoman Keamanan Wajib</h2>
+            
+            <div class="bg-red-50 border-l-4 border-red-500 p-5 rounded-r-xl mb-6">
+                <h4 class="font-bold text-red-800 text-sm mb-2 uppercase tracking-widest flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Dilarang Keras Auto-Approve Saldo!
+                </h4>
+                <p class="text-sm text-red-700 leading-relaxed mb-3">
+                    Anda <b>TIDAK BOLEH</b> menambahkan saldo atau memproses pesanan user Anda hanya karena user menekan tombol "Saya Sudah Bayar" di aplikasi/web Anda. Manipulasi di sisi <i>Frontend</i> (seperti Inspect Element) sangat mudah dilakukan oleh oknum yang tidak bertanggung jawab.
+                </p>
+                <p class="text-sm text-red-700 font-bold leading-relaxed">
+                    Sistem Anda wajib menahan pesanan sampai Server Anda melakukan pengecekan lintas server (Server-to-Server) ke Neticon Pay melalui Endpoint Validasi, dan mendapatkan balasan mutlak <code>"status": "success"</code>.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-3"><i class="fa-solid fa-key"></i></div>
+                    <h3 class="font-bold text-slate-800 text-sm mb-2">Simpan API Key di Backend</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">Jangan pernah menaruh API Key Anda di dalam kode HTML, JavaScript (Frontend), atau aplikasi mobile sisi klien. API Key hanya boleh dieksekusi melalui skrip Backend (PHP, Node.js, dll).</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="w-10 h-10 bg-green-100 text-green-600 rounded-xl flex items-center justify-center mb-3"><i class="fa-solid fa-network-wired"></i></div>
+                    <h3 class="font-bold text-slate-800 text-sm mb-2">Aktifkan IP Whitelist</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">Daftarkan IP Server/Hosting website Anda di dashboard My Qris (Menu Integrasi H2H). Request dari IP yang tidak terdaftar akan otomatis ditolak oleh sistem pengamanan kami.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- API: CREATE DEPOSIT -->
+        <section id="api-request" class="mb-20">
+            <div class="flex items-center gap-3 mb-6 border-b border-slate-200 pb-2">
+                <span class="method-badge method-post">POST</span>
+                <h2 class="text-2xl font-bold text-slate-900">1. Buat Tagihan Baru</h2>
+            </div>
+            <p class="text-slate-600 text-sm mb-6">Langkah pertama dalam alur H2H adalah menginisiasi transaksi. Sistem kami akan mencatat nominal (wajib ditambah kode unik dari sistem Anda) dan merespons dengan ID Transaksi (Trx ID).</p>
+            
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 mb-6 shadow-sm overflow-x-auto">
+                <h4 class="font-bold text-slate-800 text-sm mb-4 uppercase tracking-widest">Parameter Request</h4>
+                <table class="api-table">
+                    <thead><tr><th>Parameter</th><th>Tipe</th><th>Deskripsi</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><code class="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">action</code></td>
+                            <td class="text-slate-500">String</td>
+                            <td>Harus diisi dengan <code>request_deposit</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">api_key</code></td>
+                            <td class="text-slate-500">String</td>
+                            <td>Secret API Key H2H Anda.</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">user_id</code></td>
+                            <td class="text-slate-500">String</td>
+                            <td>Merchant Code / User ID akun Neticon Anda.</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">amount</code></td>
+                            <td class="text-slate-500">Integer</td>
+                            <td>Total nominal tagihan. <b>PENTING:</b> Sistem Anda harus menambahkan 3 angka unik di belakang nominal (contoh: <code>50123</code>). Minimal nominal Rp 1.000.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="code-block m-0">
+                    <div class="code-header">
+                        <span>Request Data (JSON)</span>
+                        <button class="copy-btn" onclick="copyCodeBlock(this, 'req-dep')"><i class="fa-regular fa-copy"></i> Salin</button>
+                    </div>
+<pre><code id="req-dep" class="language-json">{
+  "action": "request_deposit",
+  "api_key": "NP_1234567890abcdef",
+  "user_id": "MERCHANT_01",
+  "amount": 50123
+}</code></pre>
+                </div>
+                <div class="code-block m-0">
+                    <div class="code-header">
+                        <span>Response Diterima</span>
+                        <button class="copy-btn" onclick="copyCodeBlock(this, 'res-dep')"><i class="fa-regular fa-copy"></i> Salin</button>
+                    </div>
+<pre><code id="res-dep" class="language-json">{
+  "result": true,
+  "trx_id": "H2H1710001234",
+  "amount": 50123
+}</code></pre>
+                </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-3 italic">* Simpan `trx_id` yang didapat ke dalam database sistem Anda untuk keperluan pengecekan status.</p>
+        </section>
+
+        <!-- API: CHECK STATUS (VALIDATION) -->
+        <section id="api-status" class="mb-20">
+            <div class="flex items-center gap-3 mb-6 border-b border-slate-200 pb-2">
+                <span class="method-badge method-post">POST</span>
+                <h2 class="text-2xl font-bold text-slate-900">2. Validasi Pembayaran (Wajib)</h2>
+            </div>
+            
+            <p class="text-slate-600 text-sm mb-4">
+                Ini adalah tahap krusial. Sistem (Backend) Anda harus menembak endpoint ini untuk mengecek apakah pelanggan sudah mentransfer dana yang sesuai. Lakukan pengecekan secara <i>polling</i> (misal: setiap 5-10 detik) atau saat user menekan tombol "Cek Pembayaran".
+            </p>
+
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 mb-6 shadow-sm overflow-x-auto">
+                <h4 class="font-bold text-slate-800 text-sm mb-4 uppercase tracking-widest">Parameter Request</h4>
+                <table class="api-table">
+                    <thead><tr><th>Parameter</th><th>Tipe</th><th>Deskripsi</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><code class="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">action</code></td>
+                            <td class="text-slate-500">String</td>
+                            <td>Nilai harus <code>check_status</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">api_key</code> & <code class="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">user_id</code></td>
+                            <td class="text-slate-500">String</td>
+                            <td>Kredensial Anda.</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">trx_id</code></td>
+                            <td class="text-slate-500">String</td>
+                            <td>ID Transaksi dari langkah pertama.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="code-block m-0">
+                    <div class="code-header">
+                        <span>Request Validasi</span>
+                        <button class="copy-btn" onclick="copyCodeBlock(this, 'req-stat')"><i class="fa-regular fa-copy"></i> Salin</button>
+                    </div>
+<pre><code id="req-stat" class="language-json">{
+  "action": "check_status",
+  "api_key": "NP_1234567890abcdef",
+  "user_id": "MERCHANT_01",
+  "trx_id": "H2H1710001234"
+}</code></pre>
+                </div>
+                <div class="code-block m-0 border-green-500/50 shadow-green-900/20">
+                    <div class="code-header bg-green-900/30">
+                        <span>Response Sukses (Valid)</span>
+                        <button class="copy-btn" onclick="copyCodeBlock(this, 'res-stat')"><i class="fa-regular fa-copy"></i> Salin</button>
+                    </div>
+<pre><code id="res-stat" class="language-json">{
+  "result": true,
+  "status": "success" 
+}</code></pre>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 text-slate-300 p-5 rounded-2xl mt-6 text-sm leading-relaxed border border-slate-700">
+                <strong class="text-white">Alur Logika di Sistem Anda:</strong><br>
+                <code>Jika response.status == "success" {</code><br>
+                <code class="ml-4 text-green-400">// AMAN! Dana sudah terverifikasi di Neticon Pay.</code><br>
+                <code class="ml-4 text-green-400">// Update database Anda: Ubah pesanan jadi LUNAS.</code><br>
+                <code class="ml-4 text-green-400">// Berikan hak akses / saldo ke user Anda di sistem Anda.</code><br>
+                <code>} else {</code><br>
+                <code class="ml-4 text-orange-400">// Jangan lakukan apapun. Pembayaran belum valid.</code><br>
+                <code>}</code>
+            </div>
+        </section>
+
+        <!-- SCRIPT PHP AMAN -->
+        <section id="checkout-script" class="mb-20">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">Skrip PHP Checkout & Validasi</h2>
+            <p class="text-slate-600 text-sm mb-6">Berikut adalah contoh implementasi <b>yang aman</b> menggunakan PHP murni. Skrip ini secara otomatis membuat kode unik, merender QRIS dinamis, menjalankan hitung mundur, dan memvalidasi pembayaran ke sistem kami secara Server-to-Server tanpa celah manipulasi.</p>
+
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="flex items-center gap-2"><i class="fa-brands fa-php text-indigo-400 text-base"></i> checkout.php</span>
+                    <button class="copy-btn" onclick="copyCodeBlock(this, 'full-php')"><i class="fa-regular fa-copy text-sm"></i> SALIN SELURUH KODE</button>
+                </div>
+<pre><code id="full-php" class="language-php">&lt;?php
+session_start();
+date_default_timezone_set('Asia/Jakarta');
+
+// --- 1. KREDENSIAL (SIMPAN SECARA RAHASIA) ---
+$apiKey   = "GANTI_DENGAN_API_KEY_ANDA"; 
+$userId   = "GANTI_DENGAN_USER_ID_ANDA"; 
+$apiUrl   = "https://qris.neticonpay.my.id/qris.php";
+
+// --- 2. FUNGSI REQUEST ---
+function callNeticon($url, $data) {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
+    $res = curl_exec($ch); curl_close($ch);
+    return json_decode($res, true);
+}
+
+// --- 3. AJAX AUTO-VALIDATION DARI FRONTEND ---
+if (isset($_GET['check_status'])) {
+    if (!isset($_SESSION['trx_id']) || time() > $_SESSION['expiry_time']) {
+        echo json_encode(['status' => 'expired']); exit;
+    }
+    
+    // Server Anda mengecek langsung ke Server Neticon (Server-to-Server)
+    $res = callNeticon($apiUrl, [
+        'action' => 'check_status', 
+        'api_key' => $apiKey, 
+        'user_id' => $userId,
+        'trx_id' => $_SESSION['trx_id']
+    ]);
+    
+    // VALIDASI KEAMANAN: HANYA BERIKAN SALDO/HAK AKSES JIKA STATUS SUCCESS
+    if(isset($res['status']) && $res['status'] === 'success' && !isset($_SESSION['is_paid'])) {
+        
+        // ====================================================
+        // PENTING: LAKUKAN UPDATE DATABASE ANDA DI SINI!
+        // ====================================================
+        // Contoh implementasi aman:
+        // mysqli_query($db, "UPDATE pesanan SET status='LUNAS' WHERE trx_id='{$_SESSION['trx_id']}'");
+        // mysqli_query($db, "UPDATE user SET saldo=saldo+{$_SESSION['amount']} WHERE id='123'");
+        
+        // Tandai agar tidak dieksekusi dua kali
+        $_SESSION['is_paid'] = true;
+    }
+
+    header('Content-Type: application/json');
+    echo json_encode(['status' => ($res['status'] ?? 'pending')]);
+    exit;
+}
+
+// --- LOGIKA RESET ---
+if (isset($_GET['action']) && $_GET['action'] == 'reset') { session_destroy(); header("Location: checkout.php"); exit; }
+
+// --- 4. BUAT TAGIHAN ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['amount']) && !isset($_SESSION['trx_id'])) {
+    $baseAmount = (int)$_POST['amount'];
+    if ($baseAmount >= 1000) {
+        $total = $baseAmount + rand(100, 999); // Wajib kode unik
+        $res = callNeticon($apiUrl, [
+            'action' => 'request_deposit', 'api_key' => $apiKey, 
+            'user_id' => $userId, 'amount' => $total
+        ]);
+
+        if (isset($res['result']) && $res['result']) {
+            // Pembuatan Payload QRIS Dinamis
+            $qrisRaw = "00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214115511360752490303UMI51440014ID.CO.QRIS.WWW0215ID20254316887330303UMI5204653353033605802ID5925NETICON PAYMENT INDONESIA6009PURWOREJO61055411262070703A016304684E";
+            $body = str_replace("010211", "010212", $qrisRaw);
+            $parts = explode("6304", $body);
+            $body = $parts[0] . "54" . str_pad(strlen($total), 2, '0', STR_PAD_LEFT) . $total . "6304";
+            
+            $crc = 0xFFFF;
+            for ($c = 0; $c < strlen($body); $c++) {
+                $x = (($crc >> 8) ^ ord($body[$c])) & 0xFF; $x ^= $x >> 4;
+                $crc = (($crc << 8) ^ ($x << 12) ^ ($x << 5) ^ $x) & 0xFFFF;
+            }
+            $payload = $body . strtoupper(str_pad(dechex($crc), 4, '0', STR_PAD_LEFT));
+            
+            $_SESSION['trx_id'] = $res['trx_id'];
+            $_SESSION['amount'] = $total;
+            $_SESSION['qr_img'] = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=" . urlencode($payload);
+            $_SESSION['expiry_time'] = time() + (15 * 60); // Waktu 15 Menit
+            
+            header("Location: checkout.php"); exit;
+        }
+    }
+}
+?&gt;
+
+&lt;!DOCTYPE html&gt;
+&lt;html lang="id"&gt;
+&lt;head&gt;
+    &lt;title&gt;Secure Checkout&lt;/title&gt;
+    &lt;script src="https://cdn.tailwindcss.com"&gt;&lt;/script&gt;
+    &lt;script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body class="bg-slate-100 flex items-center justify-center min-h-screen"&gt;
+    &lt;div class="w-full max-w-sm bg-white rounded-3xl shadow-xl p-8 text-center"&gt;
+        &lt;h1 class="font-bold text-2xl mb-6 text-slate-800"&gt;Payment Gateway&lt;/h1&gt;
+
+        &lt;?php if (isset($_SESSION['trx_id'])): ?&gt;
+            &lt;img src="&lt;?php echo $_SESSION['qr_img']; ?&gt;" class="w-60 h-60 mx-auto mb-4 border rounded-xl p-2"&gt;
+            &lt;div class="bg-indigo-600 p-4 rounded-2xl text-white mb-6"&gt;
+                &lt;p class="text-xs opacity-70"&gt;Transfer Tepat&lt;/p&gt;
+                &lt;h2 class="text-3xl font-black"&gt;Rp &lt;?php echo number_format($_SESSION['amount'], 0, ',', '.'); ?&gt;&lt;/h2&gt;
+            &lt;/div&gt;
+            &lt;p class="text-sm font-bold text-orange-500 animate-pulse mb-6"&gt;Menunggu Pembayaran...&lt;/p&gt;
+            &lt;button onclick="location.href='?action=reset'" class="text-xs text-slate-400 underline"&gt;Batalkan&lt;/button&gt;
+
+            &lt;script&gt;
+                // Polling ke backend PHP kita sendiri setiap 5 detik (Keamanan Tinggi)
+                setInterval(() =&gt; {
+                    fetch('?check_status=1').then(r=&gt;r.json()).then(d =&gt; {
+                        if(d.status === 'success') {
+                            Swal.fire({ icon: 'success', title: 'LUNAS!', text: 'Sistem telah memvalidasi pembayaran Anda.', allowOutsideClick: false })
+                            .then(()=&gt;location.href='?action=reset');
+                        } else if (d.status === 'expired') { 
+                            Swal.fire({icon:'error', title:'Kedaluwarsa'}).then(()=&gt;location.reload());
+                        }
+                    });
+                }, 5000);
+            &lt;/script&gt;
+        &lt;?php else: ?&gt;
+            &lt;form method="POST"&gt;
+                &lt;input type="number" name="amount" class="w-full p-4 border-2 border-slate-200 rounded-xl mb-4 font-bold text-center outline-none focus:border-indigo-600" placeholder="Minimal 1000" required&gt;
+                &lt;button class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-indigo-600 transition"&gt;BUAT TAGIHAN&lt;/button&gt;
+            &lt;/form&gt;
+        &lt;?php endif; ?&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+            </div>
+        </section>
+
+        <!-- KODE ERROR -->
+        <section id="errors" class="mb-20">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 border-b border-slate-200 pb-2">Daftar Kode Error</h2>
+            <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                <table class="api-table m-0">
+                    <thead><tr class="bg-slate-50"><th class="w-1/3">Pesan Error (message)</th><th>Penjelasan & Solusi</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><code class="text-red-600 font-bold">API Key Required</code></td>
+                            <td class="text-slate-600">Parameter <code>api_key</code> tidak terdeteksi. Pastikan dikirim dalam body request.</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-red-600 font-bold">Kredensial tidak valid</code></td>
+                            <td class="text-slate-600">Kombinasi API Key & User ID salah, atau Akun Anda sedang diblokir.</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-red-600 font-bold">IP ... tidak terdaftar</code></td>
+                            <td class="text-slate-600">Sistem keamanan kami menolak request ini. Tambahkan IP Server Anda di menu Integrasi H2H MyQris.</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-red-600 font-bold">Minimal Rp 1.000</code></td>
+                            <td class="text-slate-600">Sistem tidak menerima nilai di bawah batas minimum QRIS.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer class="text-center text-slate-400 text-xs py-10 border-t border-slate-200 mt-10">
+            &copy; 2026 PT Neticon Pay Indonesia. Mengutamakan Keamanan Transaksi Anda.
+        </footer>
+
+    </main>
+
+    <!-- NOTIFIKASI COPY -->
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-bold shadow-2xl opacity-0 transition-all pointer-events-none z-[200] flex items-center gap-2 border border-slate-700">
+        <i class="fa-solid fa-circle-check text-green-400"></i> Berhasil disalin!
+    </div>
+
+    <!-- Script Prism untuk Highlight Syntax -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-php.min.js"></script>
+    
+    <script>
+        // Logika Copy Text yang sangat andal (Mendukung semua perangkat & browser)
+        function copyToClipboard(text, btnElement) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                
+                // Efek Visual Tombol Berubah Hijau (Sukses)
+                if(btnElement) {
+                    const originalHtml = btnElement.innerHTML;
+                    btnElement.classList.add('copied');
+                    btnElement.innerHTML = '<i class="fa-solid fa-check"></i> Tersalin';
+                    
+                    setTimeout(() => {
+                        btnElement.classList.remove('copied');
+                        btnElement.innerHTML = originalHtml;
+                    }, 2500);
+                }
+                
+                showToast();
+            } catch (err) {
+                console.error('Gagal menyalin teks', err);
+                alert('Gagal menyalin teks. Silakan salin manual.');
+            }
+            
+            document.body.removeChild(textarea);
+        }
+
+        function copyTextDirect(btnElement, id) {
+            const text = document.getElementById(id).innerText;
+            copyToClipboard(text, btnElement);
+        }
+
+        function copyCodeBlock(btnElement, codeId) {
+            // Mengambil text murni dari tag code (tanpa format HTML)
+            const codeElement = document.getElementById(codeId);
+            const textToCopy = codeElement.textContent || codeElement.innerText;
+            copyToClipboard(textToCopy, btnElement);
+        }
+
+        function showToast() {
+            const t = document.getElementById('toast');
+            t.style.opacity = '1'; t.style.transform = 'translate(-50%, -10px)';
+            setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translate(-50%, 0)'; }, 2000);
+        }
+
+        // Active Sidebar Scroll Spy
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('section');
+            let current = 'intro';
+            sections.forEach(s => { if (window.pageYOffset >= s.offsetTop - 150) current = s.getAttribute('id'); });
+            document.querySelectorAll('.nav-link').forEach(l => {
+                l.classList.remove('active', 'bg-indigo-50', 'text-indigo-600');
+                if (l.getAttribute('href') === `#${current}`) l.classList.add('active', 'bg-indigo-50', 'text-indigo-600');
+            });
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e74200ee9a45ff2',t:'MTc3NTM0NTY4MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

@@ -24,7 +24,7 @@ func (r *NotificationRepo) FindByUserID(userID uuid.UUID, page, limit int) ([]mo
 	var total int64
 	q := r.db.Model(&model.Notification{}).Where("user_id = ?", userID)
 	q.Count(&total)
-	err := q.Offset((page-1)*limit).Limit(limit).
+	err := q.Offset((page - 1) * limit).Limit(limit).
 		Order("created_at DESC").
 		Find(&notifs).Error
 	return notifs, total, err

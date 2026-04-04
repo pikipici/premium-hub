@@ -31,7 +31,7 @@ func (r *ClaimRepo) FindByUserID(userID uuid.UUID, page, limit int) ([]model.Cla
 	q := r.db.Model(&model.Claim{}).Where("user_id = ?", userID)
 	q.Count(&total)
 	err := q.Preload("Order").
-		Offset((page-1)*limit).Limit(limit).
+		Offset((page - 1) * limit).Limit(limit).
 		Order("created_at DESC").
 		Find(&claims).Error
 	return claims, total, err
@@ -50,7 +50,7 @@ func (r *ClaimRepo) AdminList(status string, page, limit int) ([]model.Claim, in
 	}
 	q.Count(&total)
 	err := q.Preload("User").Preload("Order").
-		Offset((page-1)*limit).Limit(limit).
+		Offset((page - 1) * limit).Limit(limit).
 		Order("created_at DESC").
 		Find(&claims).Error
 	return claims, total, err

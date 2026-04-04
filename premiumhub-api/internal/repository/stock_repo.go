@@ -56,7 +56,7 @@ func (r *StockRepo) List(productID *uuid.UUID, status string, page, limit int) (
 	}
 	q.Count(&total)
 	err := q.Preload("Product").
-		Offset((page-1)*limit).Limit(limit).
+		Offset((page - 1) * limit).Limit(limit).
 		Order("created_at DESC").
 		Find(&stocks).Error
 	return stocks, total, err
