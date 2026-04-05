@@ -79,6 +79,26 @@ find_backend_entry() {
   return 1
 }
 
+wait_for_http() {
+  local url="$1"
+  local label="$2"
+  local attempts="${3:-15}"
+  local sleep_s="${4:-2}"
+
+  local i
+  for ((i=1; i<=attempts; i++)); do
+    if curl -fsS "${url}" >/dev/null; then
+      log_ok "${label} healthy (${url})"
+      return 0
+    fi
+    log_warn "${label} belum ready (attempt ${i}/${attempts}), retry ${sleep_s}s..."
+    sleep "${sleep_s}"
+  done
+
+  log_err "${label} tidak healthy setelah ${attempts} percobaan: ${url}"
+  return 1
+}
+
 # ---------- Precheck ----------
 step_start "PRECHECK"
 command -v git >/dev/null
@@ -190,16 +210,12 @@ step_done "RESTART SERVICES"
 step_start "POST-RESTART HEALTHCHECK"
 
 log_info "Checking frontend endpoint: ${FE_HEALTH_URL}"
-curl -fsS "${FE_HEALTH_URL}" >/dev/null
-log_ok "Frontend endpoint healthy"
+wait_for_http "${FE_HEALTH_URL}" "Frontend" 20 1
 
 log_info "Checking backend endpoint: ${BE_HEALTH_URL}"
-if curl -fsS "${BE_HEALTH_URL}" >/dev/null; then
-  log_ok "Backend endpoint healthy (${BE_HEALTH_URL})"
-else
+if ! wait_for_http "${BE_HEALTH_URL}" "Backend(primary)" 10 1; then
   log_warn "Primary backend health failed, trying fallback: ${BE_HEALTH_FALLBACK_URL}"
-  curl -fsS "${BE_HEALTH_FALLBACK_URL}" >/dev/null
-  log_ok "Backend endpoint healthy via fallback (${BE_HEALTH_FALLBACK_URL})"
+  wait_for_http "${BE_HEALTH_FALLBACK_URL}" "Backend(fallback)" 10 1
 fi
 
 step_done "POST-RESTART HEALTHCHECK"
