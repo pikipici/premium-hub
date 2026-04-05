@@ -3,7 +3,7 @@ import type { ApiResponse } from '@/types/api'
 import type { Order } from '@/types/order'
 
 export const orderService = {
-  create: async (data: { price_id: string }) => {
+  create: async (data: { price_id: string; payment_method?: string }) => {
     const res = await api.post<ApiResponse<Order>>('/orders', data)
     return res.data
   },

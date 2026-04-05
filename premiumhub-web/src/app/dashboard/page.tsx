@@ -2,15 +2,21 @@
 
 import { useAuthStore } from '@/store/authStore'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { orderService } from '@/services/orderService'
+import { walletService } from '@/services/walletService'
 import { formatRupiah } from '@/lib/utils'
 import type { Order } from '@/types/order'
 import Link from 'next/link'
+import WalletCard from '@/components/shared/WalletCard'
 import { ShoppingBag, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
 
 export default function DashboardPage() {
-  const { user } = useAuthStore()
+  const router = useRouter()
+  const { user, setWalletBalance } = useAuthStore()
   const [orders, setOrders] = useState<Order[]>([])
+  const [wallet, setWallet] = useState({ balance: 0, totalTopup: 0, totalSpent: 0 })
+  const [walletLoading, setWalletLoading] = useState(true)
 
   useEffect(() => {
     orderService.list({ limit: 5 }).then(res => {
@@ -18,12 +24,34 @@ export default function DashboardPage() {
     }).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    walletService.getWallet()
+      .then((res) => {
+        setWallet({
+          balance: res.balance,
+          totalTopup: res.total_topup ?? 0,
+          totalSpent: res.total_spent ?? 0,
+        })
+        setWalletBalance(res.balance)
+      })
+      .catch(() => {})
+      .finally(() => setWalletLoading(false))
+  }, [setWalletBalance])
+
   const activeOrders = orders.filter(o => o.order_status === 'active')
   const pendingOrders = orders.filter(o => o.payment_status === 'pending')
 
   return (
     <div>
       <h1 className="text-2xl font-extrabold mb-6">Halo, {user?.name}! 👋</h1>
+
+      <WalletCard
+        balance={wallet.balance}
+        totalTopup={wallet.totalTopup}
+        totalSpent={wallet.totalSpent}
+        loading={walletLoading}
+        onTopUp={() => router.push('/dashboard/wallet')}
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

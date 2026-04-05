@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
-import { LayoutDashboard, ShoppingBag, History, ShieldCheck, Bell, UserCircle, LogOut } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, History, ShieldCheck, Bell, UserCircle, LogOut, Wallet } from 'lucide-react'
 
 const MENU = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/dashboard/wallet', icon: Wallet, label: 'Wallet' },
   { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Akun Aktif' },
   { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order' },
   { href: '/dashboard/klaim-garansi', icon: ShieldCheck, label: 'Klaim Garansi' },
@@ -22,7 +23,9 @@ export default function DashboardSidebar() {
     <aside className="w-64 bg-white border-r border-[#EBEBEB] min-h-screen py-6 px-4 hidden md:block">
       <nav className="space-y-1">
         {MENU.map(item => {
-          const active = pathname === item.href
+          const active = item.href === '/dashboard'
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (
             <Link
               key={item.href}

@@ -5,7 +5,9 @@ import type { User } from '@/types/user'
 interface AuthState {
   user: User | null
   isAuthenticated: boolean
+  walletBalance: number
   setUser: (u: User | null) => void
+  setWalletBalance: (balance: number) => void
   logout: () => void
 }
 
@@ -14,8 +16,10 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       isAuthenticated: false,
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
-      logout: () => set({ user: null, isAuthenticated: false }),
+      walletBalance: 0,
+      setUser: (user) => set({ user, isAuthenticated: !!user, walletBalance: 0 }),
+      setWalletBalance: (walletBalance) => set({ walletBalance }),
+      logout: () => set({ user: null, isAuthenticated: false, walletBalance: 0 }),
     }),
     { name: 'premiumhub-auth' }
   )

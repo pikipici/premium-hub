@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useAuthStore } from '@/store/authStore'
 import { useState } from 'react'
 import { Menu, X, ShoppingBag, User, LogOut, LayoutDashboard, Shield } from 'lucide-react'
+import WalletBadge from '@/components/shared/WalletBadge'
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuthStore()
@@ -39,6 +40,7 @@ export default function Navbar() {
                 <Link href="/dashboard" className="flex items-center gap-1.5 text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">
                   <LayoutDashboard className="w-4 h-4" /> Dashboard
                 </Link>
+                <WalletBadge />
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-[#F7F7F5] rounded-full">
                   <User className="w-4 h-4 text-[#888]" />
                   <span className="text-sm font-medium">{user?.name}</span>
@@ -73,6 +75,7 @@ export default function Navbar() {
             {isAuthenticated ? (
               <>
                 <Link href="/dashboard" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Dashboard</Link>
+                <Link href="/dashboard/wallet" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Wallet</Link>
                 {user?.role === 'admin' && <Link href="/admin" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Admin Panel</Link>}
                 <button onClick={() => { logout(); setOpen(false) }} className="block text-sm font-medium text-red-500 py-2">Logout</button>
               </>
