@@ -5,10 +5,26 @@ import { useAuthStore } from '@/store/authStore'
 import { useState } from 'react'
 import { Menu, X, ShoppingBag, User, LogOut, LayoutDashboard, Shield } from 'lucide-react'
 import WalletBadge from '@/components/shared/WalletBadge'
+import { authService } from '@/services/authService'
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuthStore()
   const [open, setOpen] = useState(false)
+  const [logouting, setLogouting] = useState(false)
+
+  const handleLogout = async () => {
+    if (logouting) return
+    setLogouting(true)
+    try {
+      await authService.logout()
+    } catch {
+      // Ignore API logout failure, local state still needs to be cleared.
+    } finally {
+      logout()
+      setOpen(false)
+      setLogouting(false)
+    }
+  }
 
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-[#EBEBEB]">
@@ -45,7 +61,7 @@ export default function Navbar() {
                   <User className="w-4 h-4 text-[#888]" />
                   <span className="text-sm font-medium">{user?.name}</span>
                 </div>
-                <button onClick={logout} className="p-2 text-[#888] hover:text-red-500 transition-colors">
+                <button onClick={handleLogout} className="p-2 text-[#888] hover:text-red-500 transition-colors" disabled={logouting}>
                   <LogOut className="w-4 h-4" />
                 </button>
               </>
@@ -77,7 +93,7 @@ export default function Navbar() {
                 <Link href="/dashboard" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Dashboard</Link>
                 <Link href="/dashboard/wallet" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Wallet</Link>
                 {user?.role === 'admin' && <Link href="/admin" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Admin Panel</Link>}
-                <button onClick={() => { logout(); setOpen(false) }} className="block text-sm font-medium text-red-500 py-2">Logout</button>
+                <button onClick={handleLogout} className="block text-sm font-medium text-red-500 py-2" disabled={logouting}>Logout</button>
               </>
             ) : (
               <div className="flex gap-3 pt-2">

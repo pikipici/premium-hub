@@ -2,11 +2,13 @@
 
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/store/authStore'
+import { getHttpErrorMessage } from '@/lib/httpError'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
 
 export default function LoginPage() {
@@ -27,12 +29,28 @@ export default function LoginPage() {
         setUser(res.data.user)
         router.push(res.data.user.role === 'admin' ? '/admin' : '/dashboard')
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login gagal')
+    } catch (err: unknown) {
+      setError(getHttpErrorMessage(err, 'Login gagal'))
     } finally {
       setLoading(false)
     }
   }
+
+  const handleGoogleToken = useCallback(async (idToken: string) => {
+    setError('')
+    setLoading(true)
+    try {
+      const res = await authService.googleLogin({ id_token: idToken })
+      if (res.success) {
+        setUser(res.data.user)
+        router.push(res.data.user.role === 'admin' ? '/admin' : '/dashboard')
+      }
+    } catch (err: unknown) {
+      setError(getHttpErrorMessage(err, 'Login Google gagal'))
+    } finally {
+      setLoading(false)
+    }
+  }, [setUser, router])
 
   return (
     <>
@@ -95,6 +113,19 @@ export default function LoginPage() {
                 {loading ? 'Memproses...' : <><LogIn className="w-4 h-4" /> Masuk</>}
               </button>
             </form>
+
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-[#EBEBEB]" />
+              <span className="text-xs text-[#888] font-medium">atau</span>
+              <div className="h-px flex-1 bg-[#EBEBEB]" />
+            </div>
+
+            <GoogleSignInButton
+              mode="login"
+              disabled={loading}
+              onToken={handleGoogleToken}
+              onError={setError}
+            />
 
             <p className="text-center text-sm text-[#888] mt-6">
               Belum punya akun?{' '}

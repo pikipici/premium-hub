@@ -31,6 +31,12 @@ func (r *UserRepo) FindByID(id uuid.UUID) (*model.User, error) {
 	return &user, err
 }
 
+func (r *UserRepo) FindByGoogleSub(sub string) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("google_sub = ?", sub).First(&user).Error
+	return &user, err
+}
+
 func (r *UserRepo) Update(user *model.User) error {
 	return r.db.Save(user).Error
 }

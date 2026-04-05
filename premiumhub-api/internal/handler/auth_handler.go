@@ -2,7 +2,9 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
+	"premiumhub-api/config"
 	"premiumhub-api/internal/service"
 	"premiumhub-api/pkg/response"
 
@@ -12,10 +14,11 @@ import (
 
 type AuthHandler struct {
 	authSvc *service.AuthService
+	cfg     *config.Config
 }
 
-func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
-	return &AuthHandler{authSvc: authSvc}
+func NewAuthHandler(authSvc *service.AuthService, cfg *config.Config) *AuthHandler {
+	return &AuthHandler{authSvc: authSvc, cfg: cfg}
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -31,7 +34,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("access_token", res.Token, 86400, "/", "", false, true)
+	h.setAuthCookie(c, res.Token, 86400)
 	response.Created(c, "Registrasi berhasil", res)
 }
 
@@ -48,12 +51,30 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("access_token", res.Token, 86400, "/", "", false, true)
+	h.setAuthCookie(c, res.Token, 86400)
 	response.Success(c, "Login berhasil", res)
 }
 
+func (h *AuthHandler) GoogleLogin(c *gin.Context) {
+	var input service.GoogleLoginInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	res, err := h.authSvc.LoginWithGoogle(c.Request.Context(), input)
+	if err != nil {
+		status := statusFromGoogleLoginError(err.Error())
+		response.Error(c, status, err.Error())
+		return
+	}
+
+	h.setAuthCookie(c, res.Token, 86400)
+	response.Success(c, "Login Google berhasil", res)
+}
+
 func (h *AuthHandler) Logout(c *gin.Context) {
-	c.SetCookie("access_token", "", -1, "/", "", false, true)
+	h.setAuthCookie(c, "", -1)
 	response.Success(c, "Logout berhasil", nil)
 }
 
@@ -94,4 +115,46 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 	response.Success(c, "Password berhasil diubah", nil)
+}
+
+func (h *AuthHandler) setAuthCookie(c *gin.Context, token string, maxAge int) {
+	domain := ""
+	secure := false
+	sameSite := http.SameSiteLaxMode
+
+	if h.cfg != nil {
+		domain = strings.TrimSpace(h.cfg.CookieDomain)
+		secure = h.cfg.CookieSecure
+		sameSite = parseSameSiteMode(h.cfg.CookieSameSite)
+	}
+
+	if sameSite == http.SameSiteNoneMode {
+		secure = true
+	}
+
+	c.SetSameSite(sameSite)
+	c.SetCookie("access_token", token, maxAge, "/", domain, secure, true)
+}
+
+func parseSameSiteMode(v string) http.SameSite {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	default:
+		return http.SameSiteLaxMode
+	}
+}
+
+func statusFromGoogleLoginError(msg string) int {
+	s := strings.ToLower(strings.TrimSpace(msg))
+	switch {
+	case strings.Contains(s, "belum dikonfigurasi"), strings.Contains(s, "verifier"):
+		return http.StatusServiceUnavailable
+	case strings.Contains(s, "token"), strings.Contains(s, "terverifikasi"), strings.Contains(s, "tidak cocok"):
+		return http.StatusUnauthorized
+	default:
+		return http.StatusBadRequest
+	}
 }

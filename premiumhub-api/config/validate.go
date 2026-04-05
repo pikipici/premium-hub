@@ -2,7 +2,9 @@ package config
 
 import (
 	"errors"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func (c *Config) Validate() error {
@@ -12,6 +14,34 @@ func (c *Config) Validate() error {
 	jwtSecret := strings.TrimSpace(c.JWTSecret)
 	if jwtSecret == "" || strings.Contains(jwtSecret, "changeme-secret") {
 		problems = append(problems, "JWT_SECRET belum aman (masih default/kosong)")
+	}
+	if len(jwtSecret) > 0 && len(jwtSecret) < 32 {
+		problems = append(problems, "JWT_SECRET minimal 32 karakter")
+	}
+
+	sameSite := strings.ToLower(strings.TrimSpace(c.CookieSameSite))
+	if sameSite == "" {
+		sameSite = "lax"
+	}
+	switch sameSite {
+	case "lax", "strict", "none":
+	default:
+		problems = append(problems, "COOKIE_SAMESITE harus salah satu: lax|strict|none")
+	}
+	if sameSite == "none" && !c.CookieSecure {
+		problems = append(problems, "COOKIE_SECURE wajib true kalau COOKIE_SAMESITE=none")
+	}
+
+	if v := strings.TrimSpace(c.AuthRateLimitMax); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			problems = append(problems, "AUTH_RATE_LIMIT_MAX harus angka > 0")
+		}
+	}
+	if v := strings.TrimSpace(c.AuthRateLimitWindow); v != "" {
+		if _, err := time.ParseDuration(v); err != nil {
+			problems = append(problems, "AUTH_RATE_LIMIT_WINDOW harus format duration valid (contoh: 1m, 30s)")
+		}
 	}
 
 	if appEnv == "production" {

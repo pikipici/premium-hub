@@ -37,7 +37,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
 
 	// Handlers
-	authHandler := handler.NewAuthHandler(authSvc)
+	authHandler := handler.NewAuthHandler(authSvc, cfg)
 	productHandler := handler.NewProductHandler(productSvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
@@ -51,8 +51,10 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	// Public routes
 	auth := api.Group("/auth")
+	auth.Use(middleware.NewAuthRateLimiter(cfg.AuthRateLimitMax, cfg.AuthRateLimitWindow))
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
+	auth.POST("/google", authHandler.GoogleLogin)
 	auth.POST("/logout", authHandler.Logout)
 
 	products := api.Group("/products")

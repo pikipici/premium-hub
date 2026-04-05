@@ -2,11 +2,13 @@
 
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/store/authStore'
+import { getHttpErrorMessage } from '@/lib/httpError'
 import { Eye, EyeOff, UserPlus } from 'lucide-react'
 
 export default function RegisterPage() {
@@ -20,8 +22,14 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (form.password !== form.confirm) { setError('Password tidak sama'); return }
-    if (form.password.length < 6) { setError('Password minimal 6 karakter'); return }
+    if (form.password !== form.confirm) {
+      setError('Password tidak sama')
+      return
+    }
+    if (form.password.length < 6) {
+      setError('Password minimal 6 karakter')
+      return
+    }
 
     setLoading(true)
     try {
@@ -30,12 +38,28 @@ export default function RegisterPage() {
         setUser(res.data.user)
         router.push('/dashboard')
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registrasi gagal')
+    } catch (err: unknown) {
+      setError(getHttpErrorMessage(err, 'Registrasi gagal'))
     } finally {
       setLoading(false)
     }
   }
+
+  const handleGoogleToken = useCallback(async (idToken: string) => {
+    setError('')
+    setLoading(true)
+    try {
+      const res = await authService.googleLogin({ id_token: idToken })
+      if (res.success) {
+        setUser(res.data.user)
+        router.push('/dashboard')
+      }
+    } catch (err: unknown) {
+      setError(getHttpErrorMessage(err, 'Google signup gagal'))
+    } finally {
+      setLoading(false)
+    }
+  }, [router, setUser])
 
   return (
     <>
@@ -94,6 +118,19 @@ export default function RegisterPage() {
                 {loading ? 'Memproses...' : <><UserPlus className="w-4 h-4" /> Daftar</>}
               </button>
             </form>
+
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-[#EBEBEB]" />
+              <span className="text-xs text-[#888] font-medium">atau</span>
+              <div className="h-px flex-1 bg-[#EBEBEB]" />
+            </div>
+
+            <GoogleSignInButton
+              mode="signup"
+              disabled={loading}
+              onToken={handleGoogleToken}
+              onError={setError}
+            />
 
             <p className="text-center text-sm text-[#888] mt-6">
               Sudah punya akun?{' '}

@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -15,15 +16,23 @@ type Config struct {
 	NeticonBaseURL, NeticonAPIKey, NeticonUserID, NeticonHTTPTimeoutSec string
 	WalletTopupExpiryMinutes                                            string
 	SMTPHost, SMTPPort, SMTPUser, SMTPPass, FrontendURL                 string
+	CookieDomain, CookieSameSite                                        string
+	CookieSecure                                                        bool
+	GoogleClientID                                                      string
+	AuthRateLimitMax, AuthRateLimitWindow                               string
 }
 
 func Load() *Config {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file")
 	}
+
+	appEnv := e("APP_ENV", "development")
+	isProd := strings.EqualFold(strings.TrimSpace(appEnv), "production")
+
 	return &Config{
 		AppPort:                  e("APP_PORT", "8080"),
-		AppEnv:                   e("APP_ENV", "development"),
+		AppEnv:                   appEnv,
 		DBHost:                   e("DB_HOST", "localhost"),
 		DBPort:                   e("DB_PORT", "5432"),
 		DBUser:                   e("DB_USER", "postgres"),
@@ -44,6 +53,12 @@ func Load() *Config {
 		SMTPUser:                 e("SMTP_USER", ""),
 		SMTPPass:                 e("SMTP_PASS", ""),
 		FrontendURL:              e("FRONTEND_URL", "http://localhost:3000"),
+		CookieDomain:             e("COOKIE_DOMAIN", ""),
+		CookieSameSite:           e("COOKIE_SAMESITE", "lax"),
+		CookieSecure:             eb("COOKIE_SECURE", isProd),
+		GoogleClientID:           e("GOOGLE_CLIENT_ID", ""),
+		AuthRateLimitMax:         e("AUTH_RATE_LIMIT_MAX", "20"),
+		AuthRateLimitWindow:      e("AUTH_RATE_LIMIT_WINDOW", "1m"),
 	}
 }
 
@@ -52,4 +67,21 @@ func e(k, fb string) string {
 		return v
 	}
 	return fb
+}
+
+func eb(k string, fb bool) bool {
+	v, ok := os.LookupEnv(k)
+	if !ok {
+		return fb
+	}
+
+	s := strings.TrimSpace(strings.ToLower(v))
+	switch s {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fb
+	}
 }

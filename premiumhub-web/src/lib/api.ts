@@ -6,10 +6,19 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/google']
+
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) window.location.href = '/login'
+    const status = err.response?.status
+    const url = String(err.config?.url || '')
+    const isAuthEndpoint = AUTH_ENDPOINTS.some((ep) => url.includes(ep))
+
+    if (typeof window !== 'undefined' && status === 401 && !isAuthEndpoint) {
+      window.location.href = '/login'
+    }
+
     return Promise.reject(err)
   }
 )

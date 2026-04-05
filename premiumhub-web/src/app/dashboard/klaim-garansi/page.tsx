@@ -5,6 +5,7 @@ import { claimService } from '@/services/claimService'
 import type { Claim } from '@/types/order'
 import { useEffect } from 'react'
 import { ShieldCheck, Send } from 'lucide-react'
+import { getHttpErrorMessage } from '@/lib/httpError'
 
 const REASONS = [
   { value: 'login', label: 'Tidak bisa login' },
@@ -39,8 +40,8 @@ export default function KlaimGaransiPage() {
         // Refresh claims
         claimService.list({ limit: 50 }).then(r => { if (r.success) setClaims(r.data) })
       }
-    } catch (err: any) {
-      setMsg({ type: 'error', text: err.response?.data?.message || 'Gagal mengajukan klaim' })
+    } catch (err: unknown) {
+      setMsg({ type: 'error', text: getHttpErrorMessage(err, 'Gagal mengajukan klaim') })
     } finally {
       setLoading(false)
     }

@@ -33,12 +33,17 @@ function KatalogContent() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
     productService.list({ category: category || undefined, limit: 50 })
       .then(res => { if (res.success) setProducts(res.data) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [category])
+
+  const handleCategoryChange = (nextCategory: string) => {
+    if (nextCategory === category) return
+    setLoading(true)
+    setCategory(nextCategory)
+  }
 
   return (
     <>
@@ -58,7 +63,7 @@ function KatalogContent() {
             {CATEGORIES.map(cat => (
               <button
                 key={cat.value}
-                onClick={() => setCategory(cat.value)}
+                onClick={() => handleCategoryChange(cat.value)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                   category === cat.value
                     ? 'bg-[#141414] text-white'
