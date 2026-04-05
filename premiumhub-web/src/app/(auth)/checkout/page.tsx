@@ -18,7 +18,7 @@ type CheckoutPaymentMethod = 'midtrans' | 'wallet'
 export default function CheckoutPage() {
   const router = useRouter()
   const { item, clearCart } = useCartStore()
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, hasHydrated } = useAuthStore()
 
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>('midtrans')
   const [walletBalance, setWalletBalance] = useState(0)
@@ -28,12 +28,20 @@ export default function CheckoutPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!isAuthenticated) router.push('/login')
-    if (!item) router.push('/katalog')
-  }, [isAuthenticated, item, router])
+    if (!hasHydrated) return
+
+    if (!isAuthenticated) {
+      router.replace('/login')
+      return
+    }
+
+    if (!item) {
+      router.replace('/katalog')
+    }
+  }, [hasHydrated, isAuthenticated, item, router])
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!hasHydrated || !isAuthenticated) return
 
     walletService.getBalance()
       .then((res) => {
@@ -41,7 +49,7 @@ export default function CheckoutPage() {
       })
       .catch(() => {})
       .finally(() => setWalletLoading(false))
-  }, [isAuthenticated])
+  }, [hasHydrated, isAuthenticated])
 
   const hasEnoughWallet = item ? walletBalance >= item.price : false
 
@@ -105,7 +113,7 @@ export default function CheckoutPage() {
     }
   }
 
-  if (!item) return null
+  if (!hasHydrated || !item) return null
 
   return (
     <>

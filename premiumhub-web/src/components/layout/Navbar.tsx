@@ -8,9 +8,11 @@ import WalletBadge from '@/components/shared/WalletBadge'
 import { authService } from '@/services/authService'
 
 export default function Navbar() {
-  const { user, isAuthenticated, logout } = useAuthStore()
+  const { user, isAuthenticated, logout, hasHydrated } = useAuthStore()
   const [open, setOpen] = useState(false)
   const [logouting, setLogouting] = useState(false)
+
+  const showAuthenticated = hasHydrated && isAuthenticated
 
   const handleLogout = async () => {
     if (logouting) return
@@ -46,7 +48,7 @@ export default function Navbar() {
 
           {/* Desktop Auth */}
           <div className="hidden md:flex items-center gap-3">
-            {isAuthenticated ? (
+            {showAuthenticated ? (
               <>
                 {user?.role === 'admin' && (
                   <Link href="/admin" className="flex items-center gap-1.5 text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">
@@ -88,7 +90,7 @@ export default function Navbar() {
           <div className="md:hidden pb-4 border-t border-[#EBEBEB] mt-2 pt-4 space-y-3">
             <Link href="/katalog" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Katalog</Link>
             <Link href="/faq" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>FAQ</Link>
-            {isAuthenticated ? (
+            {showAuthenticated ? (
               <>
                 <Link href="/dashboard" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Dashboard</Link>
                 <Link href="/dashboard/wallet" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Wallet</Link>
