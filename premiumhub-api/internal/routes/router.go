@@ -121,6 +121,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	admin.GET("/users", adminHandler.ListUsers)
 	admin.PUT("/users/:id/block", adminHandler.BlockUser)
+	admin.POST("/wallet/topups/:id/recheck", walletHandler.AdminRecheckTopup)
 	admin.POST("/wallet/topups/reconcile", walletHandler.ReconcilePending)
 
 	return r

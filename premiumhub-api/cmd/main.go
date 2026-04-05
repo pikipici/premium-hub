@@ -8,6 +8,10 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("invalid config: %v", err)
+	}
+
 	db := config.InitDB(cfg)
 	r := routes.Setup(db, cfg)
 	log.Printf("Server running on :%s", cfg.AppPort)

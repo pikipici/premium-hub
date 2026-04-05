@@ -52,14 +52,7 @@ func (h *WalletHandler) CreateTopup(c *gin.Context) {
 
 func (h *WalletHandler) ListTopups(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 20
-	}
+	page, limit := parsePagination(c, 20, 100)
 
 	res, err := h.walletSvc.ListTopups(userID, page, limit)
 	if err != nil {
@@ -109,14 +102,7 @@ func (h *WalletHandler) CheckTopup(c *gin.Context) {
 
 func (h *WalletHandler) ListLedger(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 20
-	}
+	page, limit := parsePagination(c, 20, 100)
 
 	res, err := h.walletSvc.ListLedger(userID, page, limit)
 	if err != nil {
@@ -132,12 +118,49 @@ func (h *WalletHandler) ListLedger(c *gin.Context) {
 	})
 }
 
+func (h *WalletHandler) AdminRecheckTopup(c *gin.Context) {
+	topupID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID topup tidak valid")
+		return
+	}
+
+	res, err := h.walletSvc.AdminRecheckTopup(c.Request.Context(), topupID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "Recheck topup selesai", res)
+}
+
 func (h *WalletHandler) ReconcilePending(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
+	if limit <= 0 {
+		limit = 200
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
 	res, err := h.walletSvc.ReconcilePending(c.Request.Context(), limit)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 	response.Success(c, "Rekonsiliasi selesai", res)
+}
+
+func parsePagination(c *gin.Context, defaultLimit, maxLimit int) (int, int) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(defaultLimit)))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = defaultLimit
+	}
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+	return page, limit
 }

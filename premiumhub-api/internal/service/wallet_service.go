@@ -65,6 +65,7 @@ type WalletTopupResponse struct {
 	ProviderStatus  string     `json:"provider_status"`
 	IdempotencyKey  string     `json:"idempotency_key"`
 	ExpiresAt       time.Time  `json:"expires_at"`
+	IsOverdue       bool       `json:"is_overdue"`
 	LastCheckedAt   *time.Time `json:"last_checked_at"`
 	SettledAt       *time.Time `json:"settled_at"`
 	CreatedAt       time.Time  `json:"created_at"`
@@ -103,14 +104,18 @@ type WalletReconcileResult struct {
 }
 
 func (s *WalletService) GetBalance(userID uuid.UUID) (*WalletBalanceResponse, error) {
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.ensureActiveUser(userID)
 	if err != nil {
-		return nil, errors.New("user tidak ditemukan")
+		return nil, err
 	}
 	return &WalletBalanceResponse{Balance: user.WalletBalance}, nil
 }
 
 func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input CreateTopupInput) (*WalletTopupResponse, error) {
+	if _, err := s.ensureActiveUser(userID); err != nil {
+		return nil, err
+	}
+
 	amount := input.Amount
 	if amount < 1000 {
 		return nil, errors.New("minimal topup Rp 1.000")
@@ -175,6 +180,10 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 }
 
 func (s *WalletService) GetTopupByID(userID, topupID uuid.UUID) (*WalletTopupResponse, error) {
+	if _, err := s.ensureActiveUser(userID); err != nil {
+		return nil, err
+	}
+
 	topup, err := s.walletRepo.FindTopupByIDAndUser(topupID, userID)
 	if err != nil {
 		return nil, errors.New("topup tidak ditemukan")
@@ -183,6 +192,10 @@ func (s *WalletService) GetTopupByID(userID, topupID uuid.UUID) (*WalletTopupRes
 }
 
 func (s *WalletService) ListTopups(userID uuid.UUID, page, limit int) (*WalletTopupListResponse, error) {
+	if _, err := s.ensureActiveUser(userID); err != nil {
+		return nil, err
+	}
+
 	if page < 1 {
 		page = 1
 	}
@@ -207,6 +220,10 @@ func (s *WalletService) ListTopups(userID uuid.UUID, page, limit int) (*WalletTo
 }
 
 func (s *WalletService) ListLedger(userID uuid.UUID, page, limit int) (*WalletLedgerListResponse, error) {
+	if _, err := s.ensureActiveUser(userID); err != nil {
+		return nil, err
+	}
+
 	if page < 1 {
 		page = 1
 	}
@@ -241,39 +258,39 @@ func (s *WalletService) ListLedger(userID uuid.UUID, page, limit int) (*WalletLe
 }
 
 func (s *WalletService) CheckTopupStatus(ctx context.Context, userID, topupID uuid.UUID) (*WalletTopupResponse, error) {
+	if _, err := s.ensureActiveUser(userID); err != nil {
+		return nil, err
+	}
+
 	topup, err := s.walletRepo.FindTopupByIDAndUser(topupID, userID)
 	if err != nil {
 		return nil, errors.New("topup tidak ditemukan")
 	}
 
-	if topup.Status == "success" || topup.Status == "failed" || topup.Status == "expired" {
-		return toTopupResponse(topup), nil
-	}
-
-	statusRes, raw, err := s.neticon.CheckStatus(ctx, topup.ProviderTrxID)
-	if err != nil {
-		return nil, fmt.Errorf("gagal cek status topup: %w", err)
-	}
-
-	mapped := mapProviderStatus(statusRes.Status)
-	switch mapped {
-	case "success":
-		if err := s.settleSuccess(topup.ID, statusRes.Status, raw); err != nil {
-			return nil, err
-		}
-	case "failed", "expired":
-		if err := s.markFinalStatus(topup.ID, mapped, statusRes.Status, raw); err != nil {
-			return nil, err
-		}
-	default:
-		if err := s.touchPending(topup.ID, statusRes.Status, raw); err != nil {
-			return nil, err
-		}
+	if err := s.syncTopupStatus(ctx, topup); err != nil {
+		return nil, err
 	}
 
 	updated, err := s.walletRepo.FindTopupByIDAndUser(topupID, userID)
 	if err != nil {
 		return nil, errors.New("gagal memuat status topup")
+	}
+	return toTopupResponse(updated), nil
+}
+
+func (s *WalletService) AdminRecheckTopup(ctx context.Context, topupID uuid.UUID) (*WalletTopupResponse, error) {
+	topup, err := s.walletRepo.FindTopupByID(topupID)
+	if err != nil {
+		return nil, errors.New("topup tidak ditemukan")
+	}
+
+	if err := s.syncTopupStatus(ctx, topup); err != nil {
+		return nil, err
+	}
+
+	updated, err := s.walletRepo.FindTopupByID(topupID)
+	if err != nil {
+		return nil, errors.New("gagal memuat topup")
 	}
 	return toTopupResponse(updated), nil
 }
@@ -296,36 +313,25 @@ func (s *WalletService) ReconcilePending(ctx context.Context, limit int) (*Walle
 		topup := topups[i]
 		result.Checked++
 
-		statusRes, raw, err := s.neticon.CheckStatus(ctx, topup.ProviderTrxID)
-		if err != nil {
+		if err := s.syncTopupStatus(ctx, &topup); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", topup.ID.String(), err))
 			continue
 		}
 
-		switch mapProviderStatus(statusRes.Status) {
+		updated, err := s.walletRepo.FindTopupByID(topup.ID)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: gagal memuat status terbaru", topup.ID.String()))
+			continue
+		}
+
+		switch updated.Status {
 		case "success":
-			if err := s.settleSuccess(topup.ID, statusRes.Status, raw); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", topup.ID.String(), err))
-				continue
-			}
 			result.Settled++
 		case "failed":
-			if err := s.markFinalStatus(topup.ID, "failed", statusRes.Status, raw); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", topup.ID.String(), err))
-				continue
-			}
 			result.Failed++
 		case "expired":
-			if err := s.markFinalStatus(topup.ID, "expired", statusRes.Status, raw); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", topup.ID.String(), err))
-				continue
-			}
 			result.Expired++
 		default:
-			if err := s.touchPending(topup.ID, statusRes.Status, raw); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", topup.ID.String(), err))
-				continue
-			}
 			result.Pending++
 		}
 	}
@@ -335,6 +341,27 @@ func (s *WalletService) ReconcilePending(ctx context.Context, limit int) (*Walle
 	}
 
 	return result, nil
+}
+
+func (s *WalletService) syncTopupStatus(ctx context.Context, topup *model.WalletTopup) error {
+	if topup.Status == "success" || topup.Status == "failed" || topup.Status == "expired" {
+		return nil
+	}
+
+	statusRes, raw, err := s.neticon.CheckStatus(ctx, topup.ProviderTrxID)
+	if err != nil {
+		return fmt.Errorf("gagal cek status topup: %w", err)
+	}
+
+	mapped := mapProviderStatus(statusRes.Status)
+	switch mapped {
+	case "success":
+		return s.settleSuccess(topup.ID, statusRes.Status, raw)
+	case "failed", "expired":
+		return s.markFinalStatus(topup.ID, mapped, statusRes.Status, raw)
+	default:
+		return s.touchPending(topup.ID, statusRes.Status, raw)
+	}
 }
 
 func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, raw []byte) error {
@@ -466,13 +493,19 @@ func (s *WalletService) touchPending(topupID uuid.UUID, providerStatus string, r
 		topup.LastCheckedAt = &now
 		topup.ProviderStatus = strings.ToLower(strings.TrimSpace(providerStatus))
 		topup.RawResponse = string(raw)
-
-		if topup.Status == "pending" && now.After(topup.ExpiresAt) {
-			topup.Status = "expired"
-		}
-
 		return s.walletRepo.SaveTopupTx(tx, topup)
 	})
+}
+
+func (s *WalletService) ensureActiveUser(userID uuid.UUID) (*model.User, error) {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return nil, errors.New("user tidak ditemukan")
+	}
+	if !user.IsActive {
+		return nil, errors.New("akun diblokir")
+	}
+	return user, nil
 }
 
 func normalizeIdempotencyKey(key string) string {
@@ -510,6 +543,9 @@ func mapProviderStatus(status string) string {
 }
 
 func toTopupResponse(topup *model.WalletTopup) *WalletTopupResponse {
+	now := time.Now()
+	isOverdue := topup.Status == "pending" && now.After(topup.ExpiresAt)
+
 	return &WalletTopupResponse{
 		ID:              topup.ID.String(),
 		Provider:        topup.Provider,
@@ -521,6 +557,7 @@ func toTopupResponse(topup *model.WalletTopup) *WalletTopupResponse {
 		ProviderStatus:  topup.ProviderStatus,
 		IdempotencyKey:  topup.IdempotencyKey,
 		ExpiresAt:       topup.ExpiresAt,
+		IsOverdue:       isOverdue,
 		LastCheckedAt:   topup.LastCheckedAt,
 		SettledAt:       topup.SettledAt,
 		CreatedAt:       topup.CreatedAt,
