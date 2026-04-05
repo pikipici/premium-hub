@@ -309,8 +309,17 @@ function orderStatusMeta(status?: string) {
   }
 }
 
-function formatProviderPrice(price: number): string {
-  return `US$ ${price.toFixed(price >= 1 ? 2 : 4)}`
+function calculateWalletDebit(providerPrice: number, multiplier: number, minDebit: number): number {
+  if (!Number.isFinite(providerPrice) || providerPrice <= 0) return 0
+
+  const safeMultiplier = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : FALLBACK_WALLET_MULTIPLIER
+  const safeMinDebit = Number.isFinite(minDebit) && minDebit > 0 ? Math.ceil(minDebit) : FALLBACK_WALLET_MIN_DEBIT
+
+  return Math.max(safeMinDebit, Math.ceil(providerPrice * safeMultiplier))
+}
+
+function formatWalletRupiah(value: number): string {
+  return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
 }
 
 function formatOrderDate(value?: string): string {
@@ -434,7 +443,7 @@ export default function NomorVirtualPage() {
 
   const activationReady = Boolean(selectedCountry && selectedProduct && selectedPrice)
   const estimatedDebit = selectedPrice
-    ? Math.max(walletMinDebit, Math.ceil(selectedPrice.price * walletMultiplier))
+    ? calculateWalletDebit(selectedPrice.price, walletMultiplier, walletMinDebit)
     : 0
   const likelyInsufficient = activationReady && walletBalance < estimatedDebit
 
@@ -975,7 +984,7 @@ export default function NomorVirtualPage() {
               <div>
                 <p className="text-[11px] text-[#888] uppercase tracking-wide">Operator/Harga</p>
                 <p className="text-sm font-semibold text-[#141414]">
-                  {selectedPrice ? `${selectedPrice.operator} · ${formatProviderPrice(selectedPrice.price)}` : 'Pilih harga'}
+                  {selectedPrice ? `${selectedPrice.operator} · ${formatWalletRupiah(estimatedDebit)}` : 'Pilih harga'}
                 </p>
               </div>
             </div>
@@ -1161,7 +1170,9 @@ export default function NomorVirtualPage() {
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-semibold text-[#141414] truncate">{priceOption.operator}</span>
-                            <span className="text-sm font-bold text-[#141414] shrink-0">{formatProviderPrice(priceOption.price)}</span>
+                            <span className="text-sm font-bold text-[#141414] shrink-0">
+                              {formatWalletRupiah(calculateWalletDebit(priceOption.price, walletMultiplier, walletMinDebit))}
+                            </span>
                           </div>
                         </button>
                       )
@@ -1189,7 +1200,7 @@ export default function NomorVirtualPage() {
                 {buyTab === 'activation' ? (
                   <div className="p-4 space-y-3">
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wide text-[#888] mb-1.5">Max Price (USD)</label>
+                      <label className="block text-[11px] font-bold uppercase tracking-wide text-[#888] mb-1.5">Batas Harga (opsional)</label>
                       <input
                         type="number"
                         value={maxPrice}
@@ -1225,25 +1236,19 @@ export default function NomorVirtualPage() {
                         <span className="font-semibold text-right">{selectedPrice?.operator || '—'}</span>
                       </div>
                       <div className="flex justify-between gap-3 border-t border-[#EBEBEB] pt-2">
-                        <span className="text-[#555] font-semibold">Harga Provider (USD)</span>
+                        <span className="text-[#555] font-semibold">Harga</span>
                         <span className="font-extrabold text-[#141414] text-right">
-                          {selectedPrice ? formatProviderPrice(selectedPrice.price) : '—'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <span className="text-[#555] font-semibold">Estimasi Potong Wallet (IDR)</span>
-                        <span className="font-extrabold text-[#141414] text-right">
-                          {selectedPrice ? `Rp ${estimatedDebit.toLocaleString('id-ID')}` : '—'}
+                          {selectedPrice ? formatWalletRupiah(estimatedDebit) : '—'}
                         </span>
                       </div>
                       <p className="text-[11px] text-[#888] leading-relaxed">
-                        Kalkulasi estimasi: ceil(USD × {walletMultiplier.toLocaleString('id-ID')}) dengan minimum Rp {walletMinDebit.toLocaleString('id-ID')}.
+                        Nominal ini yang akan dipotong dari wallet saat pembelian nomor berhasil.
                       </p>
                     </div>
 
                     {(likelyInsufficient || insufficientByServer) && activationReady ? (
                       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
-                        Saldo wallet kemungkinan tidak cukup. Estimasi debit transaksi ini Rp {estimatedDebit.toLocaleString('id-ID')}.
+                        Saldo wallet kemungkinan tidak cukup. Estimasi debit transaksi ini {formatWalletRupiah(estimatedDebit)}.
                         <Link href="/dashboard/wallet" className="inline-flex items-center gap-1 ml-1 font-bold underline">
                           Top Up <ArrowRight className="w-3 h-3" />
                         </Link>
@@ -1336,9 +1341,7 @@ export default function NomorVirtualPage() {
                     {walletLoading ? 'Memuat...' : `Rp ${walletBalance.toLocaleString('id-ID')}`}
                   </span>
                 </p>
-                <p className="mt-1 text-[11px] text-[#888]">
-                  Konfigurasi harga: multiplier {walletMultiplier.toLocaleString('id-ID')} · min debit Rp {walletMinDebit.toLocaleString('id-ID')}
-                </p>
+                <p className="mt-1 text-[11px] text-[#888]">Pastikan saldo cukup sebelum checkout nomor.</p>
               </div>
             </section>
           </div>
@@ -1412,7 +1415,12 @@ export default function NomorVirtualPage() {
                       </div>
 
                       <div className="text-left md:text-right shrink-0">
-                        <div className="text-sm font-extrabold text-[#141414]">{formatProviderPrice(order.provider_price || 0)}</div>
+                        <div className="text-sm font-extrabold text-[#141414]">
+                          {(() => {
+                            const debit = calculateWalletDebit(order.provider_price || 0, walletMultiplier, walletMinDebit)
+                            return debit > 0 ? formatWalletRupiah(debit) : '-'
+                          })()}
+                        </div>
                         <span className={`mt-1 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${status.className}`}>
                           {status.label}
                         </span>
