@@ -118,17 +118,35 @@ function isoToFlag(iso?: string): string {
     .join('')
 }
 
+function firstObjectKey(value: unknown): string | undefined {
+  const rec = asRecord(value)
+  if (!rec) return undefined
+
+  for (const key of Object.keys(rec)) {
+    const normalized = key.trim()
+    if (normalized) return normalized
+  }
+
+  return undefined
+}
+
 function parseCountries(payload: FiveSimCountriesPayload | undefined): CountryOption[] {
   if (!payload) return []
 
   return Object.entries(payload)
     .map(([key, raw]) => {
       const rec = asRecord(raw)
-      const iso = asString(rec?.iso)
-      const prefix = asString(rec?.prefix)
+
+      const iso = asString(rec?.iso) ?? firstObjectKey(rec?.iso)
+      const prefix = asString(rec?.prefix) ?? firstObjectKey(rec?.prefix)
+      const name =
+        asString(rec?.text_en) ??
+        asString(rec?.text_ru) ??
+        toTitleCase(key)
+
       return {
         key,
-        name: toTitleCase(key),
+        name,
         iso,
         prefix,
         flag: isoToFlag(iso),
