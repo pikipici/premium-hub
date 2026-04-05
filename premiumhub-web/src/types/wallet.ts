@@ -11,6 +11,8 @@ export interface Wallet {
 
 export interface WalletBalance {
   balance: number
+  fivesim_wallet_price_multiplier?: number
+  fivesim_wallet_min_debit?: number
 }
 
 export interface WalletTopup {

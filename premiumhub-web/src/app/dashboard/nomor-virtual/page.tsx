@@ -71,6 +71,20 @@ const ORDER_STATUS_FILTERS: { key: OrderStatusFilter; label: string }[] = [
   { key: 'CANCELED', label: 'Batal' },
 ]
 
+const FALLBACK_WALLET_MULTIPLIER = (() => {
+  const raw = process.env.NEXT_PUBLIC_FIVESIM_WALLET_PRICE_MULTIPLIER
+  const parsed = raw ? Number(raw) : Number.NaN
+  if (Number.isFinite(parsed) && parsed > 0) return parsed
+  return 18500
+})()
+
+const FALLBACK_WALLET_MIN_DEBIT = (() => {
+  const raw = process.env.NEXT_PUBLIC_FIVESIM_WALLET_MIN_DEBIT
+  const parsed = raw ? Number(raw) : Number.NaN
+  if (Number.isFinite(parsed) && parsed > 0) return Math.ceil(parsed)
+  return 1
+})()
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -366,6 +380,8 @@ export default function NomorVirtualPage() {
   const [productsLoading, setProductsLoading] = useState(false)
   const [pricesLoading, setPricesLoading] = useState(false)
   const [walletLoading, setWalletLoading] = useState(false)
+  const [walletMultiplier, setWalletMultiplier] = useState(FALLBACK_WALLET_MULTIPLIER)
+  const [walletMinDebit, setWalletMinDebit] = useState(FALLBACK_WALLET_MIN_DEBIT)
 
   const [countryQuery, setCountryQuery] = useState('')
   const [productQuery, setProductQuery] = useState('')
@@ -417,7 +433,9 @@ export default function NomorVirtualPage() {
   }, [products, productQuery])
 
   const activationReady = Boolean(selectedCountry && selectedProduct && selectedPrice)
-  const estimatedDebit = selectedPrice ? Math.max(1, Math.ceil(selectedPrice.price)) : 0
+  const estimatedDebit = selectedPrice
+    ? Math.max(walletMinDebit, Math.ceil(selectedPrice.price * walletMultiplier))
+    : 0
   const likelyInsufficient = activationReady && walletBalance < estimatedDebit
 
   const filteredOrders = useMemo(() => {
@@ -450,6 +468,16 @@ export default function NomorVirtualPage() {
       const res = await walletService.getBalance()
       if (res.success) {
         setWalletBalance(res.data.balance)
+
+        const serverMultiplier = asNumber(res.data.fivesim_wallet_price_multiplier)
+        if (serverMultiplier !== null && serverMultiplier > 0) {
+          setWalletMultiplier(serverMultiplier)
+        }
+
+        const serverMinDebit = asNumber(res.data.fivesim_wallet_min_debit)
+        if (serverMinDebit !== null && serverMinDebit > 0) {
+          setWalletMinDebit(Math.ceil(serverMinDebit))
+        }
       }
     } catch {
       // Keep UI usable even when wallet refresh fails.
@@ -1197,16 +1225,25 @@ export default function NomorVirtualPage() {
                         <span className="font-semibold text-right">{selectedPrice?.operator || '—'}</span>
                       </div>
                       <div className="flex justify-between gap-3 border-t border-[#EBEBEB] pt-2">
-                        <span className="text-[#555] font-semibold">Harga Provider</span>
+                        <span className="text-[#555] font-semibold">Harga Provider (USD)</span>
                         <span className="font-extrabold text-[#141414] text-right">
                           {selectedPrice ? formatProviderPrice(selectedPrice.price) : '—'}
                         </span>
                       </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-[#555] font-semibold">Estimasi Potong Wallet (IDR)</span>
+                        <span className="font-extrabold text-[#141414] text-right">
+                          {selectedPrice ? `Rp ${estimatedDebit.toLocaleString('id-ID')}` : '—'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#888] leading-relaxed">
+                        Kalkulasi estimasi: ceil(USD × {walletMultiplier.toLocaleString('id-ID')}) dengan minimum Rp {walletMinDebit.toLocaleString('id-ID')}.
+                      </p>
                     </div>
 
                     {(likelyInsufficient || insufficientByServer) && activationReady ? (
                       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
-                        Saldo wallet kemungkinan tidak cukup. Langsung top up dulu biar nggak mental di backend.
+                        Saldo wallet kemungkinan tidak cukup. Estimasi debit transaksi ini Rp {estimatedDebit.toLocaleString('id-ID')}.
                         <Link href="/dashboard/wallet" className="inline-flex items-center gap-1 ml-1 font-bold underline">
                           Top Up <ArrowRight className="w-3 h-3" />
                         </Link>
@@ -1298,6 +1335,9 @@ export default function NomorVirtualPage() {
                   <span className="font-bold text-[#141414]">
                     {walletLoading ? 'Memuat...' : `Rp ${walletBalance.toLocaleString('id-ID')}`}
                   </span>
+                </p>
+                <p className="mt-1 text-[11px] text-[#888]">
+                  Konfigurasi harga: multiplier {walletMultiplier.toLocaleString('id-ID')} · min debit Rp {walletMinDebit.toLocaleString('id-ID')}
                 </p>
               </div>
             </section>
