@@ -8,6 +8,7 @@ set -Eeuo pipefail
 # - FE + BE build
 # - Smoke test
 # - Restart service
+# - Health check dengan fallback endpoint
 # ==============================================
 
 # ---------- Terminal colors ----------
@@ -43,18 +44,40 @@ on_error() {
 }
 trap 'on_error "$LINENO" "$BASH_COMMAND" "$?"' ERR
 
-# ---------- Config (ubah kalau struktur project berubah) ----------
+# ---------- Config ----------
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BRANCH="${BRANCH:-main}"
 
 FRONTEND_DIR="${PROJECT_ROOT}/premiumhub-web"
 BACKEND_DIR="${PROJECT_ROOT}/premiumhub-api"
 
+# Build behavior toggles
+RUN_GO_MOD_TIDY="${RUN_GO_MOD_TIDY:-0}"   # default: jangan mutate deps saat deploy
+NPM_FLAGS="${NPM_FLAGS:---include=dev --no-audit --no-fund}"
+
+# Health check targets
+FE_HEALTH_URL="${FE_HEALTH_URL:-http://127.0.0.1:3002/}"
+BE_HEALTH_URL="${BE_HEALTH_URL:-http://127.0.0.1:8081/healthz}"
+BE_HEALTH_FALLBACK_URL="${BE_HEALTH_FALLBACK_URL:-http://127.0.0.1:8081/api/v1/products}"
+
 # Service names (user-level systemd)
 SERVICES=(
   "premiumhub-api.service"
   "premiumhub-web.service"
 )
+
+# ---------- Helpers ----------
+find_backend_entry() {
+  if [[ -f "${BACKEND_DIR}/cmd/main.go" ]]; then
+    echo "cmd/main.go"
+    return 0
+  fi
+  if [[ -f "${BACKEND_DIR}/main.go" ]]; then
+    echo "main.go"
+    return 0
+  fi
+  return 1
+}
 
 # ---------- Precheck ----------
 step_start "PRECHECK"
@@ -66,16 +89,50 @@ command -v systemctl >/dev/null
 
 [[ -d "${FRONTEND_DIR}" ]] || { log_err "Frontend dir tidak ditemukan: ${FRONTEND_DIR}"; exit 1; }
 [[ -d "${BACKEND_DIR}" ]] || { log_err "Backend dir tidak ditemukan: ${BACKEND_DIR}"; exit 1; }
+
+BACKEND_ENTRY="$(find_backend_entry)" || { log_err "Entry backend tidak ditemukan (cari cmd/main.go atau main.go)"; exit 1; }
+log_info "Backend entry: ${BACKEND_ENTRY}"
+
+if [[ -f "${BACKEND_DIR}/go.mod" ]]; then
+  GO_DIRECTIVE="$(awk '/^go[[:space:]]+[0-9]+(\.[0-9]+){1,2}$/ {print $2; exit}' "${BACKEND_DIR}/go.mod" || true)"
+  if [[ -z "${GO_DIRECTIVE}" ]]; then
+    log_warn "go.mod directive tidak terbaca valid. Contoh valid: 'go 1.22.6'"
+  else
+    log_info "go.mod directive: ${GO_DIRECTIVE}"
+  fi
+fi
+
 step_done "PRECHECK"
 
 # ---------- Pull latest code ----------
 step_start "PULL LATEST CODE"
 cd "${PROJECT_ROOT}"
 
+STASH_CREATED=0
+STASH_REF=""
+
 log_info "Starting git update on branch: ${BRANCH}"
 git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
+
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  log_warn "Working tree kotor, auto-stash sebelum pull --rebase"
+  STASH_REF="deploy-autostash-$(date +%s)"
+  git stash push -u -m "${STASH_REF}"
+  STASH_CREATED=1
+fi
+
 git pull --rebase origin "${BRANCH}"
+
+if [[ "${STASH_CREATED}" == "1" ]]; then
+  log_info "Mencoba restore perubahan lokal (git stash pop)..."
+  if git stash pop; then
+    log_ok "Perubahan lokal berhasil direstore"
+  else
+    log_warn "Stash pop conflict. Periksa manual via 'git status' dan 'git stash list'"
+    exit 1
+  fi
+fi
 
 step_done "PULL LATEST CODE"
 
@@ -83,8 +140,8 @@ step_done "PULL LATEST CODE"
 step_start "BUILD FRONTEND"
 cd "${FRONTEND_DIR}"
 
-log_info "Installing frontend dependencies (npm ci)..."
-npm ci
+log_info "Installing frontend dependencies (npm ci ${NPM_FLAGS})..."
+npm ci ${NPM_FLAGS}
 
 log_info "Starting frontend build (npm run build)..."
 npm run build
@@ -95,11 +152,16 @@ step_done "BUILD FRONTEND"
 step_start "BUILD BACKEND"
 cd "${BACKEND_DIR}"
 
-log_info "Resolving backend dependencies (go mod tidy)..."
-go mod tidy
+if [[ "${RUN_GO_MOD_TIDY}" == "1" ]]; then
+  log_info "RUN_GO_MOD_TIDY=1 -> running go mod tidy..."
+  go mod tidy
+else
+  log_info "Skipping go mod tidy (set RUN_GO_MOD_TIDY=1 jika diperlukan)"
+fi
 
-log_info "Starting backend build (go build)..."
-go build -o bin/premiumhub-api cmd/main.go
+mkdir -p bin
+log_info "Starting backend build (go build -o bin/premiumhub-api ${BACKEND_ENTRY})..."
+go build -o bin/premiumhub-api "${BACKEND_ENTRY}"
 
 step_done "BUILD BACKEND"
 
@@ -127,13 +189,18 @@ step_done "RESTART SERVICES"
 # ---------- Post-restart health check ----------
 step_start "POST-RESTART HEALTHCHECK"
 
-log_info "Checking frontend endpoint: http://127.0.0.1:3002/"
-curl -fsS "http://127.0.0.1:3002/" >/dev/null
+log_info "Checking frontend endpoint: ${FE_HEALTH_URL}"
+curl -fsS "${FE_HEALTH_URL}" >/dev/null
 log_ok "Frontend endpoint healthy"
 
-log_info "Checking backend endpoint: http://127.0.0.1:8081/api/v1/products"
-curl -fsS "http://127.0.0.1:8081/api/v1/products" >/dev/null
-log_ok "Backend endpoint healthy"
+log_info "Checking backend endpoint: ${BE_HEALTH_URL}"
+if curl -fsS "${BE_HEALTH_URL}" >/dev/null; then
+  log_ok "Backend endpoint healthy (${BE_HEALTH_URL})"
+else
+  log_warn "Primary backend health failed, trying fallback: ${BE_HEALTH_FALLBACK_URL}"
+  curl -fsS "${BE_HEALTH_FALLBACK_URL}" >/dev/null
+  log_ok "Backend endpoint healthy via fallback (${BE_HEALTH_FALLBACK_URL})"
+fi
 
 step_done "POST-RESTART HEALTHCHECK"
 
