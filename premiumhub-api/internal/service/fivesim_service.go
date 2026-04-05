@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,10 +18,14 @@ import (
 	"gorm.io/gorm"
 )
 
+var errFiveSimWalletInsufficient = errors.New("saldo wallet tidak cukup untuk beli nomor 5sim")
+
 type FiveSimService struct {
-	userRepo  *repository.UserRepo
-	orderRepo *repository.FiveSimOrderRepo
-	client    FiveSimClient
+	cfg        *config.Config
+	userRepo   *repository.UserRepo
+	orderRepo  *repository.FiveSimOrderRepo
+	walletRepo *repository.WalletRepo
+	client     FiveSimClient
 }
 
 type FiveSimBuyActivationInput struct {
@@ -53,14 +59,22 @@ type FiveSimProviderHistoryInput struct {
 	Reverse  bool
 }
 
-func NewFiveSimService(cfg *config.Config, userRepo *repository.UserRepo, orderRepo *repository.FiveSimOrderRepo, client FiveSimClient) *FiveSimService {
+func NewFiveSimService(
+	cfg *config.Config,
+	userRepo *repository.UserRepo,
+	orderRepo *repository.FiveSimOrderRepo,
+	walletRepo *repository.WalletRepo,
+	client FiveSimClient,
+) *FiveSimService {
 	if client == nil {
 		client = NewFiveSimClient(cfg)
 	}
 	return &FiveSimService{
-		userRepo:  userRepo,
-		orderRepo: orderRepo,
-		client:    client,
+		cfg:        cfg,
+		userRepo:   userRepo,
+		orderRepo:  orderRepo,
+		walletRepo: walletRepo,
+		client:     client,
 	}
 }
 
@@ -121,7 +135,7 @@ func (s *FiveSimService) BuyActivation(ctx context.Context, userID uuid.UUID, in
 		return nil, nil, s.normalizeProviderErr(err)
 	}
 
-	localOrder, err := s.upsertOwnedOrder(userID, "activation", providerOrder)
+	localOrder, err := s.finalizePurchasedOrder(ctx, userID, "activation", providerOrder)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,7 +156,7 @@ func (s *FiveSimService) BuyHosting(ctx context.Context, userID uuid.UUID, input
 		return nil, nil, s.normalizeProviderErr(err)
 	}
 
-	localOrder, err := s.upsertOwnedOrder(userID, "hosting", providerOrder)
+	localOrder, err := s.finalizePurchasedOrder(ctx, userID, "hosting", providerOrder)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -166,11 +180,190 @@ func (s *FiveSimService) ReuseNumber(ctx context.Context, userID uuid.UUID, inpu
 		return nil, nil, s.normalizeProviderErr(err)
 	}
 
-	localOrder, err := s.upsertOwnedOrder(userID, "reuse", providerOrder)
+	localOrder, err := s.finalizePurchasedOrder(ctx, userID, "reuse", providerOrder)
 	if err != nil {
 		return nil, nil, err
 	}
 	return localOrder, providerOrder, nil
+}
+
+func (s *FiveSimService) finalizePurchasedOrder(ctx context.Context, userID uuid.UUID, orderType string, providerOrder *FiveSimOrderPayload) (*model.FiveSimOrder, error) {
+	if providerOrder == nil || providerOrder.ID <= 0 {
+		return nil, errors.New("response order 5sim tidak valid")
+	}
+
+	localOrder, err := s.upsertOwnedOrder(userID, orderType, providerOrder)
+	if err != nil {
+		if cancelErr := s.cancelProviderOrder(ctx, providerOrder.ID); cancelErr != nil {
+			return nil, errors.New("gagal menyimpan order 5sim dan gagal rollback order provider, hubungi admin")
+		}
+		return nil, err
+	}
+
+	if _, err := s.debitWalletForOrder(userID, orderType, providerOrder); err != nil {
+		if cancelErr := s.cancelProviderOrderAndSyncLocal(ctx, localOrder, providerOrder.ID); cancelErr != nil {
+			return nil, fmt.Errorf("%s; order provider gagal dibatalkan otomatis, hubungi admin", err.Error())
+		}
+		return nil, err
+	}
+
+	return localOrder, nil
+}
+
+func (s *FiveSimService) cancelProviderOrder(ctx context.Context, providerOrderID int64) error {
+	if providerOrderID <= 0 {
+		return errors.New("provider_order_id tidak valid")
+	}
+	_, err := s.client.CancelOrder(ctx, providerOrderID)
+	if err != nil {
+		return s.normalizeProviderErr(err)
+	}
+	return nil
+}
+
+func (s *FiveSimService) cancelProviderOrderAndSyncLocal(ctx context.Context, localOrder *model.FiveSimOrder, providerOrderID int64) error {
+	if providerOrderID <= 0 {
+		return errors.New("provider_order_id tidak valid")
+	}
+
+	providerOrder, err := s.client.CancelOrder(ctx, providerOrderID)
+	if err != nil {
+		if localOrder != nil {
+			if latestOrder, checkErr := s.client.CheckOrder(ctx, providerOrderID); checkErr == nil {
+				if applyErr := s.applySnapshot(localOrder, latestOrder, localOrder.OrderType, "check"); applyErr == nil {
+					_ = s.orderRepo.Update(localOrder)
+				}
+			}
+		}
+		return s.normalizeProviderErr(err)
+	}
+
+	if localOrder != nil {
+		if applyErr := s.applySnapshot(localOrder, providerOrder, localOrder.OrderType, "cancel"); applyErr != nil {
+			return applyErr
+		}
+		if updateErr := s.orderRepo.Update(localOrder); updateErr != nil {
+			return errors.New("order 5sim berhasil dibatalkan, tapi gagal simpan status lokal")
+		}
+	}
+
+	return nil
+}
+
+func (s *FiveSimService) debitWalletForOrder(userID uuid.UUID, orderType string, providerOrder *FiveSimOrderPayload) (int64, error) {
+	if s.walletRepo == nil {
+		return 0, errors.New("konfigurasi wallet belum siap")
+	}
+	if providerOrder == nil || providerOrder.ID <= 0 {
+		return 0, errors.New("response order 5sim tidak valid")
+	}
+
+	chargeAmount, multiplier, err := s.calculateWalletDebit(providerOrder.Price)
+	if err != nil {
+		return 0, err
+	}
+
+	reference := fmt.Sprintf("fivesim_order:%d:charge", providerOrder.ID)
+	description := fmt.Sprintf(
+		"Pembelian 5sim %s (%s/%s/%s), provider_price=%.6f, multiplier=%.6f",
+		orderType,
+		providerOrder.Country,
+		providerOrder.Operator,
+		providerOrder.Product,
+		providerOrder.Price,
+		multiplier,
+	)
+
+	err = s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, reference); err == nil {
+			return nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("gagal cek ledger wallet")
+		}
+
+		user, err := s.walletRepo.LockUserByIDTx(tx, userID)
+		if err != nil {
+			return errors.New("user tidak ditemukan")
+		}
+		if !user.IsActive {
+			return errors.New("akun diblokir")
+		}
+
+		before := user.WalletBalance
+		if before < chargeAmount {
+			return errFiveSimWalletInsufficient
+		}
+		after := before - chargeAmount
+
+		user.WalletBalance = after
+		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+			return errors.New("gagal update saldo wallet")
+		}
+
+		ledger := &model.WalletLedger{
+			ID:            uuid.New(),
+			UserID:        user.ID,
+			Type:          "debit",
+			Category:      "5sim_purchase",
+			Amount:        chargeAmount,
+			BalanceBefore: before,
+			BalanceAfter:  after,
+			Reference:     reference,
+			Description:   description,
+		}
+		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
+			return errors.New("gagal menulis ledger wallet")
+		}
+
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, errFiveSimWalletInsufficient) {
+			return chargeAmount, errFiveSimWalletInsufficient
+		}
+		return chargeAmount, err
+	}
+
+	return chargeAmount, nil
+}
+
+func (s *FiveSimService) calculateWalletDebit(providerPrice float64) (int64, float64, error) {
+	if providerPrice <= 0 {
+		return 0, 0, errors.New("harga provider 5sim tidak valid")
+	}
+
+	multiplier := 1.0
+	if s.cfg != nil {
+		if v := strings.TrimSpace(s.cfg.FiveSimWalletPriceMultiplier); v != "" {
+			if parsed, err := strconv.ParseFloat(v, 64); err == nil && parsed > 0 {
+				multiplier = parsed
+			}
+		}
+	}
+
+	minDebit := int64(1)
+	if s.cfg != nil {
+		if v := strings.TrimSpace(s.cfg.FiveSimWalletMinDebit); v != "" {
+			if parsed, err := strconv.ParseInt(v, 10, 64); err == nil && parsed > 0 {
+				minDebit = parsed
+			}
+		}
+	}
+
+	rawDebit := providerPrice * multiplier
+	if math.IsNaN(rawDebit) || math.IsInf(rawDebit, 0) || rawDebit <= 0 {
+		return 0, 0, errors.New("gagal hitung debit wallet 5sim")
+	}
+
+	amount := int64(math.Ceil(rawDebit))
+	if amount < minDebit {
+		amount = minDebit
+	}
+	if amount <= 0 {
+		return 0, 0, errors.New("debit wallet 5sim tidak valid")
+	}
+
+	return amount, multiplier, nil
 }
 
 func (s *FiveSimService) CheckOrder(ctx context.Context, userID uuid.UUID, providerOrderID int64) (*model.FiveSimOrder, *FiveSimOrderPayload, error) {

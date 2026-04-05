@@ -86,6 +86,25 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject invalid fivesim wallet debit config", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                       "development",
+			JWTSecret:                    "super-secure-secret-value-32chars++",
+			CookieSameSite:               "lax",
+			AuthRateLimitMax:             "20",
+			AuthRateLimitWindow:          "1m",
+			FiveSimWalletPriceMultiplier: "0",
+			FiveSimWalletMinDebit:        "-2",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected fivesim wallet debit config error")
+		}
+		if !strings.Contains(err.Error(), "FIVESIM_WALLET_PRICE_MULTIPLIER") || !strings.Contains(err.Error(), "FIVESIM_WALLET_MIN_DEBIT") {
+			t.Fatalf("expected fivesim wallet config errors, got: %v", err)
+		}
+	})
+
 	t.Run("production requires neticon fields", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:    "production",

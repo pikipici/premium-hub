@@ -49,6 +49,18 @@ func (c *Config) Validate() error {
 			problems = append(problems, "FIVESIM_HTTP_TIMEOUT_SEC harus angka 1-120")
 		}
 	}
+	if v := strings.TrimSpace(c.FiveSimWalletPriceMultiplier); v != "" {
+		n, err := strconv.ParseFloat(v, 64)
+		if err != nil || n <= 0 || n > 1_000_000 {
+			problems = append(problems, "FIVESIM_WALLET_PRICE_MULTIPLIER harus angka > 0 dan <= 1000000")
+		}
+	}
+	if v := strings.TrimSpace(c.FiveSimWalletMinDebit); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 || n > 1_000_000_000 {
+			problems = append(problems, "FIVESIM_WALLET_MIN_DEBIT harus angka > 0 dan <= 1000000000")
+		}
+	}
 
 	if appEnv == "production" {
 		if strings.TrimSpace(c.NeticonAPIKey) == "" {

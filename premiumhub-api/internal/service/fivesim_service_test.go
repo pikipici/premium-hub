@@ -39,7 +39,8 @@ type fakeFiveSimClient struct {
 	banResp           *FiveSimOrderPayload
 	banErr            error
 
-	checkHits int
+	checkHits  int
+	cancelHits int
 }
 
 func (f *fakeFiveSimClient) GetProfile(_ context.Context) (map[string]any, error) {
@@ -122,6 +123,7 @@ func (f *fakeFiveSimClient) FinishOrder(_ context.Context, _ int64) (*FiveSimOrd
 }
 
 func (f *fakeFiveSimClient) CancelOrder(_ context.Context, _ int64) (*FiveSimOrderPayload, error) {
+	f.cancelHits++
 	if f.cancelErr != nil {
 		return nil, f.cancelErr
 	}
@@ -164,29 +166,31 @@ func setupFiveSimService(t *testing.T) (*FiveSimService, *gorm.DB, *fakeFiveSimC
 		t.Fatalf("open db: %v", err)
 	}
 
-	if err := db.AutoMigrate(&model.User{}, &model.FiveSimOrder{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.FiveSimOrder{}, &model.WalletLedger{}); err != nil {
 		t.Fatalf("migrate db: %v", err)
 	}
 
 	activeUser := model.User{
-		ID:       uuid.New(),
-		Name:     "active",
-		Email:    fmt.Sprintf("active-%s@example.com", uuid.NewString()),
-		Password: "hashed",
-		Role:     "user",
-		IsActive: true,
+		ID:            uuid.New(),
+		Name:          "active",
+		Email:         fmt.Sprintf("active-%s@example.com", uuid.NewString()),
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 50_000,
 	}
 	if err := db.Create(&activeUser).Error; err != nil {
 		t.Fatalf("create active user: %v", err)
 	}
 
 	otherUser := model.User{
-		ID:       uuid.New(),
-		Name:     "other",
-		Email:    fmt.Sprintf("other-%s@example.com", uuid.NewString()),
-		Password: "hashed",
-		Role:     "user",
-		IsActive: true,
+		ID:            uuid.New(),
+		Name:          "other",
+		Email:         fmt.Sprintf("other-%s@example.com", uuid.NewString()),
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 50_000,
 	}
 	if err := db.Create(&otherUser).Error; err != nil {
 		t.Fatalf("create other user: %v", err)
@@ -194,9 +198,13 @@ func setupFiveSimService(t *testing.T) (*FiveSimService, *gorm.DB, *fakeFiveSimC
 
 	fakeClient := &fakeFiveSimClient{}
 	svc := NewFiveSimService(
-		&config.Config{},
+		&config.Config{
+			FiveSimWalletPriceMultiplier: "1000",
+			FiveSimWalletMinDebit:        "1000",
+		},
 		repository.NewUserRepo(db),
 		repository.NewFiveSimOrderRepo(db),
+		repository.NewWalletRepo(db),
 		fakeClient,
 	)
 
@@ -244,6 +252,25 @@ func TestFiveSimServiceBuyActivationCreatesLocalOrder(t *testing.T) {
 	if dbRow.ProviderStatus != "PENDING" {
 		t.Fatalf("expected provider status PENDING, got %s", dbRow.ProviderStatus)
 	}
+
+	var updatedUser model.User
+	if err := db.First(&updatedUser, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user: %v", err)
+	}
+	if updatedUser.WalletBalance != 49_000 {
+		t.Fatalf("unexpected wallet balance: got %d want %d", updatedUser.WalletBalance, 49_000)
+	}
+
+	var ledger model.WalletLedger
+	if err := db.First(&ledger, "reference = ?", "fivesim_order:991122:charge").Error; err != nil {
+		t.Fatalf("load wallet ledger: %v", err)
+	}
+	if ledger.Type != "debit" || ledger.Category != "5sim_purchase" {
+		t.Fatalf("unexpected ledger row: type=%s category=%s", ledger.Type, ledger.Category)
+	}
+	if ledger.Amount != 1000 {
+		t.Fatalf("unexpected debit amount: got %d want %d", ledger.Amount, 1000)
+	}
 }
 
 func TestFiveSimServiceCheckOrderRespectsOwnership(t *testing.T) {
@@ -280,5 +307,100 @@ func TestFiveSimServiceMapsProviderRateLimitError(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "limit request") {
 		t.Fatalf("expected mapped rate-limit error, got: %v", err)
+	}
+}
+
+func TestFiveSimServiceBuyActivationInsufficientWalletCancelsProviderOrder(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	if err := db.Model(&model.User{}).Where("id = ?", activeUser.ID).Update("wallet_balance", 100).Error; err != nil {
+		t.Fatalf("set wallet balance: %v", err)
+	}
+
+	fake.buyActivationResp = &FiveSimOrderPayload{
+		ID:       774411,
+		Phone:    "+62812345678",
+		Operator: "telkomsel",
+		Product:  "telegram",
+		Price:    2.40,
+		Status:   "PENDING",
+		Country:  "indonesia",
+	}
+	fake.cancelResp = &FiveSimOrderPayload{
+		ID:       774411,
+		Phone:    "+62812345678",
+		Operator: "telkomsel",
+		Product:  "telegram",
+		Price:    2.40,
+		Status:   "CANCELED",
+		Country:  "indonesia",
+	}
+
+	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:  "indonesia",
+		Operator: "any",
+		Product:  "telegram",
+	})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "saldo wallet tidak cukup") {
+		t.Fatalf("expected insufficient wallet error, got: %v", err)
+	}
+	if fake.cancelHits != 1 {
+		t.Fatalf("expected cancel provider hit once, got %d", fake.cancelHits)
+	}
+
+	var updatedUser model.User
+	if err := db.First(&updatedUser, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user: %v", err)
+	}
+	if updatedUser.WalletBalance != 100 {
+		t.Fatalf("wallet balance should remain unchanged, got %d", updatedUser.WalletBalance)
+	}
+
+	var ledgerCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", "fivesim_order:774411:charge").Count(&ledgerCount).Error; err != nil {
+		t.Fatalf("count ledger: %v", err)
+	}
+	if ledgerCount != 0 {
+		t.Fatalf("expected no debit ledger row, got %d", ledgerCount)
+	}
+
+	var row model.FiveSimOrder
+	if err := db.First(&row, "provider_order_id = ?", 774411).Error; err != nil {
+		t.Fatalf("load local order: %v", err)
+	}
+	if row.ProviderStatus != "CANCELED" {
+		t.Fatalf("expected local order status CANCELED, got %s", row.ProviderStatus)
+	}
+}
+
+func TestFiveSimServiceBuyActivationInsufficientWalletCancelFailureEscalates(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	if err := db.Model(&model.User{}).Where("id = ?", activeUser.ID).Update("wallet_balance", 100).Error; err != nil {
+		t.Fatalf("set wallet balance: %v", err)
+	}
+
+	fake.buyActivationResp = &FiveSimOrderPayload{
+		ID:       889900,
+		Phone:    "+62811222333",
+		Operator: "xl",
+		Product:  "telegram",
+		Price:    1.25,
+		Status:   "PENDING",
+		Country:  "indonesia",
+	}
+	fake.cancelErr = &FiveSimAPIError{StatusCode: 503, Message: "server offline", Retryable: true}
+
+	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country: "indonesia",
+		Product: "telegram",
+	})
+	if err == nil {
+		t.Fatalf("expected error when cancel rollback fails")
+	}
+	msg := strings.ToLower(err.Error())
+	if !strings.Contains(msg, "saldo wallet tidak cukup") || !strings.Contains(msg, "hubungi admin") {
+		t.Fatalf("expected escalated rollback message, got: %v", err)
+	}
+	if fake.cancelHits != 1 {
+		t.Fatalf("expected cancel provider hit once, got %d", fake.cancelHits)
 	}
 }

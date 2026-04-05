@@ -36,7 +36,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
 	paymentSvc := service.NewPaymentService(orderRepo, orderSvc)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
-	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, nil)
+	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc, cfg)

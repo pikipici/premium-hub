@@ -216,16 +216,26 @@ type FiveSimMutateResponse = {
 3. **Order upsert by provider_order_id**
    - Key unik global di BE: `provider_order_id`.
 
-4. **Status sinkron dari provider**
+4. **Wallet debit wajib saat buy order 5sim**
+   - Endpoint buy (`activation/hosting/reuse`) akan debit wallet user setelah order provider berhasil dibuat.
+   - Debit dicatat ke wallet ledger (`type=debit`, `category=5sim_purchase`, reference unik `fivesim_order:<provider_order_id>:charge`).
+   - Kalau saldo kurang: buy dianggap gagal untuk user.
+
+5. **Rollback provider saat wallet debit gagal**
+   - Jika debit wallet gagal (mis. saldo kurang), backend akan coba `cancel` order ke provider secara otomatis.
+   - Kalau rollback provider gagal, backend return error eskalasi (minta hubungi admin).
+
+6. **Status sinkron dari provider**
    - FE jangan hardcode state machine sendiri yang ngelawan response provider.
 
-5. **Error mapping BE sudah dinormalisasi**
+7. **Error mapping BE sudah dinormalisasi**
    - Contoh message penting:
      - `autentikasi 5sim gagal, cek API key`
      - `resource 5sim tidak ditemukan`
      - `limit request 5sim tercapai, coba lagi sebentar`
      - `5sim sedang sibuk/offline, coba lagi`
      - `5sim sedang bermasalah, coba lagi`
+     - `saldo wallet tidak cukup untuk beli nomor 5sim`
 
 ---
 
@@ -240,6 +250,9 @@ type FiveSimMutateResponse = {
 ## 7.2 Buy Flow Screen
 - Tab/segment: Activation / Hosting / Reuse
 - Form rules harus align sama section #4
+- Wajib ada konteks wallet:
+  - tampilkan saldo wallet user sebelum submit (`GET /wallet/balance`)
+  - setelah buy sukses, refresh saldo + ledger agar state FE sinkron
 - Submit result tampilkan:
   - provider order id
   - nomor
@@ -304,6 +317,8 @@ FE dianggap **match 100%** kalau:
 - [ ] Pagination list order pakai `meta` dari backend.
 - [ ] Error handling preserve `message` backend.
 - [ ] `withCredentials` aktif untuk auth cookie flow.
+- [ ] Flow buy 5sim refresh saldo wallet setelah success.
+- [ ] FE handle error saldo kurang (`saldo wallet tidak cukup untuk beli nomor 5sim`) dengan CTA topup.
 - [ ] Admin route diproteksi role (UI guard + fallback handle 403).
 
 ---

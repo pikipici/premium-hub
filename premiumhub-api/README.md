@@ -26,3 +26,4 @@ Server akan auto-migrate tabel saat start.
 - `COOKIE_SAMESITE=none` mewajibkan `COOKIE_SECURE=true`
 - `AUTH_RATE_LIMIT_MAX` + `AUTH_RATE_LIMIT_WINDOW` mengatur throttle endpoint auth
 - `FIVESIM_API_KEY` wajib diisi untuk fitur integrasi 5sim (wajib di production)
+- `FIVESIM_WALLET_PRICE_MULTIPLIER` + `FIVESIM_WALLET_MIN_DEBIT` mengatur konversi harga provider 5sim ke debit wallet user
