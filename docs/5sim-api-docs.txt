@@ -1,0 +1,6042 @@
+Virtual Numbers
+
+User
+Balance
+Order history
+Payments history
+Price limits
+Get a list
+Create or update the price limit per product
+Delete the price limit per product
+Products and prices
+Products request
+Prices request
+Prices by country
+Prices by product
+Prices by country and product
+Purchase
+Buy activation number
+Buy hosting number
+Re-buy number
+Order management
+Check order (Get SMS)
+Finish order
+Cancel order
+Ban order
+SMS inbox list
+Notifications
+Get notifications
+Vendor
+Vendor statistic
+Wallets reserve
+Vendor orders history
+Vendor payments history
+Create payouts
+Vendor Prices
+Get prices list
+Create price
+Change price
+Enable/Disable price
+Countries list
+Get countries list
+Order statuses
+Products list
+Operators list
+Structure of SMS
+Limits
+Rating
+
+5SIM.NET © 2016-2026
+
+ShellPythonPHP
+User
+Balance
+
+Request example
+
+curl "https://5sim.net/v1/user/profile" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "id":1,
+  "email":"mail@gmail.com",
+  "vendor":"demo",
+  "default_forwarding_number":"447350690992",
+  "balance":100,
+  "rating":96,
+  "default_country": {
+    "name":"england","iso":"gb","prefix":"+44"
+  },
+  "default_operator": {
+    "name":""
+  },
+  "frozen_balance":0
+}
+
+
+GET - https://5sim.net/v1/user/profile
+
+Provides profile data: email, balance and rating.
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Response
+
+Status code: 200 OK
+
+Name	Type	Description
+id	number	User ID
+email	string	User email
+balance	number	Balance
+rating	number	Rating
+default_country	array	Default country
+default_country.name	string	Country name
+default_country.iso	string	ISO country code
+default_country.prefix	string	Mobile prefix
+default_operator	array	Default operator
+default_operator.name	string	Operator name
+frozen_balance	number	Frozen balance
+default_forwarding_number	string	Default forwarding number
+vendor	string	Vendor name
+
+Status code : 401 Unauthorized
+
+Order history
+
+Request example
+
+curl "https://5sim.net/v1/user/orders?category=hosting&limit=15&offset=0&order=id&reverse=true" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "Data": [
+    {
+      "id":53533933,
+      "phone":"+447350690992",
+      "operator":"vodafone",
+      "product":"facebook",
+      "price":2,
+      "status":"BANNED",
+      "expires":"2020-06-28T16:32:43.307041Z",
+      "sms":[],
+      "created_at":"2020-06-28T16:17:43.307041Z",
+      "country":"england"
+    }
+  ],
+  "ProductNames":[],
+  "Statuses":[],
+  "Total":3
+}
+
+
+GET - https://5sim.net/v1/user/orders?category=$category
+
+Provides orders history by choosen category.
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+category	query string	Yes	Category can be 'hosting' or 'activation'
+limit	query string	No	Pagination limit
+offset	query string	No	Pagination offset
+order	query string	No	Pagination order, should be field name
+reverse	query string	No	Is reversed history, true / false
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+Data	array	Orders list
+ProductNames	array	Products list
+Statuses	array	Statuses list
+Total	number	Orders count
+Payments history
+
+Request example
+
+curl "https://5sim.net/v1/user/payments?limit=15&offset=0&order=id&reverse=true" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "Data": [
+    {
+      "ID":30011934,
+      "TypeName":"charge",
+      "ProviderName":"admin",
+      "Amount":100,
+      "Balance":100,
+      "CreatedAt":"2020-06-24T15:37:08.149895Z"
+    }
+  ],
+  "PaymentTypes": [{"Name":"charge"}],
+  "PaymentProviders":[{"Name":"admin"}],
+  "Total":1
+}
+
+
+GET - https://5sim.net/v1/user/payments
+
+Provides payments history.
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+limit	query string	No	Pagination limit
+offset	query string	No	Pagination offset
+order	query string	No	Pagination order, should be field name
+reverse	query string	No	Is reversed history, true / false
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+Data	array	Payments list
+PaymentProviders	array	Names of payments systems
+PaymentTypes	array	Payments types
+Total	number	Payments count
+Prices limit
+Get a list
+
+Request example
+
+curl "https://5sim.net/v1/user/max-prices" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+[
+    {
+      "id": 14,
+      "product": "facebook",
+      "price": 11,
+      "CreatedAt": "2020-06-24T15:37:08.149895Z"
+    }
+]
+
+GET - https://5sim.net/v1/user/max-prices
+
+Get a list of established price limits.
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Response
+Name	Type	Description
+id	number	ID
+product	string	Product name
+price	number	Price
+created_at	date string	The date and time when the object was created
+
+Status code : 200 OK
+
+Status code : 401 Unauthorized
+
+Create or update the price limit per product
+
+Request example
+
+curl -X POST "https://5sim.net/v1/user/max-prices" \
+  -d '{"product_name": "facebook", "price": 30}'\
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+POST - https://5sim.net/v1/user/max-prices
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+product_name	query string	Yes	Product name
+price	query number	Yes	Price
+
+Status code : 200 - success
+
+Status code : 400 - record not found
+
+Status code : 400 - any error
+
+Status code : 400 - product_name is empty
+
+Delete the price limit per product
+
+Request example
+
+curl -X DELETE "https://5sim.net/v1/user/max-prices" \
+  -d '{"product_name": "facebook"}'\
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+DELETE - https://5sim.net/v1/user/max-prices
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+product_name	query string	Yes	Product name
+
+Status code : 200 - success
+
+Status code : 400 - record not found
+
+Status code : 400 - any error
+
+Status code : 400 - product_name is empty
+
+Products and prices
+Products request
+
+Request example
+
+curl "https://5sim.net/v1/guest/products/$country/$operator" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "1day":{"Category":"hosting","Qty":14,"Price":80},
+  "facebook":{"Category":"activation","Qty":133,"Price":21}
+}
+
+
+GET - https://5sim.net/v1/guest/products/$country/$operator
+
+To receive the name, the price, quantity of all products, available to buy.
+
+Headers
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+country	query string	Yes	The country, "any" - any country
+operator	query string	Yes	The operator, "any" - any operator
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+Category	string	activation/hosting
+Qty	number	Available quantity
+Price	number	Price
+Prices request
+
+Request example
+
+curl "https://5sim.net/v1/guest/prices" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "england":{
+    "facebook":{
+      "vodafone":{
+        "cost":4,
+        "count":1260,
+        "rate": 99.99
+      },
+      "virtual60":{
+        "cost":4,
+        "count":935,
+        "rate": 99.99
+      },
+      "virtual52":{
+        "cost":4,
+        "count":0,
+        "rate": 99.99
+      }
+    }
+  }
+}
+
+
+GET - https://5sim.net/v1/guest/prices
+
+Returns product prices
+
+Headers
+Accept: application/json
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+cost	float	Virtual number price, two decimal places
+count	number	Available quantity
+rate	float	Delivery percentage, two decimal places, omitted less than 20% or too few orders
+Prices by country
+
+Request example
+
+curl "https://5sim.net/v1/guest/prices?country=$country" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "england":{
+    "facebook":{
+      "vodafone":{
+        "cost":4,
+        "count":1260,
+        "rate": 99.99
+      },
+      "virtual60":{
+        "cost":4,
+        "count":935,
+        "rate": 99.99
+      },
+      "virtual52":{
+        "cost":4,
+        "count":0,
+        "rate": 99.99
+      }
+    }
+  }
+}
+
+
+GET - https://5sim.net/v1/guest/prices?country=$country
+
+Returns product prices by country
+
+Headers
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+country	query string	Yes	Country name
+Response
+
+Status code : 200 OK
+
+Status code : 400 country is incorrect
+
+Name	Type	Description
+cost	float	Virtual number price, two decimal places
+count	number	Available quantity
+rate	float	Delivery percentage, two decimal places, omitted less than 20% or too few orders
+Prices by product
+
+Request example
+
+curl "https://5sim.net/v1/guest/prices?product=$product" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "facebook":{
+    "afghanistan":{
+      "virtual18":{
+        "cost":4,
+        "count":1260,
+        "rate": 99.99
+      },
+      "virtual23":{
+        "cost":4,
+        "count":935,
+        "rate": 99.99
+      },
+      "virtual4":{
+        "cost":4,
+        "count":0,
+        "rate": 99.99
+      }
+    }
+  }
+}
+
+
+GET - https://5sim.net/v1/guest/prices?product=$product
+
+Returns product prices for a specific product
+
+Headers
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+product	query string	Yes	Product name
+Response
+
+Status code : 200 OK
+
+Status code : 400 product is incorrect
+
+Name	Type	Description
+cost	float	Virtual number price, two decimal places
+count	number	Available quantity
+rate	float	Delivery percentage, two decimal places, omitted less than 20% or too few orders
+Prices by country and product
+
+Request example
+
+curl "https://5sim.net/v1/guest/prices?country=$country&product=$product" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "england":{
+    "facebook":{
+      "vodafone":{
+        "cost":8,
+        "count":0,
+        "rate": 99.99
+      },
+      "matrix":{
+        "cost":8,
+        "count":0,
+        "rate": 99.99
+      },
+      "virtual60":{
+        "cost":8,
+        "count":0,
+        "rate": 99.99
+      },
+      "virtual52":{
+        "cost":8,
+        "count":0,
+        "rate": 99.99
+      },
+      "ee":{
+        "cost":8,
+        "count":0,
+        "rate": 99.99
+      },
+      "virtual59":{
+        "cost":8,
+        "count":0,
+        "rate": 99.99
+      },
+      "virtual15":{
+        "cost":8,
+        "count":0,
+        "rate": 99.99
+      },
+      "vodafone":{
+        "cost":8,
+        "count":0,
+        "rate": 99.99
+      }
+    }
+  }
+}
+
+
+GET - https://5sim.net/v1/guest/prices?country=$country&product=$product
+
+Returns product prices by country and specific product
+
+Headers
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+country	query string	Yes	Country name
+product	query string	Yes	Product name
+Response
+
+Status code : 200 OK
+
+Status code : 400 country is incorrect
+
+Status code : 400 product is incorrect
+
+Name	Type	Description
+cost	float	Virtual number price, two decimal places
+count	number	Available quantity
+rate	float	Delivery percentage, two decimal places, omitted less than 20% or too few orders
+Purchase
+Buy activation number
+
+Request example
+
+curl "https://5sim.net/v1/user/buy/activation/$country/$operator/$product" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "id":11631253,
+  "phone":"+447350690992",
+  "operator":"vodafone",
+  "product":"facebook",
+  "price":21,
+  "status":"PENDING",
+  "expires":"2018-10-13T08:28:38.809469028Z",
+  "sms":null,
+  "created_at":"2018-10-13T08:13:38.809469028Z",
+  "forwarding":false,
+  "forwarding_number":"",
+  "country":"england"
+}
+
+
+GET - https://5sim.net/v1/user/buy/activation/$country/$operator/$product
+
+GET - https://5sim.net/v1/user/buy/activation/$country/$operator/$product?forwarding=$forwarding&number=$number&reuse=$reuse&voice=$voice&ref=$ref
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+URL parameters
+Name	Type	Required	Description
+country	query string	Yes	The country, "any" - any country
+operator	query string	Yes	The operator, "any" - any operator
+product	query string	Yes	Product name
+Query parameters
+Name	Type	Required	Description
+forwarding	query string	No	Whether or not to enable forwarding
+number	query string	No	Number for which the call will be forwarded, 11 digits, without the + sign
+reuse	query string	No	If equal to "1" buy with the ability to reuse the number, if available
+voice	query string	No	If equal to "1" buy with the ability to receive a call from the robot, if available
+ref	query string	No	Your referral key if you have it, if you are developer of the software, you can read terms here
+maxPrice	query string	No	Max price specified in the Purchase method parameters shall have priority over the settings adjusted in the Max purchase price section and shall work only if the operator value is set as "any"
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+id	number	Order ID
+phone	string	Phone number
+operator	string	Operator
+product	string	Product
+price	number	Price
+status	string	Order's status
+expires	date string	When the order expires
+sms	sms array	SMS list
+created_at	date string	When the order was created
+forwarding	boolean	Whether or not to enable forwarding
+forwarding_number	string	Call forwarding number
+country	string	Name of country of number
+
+Status code : 200 no free phones
+
+Status code : 400
+
+not enough user balance
+not enough rating
+select country
+select operator
+bad country
+bad operator
+no product
+server offline
+
+Status code : 500 internal error
+
+Request limits
+
+Maximum waiting time is 15 minutes. Timeout no sms 5 minute
+
+Buy hosting number
+
+Request example
+
+curl "https://5sim.net/v1/user/buy/hosting/$country/$operator/$product" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "id": 1,
+  "phone": "+447350690992",
+  "product": "facebook",
+  "price": 1,
+  "status": "PENDING",
+  "expires": "1970-12-01T03:00:00.000000Z",
+  "sms": [
+      {
+        "id":3027531,
+        "created_at":"1970-12-01T17:23:25.106597Z",
+        "date":"1970-12-01T17:23:15Z",
+        "sender":"Facebook",
+        "text":"Use 415127 as your login code",
+        "code":"415127"
+      }
+    ],
+  "created_at": "1970-12-01T00:00:00.000000Z"
+}
+
+
+GET - https://5sim.net/v1/user/buy/hosting/$country/$operator/$product
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+country	query string	Yes	The country, "any" - any country
+operator	query string	Yes	The operator, "any" - any operator
+product	query string	Yes	Product name, {3hours, facebook}
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+id	number	Order ID
+phone	string	Phone number
+product	string	Product
+price	number	Price
+status	string	Order's status
+expires	date string	When the order expires
+sms	sms array	SMS list
+created_at	date string	When the order was created
+
+Status code : 400
+
+no free phones
+not enough user balance
+not enough rating
+select country
+select operator
+bad country
+bad operator
+no product
+server offline
+
+Status code : 500 internal error
+
+Re-buy number
+
+Request example
+
+curl "https://5sim.net/v1/user/reuse/$product/$number" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+GET - https://5sim.net/v1/user/reuse/$product/$number
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+product	query string	Yes	Product name
+number	query string	Yes	Phone number, 4-15 digits (without the + sign)
+Response
+
+Status code : 200 OK
+
+Status code : 400
+
+no free phones
+select operator
+not enough user balance
+bad country
+bad operator
+server offline
+not enough rating
+no product
+reuse not possible
+reuse false
+reuse expired
+
+Status code : 500 internal error
+
+Order management
+Check order (Get SMS)
+
+Request example
+
+curl "https://5sim.net/v1/user/check/$id" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "id": 11631253,
+  "created_at": "2018-10-13T08:13:38.809469028Z",
+  "phone": "+447350690992",
+  "product": "facebook",
+  "price": 21,
+  "status": "RECEIVED",
+  "expires": "2018-10-13T08:28:38.809469028Z",
+  "sms": [
+      {
+        "created_at":"2018-10-13T08:20:38.809469028Z",
+        "date":"2018-10-13T08:19:38Z",
+        "sender":"Facebook",
+        "text":"Facebook: 09363 - use this code to reclaim your suspended profile.",
+        "code":"09363"
+      }
+  ],
+  "forwarding": false,
+  "forwarding_number": "",
+  "country":"england"
+}
+
+
+GET - https://5sim.net/v1/user/check/$id
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+id	query string	Yes	Order ID
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+id	number	Order ID
+created_at	date string	When the order was created
+phone	string	Phone number
+product	string	Product
+price	number	Price
+status	string	Order's status
+expires	date string	When the order expires
+sms	sms array	SMS list
+forwarding	boolean	Whether or not to enable forwarding
+forwarding_number	string	Call forwarding number
+country	string	Name of country of number
+
+Status code : 404 order not found
+
+Status code : 500 internal error
+
+Finish order
+
+Request example
+
+curl "https://5sim.net/v1/user/finish/$id" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "id": 11631253,
+  "created_at": "2018-10-13T08:13:38.809469028Z",
+  "phone": "+447350690992",
+  "product": "facebook",
+  "price": 21,
+  "status": "FINISHED",
+  "expires": "2018-10-13T08:28:38.809469028Z",
+  "sms": [
+      {
+        "created_at":"2018-10-13T08:20:38.809469028Z",
+        "date":"2018-10-13T08:19:38Z",
+        "sender":"Facebook",
+        "text":"Facebook: 09363 - use this code to reclaim your suspended profile.",
+        "code":"09363"
+      }
+  ],
+  "forwarding": false,
+  "forwarding_number": "",
+  "country":"england"
+}
+
+
+GET - https://5sim.net/v1/user/finish/$id
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+id	query string	Yes	Order ID
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+id	number	Order ID
+created_at	date string	When the order was created
+phone	string	Phone number
+product	string	Product
+price	number	Price
+status	string	Order's status
+expires	date string	When the order expires
+sms	sms array	SMS list
+forwarding	boolean	Whether or not to enable forwarding
+forwarding_number	string	Call forwarding number
+country	string	Name of country of number
+Cancel order
+
+Request example
+
+curl "https://5sim.net/v1/user/cancel/$id" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "id": 11631253,
+  "created_at": "2018-10-13T08:13:38.809469028Z",
+  "phone": "+447350690992",
+  "product": "facebook",
+  "price": 21,
+  "status": "CANCELED",
+  "expires": "2018-10-13T08:28:38.809469028Z",
+  "sms": [
+      {
+        "created_at":"2018-10-13T08:20:38.809469028Z",
+        "date":"2018-10-13T08:19:38Z",
+        "sender":"Facebook",
+        "text":"Facebook: 09363 - use this code to reclaim your suspended profile.",
+        "code":"09363"
+      }
+  ],
+  "forwarding": false,
+  "forwarding_number": "",
+  "country":"england"
+}
+
+
+GET - https://5sim.net/v1/user/cancel/$id
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+id	query string	Yes	Order ID
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+id	number	Order ID
+created_at	date string	When the order was created
+phone	string	Phone number
+product	string	Product
+price	number	Price
+status	string	Order's status
+expires	date string	When the order expires
+sms	sms array	SMS list
+forwarding	boolean	Whether or not to enable forwarding
+forwarding_number	string	Call forwarding number
+country	string	Name of country of number
+
+Status code : 400 order not found
+
+Status code : 400 order expired
+
+Status code : 400 order has sms
+
+Status code : 400 hosting order
+
+Ban order
+
+Request example
+
+curl "https://5sim.net/v1/user/bn/$id" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "id": 11631253,
+  "created_at": "2018-10-13T08:13:38.809469028Z",
+  "phone": "+447350690992",
+  "product": "facebook",
+  "price": 21,
+  "status": "BANNED",
+  "expires": "2018-10-13T08:28:38.809469028Z",
+  "sms": [
+      {
+        "created_at":"2018-10-13T08:20:38.809469028Z",
+        "date":"2018-10-13T08:19:38Z",
+        "sender":"Facebook",
+        "text":"Facebook: 09363 - use this code to reclaim your suspended profile.",
+        "code":"09363"
+      }
+  ],
+  "forwarding": false,
+  "forwarding_number": "",
+  "country":"england"
+}
+
+
+GET - https://5sim.net/v1/user/ban/$id
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+id	query string	Yes	Order ID
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+id	number	Order ID
+created_at	date string	When the order was created
+phone	string	Phone number
+product	string	Product
+price	number	Price
+status	string	Order's status
+expires	date string	When the order expires
+sms	sms array	SMS list
+forwarding	boolean	Whether or not to enable forwarding
+forwarding_number	string	Call forwarding number
+country	string	Name of country of number
+
+Status code : 400 order not found
+
+Status code : 400 order expired
+
+Status code : 400 order has sms
+
+Status code : 400 hosting order
+
+SMS inbox list
+
+Request example
+
+curl "https://5sim.net/v1/user/sms/inbox/$id" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "Data": [
+    {
+      "ID":844928,
+      "created_at":"2017-09-05T15:48:33.763297Z",
+      "date":"2017-09-05T15:48:27Z",
+      "sender":"+447350690992",
+      "text":"12345",
+      "code":"",
+      "is_wave":false,
+      "wave_uuid":""
+    }
+  ],
+  "Total":1
+}
+
+
+GET - https://5sim.net/v1/user/sms/inbox/$id
+
+Get SMS inbox list by order's id.
+
+Important: This endpoint is available only for rented numbers. It does not work with one-time numbers used for service activations.
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+id	query string	Yes	Order ID
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+Data	array	SMS list
+Total	number	SMS count
+
+Status code : 400 order not found
+
+Status code : 404 record not found
+
+Status code : 500 internal error
+
+Notifications
+Get notifications
+
+Request example
+
+curl "https://5sim.net/v1/guest/flash/$lang" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "text":"...notification text..."
+}
+
+
+GET - https://5sim.net/v1/guest/flash/$lang
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+lang	query string	Yes	Language of notification, en
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+text	string	Notification text
+Vendor
+Vendor statistic
+
+Request example
+
+curl "https://5sim.net/v1/user/vendor" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "id":1,
+  "email":"mail@gmail.com",
+  "vendor":"demo",
+  "default_forwarding_number":"447350690992",
+  "balance":100,
+  "rating":96,
+  "default_country": {
+    "name":"england","iso":"gb","prefix":"+44"
+  },
+  "default_operator": {
+    "name":""
+  },
+  "frozen_balance":0
+}
+
+
+GET - https://5sim.net/v1/user/vendor
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+id	number	Vendor ID
+email	string	Vendor email
+balance	number	Balance
+rating	number	Rating
+default_country	array	Default country
+default_country.name	string	Country name
+default_country.iso	string	ISO country code
+default_country.prefix	string	Mobile prefix
+default_operator	array	Default operator
+default_operator.name	string	Operator name
+frozen_balance	number	Frozen balance
+default_forwarding_number	string	Default forwarding number
+vendor	string	Vendor name
+
+Status code : 401 Unauthorized
+
+Wallets reserve
+
+Request example
+
+curl "https://5sim.net/v1/vendor/wallets" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "fkwallet":43339.55,
+  "payeer":2117.32,
+  "unitpay":97.6
+}
+
+
+GET - https://5sim.net/v1/vendor/wallets
+
+Available reserves currency for partner.
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+fkwallet	number	
+payeer	number	
+unitpay	number	
+
+Status code : 401 Unauthorized
+
+Vendor orders history
+
+Request example
+
+curl "https://5sim.net/v1/vendor/orders?category=activation&limit=15&offset=0&order=id&reverse=true" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "Data": [],
+  "ProductNames":[],
+  "Statuses":[],
+  "Total":3
+}
+
+
+GET - https://5sim.net/v1/vendor/orders?category=$category
+
+Provides vendor's orders history by chosen category.
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+category	query string	Yes	Category can be 'hosting' or 'activation'
+limit	query string	No	Pagination limit
+offset	query string	No	Pagination offset
+order	query string	No	Pagination order, should be field name
+reverse	query string	No	Is reversed history, true / false
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+Data	array	Orders list
+ProductNames	array	Products list
+Statuses	array	Statuses list
+Total	number	Orders count
+Vendor payments history
+
+Request example
+
+curl "https://5sim.net/v1/vendor/payments?limit=15&offset=0&order=id&reverse=true" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "Data": [],
+  "PaymentProviders":null,
+  "PaymentStatuses":null,
+  "PaymentTypes":null,
+  "Total":3
+}
+
+
+GET - https://5sim.net/v1/vendor/payments
+
+Provides vendor's payments history.
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+limit	query string	No	Pagination limit
+offset	query string	No	Pagination offset
+order	query string	No	Pagination order, should be field name
+reverse	query string	No	Is reversed history, true / false
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+Data	array	Payments list
+PaymentProviders	array	Names of payments systems
+PaymentStatuses	array	Payments statuses
+PaymentTypes	array	Payments types
+Total	number	Payments count
+Create payouts
+
+Request example
+
+curl -X POST "https://5sim.net/v1/vendor/withdraw" \
+  -d '{"receiver":"1","method":"qiwi","amount":"1","fee":"unitpay"}' \
+  -H "Authorization: Bearer $token" \
+  -H "Content-Type: application/json"
+
+
+POST - https://5sim.net/v1/vendor/withdraw
+
+Create payouts for a partner.
+
+Headers
+Authorization: Bearer $token
+Content-Type: application/json
+Request parameters
+Name	Type	Required	Description
+receiver	string	Yes	Receiver
+method	string	Yes	Output method visa
+amount	string	Yes	Amount
+fee	string	Yes	Payment system fkwallet / payeer / unitpay
+Response
+
+Status code : 200 OK
+
+Vendor Prices
+Get prices list
+
+Request example
+
+curl "https://5sim.net/v1/vendor/prices" \
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+Response example
+
+{
+  "Prices": [
+    {
+      "Count":0,
+      "CountryName":"england",
+      "ID":333567,
+      "OperatorName":"virtual16",
+      "Price":22,
+      "ProductName":"facebook"
+    }
+  ],
+  "Products": ["facebook"],
+  "Country": ["england"],
+  "Operators": ["virtual16"],
+  "Total":1
+}
+
+
+GET - https://5sim.net/v1/vendor/prices
+
+GET - https://5sim.net/v1/vendor/prices?_filters={"ID":"$ID","ProductName":"$ProductName","CountryName":"$CountryName","OperatorName":"$OperatorName","Enabled":"$Enabled","Count":"$Count","AutoDisabled":"$AutoDisabled"}&_sortDir=$sortDir&_sortField=$sortField&_page=$page&_perPage=$perPage
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+_filter.ID	query string	No	Filter by record ID
+_filter.CountryName	query string	No	Filter by country
+_filter.ProductName	query string	No	Filter by product
+_filter.OperatorName	query string	No	Filter by mobile operator
+_filter.Count	query string	No	Filter by available numbers count
+_filter.Rate	query string	No	Filter by rate value
+_filter.Price	query string	No	Filter by current price
+_filter.Hours	query string	No	Filter by time validity
+_filter.DeletedAt	query string	No	Filter by deletion date
+_filter.NewPrice	query string	No	Filter by new/updated price
+_filter.NewPriceUpdatedAt	query string	No	Filter by last update date of new price
+_sortDir	query string	No	Sorting direction, can be ASC or DESC
+_sortField	query string	No	Field name to sort by (e.g., Price, Rate, Count)
+_page	query string	No	Page number for pagination
+_perPage	query string	No	Number of items per page
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+Prices	array	Prices list
+Products	array	Products list
+Countries	array	Countries list
+Operators	array	Operators list
+Total	number	Total prices count
+
+Status code : 401 Unauthorized
+
+Create price
+
+Request example
+
+curl -X PUT "https://5sim.net/v1/vendor/prices" \
+  -d '{"Price": 30, "ProductName": "facebook", "CountryName": "england", "OperatorName": "virtual52"}'\
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+PUT - https://5sim.net/v1/vendor/prices
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required
+Price	number	Yes
+ProductName	string	Yes
+CountryName	string	Yes
+OperatorName	string	Yes
+
+Status code : 200 - success
+
+Status code : 400 - ProductName is empty
+
+Change price
+
+Request example
+
+curl -X POST "https://5sim.net/v1/vendor/prices" \
+  -d '{"Price": 30, "Product": "facebook", "Country": "england", "Operator": "virtual52"}'\
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+POST - https://5sim.net/v1/vendor/prices
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required
+Price	number	Yes
+Product	string	Yes
+Country	string	Yes
+Operator	string	Yes
+
+Status code : 200 - success
+
+Status code : 400 - Product is empty
+
+Enable/Disable price
+
+Request example
+
+curl -X POST "https://5sim.net/v1/vendor/prices/disable" \
+  -d '{"Disable": true, "List": [333567]}'\
+  -H "Authorization: Bearer $token" \
+  -H "Accept: application/json"
+
+
+POST - https://5sim.net/v1/vendor/prices/disable
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Request parameters
+Name	Type	Required	Description
+Disable	boolean	Yes	Disable numbers if value is true
+List	array	No	An array of price ids. If not specified, it will apply to all prices
+
+Status code : 200 - success
+
+Status code : 400 - Product is empty
+
+Countries list
+Get countries list
+
+Response example
+
+{
+  "afghanistan":{
+    "iso":{
+      "af":1
+    },
+    "prefix":{
+      "+93":1
+    },
+    "text_en":"Afghanistan",
+    "virtual18":{
+      "activation":1
+    },
+    "virtual21":{
+      "activation":1
+    },
+    "virtual23":{
+      "activation":1
+    },
+    "virtual4":{
+      "activation":1
+    }
+  }
+}
+
+
+GET - https://5sim.net/v1/guest/countries
+
+Returns a list of countries with available operators for purchase.
+
+Headers
+Authorization: Bearer $token
+Accept: application/json
+Response
+
+Status code : 200 OK
+
+Name	Type	Description
+iso	array	ISO country code
+text_en	string	Country name in English
+Countries list
+Country	API 5SIM
+
+Afghanistan
+	afghanistan
+
+Albania
+	albania
+
+Algeria
+	algeria
+
+Angola
+	angola
+
+Antigua and Barbuda
+	antiguaandbarbuda
+
+Argentina
+	argentina
+
+Armenia
+	armenia
+
+Aruba
+	aruba
+
+Australia
+	australia
+
+Austria
+	austria
+
+Azerbaijan
+	azerbaijan
+
+Bahamas
+	bahamas
+
+Bahrain
+	bahrain
+
+Bangladesh
+	bangladesh
+
+Barbados
+	barbados
+
+Belgium
+	belgium
+
+Belize
+	belize
+
+Benin
+	benin
+
+Bhutan
+	bhutane
+
+Bosnia and Herzegovina
+	bih
+
+Bolivia
+	bolivia
+
+Botswana
+	botswana
+
+Brazil
+	brazil
+
+Bulgaria
+	bulgaria
+
+Burkina Faso
+	burkinafaso
+
+Burundi
+	burundi
+
+Cambodia
+	cambodia
+
+Cameroon
+	cameroon
+
+Canada
+	canada
+
+Cape Verde
+	capeverde
+
+Chad
+	chad
+
+Chile
+	chile
+
+Colombia
+	colombia
+
+Comoros
+	comoros
+
+Congo
+	congo
+
+Costa Rica
+	costarica
+
+Croatia
+	croatia
+
+Cyprus
+	cyprus
+
+Czechia
+	czech
+
+Denmark
+	denmark
+
+Djibouti
+	djibouti
+
+Dominican Republic
+	dominicana
+
+East Timor
+	easttimor
+
+Ecuador
+	ecuador
+
+Egypt
+	egypt
+
+England
+	england
+
+Equatorial Guinea
+	equatorialguinea
+
+Estonia
+	estonia
+
+Ethiopia
+	ethiopia
+
+Finland
+	finland
+
+France
+	france
+
+French Guiana
+	frenchguiana
+
+Gabon
+	gabon
+
+Gambia
+	gambia
+
+Georgia
+	georgia
+
+Germany
+	germany
+
+Ghana
+	ghana
+
+Greece
+	greece
+
+Guadeloupe
+	guadeloupe
+
+Guatemala
+	guatemala
+
+Guinea
+	guinea
+
+Guinea-Bissau
+	guineabissau
+
+Guyana
+	guyana
+
+Haiti
+	haiti
+
+Honduras
+	honduras
+
+Hong Kong
+	hongkong
+
+Hungary
+	hungary
+
+India
+	india
+
+Indonesia
+	indonesia
+
+Ireland
+	ireland
+
+Israel
+	israel
+
+Italy
+	italy
+
+Ivory Coast
+	ivorycoast
+
+Jamaica
+	jamaica
+
+Jordan
+	jordan
+
+Kazakhstan
+	kazakhstan
+
+Kenya
+	kenya
+
+Kuwait
+	kuwait
+
+Kyrgyzstan
+	kyrgyzstan
+
+Laos
+	laos
+
+Latvia
+	latvia
+
+Lesotho
+	lesotho
+
+Liberia
+	liberia
+
+Lithuania
+	lithuania
+
+Luxembourg
+	luxembourg
+
+Macau
+	macau
+
+Madagascar
+	madagascar
+
+Malawi
+	malawi
+
+Malaysia
+	malaysia
+
+Maldives
+	maldives
+
+Mauritania
+	mauritania
+
+Mauritius
+	mauritius
+
+Mexico
+	mexico
+
+Moldova
+	moldova
+
+Mongolia
+	mongolia
+
+Montenegro
+	montenegro
+
+Morocco
+	morocco
+
+Mozambique
+	mozambique
+
+Namibia
+	namibia
+
+Nepal
+	nepal
+
+Netherlands
+	netherlands
+
+New Caledonia
+	newcaledonia
+
+Nicaragua
+	nicaragua
+
+Nigeria
+	nigeria
+
+North Macedonia
+	northmacedonia
+
+Norway
+	norway
+
+Oman
+	oman
+
+Pakistan
+	pakistan
+
+Panama
+	panama
+
+Papua New Guinea
+	papuanewguinea
+
+Paraguay
+	paraguay
+
+Peru
+	peru
+
+Philippines
+	philippines
+
+Poland
+	poland
+
+Portugal
+	portugal
+
+Puertorico
+	puertorico
+
+Reunion
+	reunion
+
+Romania
+	romania
+
+Rwanda
+	rwanda
+
+Saint Kitts and Nevis
+	saintkittsandnevis
+
+Saint Lucia
+	saintlucia
+
+Saint Vincent and the Grenadines
+	saintvincentandgrenadines
+
+Salvador
+	salvador
+
+Samoa
+	samoa
+
+Saudi Arabia
+	saudiarabia
+
+Senegal
+	senegal
+
+Serbia
+	serbia
+
+Republic of Seychelles
+	seychelles
+
+Sierra Leone
+	sierraleone
+
+Slovakia
+	slovakia
+
+Slovenia
+	slovenia
+
+Solomon Islands
+	solomonislands
+
+South Africa
+	southafrica
+
+Spain
+	spain
+
+Sri Lanka
+	srilanka
+
+Suriname
+	suriname
+
+Swaziland
+	swaziland
+
+Sweden
+	sweden
+
+Taiwan
+	taiwan
+
+Tajikistan
+	tajikistan
+
+Tanzania
+	tanzania
+
+Thailand
+	thailand
+
+Trinidad and Tobago
+	tit
+
+Togo
+	togo
+
+Tunisia
+	tunisia
+
+Turkmenistan
+	turkmenistan
+
+Uganda
+	uganda
+
+Uruguay
+	uruguay
+
+USA
+	usa
+
+Uzbekistan
+	uzbekistan
+
+Venezuela
+	venezuela
+
+Vietnam
+	vietnam
+
+Zambia
+	zambia
+Order statuses
+PENDING - Preparation
+RECEIVED - Waiting of receipt of SMS
+CANCELED - Is cancelled
+TIMEOUT - A timeout
+FINISHED - Is complete
+BANNED - Number banned, when number already used
+Products list
+
+Activation:
+
+Service	API 5SIM
+
+1688
+	1688
+
+115com
+	115com
+
+11exch
+	11exch
+
+163com
+	163som
+
+168bethk
+	168bethk
+
+1kkirana
+	1kkirana
+
+1mg
+	1mg
+
+1q
+	1q
+
+23red
+	23red
+
+27asia
+	27asia
+
+2dehands
+	2dehands
+
+32red
+	32red
+
+3d66
+	3d66
+
+3fun
+	3fun
+
+4fun
+	4fun
+
+5696com
+	5696com
+
+5eplay
+	5eplay
+
+777ace
+	777ace
+
+888casino
+	888casino
+
+88pls
+	88pls
+
+96in
+	96in
+
+99acres
+	99acres
+
+99app
+	99app
+
+A23
+	a23
+
+Aakash
+	aakash
+
+Abvbg
+	abvbg
+
+Ace2three
+	ace2three
+
+Acko
+	acko
+
+Adani
+	adani
+
+Adda52
+	adda52
+
+Adidas
+	adidas
+
+Adobe
+	adobe
+
+Adverts
+	adverts
+
+Agroinform
+	agroinform
+
+Aiqfome
+	aiqfome
+
+Airasia
+	airasia
+
+Airbnb
+	airbnb
+
+Airindia
+	airindia
+
+Airtel
+	airtel
+
+Airtime
+	airtime
+
+Airwick
+	airwick
+
+Aitu
+	aitu
+
+Akelni
+	akelni
+
+Alchemy
+	alchemy
+
+Alfa
+	alfa
+
+Alfamidi
+	alfamidi
+
+Alfursan
+	alfursan
+
+Algida
+	algida
+
+Alibaba
+	alibaba
+
+Alibabacloud
+	alibabacloud
+
+Aliexpress
+	aliexpress
+
+Alibaba/Alipay/Taobao/1688
+	alipay
+
+Allegro
+	allegro
+
+Allofresh
+	allofresh
+
+Allwin88
+	allwin88
+
+Alphax
+	alphax
+
+Amasia
+	amasia
+
+Amazon
+	amazon
+
+Amio
+	amio
+
+Ampol
+	ampol
+
+Angi
+	angi
+
+Ankama
+	ankama
+
+Aol
+	aol
+
+Apollo
+	apollo
+
+Appen
+	appen
+
+Appinio
+	appinio
+
+Apple
+	apple
+
+Aqualudo
+	aqualudo
+
+Arenaplus
+	arenaplus
+
+Ari10
+	ari10
+
+Arihant
+	arihant
+
+Arlens
+	arlens
+
+Arvesi
+	arvesi
+
+Asdarewards
+	asdarewards
+
+Ashleymadison
+	ashleymadison
+
+Astraotoshop
+	astraotoshop
+
+Astropay
+	astropay
+
+Atlasearth
+	atlasearth
+
+Attapoll
+	attapoll
+
+Auchan
+	auchan
+
+Aukro
+	aukro
+
+Aussui
+	aussui
+
+Authy
+	authy
+
+Autoplac
+	autoplac
+
+Avon
+	avon
+
+Axscom
+	axscom
+
+Azar
+	azar
+
+Azino
+	azino
+
+B4ucabs
+	b4ucabs
+
+Babuji
+	babuji
+
+Badoo
+	badoo
+
+Baidu
+	baidu
+
+Baihe
+	baihe
+
+Bajajfinserv
+	bajajfinserv
+
+Bananatok
+	bananatok
+
+Band
+	band
+
+Banqi
+	banqi
+
+Barq
+	barq
+
+Batball11
+	batball11
+
+Bazos
+	bazos
+
+Bazr
+	bazr
+
+Bcgame
+	bcgame
+
+Bearwww
+	bearwww
+
+Bebeclub
+	bebeclub
+
+Beccric
+	beccric
+
+Becharge
+	becharge
+
+Beehiiv
+	beehiiv
+
+Benjamin
+	benjamin
+
+Benny
+	benny
+
+Bereal
+	bereal
+
+Bestbuy
+	bestbuy
+
+Bet18
+	bet18
+
+Bet365
+	bet365
+
+Betadda
+	betadda
+
+Betano
+	betano
+
+Betfair
+	betfair
+
+Betinin
+	betinin
+
+Betpari
+	betpari
+
+Betteropinion
+	betteropinion
+
+Betvet
+	betvet
+
+Biedronka
+	biedronka
+
+Bigbasket
+	bigbasket
+
+Bigbazaar
+	bigbazaar
+
+Biggg
+	biggg
+
+Bigolive
+	bigolive
+
+Bigwin
+	bigwin
+
+Biketown
+	biketown
+
+Bilibili
+	bilibili
+
+Billmill
+	billmill
+
+Billu
+	billu
+
+Binbin
+	binbin
+
+Bingoplus
+	bingoplus
+
+Bingostars
+	bingostars
+
+Binmo
+	binmo
+
+Bip
+	bip
+
+Bisu
+	bisu
+
+Bitaqaty
+	bitaqaty
+
+Bitclout
+	bitclout
+
+Bitexen
+	bitexen
+
+Bitlo
+	bitlo
+
+Bitso
+	bitso
+
+Bittube
+	bittube
+
+Bizom
+	bizom
+
+Blablacar
+	blablacar
+
+Blackbird
+	blackbird
+
+Blankstreet
+	blankstreet
+
+Blibli
+	blibli
+
+Blink
+	blink
+
+Blizzard
+	blizzard
+
+Blkapp
+	blkapp
+
+Dropped-Call Verification
+	blockchain
+
+Blued
+	blued
+
+Bluerewards
+	bluerewards
+
+Bluesky
+	bluesky
+
+Boddess
+	boddess
+
+Boletomovil
+	boletomovil
+
+Bolt
+	bolt
+
+Bonchat
+	bonchat
+
+Bookmyplayer
+	bookmyplayer
+
+Boosty
+	boosty
+
+Boots
+	boots
+
+Bosszhipin
+	bosszhipin
+
+Botim
+	botim
+
+Boyaa
+	boyaa
+
+Boylesports
+	boylesports
+
+Bpme
+	bpme
+
+Brand20ua
+	brand20ua
+
+Brevo
+	brevo
+
+Bubblex
+	bubblex
+
+Bumble
+	bumble
+
+Burgerking
+	burgerking
+
+Bwin
+	bwin
+
+Byjuslearning
+	byjuslearning
+
+Bylukz
+	bylukz
+
+Byteplus
+	byteplus
+
+Cadbury
+	cadbury
+
+Cadburyperk
+	cadburyperk
+
+Cafebazaar
+	cafebazaar
+
+Caixa
+	caixa
+
+Caliverse
+	caliverse
+
+Caltexgo
+	caltexgo
+
+Cantina
+	cantina
+
+Cardekho
+	cardekho
+
+Careem
+	careem
+
+Carousell
+	carousell
+
+Carrefour
+	carrefour
+
+Cashkaro
+	cashkaro
+
+Cashmine
+	cashmine
+
+Cashmypic
+	cashmypic
+
+Casinoandfriends
+	casinoandfriends
+
+Casinoplus
+	casinoplus
+
+Catawiki
+	catawiki
+
+Cathay
+	cathay
+
+Ccghearts
+	ccghearts
+
+Cdkeys
+	cdkeys
+
+Cekkazan
+	cekkazan
+
+Centrum
+	centrum
+
+Chagee
+	chagee
+
+Chaingefinance
+	chaingefinance
+
+Changyou
+	changyou
+
+Chargepoint
+	chargepoint
+
+Check24
+	check24
+
+Cheddar
+	cheddar
+
+Chingari
+	chingari
+
+Chippercash
+	chippercash
+
+Chispadatinglatinos
+	chispadatinglatinos
+
+Chotot
+	chotot
+
+Chromaawards
+	chromaawards
+
+Cider
+	cider
+
+Cineplex
+	cineplex
+
+Citaprevia
+	citaprevia
+
+Citybase
+	citybase
+
+Citygo
+	citygo
+
+Clapper
+	clapper
+
+Classicrummy
+	classicrummy
+
+Classpass
+	classpass
+
+ClaudeAI/Anthropic
+	claudeai
+
+Cleartrip
+	cleartrip
+
+Clerk
+	clerk
+
+Clickentregas
+	clickentregas
+
+Cliqq
+	cliqq
+
+Cloudbet
+	cloudbet
+
+Clubhouse
+	clubhouse
+
+Clubq8
+	clubq8
+
+Cmtcuzdan
+	cmtcuzdan
+
+Cocacola
+	cocacola
+
+Cocco
+	cocco
+
+Coches
+	coches
+
+Codashop
+	codashop
+
+Codeium
+	codeium
+
+Coffeemeetsbagel
+	coffeemeetsbagel
+
+Coinbase
+	coinbase
+
+Coindcx
+	coindcx
+
+Coinfantasy
+	coinfantasy
+
+Coinswitchkuber
+	coinswitchkuber
+
+Cokfiight
+	cokfiight
+
+Coles
+	coles
+
+Collabact
+	collabact
+
+Collectionpot
+	collectionpot
+
+Comeon
+	comeon
+
+Communitygaming
+	communitygaming
+
+Connecting
+	connecting
+
+Continente
+	continente
+
+Cornerstone
+	cornerstone
+
+Cotticoffe
+	cotticoffe
+
+Coupang
+	coupang
+
+Coursehero
+	coursehero
+
+Courtyard
+	courtyard
+
+Coverd
+	coverd
+
+Coze
+	coze
+
+Craigslist
+	craigslist
+
+Cricbuzz11
+	cricbuzz11
+
+Crickpe
+	crickpe
+
+Crumblcookies
+	crumblcookies
+
+Cryptocom
+	cryptocom
+
+Cryptonow
+	cryptonow
+
+Csair
+	csair
+
+Cupid
+	cupid
+
+Cupp
+	cupp
+
+Dagangan
+	dagangan
+
+Dairylea
+	dairylea
+
+Daki
+	daki
+
+Damai
+	damai
+
+Dana
+	dana
+
+Datezone
+	datezone
+
+Daveshotchicken
+	daveshotchicken
+
+Dbworld
+	dbworld
+
+Dealshare
+	dealshare
+
+Deepseek
+	deepseek
+
+Deerika
+	deerika
+
+Deliveroo
+	deliveroo
+
+Dent
+	dent
+
+Depop
+	depop
+
+Dewupoizon
+	dewupoizon
+
+Dhani
+	dhani
+
+Didi
+	didi
+
+Digihaat
+	digihaat
+
+Digikala
+	digikala
+
+Dilmil
+	dilmil
+
+Dingtalk
+	dingtalk
+
+Discord
+	discord
+
+Discoverhongkong
+	discoverhongkong
+
+Disneyhotstar
+	disneyhotstar
+
+Distrokid
+	distrokid
+
+Divar
+	divar
+
+Dmart
+	dmart
+
+Domdara
+	domdara
+
+Dominate11
+	dominate11
+
+Dominospizza
+	dominospizza
+
+Donedeal
+	donedeal
+
+Doordash
+	doordash
+
+Doorverse
+	doorverse
+
+Dosi
+	dosi
+
+Dott
+	dott
+
+Doubao
+	doubao
+
+Douyu
+	douyu
+
+Dream11
+	dream11
+
+Driffle
+	driffle
+
+Ds88hk
+	ds88hk
+
+Dtlottery
+	dtlottery
+
+Duetapp
+	duetapp
+
+Dundle
+	dundle
+
+Dunkin
+	dunkin
+
+Dunzo
+	dunzo
+
+Duolingo
+	duolingo
+
+E2zstore
+	e2zstore
+
+Earnbox
+	earnbox
+
+Earneasy
+	earneasy
+
+Easypay
+	easypay
+
+Eatclub
+	eatclub
+
+Eatsure
+	eatsure
+
+Ebay
+	ebay
+
+Ebikegewinnspiel
+	ebikegewinnspiel
+
+Echo
+	echo
+
+Edgeless
+	edgeless
+
+Edufund
+	edufund
+
+Efood
+	efood
+
+Efsanetr
+	efsanetr
+
+Egets
+	egets
+
+Egopensooq
+	egopensooq
+
+Eklottery
+	eklottery
+
+Elante
+	elante
+
+Electroneum
+	electroneum
+
+Eleme
+	eleme
+
+Eliteludo
+	eliteludo
+
+Emag
+	emag
+
+Emoney
+	emoney
+
+En365
+	en365
+
+Eneba
+	eneba
+
+Enilive
+	enilive
+
+Enjoei
+	enjoei
+
+Epicgames
+	epicgames
+
+Eplay24
+	eplay24
+
+Erome
+	erome
+
+Escapefromtarkov
+	escapefromtarkov
+
+Etmall
+	etmall
+
+Etoto
+	etoto
+
+Etsy
+	etsy
+
+Eureka
+	eureka
+
+Eventbrite
+	eventbrite
+
+Ewargames
+	ewargames
+
+Exchange22
+	exchange22
+
+Eyecon
+	eyecon
+
+Eyemyeye
+	eyemyeye
+
+Ezbuy
+	ezbuy
+
+Ezmall
+	ezmall
+
+Facebook
+	facebook
+
+Faceit
+	faceit
+
+Factoryai/Cursor
+	factoryai
+
+Fairplay
+	fairplay
+
+Fairtiq
+	fairtiq
+
+Fairwood
+	fairwood
+
+Fambase
+	fambase
+
+Fan2play
+	fan2play
+
+Fanatics
+	fanatics
+
+Fanclash
+	fanclash
+
+Fancode
+	fancode
+
+Fancrypt
+	fancrypt
+
+Fanplus
+	fanplus
+
+Fans
+	fans
+
+Fantasycricket
+	fantasycricket
+
+Farmcare
+	farmcare
+
+Fastmail
+	fastmail
+
+Fastmoss
+	fastmoss
+
+Fave
+	fave
+
+Favorited
+	favorited
+
+Fc8au
+	fc8au
+
+Fdjparionssport
+	fdjparionssport
+
+Feeld
+	feeld
+
+Feels
+	feels
+
+Feetfinder
+	feetfinder
+
+Fengsehuanxiang
+	fengsehuanxiang
+
+Fetchrewards
+	fetchrewards
+
+Fiegame
+	fiegame
+
+Fiesta
+	fiesta
+
+Fineartamerica
+	fineartamerica
+
+Finya
+	finya
+
+Fiqsy
+	fiqsy
+
+Firecrawl
+	firecrawl
+
+Firstgame
+	firstgame
+
+Fiverr
+	fiverr
+
+Fivesurveys
+	fivesurveys
+
+Flam
+	flam
+
+Flash
+	flash
+
+Flexpay
+	flexpay
+
+Flextv
+	flextv
+
+Flink
+	flink
+
+Flip
+	flip
+
+Fk
+	flipkart
+
+Flipshope
+	flipshope
+
+Flypgs
+	flypgs
+
+Foliogames
+	foliogames
+
+Foodhub
+	foodhub
+
+Foodora
+	foodora
+
+Foodpanda
+	foodpanda
+
+Foody
+	foody
+
+Footdistrict
+	footdistrict
+
+Footlocker
+	footlocker
+
+Forecoffee
+	forecoffee
+
+Forest
+	forest
+
+Formeonline
+	formeonline
+
+Fortunask
+	fortunask
+
+Forwarding
+	forwarding
+
+Fotka
+	fotka
+
+Francemobilities
+	francemobilities
+
+Fredagain
+	fredagain
+
+Freecharge
+	freecharge
+
+Freelancehunt
+	freelancehunt
+
+Freelancercom
+	freelancercom
+
+Freenow
+	freenow
+
+Freeup
+	freeup
+
+Freshtohome
+	freshtohome
+
+Friendtech
+	friendtech
+
+Frizza
+	frizza
+
+Fruitz
+	fruitz
+
+Fuelcycle
+	fuelcycle
+
+Fun77
+	fun77
+
+Fun88
+	fun88
+
+Funexch
+	funexch
+
+Funnow
+	funnow
+
+Fyda
+	fyda
+
+G2acom
+	g2acom
+
+G2g
+	g2g
+
+Gabi
+	gabi
+
+Gailsbakery
+	gailsbakery
+
+Galaxy
+	galaxy
+
+Galaxywin
+	galaxywin
+
+Game88hk
+	game88hk
+
+Gamearena
+	gamearena
+
+Gameboy88
+	gameboy88
+
+Gameflip
+	gameflip
+
+Gamekit
+	gamekit
+
+Gamer
+	gamer
+
+Gamerji
+	gamerji
+
+Gamezone
+	gamezone
+
+Gamezy
+	gamezy
+
+Gamsgo
+	gamsgo
+
+Gaode
+	gaode
+
+Garena
+	garena
+
+Geekay
+	geekay
+
+Gemini
+	gemini
+
+Genco
+	genco
+
+Gener8
+	gener8
+
+Genspark
+	genspark
+
+Get
+	get
+
+Getir
+	getir
+
+Getninjas
+	getninjas
+
+Getresponse
+	getresponse
+
+Getsbk
+	getsbk
+
+Gett
+	gett
+
+Gfkcom
+	gfkcom
+
+Gg
+	gg
+
+Gg88hk
+	gg88hk
+
+Gg88win
+	gg88win
+
+Gghasia
+	gghasia
+
+Ggpoker
+	ggpoker
+
+Giottus
+	giottus
+
+Gitlab
+	gitlab
+
+Gittigidiyor
+	gittigidiyor
+
+Global24
+	global24
+
+Globus
+	globus
+
+Glovo
+	glovo
+
+Glowroad
+	glowroad
+
+Gmng
+	gmng
+
+Gmngjourney
+	gmngjourney
+
+Gmx
+	gmx
+
+Goawin
+	goawin
+
+Gochat
+	gochat
+
+Gofundme
+	gofundme
+
+Gogorummy
+	gogorummy
+
+Gogotrux
+	gogotrux
+
+Gojek
+	gojek
+
+Goodworker
+	goodworker
+
+Google/YouTube
+	google
+
+Googlevoice
+	googlevoice
+
+Gopay
+	gopay
+
+Gopuff
+	gopuff
+
+Gosats
+	gosats
+
+Gotgameai
+	gotgameai
+
+Grabtaxi
+	grabtaxi
+
+Grailed
+	grailed
+
+Green
+	green
+
+Greggs
+	greggs
+
+Grindr
+	grindr
+
+Grofers
+	grofers
+
+Groupme
+	groupme
+
+Guicheweb
+	guicheweb
+
+Gumtree
+	gumtree
+
+Gurubets
+	gurubets
+
+Guzmanygomez
+	guzmanygomez
+
+Gyftr
+	gyftr
+
+Hacoo
+	hacoo
+
+Hamrahaval
+	hamrahaval
+
+Handypick
+	handypick
+
+Handyticket
+	handyticket
+
+Haobanai
+	haobanai
+
+Hapi
+	hapi
+
+Happn
+	happn
+
+Happygame
+	happygame
+
+Haraj
+	haraj
+
+Healthandglow
+	healthandglow
+
+Healthians
+	healthians
+
+Hellotalk
+	hellotalk
+
+Hepsiburadacom
+	hepsiburadacom
+
+Hermes
+	hermes
+
+Heybox
+	heybox
+
+Heymaxai
+	heymaxai
+
+Hezzl
+	hezzl
+
+Hfmarkets
+	hfmarkets
+
+Higo
+	higo
+
+Hily
+	hily
+
+Hinge
+	hinge
+
+Hirect
+	hirect
+
+Hitnspin
+	hitnspin
+
+Hkgames88
+	hkgames88
+
+Hkticketing
+	hkticketing
+
+Hktvmall
+	hktvmall
+
+Hobigames
+	hobigames
+
+Home4us
+	home4us
+
+Honda
+	honda
+
+Hongguoduanju
+	hongguoduanju
+
+Hopbike
+	hopbike
+
+Hopi
+	hopi
+
+Hopper
+	hopper
+
+Hornet
+	hornet
+
+Hotel101
+	hotel101
+
+Hotline
+	hotline
+
+Hotmail
+	hotmail
+
+Housing
+	housing
+
+Howzat
+	howzat
+
+Hoyoverse
+	hoyoverse
+
+Hqtrivia
+	hqtrivia
+
+Huawei
+	huawei
+
+Hubbl
+	hubbl
+
+Hubble
+	hubble
+
+Hudapp
+	hudapp
+
+Huionepay
+	huionepay
+
+Humblebundle
+	humblebundle
+
+Humta
+	humta
+
+Hungerstation
+	hungerstation
+
+Hungrypanda
+	hungrypanda
+
+Huya
+	huya
+
+Hyperbolic
+	hyperbolic
+
+Ibet
+	ibet
+
+Icard
+	icard
+
+Icecasino
+	icecasino
+
+Icicidirect
+	icicidirect
+
+Idealhome
+	idealhome
+
+Idealista
+	idealista
+
+Ifood
+	ifood
+
+Igamebuy
+	igamebuy
+
+Igxe
+	igxe
+
+Immoscout24
+	immoscout24
+
+Immowelt
+	immowelt
+
+Immutableplay
+	immutableplay
+
+Imo
+	imo
+
+Inboxlv
+	inboxlv
+
+Incheoneasy
+	incheoneasy
+
+Inclave
+	inclave
+
+Indane
+	indane
+
+Indeed
+	indeed
+
+Indianoil
+	indianoil
+
+Indiaplays
+	indiaplays
+
+Indiapolls
+	indiapolls
+
+Indibet
+	indibet
+
+Indomaret
+	indomaret
+
+Indriver
+	indriver
+
+Indslots
+	indslots
+
+Infinitepay
+	infinitepay
+
+Infomaniak
+	infomaniak
+
+Ingramspark
+	ingramspark
+
+Ininal
+	ininal
+
+Inpost
+	inpost
+
+Inshallah
+	inshallah
+
+Insomniacookies
+	insomniacookies
+
+Inspirationclub
+	inspirationclub
+
+Instacart
+	instacart
+
+Instagram/Threads
+	instagram
+
+Intoverse
+	intoverse
+
+Investro
+	investro
+
+Iost
+	iost
+
+Iplin9
+	iplin9
+
+Iplwin
+	iplwin
+
+Ipsosisay
+	ipsosisay
+
+Iqiyi
+	iqiyi
+
+Iqos
+	iqos
+
+Irctc
+	irctc
+
+Isystem
+	isystem
+
+Iwplay
+	iwplay
+
+Jackaroo
+	jackaroo
+
+Jaco
+	jaco
+
+Jagocoffee
+	jagocoffee
+
+Jamesdelivery
+	jamesdelivery
+
+Jbhifi
+	jbhifi
+
+Jd
+	jd
+
+Jeet11
+	jeet11
+
+Jeevansathi
+	jeevansathi
+
+Jili567
+	jili567
+
+Jiliwinner
+	jiliwinner
+
+Jiomart
+	jiomart
+
+Jivapetani
+	jivapetani
+
+Jjbet
+	jjbet
+
+Jkf
+	jkf
+
+Jkjoker
+	jkjoker
+
+Joymall
+	joymall
+
+Joyride
+	joyride
+
+Jspp
+	jspp
+
+Jungleepoker
+	jungleepoker
+
+Jungleerummy
+	jungleerummy
+
+Junio
+	junio
+
+Justdating
+	justdating
+
+Justdial
+	justdial
+
+Justeat
+	justeat
+
+Kaggle
+	kaggle
+
+Kaidee
+	kaidee
+
+Kaito
+	kaito
+
+Kakaotalk
+	kakaotalk
+
+Kalppmart
+	kalppmart
+
+Kalshi
+	kalshi
+
+Kalyanmatrimony
+	kalyanmatrimony
+
+Kamatera
+	kamatera
+
+Kartedirekt
+	kartedirekt
+
+Kazandirio
+	kazandirio
+
+Keeta
+	keeta
+
+Kerastase
+	kerastase
+
+Keybase
+	keybase
+
+Keypay
+	keypay
+
+Kfc
+	kfc
+
+Kgen
+	kgen
+
+Khelplayrummy
+	khelplayrummy
+
+Khelraja
+	khelraja
+
+Khiladi
+	khiladi
+
+Khmer24
+	khmer24
+
+Kiacom
+	kiacom
+
+Kingpet
+	kingpet
+
+Kintogo
+	kintogo
+
+Kisma
+	kisma
+
+Kktix
+	kktix
+
+Klook
+	klook
+
+Knuddels
+	knuddels
+
+Kolesakz
+	kolesakz
+
+Koo
+	koo
+
+Kopikenangan
+	kopikenangan
+
+Kopinako
+	kopinako
+
+Kpnfarmfresh
+	kpnfarmfresh
+
+Krummyplus
+	krummyplus
+
+Krutrim
+	krutrim
+
+Kucoinplay
+	kucoinplay
+
+Kufarby
+	kufarby
+
+Kukufm
+	kukufm
+
+Kwai
+	kwai
+
+Kwiff
+	kwiff
+
+Lakme
+	lakme
+
+Lalamove
+	lalamove
+
+Laposte
+	laposte
+
+Laylo
+	laylo
+
+Lazada
+	lazada
+
+Lbry
+	lbry
+
+League
+	league
+
+Leboncoin
+	leboncoin
+
+Lemon8
+	lemon8
+
+Lemonswan
+	lemonswan
+
+Lenskart
+	lenskart
+
+Leolist
+	leolist
+
+Lgcom
+	lgcom
+
+Lianxin
+	lianxin
+
+Licentie2go
+	licentie2go
+
+Licgames
+	licgames
+
+Lidl
+	lidl
+
+Lightchat
+	lightchat
+
+Lightningai
+	lightningai
+
+Likee
+	likee
+
+Lilibet
+	lilibet
+
+Lime
+	lime
+
+Limeroad
+	limeroad
+
+Line
+	line
+
+Linkedin
+	linkedin
+
+Linode
+	linode
+
+Livescore
+	livescore
+
+Livu
+	livu
+
+Lizbuyshouses
+	lizbuyshouses
+
+Lizol
+	lizol
+
+Locoff
+	locoff
+
+Locogg
+	locogg
+
+Loda
+	loda
+
+Loreal
+	loreal
+
+Lotoclub
+	lotoclub
+
+Lottery7
+	lottery7
+
+Lottomatica
+	lottomatica
+
+Lotus365
+	lotus365
+
+Lovelocal
+	lovelocal
+
+Lovoo
+	lovoo
+
+Luck
+	luck
+
+Luckyclub
+	luckyclub
+
+Ludosupreme
+	ludosupreme
+
+Luup
+	luup
+
+Lybrate
+	lybrate
+
+Lyft
+	lyft
+
+Lyka
+	lyka
+
+Macauticket
+	macauticket
+
+Madslots
+	madslots
+
+Magicbricks
+	magicbricks
+
+Magicpin
+	magicpin
+
+Magnolia
+	magnolia
+
+Mahabharatjigsawpuzzlesfull
+	mahabharatjigsawpuzzlesfull
+
+Mail2world
+	mail2world
+
+Mailuk
+	mailuk
+
+Makemytrip
+	makemytrip
+
+Mangot5
+	mangot5
+
+Mani777games
+	mani777games
+
+Mantrimall
+	mantrimall
+
+Manus
+	manus
+
+Mapclub
+	mapclub
+
+Maplesea
+	maplesea
+
+Marktplaats
+	marktplaats
+
+Mbmbet
+	mbmbet
+
+McDonalds
+	mcdonalds
+
+Mchat
+	mchat
+
+Medal
+	medal
+
+Medibuddy
+	medibuddy
+
+Medium
+	medium
+
+Mediworld
+	mediworld
+
+Meeff
+	meeff
+
+Meesho
+	meesho
+
+Meetic
+	meetic
+
+Meetme
+	meetme
+
+Mega
+	mega
+
+Megapari
+	megapari
+
+Meiqfashion
+	meiqfashion
+
+Meitu
+	meitu
+
+Meituan
+	meituan
+
+Meliuz
+	meliuz
+
+Memelut
+	memelut
+
+Meragaon
+	meragaon
+
+Mercado
+	mercado
+
+Mercari
+	mercari
+
+Meseems
+	meseems
+
+Meta
+	meta
+
+Metro
+	metro
+
+Mewt
+	mewt
+
+Michat
+	michat
+
+Microsoft
+	microsoft
+
+Midnite
+	midnite
+
+Mihuashi
+	mihuashi
+
+Milanuncios
+	milanuncios
+
+Miloan
+	miloan
+
+Minima
+	minima
+
+Mirchi
+	mirchi
+
+Mistralai
+	mistralai
+
+Mlbcom
+	mlbcom
+
+Mobikwik
+	mobikwik
+
+Mobile01
+	mobile01
+
+Mobilmechanicunnati
+	mobilmechanicunnati
+
+Mocospace
+	mocospace
+
+Momo
+	momo
+
+Monese
+	monese
+
+Moneyback
+	moneyback
+
+Moneylion
+	moneylion
+
+Monoapp
+	monoapp
+
+Monobank
+	monobank
+
+Monopolygo
+	monopolygo
+
+Monsterenergy
+	monsterenergy
+
+Monta
+	monta
+
+More
+	more
+
+Mosgram
+	mosgram
+
+Mostbet
+	mostbet
+
+Motorkux
+	motorkux
+
+Moveit
+	moveit
+
+Mpanels
+	mpanels
+
+Mpl
+	mpl
+
+Mrgreen
+	mrgreen
+
+Mrsool
+	mrsool
+
+Muzmu
+	muzmu
+
+Muzz
+	muzz
+
+Mwmbet
+	mwmbet
+
+My11circle
+	my11circle
+
+Mycapella
+	mycapella
+
+Myfab11
+	myfab11
+
+Myglo
+	myglo
+
+Mygoplus
+	mygoplus
+
+Myhpgas
+	myhpgas
+
+Myjar
+	myjar
+
+Mylotteries
+	mylotteries
+
+Mylove
+	mylove
+
+Mymusictaste
+	mymusictaste
+
+Myntra
+	myntra
+
+Myshopprime
+	myshopprime
+
+Mystore
+	mystore
+
+Myteam11
+	myteam11
+
+Myvalue
+	myvalue
+
+Mzadqatar
+	mzadqatar
+
+Nammayatri
+	nammayatri
+
+Nana
+	nana
+
+Nandos
+	nandos
+
+Nativecamp
+	nativecamp
+
+Naukri
+	naukri
+
+Naver
+	naver
+
+Ncsoft
+	ncsoft
+
+Neighbor
+	neighbor
+
+Nerolac
+	nerolac
+
+Netease
+	netease
+
+Netflix
+	netflix
+
+Netmarble
+	netmarble
+
+Netwin
+	netwin
+
+Nexon
+	nexon
+
+Nextdoor
+	nextdoor
+
+Nham24
+	nham24
+
+Nhseven
+	nhseven
+
+Nice88
+	nice88
+
+Nielsen
+	nielsen
+
+Nifty
+	nifty
+
+Nike
+	nike
+
+Nimo
+	nimo
+
+Nimses
+	nimses
+
+Nintendo
+	nintendo
+
+Njuskalo
+	njuskalo
+
+Nobroker
+	nobroker
+
+Noon
+	noon
+
+Norstat
+	norstat
+
+Nrjmusicawards
+	nrjmusicawards
+
+Nttgame
+	nttgame
+
+Nunstar
+	nunstar
+
+Nurturefarm
+	nurturefarm
+
+Nvidia
+	nvidia
+
+Nykaa
+	nykaa
+
+Odds96
+	odds96
+
+Offerup
+	offerup
+
+Offgamers
+	offgamers
+
+Ohiapp
+	ohiapp
+
+Okbet
+	okbet
+
+Okta
+	okta
+
+Olacabs
+	olacabs
+
+Oldubil
+	oldubil
+
+Olx
+	olx
+
+Omi
+	omi
+
+Oneforma
+	oneforma
+
+Oneplus
+	oneplus
+
+Onet
+	onet
+
+Onlinerby
+	onlinerby
+
+Ontaxi
+	ontaxi
+
+OpenAI/ChatGPT
+	openai
+
+Openphone/Quo
+	openphone
+
+Openpoint
+	openpoint
+
+Opera
+	opera
+
+Oraclecloud
+	oraclecloud
+
+Oreo
+	oreo
+
+Oreocricket
+	oreocricket
+
+Oriflame
+	oriflame
+
+Other
+	other
+
+Otipy
+	otipy
+
+Otovinn
+	otovinn
+
+Ourbit
+	ourbit
+
+Outlier
+	outlier
+
+Oyo
+	oyo
+
+Ozan
+	ozan
+
+Ozapay
+	ozapay
+
+Pacificcoffee
+	pacificcoffee
+
+Paddypower
+	paddypower
+
+Pairs
+	pairs
+
+Pampers
+	pampers
+
+Panelstation
+	panelstation
+
+Papaen
+	papaen
+
+Papara
+	papara
+
+Paperspace
+	paperspace
+
+Parimatch
+	parimatch
+
+Pawns
+	pawns
+
+Paxful
+	paxful
+
+Paycell
+	paycell
+
+Paypal
+	paypal
+
+Paysend
+	paysend
+
+Payzapp
+	payzapp
+
+Pearbee
+	pearbee
+
+Pelago
+	pelago
+
+Peoplecom
+	peoplecom
+
+Pgbonus
+	pgbonus
+
+Phable
+	phable
+
+Pharmeasy
+	pharmeasy
+
+Phocketcharge
+	phocketcharge
+
+Phoenix
+	phoenix
+
+Picnic
+	picnic
+
+Picpay
+	picpay
+
+Pikkit
+	pikkit
+
+Pinduoduo
+	pinduoduo
+
+Pingpong
+	pingpong
+
+Pisos
+	pisos
+
+Pixels
+	pixels
+
+Pizzahut
+	pizzahut
+
+Planetarium
+	planetarium
+
+Planetfans
+	planetfans
+
+Playerauctions
+	playerauctions
+
+Playerzpot
+	playerzpot
+
+Playojo
+	playojo
+
+Playrummy
+	playrummy
+
+Playship
+	playship
+
+Playtento
+	playtento
+
+Playuzu
+	playuzu
+
+Plnmobile
+	plnmobile
+
+Ploom
+	ploom
+
+Pluxee
+	pluxee
+
+Pocket52
+	pocket52
+
+Pocketludo
+	pocketludo
+
+Poeai
+	poeai
+
+Pof
+	pof
+
+Poikey
+	poikey
+
+Pokec
+	pokec
+
+Pokerbaazi
+	pokerbaazi
+
+Pokercircle
+	pokercircle
+
+Pokermaster
+	pokermaster
+
+Pokersaints
+	pokersaints
+
+Polo
+	polo
+
+Poparide
+	poparide
+
+Popmart
+	popmart
+
+Porter
+	porter
+
+Poshmark
+	poshmark
+
+Potato
+	potato
+
+Powerkredite
+	powerkredite
+
+Prajmeriz2020
+	prajmeriz2020
+
+Premiumbandai
+	premiumbandai
+
+Premiumone
+	premiumone
+
+Premmia
+	premmia
+
+Prezzee
+	prezzee
+
+Primeopinion
+	primeopinion
+
+Probo
+	probo
+
+Prodege
+	prodege
+
+Prom
+	prom
+
+Proton
+	proton
+
+Protonmail
+	protonmail
+
+Proxy302
+	proxy302
+
+Pubg
+	pubg
+
+Publix
+	publix
+
+Pureplatfrom
+	pureplatfrom
+
+Purpllecom
+	purpllecom
+
+Pvrcinemas
+	pvrcinemas
+
+Pyromusic
+	pyromusic
+
+Q12trivia
+	q12trivia
+
+Qantas
+	qantas
+
+Qbet
+	qbet
+
+Qoo10
+	qoo10
+
+Qpon
+	qpon
+
+Qqpk
+	qqpk
+
+Quack
+	quack
+
+Quikr
+	quikr
+
+Quipp
+	quipp
+
+Qumpara
+	qumpara
+
+Radiate
+	radiate
+
+Radquest
+	radquest
+
+Rainmaker
+	rainmaker
+
+Rakuten
+	rakuten
+
+Rapido
+	rapido
+
+Rappi
+	rappi
+
+Ravpass
+	ravpass
+
+Razer
+	razer
+
+Real11
+	real11
+
+Realresearcher
+	realresearcher
+
+Reblz
+	reblz
+
+Rebtel
+	rebtel
+
+Receipthog
+	receipthog
+
+Redbook/Xiaohongshu
+	redbook
+
+Redbubble
+	redbubble
+
+Redbus
+	redbus
+
+Reddit
+	reddit
+
+Reddybook
+	reddybook
+
+Rediffmail
+	rediffmail
+
+Reelskit
+	reelskit
+
+Reinbow
+	reinbow
+
+Relicdao
+	relicdao
+
+Religare
+	religare
+
+Remotasks
+	remotasks
+
+Resal
+	resal
+
+Retailmenot
+	retailmenot
+
+Reuse
+	reuse
+
+Revoltmotors
+	revoltmotors
+
+Richkart
+	richkart
+
+Ride
+	ride
+
+Ridery
+	ridery
+
+Ring
+	ring
+
+Riotgames
+	riotgames
+
+Ripkord
+	ripkord
+
+Roblox
+	roblox
+
+Rocketreach
+	rocketreach
+
+Rooter
+	rooter
+
+Roposo
+	roposo
+
+Rover
+	rover
+
+Royalwin
+	royalwin
+
+Rozetka
+	rozetka
+
+Rozrummy
+	rozrummy
+
+Rslot
+	rslot
+
+Rummy
+	rummy
+
+Rummy365
+	rummy365
+
+Rummycircle
+	rummycircle
+
+Rummyculture
+	rummyculture
+
+Rummyjax
+	rummyjax
+
+Rummymoment
+	rummymoment
+
+Rummymost
+	rummymost
+
+Rummywealth
+	rummywealth
+
+Rush
+	rush
+
+Ryde
+	ryde
+
+Sahicoin
+	sahicoin
+
+Salams
+	salams
+
+Samsungshop
+	samsungshop
+
+Santiao
+	santiao
+
+Sapo
+	sapo
+
+Scruff
+	scruff
+
+Seamlessai
+	seamlessai
+
+Seated
+	seated
+
+Seloger
+	seloger
+
+Sendinblue
+	sendinblue
+
+Sendwave
+	sendwave
+
+Seosprint
+	seosprint
+
+Serpapi
+	serpapi
+
+Servexplus
+	servexplus
+
+Servify
+	servify
+
+Seznam
+	seznam
+
+Sgmid
+	sgmid
+
+Shabik
+	shabik
+
+Shareparty
+	shareparty
+
+Shctyclub
+	shctyclub
+
+Sheerid
+	sheerid
+
+Shein
+	shein
+
+Shellbox
+	shellbox
+
+Shinebrandseeds
+	shinebrandseeds
+
+Shop101
+	shop101
+
+Shopback
+	shopback
+
+Shopee
+	shopee
+
+Shopify
+	shopify
+
+Shpock
+	shpock
+
+Signal
+	signal
+
+Sikayetvar
+	sikayetvar
+
+Sikka
+	sikka
+
+Silicon Flow/Guiji Liudong
+	siliconflow
+
+Singl
+	singl
+
+Siply
+	siply
+
+Sisal
+	sisal
+
+Sixer11
+	sixer11
+
+Skout
+	skout
+
+Skrill
+	skrill
+
+Skybet
+	skybet
+
+Skype
+	skype
+
+Slikk
+	slikk
+
+Slotstars
+	slotstars
+
+Slott
+	slott
+
+Smilesuae
+	smilesuae
+
+Smitten
+	smitten
+
+Smytten
+	smytten
+
+Snai
+	snai
+
+Snapchat
+	snapchat
+
+Snapdeal
+	snapdeal
+
+Snappfood
+	snappfood
+
+Sneakerboy
+	sneakerboy
+
+Sneakersnstuff
+	sneakersnstuff
+
+Snkrdunk
+	snkrdunk
+
+Snpit
+	snpit
+
+Soarfun
+	soarfun
+
+Socios
+	socios
+
+Sonyliv
+	sonyliv
+
+Sorare
+	sorare
+
+Soulapp
+	soulapp
+
+Soulchill
+	soulchill
+
+Spade365
+	spade365
+
+Spar
+	spar
+
+Sparkdriver
+	sparkdriver
+
+Spartanpoker
+	spartanpoker
+
+Spinmillion29
+	spinmillion29
+
+Splitdrop
+	splitdrop
+
+Sponline
+	sponline
+
+Sportgully
+	sportgully
+
+Sportsbaazi
+	sportsbaazi
+
+Sportsbuzz11
+	sportsbuzz11
+
+Spothit
+	spothit
+
+Spotify
+	spotify
+
+Sprite
+	sprite
+
+Srgame
+	srgame
+
+Ssoidnet
+	ssoidnet
+
+Starchatsite
+	starchatsite
+
+Starofluck
+	starofluck
+
+Starquik
+	starquik
+
+Steam
+	steam
+
+Steemit
+	steemit
+
+Stockydodo
+	stockydodo
+
+Storewards
+	storewards
+
+Studyiq
+	studyiq
+
+Subito
+	subito
+
+Sugarwallet
+	sugarwallet
+
+Suki
+	suki
+
+Suno
+	suno
+
+Supercell
+	supercell
+
+Supercom
+	supercom
+
+Superwalk
+	superwalk
+
+Suprdaily
+	suprdaily
+
+Surveoo
+	surveoo
+
+Surveyon
+	surveyon
+
+Surveytime
+	surveytime
+
+Suzuki
+	suzuki
+
+Svip777
+	svip777
+
+Swagbucks
+	swagbucks
+
+Swash
+	swash
+
+Sweet
+	sweet
+
+Swiftysports
+	swiftysports
+
+Swiggy
+	swiggy
+
+Switips
+	switips
+
+Swvl
+	swvl
+
+Synottip
+	synottip
+
+Tada
+	tada
+
+Taimi
+	taimi
+
+Tajrummy
+	tajrummy
+
+Taker
+	taker
+
+Taki
+	taki
+
+Taksheel
+	taksheel
+
+Talabat
+	talabat
+
+Tamtam
+	tamtam
+
+Tango
+	tango
+
+Tantan
+	tantan
+
+Taobao
+	taobao
+
+Taprummy
+	taprummy
+
+Taskdealsin
+	taskdealsin
+
+Taskverse
+	taskverse
+
+Tatacliq
+	tatacliq
+
+Tatacliqpalette
+	tatacliqpalette
+
+Tataneu
+	tataneu
+
+Tatneft
+	tatneft
+
+Techxr
+	techxr
+
+Teenpattijoy
+	teenpattijoy
+
+Teenpattimaster
+	teenpattimaster
+
+Teenpattistarpro
+	teenpattistarpro
+
+Telegram
+	telegram
+
+Temtemone
+	temtemone
+
+Temu
+	temu
+
+Tencentqq
+	tencentqq
+
+Tenrenstea
+	tenrenstea
+
+Terd
+	terd
+
+Theconcert
+	theconcert
+
+Thefork
+	thefork
+
+Thehaat
+	thehaat
+
+Theoremreach
+	theoremreach
+
+Thinkacademy
+	thinkacademy
+
+Thisfate
+	thisfate
+
+Thumbtack
+	thumbtack
+
+Thxapp
+	thxapp
+
+Ticketmaster
+	ticketmaster
+
+Ticketone
+	ticketone
+
+Ticketplus
+	ticketplus
+
+Ticketswap
+	ticketswap
+
+Tier
+	tier
+
+Tigergames
+	tigergames
+
+Tiktok/Douyin
+	tiktok
+
+Timesprime
+	timesprime
+
+Tinder
+	tinder
+
+Tipsportgamechanger
+	tipsportgamechanger
+
+Tiptapp
+	tiptapp
+
+Tlzsl
+	tlzsl
+
+Todaybet
+	todaybet
+
+Tokopedia
+	tokopedia
+
+Tomatok
+	tomatok
+
+Tomorocoffe
+	tomorocoffe
+
+Tongchengtravel
+	tongchengtravel
+
+Toobit
+	toobit
+
+Toprun
+	toprun
+
+Tosla
+	tosla
+
+Totalbet
+	totalbet
+
+Totalcoin
+	totalcoin
+
+Totalpass
+	totalpass
+
+Touchance
+	touchance
+
+Toutiao
+	toutiao
+
+Towngas
+	towngas
+
+Towns
+	towns
+
+Toyou
+	toyou
+
+Tpower
+	tpower
+
+Tradexmarket
+	tradexmarket
+
+Tradingleagues
+	tradingleagues
+
+Tradingview
+	tradingview
+
+Treasury
+	treasury
+
+Trendyol
+	trendyol
+
+Tricket
+	tricket
+
+Trip
+	trip
+
+Truecaller
+	truecaller
+
+Truefan
+	truefan
+
+Truthsocial
+	truthsocial
+
+Tujia
+	tujia
+
+Tuul
+	tuul
+
+Tvsmotor
+	tvsmotor
+
+Twelfthman
+	twelfthman
+
+Twilio
+	twilio
+
+Twitch
+	twitch
+
+Twitter/X
+	twitter
+
+Uaev
+	uaev
+
+Uber
+	uber
+
+Ubisoft
+	ubisoft
+
+Uklon
+	uklon
+
+Ukrnet
+	ukrnet
+
+Ultragaz
+	ultragaz
+
+Umob
+	umob
+
+Unacademy
+	unacademy
+
+Unibit11
+	unibit11
+
+Unitedairlines
+	unitedairlines
+
+Unitedworldinstituteofdesign
+	unitedworldinstituteofdesign
+
+Unityexch
+	unityexch
+
+Universalbeijingresort
+	universalbeijingresort
+
+Unni
+	unni
+
+Unocoin
+	unocoin
+
+Upland
+	upland
+
+Uploaded
+	uploaded
+
+Upward
+	upward
+
+Upwork
+	upwork
+
+Userlyticssecurity
+	userlyticssecurity
+
+Uu163
+	uu163
+
+Valora
+	valora
+
+Vantage
+	vantage
+
+Vbet
+	vbet
+
+Vedantu
+	vedantu
+
+Venmo
+	venmo
+
+Verifykit
+	verifykit
+
+Vernyj
+	vernyj
+
+Verse
+	verse
+
+Vertt
+	vertt
+
+Vfcity
+	vfcity
+
+Vfsglobal
+	vfsglobal
+
+Viber
+	viber
+
+Vidio
+	vidio
+
+Vinita
+	vinita
+
+Vinota
+	vinota
+
+Vinted
+	vinted
+
+Virginred
+	virginred
+
+Vishalmegamart
+	vishalmegamart
+
+Vision11
+	vision11
+
+Voggt
+	voggt
+
+Voi
+	voi
+
+Voopee
+	voopee
+
+Vscric
+	vscric
+
+Vtmarkets
+	vtmarkets
+
+Wallapop
+	wallapop
+
+Walmart
+	walmart
+
+Wanmeigames
+	wanmeigames
+
+Warpcast
+	warpcast
+
+Watcho
+	watcho
+
+Watermelonvideo
+	watermelonvideo
+
+Watsons
+	watsons
+
+Watsonswaterdropsoffun
+	watsonswaterdropsoffun
+
+Waug
+	waug
+
+Weareher
+	weareher
+
+Web3auth
+	web3auth
+
+Webde
+	webde
+
+Webmotors
+	webmotors
+
+Wechat
+	wechat
+
+Weex
+	weex
+
+Wefun
+	wefun
+
+Weibo
+	weibo
+
+Weidian
+	weidian
+
+Weku
+	weku
+
+Wellify
+	wellify
+
+Welocalize
+	welocalize
+
+Weplay
+	weplay
+
+Wepoker
+	wepoker
+
+Wert
+	wert
+
+Weststein
+	weststein
+
+Wetv
+	wetv
+
+Weverse
+	weverse
+
+Whatnot
+	whatnot
+
+Whatsapp
+	whatsapp
+
+Wherestart
+	wherestart
+
+Wild
+	wild
+
+Willhaben
+	willhaben
+
+Win33ww
+	win33ww
+
+Win369
+	win369
+
+Winbuzz
+	winbuzz
+
+Winee3
+	winee3
+
+Winfortune
+	winfortune
+
+Wingmall
+	wingmall
+
+Wingmoney
+	wingmoney
+
+Winston
+	winston
+
+Winzo
+	winzo
+
+Wise
+	wise
+
+Wizely
+	wizely
+
+Wmaraci
+	wmaraci
+
+Wolt
+	wolt
+
+Wondermart
+	wondermart
+
+Woohoo
+	woohoo
+
+Wooplus
+	wooplus
+
+Worldremit
+	worldremit
+
+Wownow
+	wownow
+
+Wowzy
+	wowzy
+
+Wykoppl
+	wykoppl
+
+Wynk
+	wynk
+
+Xhsapp
+	xhsapp
+
+Xianyu
+	xianyu
+
+Xiaomi
+	xiaomi
+
+Ximalaya
+	ximalaya
+
+Xingchengonline
+	xingchengonline
+
+Xmcom
+	xmcom
+
+Xunyou
+	xunyou
+
+Yaay
+	yaay
+
+Yahoo
+	yahoo
+
+Yalla
+	yalla
+
+Yango
+	yango
+
+Yarabodega
+	yarabodega
+
+Ybirds
+	ybirds
+
+Yemeksepeti
+	yemeksepeti
+
+Yesno
+	yesno
+
+Yikyak
+	yikyak
+
+Yindii
+	yindii
+
+Yn777
+	yn777
+
+Yocket
+	yocket
+
+Yolk
+	yolk
+
+Yolo247
+	yolo247
+
+Yongshiwangluo
+	yongshiwangluo
+
+Yophone
+	yophone
+
+Yoshinoya
+	yoshinoya
+
+Yougotagift
+	yougotagift
+
+Yougovshopper
+	yougovshopper
+
+Youpin898
+	youpin898
+
+Youstar
+	youstar
+
+Yoyovoicechat
+	yoyovoicechat
+
+Yoyowallet
+	yoyowallet
+
+Yu11fantasy
+	yu11fantasy
+
+Yuanbao
+	yuanbao
+
+Yubo
+	yubo
+
+Yuewen
+	yuewen
+
+Yylive
+	yylive
+
+Zabkajush
+	zabkajush
+
+Zalo
+	zalo
+
+Zambrero
+	zambrero
+
+Zara
+	zara
+
+Zcity
+	zcity
+
+Zeabur
+	zeabur
+
+Zebpay
+	zebpay
+
+Zepto
+	zepto
+
+Zero2
+	zero2
+
+Zhihu
+	zhihu
+
+Zhipuai
+	zhipuai
+
+Ziglu
+	ziglu
+
+Zingbus
+	zingbus
+
+Zipwin
+	zipwin
+
+Zoho
+	zoho
+
+Zomato
+	zomato
+
+Zoominfo
+	zoominfo
+
+Zuiyou
+	zuiyou
+
+Zupee
+	zupee
+
+Hosting:
+
+3hours
+1day
+10days
+1month
+Operators list
+
+In order to get a list of operators, you need authorization.
+
+Structure of SMS
+
+Response example
+
+{
+    "sms": [
+        {
+            "created_at":"1970-12-01T17:23:25.106597Z",
+            "date":"1970-12-01T17:23:15Z",
+            "sender":"Facebook",
+            "text":"Use 415127 as your login code",
+            "code":"415127"
+        }
+    ]
+}
+
+Name	Type	Description
+created_at	date string	When SMS was created
+date	date string	When SMS received
+sender	string	Sender name
+text	string	Text of SMS
+code	string	Received activation code
+Limits
+
+100 requests per second by IP address, http error code 503
+
+100 requests per second by API_KEY, http error code 429
+
+100 requests per second buy number, http error code 503
+
+If requests reach limit within 10 minutes 5 times then ban 10 minutes
+
+Rating
+
+Description of the rating system.
+
+The user's current rating is displayed in the account settings, the "General" tab.
+
+The initial rating for new users is 96 points.
+
+The maximum possible rating is 96 points.
+
+The rating is formed from the following parameters:
+
+Actions	Rating (points)
+Account replenishment	+8
+Completed Purchase Before Code Elapsed Time	+0.5
+Automatically Completed Purchase After Time Allowed To Get Code	+0.4
+Timeout	-0.15
+Canceled purchase	-0.1
+The number was sent to the ban	-0.1
+
+If the rating drops to zero, then you will not be able to place an order on the site within 24 hours. After 24 hours, the rating will return to the initial value - 96 points.
