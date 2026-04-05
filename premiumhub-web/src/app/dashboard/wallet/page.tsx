@@ -1,19 +1,57 @@
 "use client"
 
 import axios from 'axios'
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, CircleAlert, CircleCheck, Loader2, RefreshCcw } from 'lucide-react'
+import { ArrowRight, CircleAlert, Loader2, RefreshCcw, Sparkles } from 'lucide-react'
 
-import WalletCard from '@/components/shared/WalletCard'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
 import type { WalletLedger, WalletTopup } from '@/types/wallet'
 
-const QUICK_AMOUNTS = [10000, 25000, 50000, 100000, 200000, 500000]
+const MIN_TOPUP = 10000
+const NETFLIX_PRICE = 25000
+const QUICK_AMOUNTS = [25000, 50000, 100000, 200000]
 
-function topupStatusBadge(status: string) {
+const PAYMENT_METHODS = [
+  { name: 'QRIS', icon: '⬛', fee: 'Gratis' },
+  { name: 'Transfer BCA', icon: '🏦', fee: 'Gratis' },
+  { name: 'GoPay', icon: '💚', fee: 'Gratis' },
+  { name: 'OVO', icon: '💜', fee: 'Gratis' },
+  { name: 'Dana', icon: '💙', fee: 'Gratis' },
+  { name: 'ShopeePay', icon: '🧡', fee: 'Gratis' },
+] as const
+
+type TxFilter = 'all' | 'topup' | 'purchase' | 'refund'
+type LedgerGroup = 'topup' | 'purchase' | 'refund' | 'other'
+
+function formatCompactAmount(value: number) {
+  if (value >= 1000) {
+    return `Rp ${Math.round(value / 1000)}rb`
+  }
+  return formatRupiah(value)
+}
+
+function normalizeLedgerGroup(ledger: WalletLedger): LedgerGroup {
+  const category = (ledger.category || '').toLowerCase()
+  const type = (ledger.type || '').toLowerCase()
+
+  if (category.includes('topup') || type.includes('topup')) return 'topup'
+  if (category.includes('refund') || type.includes('refund')) return 'refund'
+  if (category.includes('purchase') || type.includes('purchase') || type === 'debit') return 'purchase'
+
+  return 'other'
+}
+
+function isCreditLedger(ledger: WalletLedger) {
+  const type = (ledger.type || '').toLowerCase()
+  const group = normalizeLedgerGroup(ledger)
+  return type === 'credit' || group === 'topup' || group === 'refund'
+}
+
+function topupStatusClass(status: string) {
   switch (status) {
     case 'success':
     case 'paid':
@@ -27,6 +65,19 @@ function topupStatusBadge(status: string) {
   }
 }
 
+function txVisual(group: LedgerGroup) {
+  switch (group) {
+    case 'topup':
+      return { icon: '⬆️', bg: 'bg-green-100' }
+    case 'purchase':
+      return { icon: '🛍️', bg: 'bg-amber-100' }
+    case 'refund':
+      return { icon: '↩️', bg: 'bg-blue-100' }
+    default:
+      return { icon: '💳', bg: 'bg-slate-100' }
+  }
+}
+
 export default function WalletPage() {
   const router = useRouter()
   const { setWalletBalance } = useAuthStore()
@@ -34,17 +85,41 @@ export default function WalletPage() {
   const [balance, setBalance] = useState(0)
   const [topups, setTopups] = useState<WalletTopup[]>([])
   const [ledgers, setLedgers] = useState<WalletLedger[]>([])
+
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-
-  const [amount, setAmount] = useState<number>(QUICK_AMOUNTS[2])
   const [submitting, setSubmitting] = useState(false)
+
+  const [amount, setAmount] = useState<number>(QUICK_AMOUNTS[1])
+  const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHODS)[number]['name']>('QRIS')
+  const [txFilter, setTxFilter] = useState<TxFilter>('all')
   const [error, setError] = useState('')
 
   const selectedAmount = useMemo(() => {
     if (Number.isNaN(amount) || amount <= 0) return 0
     return Math.floor(amount)
   }, [amount])
+
+  const estimatedBalance = useMemo(() => balance + selectedAmount, [balance, selectedAmount])
+
+  const affordabilityCount = useMemo(() => Math.floor(balance / NETFLIX_PRICE), [balance])
+
+  const totalTopup = useMemo(() => {
+    return ledgers
+      .filter((ledger) => normalizeLedgerGroup(ledger) === 'topup')
+      .reduce((sum, ledger) => sum + ledger.amount, 0)
+  }, [ledgers])
+
+  const totalSpent = useMemo(() => {
+    return ledgers
+      .filter((ledger) => normalizeLedgerGroup(ledger) === 'purchase')
+      .reduce((sum, ledger) => sum + ledger.amount, 0)
+  }, [ledgers])
+
+  const filteredLedgers = useMemo(() => {
+    if (txFilter === 'all') return ledgers
+    return ledgers.filter((ledger) => normalizeLedgerGroup(ledger) === txFilter)
+  }, [ledgers, txFilter])
 
   const fetchAll = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -53,8 +128,8 @@ export default function WalletPage() {
     try {
       const [balanceRes, topupRes, ledgerRes] = await Promise.all([
         walletService.getBalance(),
-        walletService.listTopups({ page: 1, limit: 10 }),
-        walletService.listLedger({ page: 1, limit: 10 }),
+        walletService.listTopups({ page: 1, limit: 20 }),
+        walletService.listLedger({ page: 1, limit: 50 }),
       ])
 
       if (balanceRes.success) {
@@ -85,8 +160,8 @@ export default function WalletPage() {
   }
 
   const handleCreateTopup = async () => {
-    if (!selectedAmount || selectedAmount < 1000) {
-      setError('Nominal minimal Rp1.000')
+    if (selectedAmount < MIN_TOPUP) {
+      setError(`Nominal minimal ${formatRupiah(MIN_TOPUP)}`)
       return
     }
 
@@ -118,9 +193,12 @@ export default function WalletPage() {
   }
 
   return (
-    <div>
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="text-2xl font-extrabold">Wallet</h1>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight">Wallet Saya 💰</h1>
+          <p className="text-sm text-[#888] mt-1">Kelola saldo dan riwayat transaksi kamu</p>
+        </div>
         <button
           type="button"
           onClick={() => fetchAll(true)}
@@ -132,134 +210,285 @@ export default function WalletPage() {
         </button>
       </div>
 
-      <WalletCard
-        balance={balance}
-        totalTopup={0}
-        totalSpent={0}
-        loading={loading}
-        onTopUp={() => {
-          const formEl = document.getElementById('wallet-topup-form')
-          formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }}
-      />
+      <section className="relative overflow-hidden rounded-2xl bg-[#141414] p-6 md:p-7 text-white">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-52 w-52 rounded-full bg-white/5" />
+        <div className="pointer-events-none absolute -right-4 -bottom-14 h-36 w-36 rounded-full bg-white/5" />
 
-      <section id="wallet-topup-form" className="bg-white rounded-2xl border border-[#EBEBEB] p-5 md:p-6 mb-6">
-        <h2 className="text-lg font-bold mb-1">Buat Topup</h2>
-        <p className="text-sm text-[#888] mb-5">Struktur basic dulu. Detail UX bisa kamu poles bebas.</p>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
-          {QUICK_AMOUNTS.map((quick) => (
-            <button
-              key={quick}
-              type="button"
-              onClick={() => setAmount(quick)}
-              className={`px-3 py-2 rounded-xl text-sm font-semibold border transition-colors ${
-                amount === quick
-                  ? 'border-[#FF5733] bg-[#FFF3EF] text-[#FF5733]'
-                  : 'border-[#EBEBEB] bg-white text-[#444] hover:bg-[#F7F7F5]'
-              }`}
-            >
-              {formatRupiah(quick)}
-            </button>
-          ))}
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-xs font-semibold text-[#888] mb-1.5">Nominal custom</label>
-          <input
-            type="number"
-            min={1000}
-            step={1000}
-            value={amount}
-            onChange={(e) => setAmount(Number(e.target.value))}
-            className="w-full px-4 py-3 rounded-xl border border-[#EBEBEB] text-sm focus:outline-none focus:border-[#FF5733]"
-          />
-        </div>
-
-        {error && (
-          <div className="mb-4 text-sm rounded-xl bg-red-50 text-red-600 px-3 py-2 inline-flex items-center gap-2">
-            <CircleAlert className="w-4 h-4" />
-            {error}
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
+          <div>
+            <div className="text-[11px] uppercase tracking-wider font-semibold text-white/45 mb-2">Saldo Tersedia</div>
+            <div className="text-3xl md:text-4xl font-extrabold tracking-tight">
+              {loading ? 'Memuat saldo...' : formatRupiah(balance)}
+            </div>
+            <div className="text-sm text-white/45 mt-2">
+              {affordabilityCount >= 1
+                ? `Cukup untuk ${affordabilityCount}× pembelian Netflix`
+                : 'Saldo belum cukup untuk pembelian berikutnya'}
+            </div>
           </div>
-        )}
 
-        <button
-          type="button"
-          onClick={handleCreateTopup}
-          disabled={submitting || selectedAmount < 1000}
-          className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#FF5733] text-white text-sm font-bold hover:bg-[#e64d2e] disabled:opacity-60"
-        >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Buat Invoice Topup
-          <ArrowRight className="w-4 h-4" />
-        </button>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+            Aktif
+          </div>
+        </div>
+
+        <div className="relative grid grid-cols-3 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+          <div className="p-3 md:p-4 border-r border-white/10">
+            <div className="text-[11px] text-white/45 mb-1">Total Top Up</div>
+            <div className="text-sm md:text-base font-bold text-emerald-300">{formatRupiah(totalTopup)}</div>
+          </div>
+          <div className="p-3 md:p-4 border-r border-white/10">
+            <div className="text-[11px] text-white/45 mb-1">Total Digunakan</div>
+            <div className="text-sm md:text-base font-bold text-rose-300">{formatRupiah(totalSpent)}</div>
+          </div>
+          <div className="p-3 md:p-4">
+            <div className="text-[11px] text-white/45 mb-1">Transaksi</div>
+            <div className="text-sm md:text-base font-bold text-white/85">{ledgers.length} kali</div>
+          </div>
+        </div>
       </section>
 
-      <section className="bg-white rounded-2xl border border-[#EBEBEB] p-5 md:p-6 mb-6">
-        <h2 className="text-lg font-bold mb-4">Riwayat Topup</h2>
-        {topups.length === 0 ? (
-          <p className="text-sm text-[#888]">Belum ada topup.</p>
-        ) : (
-          <div className="space-y-3">
-            {topups.map((topup) => (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
+          <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
+            <h2 className="text-sm font-bold">Top Up Saldo</h2>
+            <span className="text-xs text-[#888]">Min. {formatRupiah(MIN_TOPUP)}</span>
+          </header>
+
+          <div className="p-5 space-y-4">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wide text-[#888] mb-2">Pilih Nominal</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {QUICK_AMOUNTS.map((quick) => {
+                  const selected = selectedAmount === quick
+                  return (
+                    <button
+                      key={quick}
+                      type="button"
+                      onClick={() => setAmount(quick)}
+                      className={`relative rounded-xl border px-2 py-3 text-center transition-colors ${
+                        selected
+                          ? 'border-[#141414] bg-[#FAFAF8]'
+                          : 'border-[#EBEBEB] bg-white hover:bg-[#FAFAF8] hover:border-[#D8D8D5]'
+                      }`}
+                    >
+                      {quick === 50000 ? (
+                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-[#FF5733] text-white px-2 py-0.5 rounded-full">
+                          Populer
+                        </span>
+                      ) : null}
+                      <div className="text-sm font-extrabold">{formatCompactAmount(quick)}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wide text-[#888] mb-2">Atau Masukkan Nominal</div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#888]">Rp</span>
+                <input
+                  type="number"
+                  min={MIN_TOPUP}
+                  step={1000}
+                  value={amount || ''}
+                  onChange={(e) => setAmount(Number(e.target.value))}
+                  className="w-full rounded-xl border border-[#EBEBEB] pl-11 pr-3 py-3 text-sm font-semibold focus:outline-none focus:border-[#141414]"
+                  placeholder="Contoh: 75000"
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wide text-[#888] mb-2">Metode Pembayaran</div>
+              <div className="grid grid-cols-3 gap-2">
+                {PAYMENT_METHODS.map((method) => {
+                  const selected = paymentMethod === method.name
+                  return (
+                    <button
+                      key={method.name}
+                      type="button"
+                      onClick={() => setPaymentMethod(method.name)}
+                      className={`relative rounded-xl border px-1.5 py-2.5 transition-colors ${
+                        selected
+                          ? 'border-[#141414] bg-[#FAFAF8]'
+                          : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D5]'
+                      }`}
+                    >
+                      {selected ? (
+                        <span className="absolute right-1 top-1 h-3.5 w-3.5 rounded-full bg-[#141414] text-white text-[8px] leading-[14px] font-black">✓</span>
+                      ) : null}
+                      <div className="text-lg leading-none mb-1">{method.icon}</div>
+                      <div className="text-[10px] font-semibold text-[#141414] leading-tight">{method.name}</div>
+                      <div className="text-[9px] text-green-700 font-semibold">{method.fee}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#EBEBEB] bg-[#F7F7F5] px-4 py-3 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[#888]">Nominal top up</span>
+                <span className="font-semibold">{selectedAmount >= MIN_TOPUP ? formatRupiah(selectedAmount) : 'Belum dipilih'}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[#888]">Metode bayar</span>
+                <span className="font-semibold">{paymentMethod}</span>
+              </div>
+              <div className="pt-2 border-t border-[#EBEBEB] flex items-center justify-between">
+                <span className="text-sm font-bold">Saldo setelah top up</span>
+                <span className="text-base font-extrabold">{formatRupiah(estimatedBalance)}</span>
+              </div>
+              <p className="text-[11px] text-[#888]">Kode unik dari provider akan ditambahkan setelah invoice dibuat.</p>
+            </div>
+
+            {error ? (
+              <div className="rounded-xl bg-red-50 text-red-600 px-3 py-2 text-sm inline-flex items-center gap-2">
+                <CircleAlert className="w-4 h-4" />
+                {error}
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={handleCreateTopup}
+              disabled={submitting || selectedAmount < MIN_TOPUP}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF5733] px-4 py-3 text-sm font-bold text-white hover:bg-[#e64d2e] disabled:opacity-50"
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Top Up Sekarang
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </section>
+
+        <div className="space-y-4">
+          <section className="rounded-2xl bg-gradient-to-br from-[#141414] to-[#2A2A2A] p-5 text-white flex flex-col md:flex-row md:items-center gap-3">
+            <div className="text-3xl">⚡</div>
+            <div className="flex-1">
+              <h3 className="text-sm font-bold mb-1">Beli 1 Klik dengan Wallet</h3>
+              <p className="text-xs text-white/60">Nggak perlu redirect payment gateway tiap transaksi.</p>
+            </div>
+            <Link
+              href="/katalog"
+              className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#141414] hover:opacity-90"
+            >
+              Beli Sekarang
+            </Link>
+          </section>
+
+          <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
+            <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
+              <h2 className="text-sm font-bold">Riwayat Mutasi</h2>
+              <button type="button" onClick={() => router.push('/dashboard/riwayat-order')} className="text-xs text-[#888] hover:text-[#141414]">
+                Lihat semua →
+              </button>
+            </header>
+
+            <div className="px-4 py-3 border-b border-[#EBEBEB] flex gap-2 overflow-x-auto">
+              {(['all', 'topup', 'purchase', 'refund'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setTxFilter(filter)}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                    txFilter === filter
+                      ? 'bg-[#141414] border-[#141414] text-white'
+                      : 'bg-white border-[#EBEBEB] text-[#888] hover:border-[#141414] hover:text-[#141414]'
+                  }`}
+                >
+                  {filter === 'all' ? 'Semua' : filter === 'topup' ? 'Top Up' : filter === 'purchase' ? 'Pembelian' : 'Refund'}
+                </button>
+              ))}
+            </div>
+
+            <div className="divide-y divide-[#EBEBEB]">
+              {filteredLedgers.length === 0 ? (
+                <div className="p-5 text-sm text-[#888]">Belum ada mutasi untuk filter ini.</div>
+              ) : (
+                filteredLedgers.slice(0, 8).map((ledger) => {
+                  const group = normalizeLedgerGroup(ledger)
+                  const visual = txVisual(group)
+                  const credit = isCreditLedger(ledger)
+
+                  return (
+                    <div key={ledger.id} className="px-5 py-3 hover:bg-[#FAFAF8] transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className={`h-10 w-10 rounded-xl ${visual.bg} flex items-center justify-center text-lg shrink-0`}>{visual.icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold truncate">{ledger.description || ledger.category || 'Transaksi wallet'}</div>
+                          <div className="text-xs text-[#888] mt-0.5 truncate">{formatDate(ledger.created_at)} • {ledger.reference}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className={`text-sm font-extrabold ${credit ? 'text-green-600' : 'text-[#141414]'}`}>
+                            {credit ? '+' : '-'}{formatRupiah(ledger.amount)}
+                          </div>
+                          <div className="text-[11px] text-[#888] mt-0.5">Saldo: {formatRupiah(ledger.balance_after)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
+        <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
+          <h2 className="text-sm font-bold">Invoice Topup Terakhir</h2>
+          <button type="button" onClick={() => fetchAll(true)} className="text-xs text-[#888] hover:text-[#141414] inline-flex items-center gap-1">
+            <RefreshCcw className="w-3.5 h-3.5" />
+            Muat ulang
+          </button>
+        </header>
+
+        <div className="divide-y divide-[#EBEBEB]">
+          {topups.length === 0 ? (
+            <div className="p-5 text-sm text-[#888]">Belum ada invoice topup.</div>
+          ) : (
+            topups.slice(0, 8).map((topup) => (
               <button
-                type="button"
                 key={topup.id}
+                type="button"
                 onClick={() => router.push(`/dashboard/wallet/topup?id=${topup.id}`)}
-                className="w-full text-left rounded-xl border border-[#EBEBEB] p-4 hover:bg-[#F7F7F5] transition-colors"
+                className="w-full px-5 py-3 text-left hover:bg-[#FAFAF8] transition-colors"
               >
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
-                    <div className="text-sm font-bold">{formatRupiah(topup.payable_amount ?? topup.total_credit ?? topup.amount ?? topup.requested_amount ?? 0)}</div>
-                    <div className="text-xs text-[#888]">{formatDate(topup.created_at)} • {topup.provider_trx_id ?? topup.midtrans_order_id ?? topup.id}</div>
+                    <div className="text-sm font-bold">
+                      {formatRupiah(topup.payable_amount ?? topup.total_credit ?? topup.amount ?? topup.requested_amount ?? 0)}
+                    </div>
+                    <div className="text-xs text-[#888] mt-1">
+                      {formatDate(topup.created_at)} • {topup.provider_trx_id ?? topup.midtrans_order_id ?? topup.id}
+                    </div>
                   </div>
+
                   <div className="flex items-center gap-2">
-                    <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold capitalize ${topupStatusBadge(topup.status)}`}>
+                    <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold capitalize ${topupStatusClass(topup.status)}`}>
                       {topup.status}
                     </span>
-                    {(topup.is_overdue || topup.status === 'expired') && (
-                      <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-gray-200 text-gray-700">
-                        overdue
-                      </span>
-                    )}
+                    {topup.is_overdue ? (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-gray-200 text-gray-700">overdue</span>
+                    ) : null}
                   </div>
                 </div>
               </button>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="bg-white rounded-2xl border border-[#EBEBEB] p-5 md:p-6">
-        <h2 className="text-lg font-bold mb-4">Ledger Wallet</h2>
-        {ledgers.length === 0 ? (
-          <p className="text-sm text-[#888]">Belum ada mutasi.</p>
-        ) : (
-          <div className="space-y-2">
-            {ledgers.map((ledger) => {
-              const isCredit = ledger.type === 'credit' || ledger.type === 'topup' || ledger.type === 'refund'
-              return (
-                <div key={ledger.id} className="rounded-xl border border-[#EBEBEB] p-3 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold">{ledger.description || ledger.category}</div>
-                    <div className="text-xs text-[#888]">{formatDate(ledger.created_at)} • {ledger.reference}</div>
-                  </div>
-                  <div className={`text-sm font-bold ${isCredit ? 'text-green-600' : 'text-red-600'}`}>
-                    {isCredit ? '+' : '-'}{formatRupiah(ledger.amount)}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
-
-      {!loading && topups.length === 0 && ledgers.length === 0 && (
-        <div className="mt-5 text-xs text-[#888] inline-flex items-center gap-2">
-          <CircleCheck className="w-4 h-4 text-green-600" />
-          Struktur wallet sudah kepasang. Tinggal lo poles UI/UX sesuai style final.
+            ))
+          )}
         </div>
-      )}
+      </section>
+
+      {!loading && topups.length === 0 && ledgers.length === 0 ? (
+        <div className="inline-flex items-center gap-2 rounded-xl border border-[#EBEBEB] bg-white px-3 py-2 text-xs text-[#888]">
+          <Sparkles className="w-3.5 h-3.5" />
+          Wallet masih kosong. Bikin topup pertama biar dashboard ini hidup.
+        </div>
+      ) : null}
     </div>
   )
 }

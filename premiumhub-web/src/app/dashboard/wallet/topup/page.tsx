@@ -4,7 +4,7 @@ import axios from 'axios'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CircleAlert, CircleCheckBig, Clock3, Loader2, RefreshCcw } from 'lucide-react'
+import { ArrowLeft, CircleAlert, CircleCheckBig, Clock3, Loader2, RefreshCcw } from 'lucide-react'
 
 import { walletService } from '@/services/walletService'
 import type { WalletTopup } from '@/types/wallet'
@@ -22,6 +22,20 @@ function statusTone(status: WalletTopup['status']) {
       return 'bg-gray-100 text-gray-700 border-gray-200'
     default:
       return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+  }
+}
+
+function statusLabel(status: WalletTopup['status']) {
+  switch (status) {
+    case 'success':
+    case 'paid':
+      return 'success'
+    case 'failed':
+      return 'failed'
+    case 'expired':
+      return 'expired'
+    default:
+      return 'pending'
   }
 }
 
@@ -90,6 +104,7 @@ function WalletTopupStatusContent() {
         setError(res.message)
         return
       }
+
       setTopup(res.data)
       if (res.data.status === 'success' || res.data.status === 'paid') {
         refreshBalance()
@@ -132,63 +147,97 @@ function WalletTopupStatusContent() {
     )
   }
 
-  return (
-    <div>
-      <h1 className="text-2xl font-extrabold mb-6">Status Topup</h1>
+  const transferAmount = topup?.payable_amount ?? topup?.total_credit ?? topup?.amount ?? topup?.requested_amount ?? 0
+  const expiresAt = topup?.expires_at ?? topup?.expired_at
 
-      <section className="bg-white rounded-2xl border border-[#EBEBEB] p-5 md:p-6 mb-6">
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => router.push('/dashboard/wallet')}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#EBEBEB] bg-white px-3 py-1.5 text-xs font-semibold text-[#555] hover:bg-[#F7F7F5]"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Kembali
+        </button>
+        <h1 className="text-2xl font-extrabold tracking-tight">Status Topup</h1>
+      </div>
+
+      <section className="relative overflow-hidden rounded-2xl bg-[#141414] p-6 text-white">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/5" />
+
         {loading ? (
-          <div className="inline-flex items-center gap-2 text-sm text-[#888]">
+          <div className="inline-flex items-center gap-2 text-sm text-white/70">
             <Loader2 className="w-4 h-4 animate-spin" />
             Memuat data topup...
           </div>
         ) : topup ? (
-          <>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-              <div>
-                <div className="text-xs font-semibold text-[#888]">Invoice</div>
-                <div className="text-sm font-bold">{topup.provider_trx_id ?? topup.midtrans_order_id ?? topup.id}</div>
-              </div>
-              <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border capitalize ${statusTone(topup.status)}`}>
-                {topup.status === 'pending' ? <Clock3 className="w-3.5 h-3.5" /> : <CircleCheckBig className="w-3.5 h-3.5" />}
-                {topup.status}
-              </span>
+          <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-white/45 mb-2">Invoice</div>
+              <div className="text-sm font-bold break-all">{topup.provider_trx_id ?? topup.midtrans_order_id ?? topup.id}</div>
+
+              <div className="mt-5 text-[11px] uppercase tracking-wide text-white/45">Nominal Transfer</div>
+              <div className="text-3xl font-extrabold tracking-tight mt-1">{formatRupiah(transferAmount)}</div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl bg-[#F7F7F5] p-3">
-                <div className="text-xs text-[#888] mb-1">Nominal Topup</div>
-                <div className="font-bold">{formatRupiah(topup.requested_amount ?? topup.amount ?? 0)}</div>
-              </div>
-              <div className="rounded-xl bg-[#F7F7F5] p-3">
-                <div className="text-xs text-[#888] mb-1">Nominal Transfer</div>
-                <div className="font-bold">{formatRupiah(topup.payable_amount ?? topup.total_credit ?? topup.amount ?? 0)}</div>
-              </div>
-              <div className="rounded-xl bg-[#F7F7F5] p-3">
-                <div className="text-xs text-[#888] mb-1">Dibuat</div>
-                <div className="font-bold">{formatDate(topup.created_at)}</div>
-              </div>
-              <div className="rounded-xl bg-[#F7F7F5] p-3">
-                <div className="text-xs text-[#888] mb-1">Expired</div>
-                <div className="font-bold">{topup.expires_at || topup.expired_at ? formatDate(topup.expires_at ?? topup.expired_at ?? '') : '-'}</div>
-              </div>
-            </div>
-
-            {topup.unique_code ? (
-              <p className="text-xs text-[#888] mt-4">Kode unik: <span className="font-semibold text-[#141414]">{topup.unique_code}</span></p>
-            ) : null}
-          </>
+            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold capitalize ${statusTone(topup.status)}`}>
+              {topup.status === 'pending' ? <Clock3 className="w-3.5 h-3.5" /> : <CircleCheckBig className="w-3.5 h-3.5" />}
+              {statusLabel(topup.status)}
+            </span>
+          </div>
         ) : (
-          <div className="text-sm text-[#888]">Topup tidak ditemukan.</div>
+          <p className="text-sm text-white/70">Topup tidak ditemukan.</p>
         )}
       </section>
 
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-5 inline-flex items-center gap-2">
+      {topup ? (
+        <section className="bg-white rounded-2xl border border-[#EBEBEB] p-5 md:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl bg-[#F7F7F5] p-3">
+              <div className="text-xs text-[#888] mb-1">Nominal Topup</div>
+              <div className="font-bold">{formatRupiah(topup.requested_amount ?? topup.amount ?? 0)}</div>
+            </div>
+            <div className="rounded-xl bg-[#F7F7F5] p-3">
+              <div className="text-xs text-[#888] mb-1">Nominal Transfer</div>
+              <div className="font-bold">{formatRupiah(transferAmount)}</div>
+            </div>
+            <div className="rounded-xl bg-[#F7F7F5] p-3">
+              <div className="text-xs text-[#888] mb-1">Dibuat</div>
+              <div className="font-bold">{formatDate(topup.created_at)}</div>
+            </div>
+            <div className="rounded-xl bg-[#F7F7F5] p-3">
+              <div className="text-xs text-[#888] mb-1">Expired</div>
+              <div className="font-bold">{expiresAt ? formatDate(expiresAt) : '-'}</div>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl bg-[#F7F7F5] p-3">
+              <div className="text-xs text-[#888] mb-1">Provider Status</div>
+              <div className="font-bold capitalize">{topup.provider_status || topup.status}</div>
+            </div>
+            <div className="rounded-xl bg-[#F7F7F5] p-3">
+              <div className="text-xs text-[#888] mb-1">Kode Unik</div>
+              <div className="font-bold">{topup.unique_code ?? '-'}</div>
+            </div>
+          </div>
+
+          {topup.status === 'pending' ? (
+            <div className="mt-4 rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-4 py-3 text-xs text-[#666] leading-relaxed">
+              Polling otomatis jalan tiap 3 detik. Kalau udah transfer tapi status belum gerak, klik <strong>Cek Status Sekarang</strong>.
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {error ? (
+        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 inline-flex items-center gap-2">
           <CircleAlert className="w-4 h-4" />
           {error}
         </div>
-      )}
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -210,9 +259,11 @@ function WalletTopupStatusContent() {
         </button>
       </div>
 
-      {finalStatus && (topup?.status === 'success' || topup?.status === 'paid') && (
-        <p className="text-sm text-green-700 mt-4">Topup sudah sukses. Saldo wallet otomatis ikut update.</p>
-      )}
+      {finalStatus && (topup?.status === 'success' || topup?.status === 'paid') ? (
+        <p className="rounded-xl bg-green-50 border border-green-100 px-4 py-3 text-sm text-green-700">
+          Topup sukses. Saldo wallet otomatis ke-update.
+        </p>
+      ) : null}
     </div>
   )
 }
