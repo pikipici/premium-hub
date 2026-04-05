@@ -25,6 +25,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	claimRepo := repository.NewClaimRepo(db)
 	notifRepo := repository.NewNotificationRepo(db)
 	walletRepo := repository.NewWalletRepo(db)
+	fiveSimOrderRepo := repository.NewFiveSimOrderRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg)
@@ -35,6 +36,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
 	paymentSvc := service.NewPaymentService(orderRepo, orderSvc)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
+	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, nil)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc, cfg)
@@ -42,6 +44,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
 	walletHandler := handler.NewWalletHandler(walletSvc)
+	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
 	claimHandler := handler.NewClaimHandler(claimSvc)
 	stockHandler := handler.NewStockHandler(stockSvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
@@ -92,6 +95,20 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/wallet/topups/:id", walletHandler.GetTopup)
 	protected.POST("/wallet/topups/:id/check", walletHandler.CheckTopup)
 
+	protected.GET("/5sim/catalog/countries", fiveSimHandler.GetCountries)
+	protected.GET("/5sim/catalog/products", fiveSimHandler.GetProducts)
+	protected.GET("/5sim/catalog/prices", fiveSimHandler.GetPrices)
+
+	protected.GET("/5sim/orders", fiveSimHandler.ListOrders)
+	protected.POST("/5sim/orders/activation", fiveSimHandler.BuyActivation)
+	protected.POST("/5sim/orders/hosting", fiveSimHandler.BuyHosting)
+	protected.POST("/5sim/orders/reuse", fiveSimHandler.ReuseNumber)
+	protected.GET("/5sim/orders/:id", fiveSimHandler.CheckOrder)
+	protected.POST("/5sim/orders/:id/finish", fiveSimHandler.FinishOrder)
+	protected.POST("/5sim/orders/:id/cancel", fiveSimHandler.CancelOrder)
+	protected.POST("/5sim/orders/:id/ban", fiveSimHandler.BanOrder)
+	protected.GET("/5sim/orders/:id/sms-inbox", fiveSimHandler.GetSMSInbox)
+
 	protected.POST("/claims", claimHandler.Create)
 	protected.GET("/claims", claimHandler.List)
 	protected.GET("/claims/:id", claimHandler.GetByID)
@@ -101,6 +118,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.Use(middleware.Auth(cfg.JWTSecret), middleware.AdminOnly())
 
 	admin.GET("/dashboard", adminHandler.Dashboard)
+	admin.GET("/5sim/profile", fiveSimHandler.GetProviderProfile)
+	admin.GET("/5sim/orders", fiveSimHandler.GetProviderOrderHistory)
 
 	admin.GET("/products", productHandler.AdminList)
 	admin.POST("/products", productHandler.Create)

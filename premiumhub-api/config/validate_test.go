@@ -71,6 +71,21 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject invalid fivesim timeout", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                "development",
+			JWTSecret:             "super-secure-secret-value-32chars++",
+			CookieSameSite:        "lax",
+			AuthRateLimitMax:      "20",
+			AuthRateLimitWindow:   "1m",
+			FiveSimHTTPTimeoutSec: "500",
+		}
+		err := cfg.Validate()
+		if err == nil || !strings.Contains(err.Error(), "FIVESIM_HTTP_TIMEOUT_SEC") {
+			t.Fatalf("expected FIVESIM timeout error, got: %v", err)
+		}
+	})
+
 	t.Run("production requires neticon fields", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:    "production",
@@ -86,6 +101,7 @@ func TestConfigValidate(t *testing.T) {
 			"NETICON_API_KEY",
 			"NETICON_USER_ID",
 			"NETICON_BASE_URL",
+			"FIVESIM_API_KEY",
 		} {
 			if !strings.Contains(msg, expected) {
 				t.Fatalf("expected error to contain %q, got: %s", expected, msg)
@@ -95,15 +111,17 @@ func TestConfigValidate(t *testing.T) {
 
 	t.Run("production passes when complete", func(t *testing.T) {
 		cfg := &Config{
-			AppEnv:              "Production",
-			JWTSecret:           "super-secure-secret-value-32chars++",
-			NeticonAPIKey:       "NP_xxx",
-			NeticonUserID:       "MERCHANT_01",
-			NeticonBaseURL:      "https://qris.neticonpay.my.id/qris.php",
-			CookieSameSite:      "strict",
-			CookieSecure:        true,
-			AuthRateLimitMax:    "25",
-			AuthRateLimitWindow: "2m",
+			AppEnv:                "Production",
+			JWTSecret:             "super-secure-secret-value-32chars++",
+			NeticonAPIKey:         "NP_xxx",
+			NeticonUserID:         "MERCHANT_01",
+			NeticonBaseURL:        "https://qris.neticonpay.my.id/qris.php",
+			FiveSimAPIKey:         "FS_xxx",
+			FiveSimHTTPTimeoutSec: "15",
+			CookieSameSite:        "strict",
+			CookieSecure:          true,
+			AuthRateLimitMax:      "25",
+			AuthRateLimitWindow:   "2m",
 		}
 		if err := cfg.Validate(); err != nil {
 			t.Fatalf("expected valid production config, got: %v", err)

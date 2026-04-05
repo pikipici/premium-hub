@@ -25,3 +25,4 @@ Server akan auto-migrate tabel saat start.
 - `GOOGLE_CLIENT_ID` wajib jika mau aktifkan Google login/signup
 - `COOKIE_SAMESITE=none` mewajibkan `COOKIE_SECURE=true`
 - `AUTH_RATE_LIMIT_MAX` + `AUTH_RATE_LIMIT_WINDOW` mengatur throttle endpoint auth
+- `FIVESIM_API_KEY` wajib diisi untuk fitur integrasi 5sim (wajib di production)

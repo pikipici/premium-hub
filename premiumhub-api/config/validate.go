@@ -43,6 +43,12 @@ func (c *Config) Validate() error {
 			problems = append(problems, "AUTH_RATE_LIMIT_WINDOW harus format duration valid (contoh: 1m, 30s)")
 		}
 	}
+	if v := strings.TrimSpace(c.FiveSimHTTPTimeoutSec); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 120 {
+			problems = append(problems, "FIVESIM_HTTP_TIMEOUT_SEC harus angka 1-120")
+		}
+	}
 
 	if appEnv == "production" {
 		if strings.TrimSpace(c.NeticonAPIKey) == "" {
@@ -53,6 +59,9 @@ func (c *Config) Validate() error {
 		}
 		if strings.TrimSpace(c.NeticonBaseURL) == "" {
 			problems = append(problems, "NETICON_BASE_URL wajib diisi di production")
+		}
+		if strings.TrimSpace(c.FiveSimAPIKey) == "" {
+			problems = append(problems, "FIVESIM_API_KEY wajib diisi di production")
 		}
 	}
 

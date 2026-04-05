@@ -14,6 +14,7 @@ type Config struct {
 	JWTSecret, JWTExpiry                                                string
 	MidtransServerKey, MidtransClientKey, MidtransEnv                   string
 	NeticonBaseURL, NeticonAPIKey, NeticonUserID, NeticonHTTPTimeoutSec string
+	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                string
 	WalletTopupExpiryMinutes                                            string
 	SMTPHost, SMTPPort, SMTPUser, SMTPPass, FrontendURL                 string
 	CookieDomain, CookieSameSite                                        string
@@ -47,6 +48,9 @@ func Load() *Config {
 		NeticonAPIKey:            e("NETICON_API_KEY", ""),
 		NeticonUserID:            e("NETICON_USER_ID", ""),
 		NeticonHTTPTimeoutSec:    e("NETICON_HTTP_TIMEOUT_SEC", "10"),
+		FiveSimBaseURL:           e("FIVESIM_BASE_URL", "https://5sim.net/v1"),
+		FiveSimAPIKey:            e("FIVESIM_API_KEY", ""),
+		FiveSimHTTPTimeoutSec:    e("FIVESIM_HTTP_TIMEOUT_SEC", "15"),
 		WalletTopupExpiryMinutes: e("WALLET_TOPUP_EXPIRY_MINUTES", "15"),
 		SMTPHost:                 e("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:                 e("SMTP_PORT", "587"),
