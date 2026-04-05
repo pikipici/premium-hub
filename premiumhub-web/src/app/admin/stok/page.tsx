@@ -1,3 +1,11 @@
+import AdminStyles from '@/components/admin/admin-styles'
+import StokPage from '@/components/admin/stok-page'
+
 export default function AdminStokPage() {
-  return <div><h1>AdminStok — TODO</h1></div>
+  return (
+    <>
+      <AdminStyles />
+      <StokPage />
+    </>
+  )
 }

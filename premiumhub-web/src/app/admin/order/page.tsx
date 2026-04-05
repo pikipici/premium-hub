@@ -1,3 +1,11 @@
+import AdminStyles from '@/components/admin/admin-styles'
+import OrderPage from '@/components/admin/order-page'
+
 export default function AdminOrderPage() {
-  return <div><h1>AdminOrder — TODO</h1></div>
+  return (
+    <>
+      <AdminStyles />
+      <OrderPage />
+    </>
+  )
 }

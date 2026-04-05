@@ -1,3 +1,11 @@
+import AdminStyles from '@/components/admin/admin-styles'
+import GaransiPage from '@/components/admin/garansi-page'
+
 export default function AdminGaransiPage() {
-  return <div><h1>AdminGaransi — TODO</h1></div>
+  return (
+    <>
+      <AdminStyles />
+      <GaransiPage />
+    </>
+  )
 }

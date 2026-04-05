@@ -1,3 +1,13 @@
+"use client"
+
+import AdminStyles from '@/components/admin/admin-styles'
+import ProdukPage from '@/components/admin/produk-page'
+
 export default function AdminProdukPage() {
-  return <div><h1>AdminProduk — TODO</h1></div>
+  return (
+    <>
+      <AdminStyles />
+      <ProdukPage onNavigate={() => {}} onEditProduk={() => {}} />
+    </>
+  )
 }
