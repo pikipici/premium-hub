@@ -55,6 +55,17 @@ BACKEND_DIR="${PROJECT_ROOT}/premiumhub-api"
 RUN_GO_MOD_TIDY="${RUN_GO_MOD_TIDY:-0}"   # default: jangan mutate deps saat deploy
 NPM_FLAGS="${NPM_FLAGS:---include=dev --no-audit --no-fund}"
 
+# Git update behavior (deterministic by default)
+# - ff-only   : aman, gagal kalau diverged (default)
+# - rebase    : pull --rebase
+# - hard-reset: paksa samakan ke origin/<branch> (drop local changes)
+GIT_UPDATE_MODE="${GIT_UPDATE_MODE:-ff-only}"
+
+# Default ketat: stop kalau working tree kotor supaya deploy bisa diprediksi
+ALLOW_DIRTY_TREE="${ALLOW_DIRTY_TREE:-0}"
+AUTO_STASH="${AUTO_STASH:-0}"
+SHOW_GIT_SUMMARY="${SHOW_GIT_SUMMARY:-1}"
+
 # Health check targets
 FE_HEALTH_URL="${FE_HEALTH_URL:-http://127.0.0.1:3002/}"
 BE_HEALTH_URL="${BE_HEALTH_URL:-http://127.0.0.1:8081/healthz}"
@@ -99,6 +110,14 @@ wait_for_http() {
   return 1
 }
 
+git_is_dirty() {
+  [[ -n "$(git status --porcelain)" ]]
+}
+
+git_head_summary() {
+  git show -s --format='%h %ci %s' "$1"
+}
+
 # ---------- Precheck ----------
 step_start "PRECHECK"
 command -v git >/dev/null
@@ -135,14 +154,46 @@ log_info "Starting git update on branch: ${BRANCH}"
 git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  log_warn "Working tree kotor, auto-stash sebelum pull --rebase"
-  STASH_REF="deploy-autostash-$(date +%s)"
-  git stash push -u -m "${STASH_REF}"
-  STASH_CREATED=1
+if [[ "${SHOW_GIT_SUMMARY}" == "1" ]]; then
+  log_info "Local HEAD : $(git_head_summary HEAD)"
+  log_info "Remote HEAD: $(git_head_summary "origin/${BRANCH}")"
 fi
 
-git pull --rebase origin "${BRANCH}"
+if git_is_dirty; then
+  if [[ "${ALLOW_DIRTY_TREE}" == "1" ]]; then
+    if [[ "${AUTO_STASH}" == "1" ]]; then
+      log_warn "Working tree kotor, AUTO_STASH=1 -> stash sebelum update"
+      STASH_REF="deploy-autostash-$(date +%s)"
+      git stash push -u -m "${STASH_REF}"
+      STASH_CREATED=1
+    else
+      log_warn "Working tree kotor, ALLOW_DIRTY_TREE=1 + AUTO_STASH=0 -> lanjut tanpa stash"
+    fi
+  else
+    log_err "Working tree kotor. Deploy dihentikan biar deterministic."
+    git status --short || true
+    log_err "Override (jika sadar risikonya): ALLOW_DIRTY_TREE=1 (opsional AUTO_STASH=1)"
+    exit 1
+  fi
+fi
+
+case "${GIT_UPDATE_MODE}" in
+  ff-only)
+    git pull --ff-only origin "${BRANCH}"
+    ;;
+  rebase)
+    git pull --rebase origin "${BRANCH}"
+    ;;
+  hard-reset)
+    log_warn "GIT_UPDATE_MODE=hard-reset -> reset ke origin/${BRANCH} (local changes dibuang)"
+    git reset --hard "origin/${BRANCH}"
+    git clean -fd
+    ;;
+  *)
+    log_err "GIT_UPDATE_MODE tidak valid: ${GIT_UPDATE_MODE}. Gunakan: ff-only|rebase|hard-reset"
+    exit 1
+    ;;
+esac
 
 if [[ "${STASH_CREATED}" == "1" ]]; then
   log_info "Mencoba restore perubahan lokal (git stash pop)..."
@@ -152,6 +203,18 @@ if [[ "${STASH_CREATED}" == "1" ]]; then
     log_warn "Stash pop conflict. Periksa manual via 'git status' dan 'git stash list'"
     exit 1
   fi
+fi
+
+LOCAL_HEAD="$(git rev-parse HEAD)"
+REMOTE_HEAD="$(git rev-parse "origin/${BRANCH}")"
+if [[ "${LOCAL_HEAD}" == "${REMOTE_HEAD}" ]]; then
+  log_ok "HEAD synced ke origin/${BRANCH}: $(git rev-parse --short HEAD)"
+else
+  log_warn "HEAD lokal beda dari origin/${BRANCH}. local=$(git rev-parse --short "${LOCAL_HEAD}") remote=$(git rev-parse --short "${REMOTE_HEAD}")"
+fi
+
+if [[ "${SHOW_GIT_SUMMARY}" == "1" ]]; then
+  log_info "Deploy commit: $(git_head_summary HEAD)"
 fi
 
 step_done "PULL LATEST CODE"
