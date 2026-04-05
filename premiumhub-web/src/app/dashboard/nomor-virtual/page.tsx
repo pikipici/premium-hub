@@ -991,7 +991,7 @@ export default function NomorVirtualPage() {
                             </div>
                             <div className="min-w-0">
                               <div className="text-sm font-semibold text-[#141414] truncate">{country.name}</div>
-                              <div className="text-[11px] text-[#888] truncate">{country.prefix || 'prefix tidak tersedia'}</div>
+                              <div className="text-[11px] text-[#888] truncate">{country.prefix || 'Prefix nomor tidak diketahui'}</div>
                             </div>
                           </div>
                           {active ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : null}
