@@ -72,8 +72,8 @@ func (h *FiveSimHandler) BuyActivation(c *gin.Context) {
 	}
 
 	response.Created(c, "Nomor 5sim berhasil dibeli", gin.H{
-		"local_order":    localOrder,
-		"provider_order": providerOrder,
+		"local_order":    sanitizeFiveSimLocalOrder(localOrder),
+		"provider_order": sanitizeFiveSimProviderOrder(providerOrder),
 	})
 }
 
@@ -92,8 +92,8 @@ func (h *FiveSimHandler) BuyHosting(c *gin.Context) {
 	}
 
 	response.Created(c, "Nomor hosting 5sim berhasil dibeli", gin.H{
-		"local_order":    localOrder,
-		"provider_order": providerOrder,
+		"local_order":    sanitizeFiveSimLocalOrder(localOrder),
+		"provider_order": sanitizeFiveSimProviderOrder(providerOrder),
 	})
 }
 
@@ -112,8 +112,8 @@ func (h *FiveSimHandler) ReuseNumber(c *gin.Context) {
 	}
 
 	response.Created(c, "Reuse nomor 5sim berhasil", gin.H{
-		"local_order":    localOrder,
-		"provider_order": providerOrder,
+		"local_order":    sanitizeFiveSimLocalOrder(localOrder),
+		"provider_order": sanitizeFiveSimProviderOrder(providerOrder),
 	})
 }
 
@@ -137,7 +137,7 @@ func (h *FiveSimHandler) ListOrders(c *gin.Context) {
 		return
 	}
 
-	response.SuccessWithMeta(c, "OK", rows, response.Meta{
+	response.SuccessWithMeta(c, "OK", sanitizeFiveSimLocalOrders(rows), response.Meta{
 		Page:       page,
 		Limit:      limit,
 		Total:      total,
@@ -226,7 +226,43 @@ func (h *FiveSimHandler) runOrderAction(
 	}
 
 	response.Success(c, successMessage, gin.H{
-		"local_order":    localOrder,
-		"provider_order": providerOrder,
+		"local_order":    sanitizeFiveSimLocalOrder(localOrder),
+		"provider_order": sanitizeFiveSimProviderOrder(providerOrder),
 	})
+}
+
+func sanitizeFiveSimLocalOrder(order *model.FiveSimOrder) *model.FiveSimOrder {
+	if order == nil {
+		return nil
+	}
+
+	safe := *order
+	safe.ProviderPrice = 0
+	safe.RawPayload = ""
+	return &safe
+}
+
+func sanitizeFiveSimProviderOrder(order *service.FiveSimOrderPayload) *service.FiveSimOrderPayload {
+	if order == nil {
+		return nil
+	}
+
+	safe := *order
+	safe.Price = 0
+	return &safe
+}
+
+func sanitizeFiveSimLocalOrders(rows []model.FiveSimOrder) []model.FiveSimOrder {
+	if len(rows) == 0 {
+		return rows
+	}
+
+	safeRows := make([]model.FiveSimOrder, len(rows))
+	for i := range rows {
+		safeRows[i] = rows[i]
+		safeRows[i].ProviderPrice = 0
+		safeRows[i].RawPayload = ""
+	}
+
+	return safeRows
 }

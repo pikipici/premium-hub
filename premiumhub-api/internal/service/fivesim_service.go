@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -59,6 +60,19 @@ type FiveSimProviderHistoryInput struct {
 	Reverse  bool
 }
 
+type FiveSimCatalogPriceRow struct {
+	Operator    string `json:"operator"`
+	WalletDebit int64  `json:"wallet_debit"`
+	NumberCount *int64 `json:"number_count,omitempty"`
+}
+
+type FiveSimCatalogPricesResponse struct {
+	Country  string                   `json:"country"`
+	Product  string                   `json:"product"`
+	Currency string                   `json:"currency"`
+	Prices   []FiveSimCatalogPriceRow `json:"prices"`
+}
+
 func NewFiveSimService(
 	cfg *config.Config,
 	userRepo *repository.UserRepo,
@@ -100,15 +114,24 @@ func (s *FiveSimService) GetCatalogProducts(ctx context.Context, userID uuid.UUI
 	return res, nil
 }
 
-func (s *FiveSimService) GetCatalogPrices(ctx context.Context, userID uuid.UUID, country, product string) (map[string]any, error) {
+func (s *FiveSimService) GetCatalogPrices(ctx context.Context, userID uuid.UUID, country, product string) (*FiveSimCatalogPricesResponse, error) {
 	if err := s.ensureUserActive(userID); err != nil {
 		return nil, err
 	}
-	res, err := s.client.GetPrices(ctx, country, product)
+
+	raw, err := s.client.GetPrices(ctx, country, product)
 	if err != nil {
 		return nil, s.normalizeProviderErr(err)
 	}
-	return res, nil
+
+	response := &FiveSimCatalogPricesResponse{
+		Country:  normalizeFiveSimCatalogKey(country, "any"),
+		Product:  normalizeFiveSimCatalogKey(product, ""),
+		Currency: "IDR",
+		Prices:   s.sanitizeCatalogPrices(raw, country, product),
+	}
+
+	return response, nil
 }
 
 func (s *FiveSimService) BuyActivation(ctx context.Context, userID uuid.UUID, input FiveSimBuyActivationInput) (*model.FiveSimOrder, *FiveSimOrderPayload, error) {
@@ -364,6 +387,300 @@ func (s *FiveSimService) calculateWalletDebit(providerPrice float64) (int64, flo
 	}
 
 	return amount, multiplier, nil
+}
+
+func normalizeFiveSimCatalogKey(value, fallback string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return fallback
+	}
+	return normalized
+}
+
+func asFiveSimMap(value any) (map[string]any, bool) {
+	mapped, ok := value.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	return mapped, true
+}
+
+func parseFiveSimFloat(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		if math.IsNaN(typed) || math.IsInf(typed, 0) {
+			return 0, false
+		}
+		return typed, true
+	case float32:
+		parsed := float64(typed)
+		if math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+			return 0, false
+		}
+		return parsed, true
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case int32:
+		return float64(typed), true
+	case int16:
+		return float64(typed), true
+	case int8:
+		return float64(typed), true
+	case uint:
+		return float64(typed), true
+	case uint64:
+		return float64(typed), true
+	case uint32:
+		return float64(typed), true
+	case uint16:
+		return float64(typed), true
+	case uint8:
+		return float64(typed), true
+	case json.Number:
+		if parsed, err := typed.Float64(); err == nil {
+			if math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+				return 0, false
+			}
+			return parsed, true
+		}
+	case string:
+		raw := strings.TrimSpace(strings.ReplaceAll(typed, ",", "."))
+		if raw == "" {
+			return 0, false
+		}
+		if parsed, err := strconv.ParseFloat(raw, 64); err == nil {
+			if math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+				return 0, false
+			}
+			return parsed, true
+		}
+	}
+	return 0, false
+}
+
+func parseFiveSimInt64(value any) (int64, bool) {
+	switch typed := value.(type) {
+	case int:
+		return int64(typed), true
+	case int64:
+		return typed, true
+	case int32:
+		return int64(typed), true
+	case int16:
+		return int64(typed), true
+	case int8:
+		return int64(typed), true
+	case uint:
+		return int64(typed), true
+	case uint64:
+		if typed > math.MaxInt64 {
+			return 0, false
+		}
+		return int64(typed), true
+	case uint32:
+		return int64(typed), true
+	case uint16:
+		return int64(typed), true
+	case uint8:
+		return int64(typed), true
+	case float64:
+		if math.IsNaN(typed) || math.IsInf(typed, 0) {
+			return 0, false
+		}
+		return int64(typed), true
+	case json.Number:
+		if parsed, err := typed.Int64(); err == nil {
+			return parsed, true
+		}
+		if parsed, err := typed.Float64(); err == nil {
+			if math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+				return 0, false
+			}
+			return int64(parsed), true
+		}
+	case string:
+		raw := strings.TrimSpace(typed)
+		if raw == "" {
+			return 0, false
+		}
+		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			return parsed, true
+		}
+		if parsed, err := strconv.ParseFloat(strings.ReplaceAll(raw, ",", "."), 64); err == nil {
+			if math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+				return 0, false
+			}
+			return int64(parsed), true
+		}
+	}
+	return 0, false
+}
+
+func findFiveSimMapByKey(source map[string]any, key string) map[string]any {
+	normalized := normalizeFiveSimCatalogKey(key, "")
+	if normalized == "" {
+		return nil
+	}
+
+	if value, ok := source[normalized]; ok {
+		if mapped, ok := asFiveSimMap(value); ok {
+			return mapped
+		}
+	}
+
+	for rawKey, value := range source {
+		if !strings.EqualFold(strings.TrimSpace(rawKey), normalized) {
+			continue
+		}
+		if mapped, ok := asFiveSimMap(value); ok {
+			return mapped
+		}
+	}
+
+	return nil
+}
+
+func extractFiveSimProviderPrice(node any) (float64, bool) {
+	if direct, ok := parseFiveSimFloat(node); ok {
+		if direct > 0 {
+			return direct, true
+		}
+	}
+
+	rec, ok := asFiveSimMap(node)
+	if !ok {
+		return 0, false
+	}
+
+	for _, key := range []string{"cost", "price", "rate", "amount", "Cost", "Price"} {
+		if parsed, ok := parseFiveSimFloat(rec[key]); ok {
+			if parsed > 0 {
+				return parsed, true
+			}
+		}
+	}
+
+	return 0, false
+}
+
+func (s *FiveSimService) extractCatalogPriceRow(operator string, node any) (*FiveSimCatalogPriceRow, bool) {
+	cleanOperator := strings.TrimSpace(operator)
+	if cleanOperator == "" {
+		return nil, false
+	}
+
+	providerPrice, ok := extractFiveSimProviderPrice(node)
+	if !ok {
+		return nil, false
+	}
+
+	walletDebit, _, err := s.calculateWalletDebit(providerPrice)
+	if err != nil || walletDebit <= 0 {
+		return nil, false
+	}
+
+	row := &FiveSimCatalogPriceRow{
+		Operator:    cleanOperator,
+		WalletDebit: walletDebit,
+	}
+
+	if rec, ok := asFiveSimMap(node); ok {
+		if parsedCount, ok := parseFiveSimInt64(rec["count"]); ok && parsedCount >= 0 {
+			count := parsedCount
+			row.NumberCount = &count
+		}
+	}
+
+	return row, true
+}
+
+func (s *FiveSimService) collectCatalogPriceRows(source map[string]any) []FiveSimCatalogPriceRow {
+	rowsByOperator := make(map[string]FiveSimCatalogPriceRow)
+
+	upsert := func(row FiveSimCatalogPriceRow) {
+		normalized := strings.ToLower(strings.TrimSpace(row.Operator))
+		if normalized == "" {
+			return
+		}
+
+		existing, exists := rowsByOperator[normalized]
+		if !exists || row.WalletDebit < existing.WalletDebit {
+			rowsByOperator[normalized] = row
+			return
+		}
+
+		if exists && existing.NumberCount == nil && row.NumberCount != nil {
+			existing.NumberCount = row.NumberCount
+			rowsByOperator[normalized] = existing
+		}
+	}
+
+	for key, value := range source {
+		if row, ok := s.extractCatalogPriceRow(key, value); ok {
+			upsert(*row)
+			continue
+		}
+
+		nested, ok := asFiveSimMap(value)
+		if !ok {
+			continue
+		}
+
+		for nestedKey, nestedValue := range nested {
+			if row, ok := s.extractCatalogPriceRow(nestedKey, nestedValue); ok {
+				upsert(*row)
+			}
+		}
+	}
+
+	rows := make([]FiveSimCatalogPriceRow, 0, len(rowsByOperator))
+	for _, row := range rowsByOperator {
+		rows = append(rows, row)
+	}
+
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].WalletDebit == rows[j].WalletDebit {
+			return rows[i].Operator < rows[j].Operator
+		}
+		return rows[i].WalletDebit < rows[j].WalletDebit
+	})
+
+	return rows
+}
+
+func (s *FiveSimService) sanitizeCatalogPrices(raw map[string]any, country, product string) []FiveSimCatalogPriceRow {
+	if len(raw) == 0 {
+		return []FiveSimCatalogPriceRow{}
+	}
+
+	candidates := make([]map[string]any, 0, 4)
+
+	if countryNode := findFiveSimMapByKey(raw, country); countryNode != nil {
+		if productNode := findFiveSimMapByKey(countryNode, product); productNode != nil {
+			candidates = append(candidates, productNode)
+		}
+		candidates = append(candidates, countryNode)
+	}
+
+	if productNode := findFiveSimMapByKey(raw, product); productNode != nil {
+		candidates = append(candidates, productNode)
+	}
+
+	candidates = append(candidates, raw)
+
+	for _, candidate := range candidates {
+		if candidate == nil {
+			continue
+		}
+		rows := s.collectCatalogPriceRows(candidate)
+		if len(rows) > 0 {
+			return rows
+		}
+	}
+
+	return []FiveSimCatalogPriceRow{}
 }
 
 func (s *FiveSimService) CheckOrder(ctx context.Context, userID uuid.UUID, providerOrderID int64) (*model.FiveSimOrder, *FiveSimOrderPayload, error) {

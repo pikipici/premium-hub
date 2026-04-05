@@ -69,6 +69,9 @@ Targetnya: tim FE tinggal fokus di **styling + UX polish**, bukan debat endpoint
 - `GET /5sim/catalog/products?country=any&operator=any`
 - `GET /5sim/catalog/prices?country=<str>&product=<str>`
 
+> **Update hardening (anti supplier-price leak):**
+> endpoint `catalog/prices` untuk user sekarang ngembaliin payload sanitasi (IDR wallet debit), bukan raw harga USD supplier.
+
 ### Orders
 - `GET /5sim/orders?page=1&limit=20`
   - default: `page=1`, `limit=20`
@@ -147,6 +150,24 @@ Rules:
 
 ## 5) Response Data Shape (Type FE)
 
+## 5.0 Catalog prices (sanitized for user)
+```ts
+type FiveSimCatalogPrices = {
+  country: string;
+  product: string;
+  currency: "IDR";
+  prices: {
+    operator: string;
+    wallet_debit: number; // nominal debit wallet user
+    number_count?: number; // stok opsional dari provider
+  }[];
+};
+```
+
+Catatan:
+- Payload ini **tidak expose harga USD supplier**.
+- FE user wajib pakai `wallet_debit` untuk display harga ke user.
+
 ## 5.1 Local order (`model.FiveSimOrder`)
 ```ts
 type FiveSimOrder = {
@@ -158,9 +179,9 @@ type FiveSimOrder = {
   country: string;
   operator: string;
   product: string;
-  provider_price: number;
+  provider_price: number; // disanitasi (user endpoint tidak expose harga supplier)
   provider_status: string;
-  raw_payload?: string;
+  raw_payload?: string; // disanitasi (kosong di user endpoint)
   last_synced_at?: string;
   created_at: string;
   updated_at: string;
@@ -174,7 +195,7 @@ type FiveSimOrderPayload = {
   phone: string;
   operator: string;
   product: string;
-  price: number;
+  price: number; // disanitasi (0 di user endpoint)
   status: string;
   expires: string;
   sms: {

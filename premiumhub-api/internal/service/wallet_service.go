@@ -49,9 +49,7 @@ func NewWalletService(
 }
 
 type WalletBalanceResponse struct {
-	Balance                     int64   `json:"balance"`
-	FiveSimWalletMultiplier     float64 `json:"fivesim_wallet_price_multiplier"`
-	FiveSimWalletMinDebitAmount int64   `json:"fivesim_wallet_min_debit"`
+	Balance int64 `json:"balance"`
 }
 
 type CreateTopupInput struct {
@@ -113,11 +111,7 @@ func (s *WalletService) GetBalance(userID uuid.UUID) (*WalletBalanceResponse, er
 	if err != nil {
 		return nil, err
 	}
-	return &WalletBalanceResponse{
-		Balance:                     user.WalletBalance,
-		FiveSimWalletMultiplier:     s.fiveSimWalletMultiplier(),
-		FiveSimWalletMinDebitAmount: s.fiveSimWalletMinDebit(),
-	}, nil
+	return &WalletBalanceResponse{Balance: user.WalletBalance}, nil
 }
 
 func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input CreateTopupInput) (*WalletTopupResponse, error) {
@@ -572,42 +566,6 @@ func toTopupResponse(topup *model.WalletTopup) *WalletTopupResponse {
 		CreatedAt:       topup.CreatedAt,
 		UpdatedAt:       topup.UpdatedAt,
 	}
-}
-
-func (s *WalletService) fiveSimWalletMultiplier() float64 {
-	if s.cfg == nil {
-		return 1
-	}
-
-	raw := strings.TrimSpace(s.cfg.FiveSimWalletPriceMultiplier)
-	if raw == "" {
-		return 1
-	}
-
-	value, err := strconv.ParseFloat(raw, 64)
-	if err != nil || value <= 0 {
-		return 1
-	}
-
-	return value
-}
-
-func (s *WalletService) fiveSimWalletMinDebit() int64 {
-	if s.cfg == nil {
-		return 1
-	}
-
-	raw := strings.TrimSpace(s.cfg.FiveSimWalletMinDebit)
-	if raw == "" {
-		return 1
-	}
-
-	value, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || value <= 0 {
-		return 1
-	}
-
-	return value
 }
 
 func (s *WalletService) topupExpiryDuration() time.Duration {

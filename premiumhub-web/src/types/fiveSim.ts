@@ -54,7 +54,21 @@ export interface FiveSimCountryInfo {
 
 export type FiveSimCountriesPayload = Record<string, FiveSimCountryInfo>
 export type FiveSimProductsPayload = Record<string, unknown>
-export type FiveSimPricesPayload = Record<string, unknown>
+
+export interface FiveSimCatalogPriceRow {
+  operator: string
+  wallet_debit: number
+  number_count?: number
+}
+
+export interface FiveSimCatalogPricesPayload {
+  country: string
+  product: string
+  currency: string
+  prices: FiveSimCatalogPriceRow[]
+}
+
+export type FiveSimPricesPayload = FiveSimCatalogPricesPayload | Record<string, unknown>
 
 export interface FiveSimBuyActivationPayload {
   country: string

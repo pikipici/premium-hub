@@ -51,7 +51,8 @@ interface ProductOption {
 
 interface PriceOption {
   operator: string
-  price: number
+  walletDebit: number
+  providerPrice?: number
 }
 
 interface SMSState {
@@ -212,15 +213,63 @@ function extractPriceFromNode(node: unknown): number | null {
   return null
 }
 
-function collectOperatorPrices(source: Record<string, unknown>): PriceOption[] {
+function parseCatalogPriceRows(payload: FiveSimPricesPayload | undefined): PriceOption[] {
+  if (!payload) return []
+
+  const root = asRecord(payload)
+  if (!root) return []
+
+  const rowsNode = root.prices
+  if (!Array.isArray(rowsNode)) return []
+
   const map = new Map<string, PriceOption>()
 
-  const pushPrice = (operator: string, price: number) => {
-    if (!Number.isFinite(price) || price <= 0) return
+  for (const rowNode of rowsNode) {
+    const row = asRecord(rowNode)
+    if (!row) continue
+
+    const operator = asString(row.operator)
+    const walletDebitRaw = asNumber(row.wallet_debit)
+    if (!operator || walletDebitRaw === null || walletDebitRaw <= 0) continue
+
+    const walletDebit = Math.ceil(walletDebitRaw)
     const normalizedOperator = operator.toLowerCase()
     const existing = map.get(normalizedOperator)
-    if (!existing || price < existing.price) {
-      map.set(normalizedOperator, { operator, price })
+
+    if (!existing || walletDebit < existing.walletDebit) {
+      map.set(normalizedOperator, {
+        operator,
+        walletDebit,
+      })
+    }
+  }
+
+  return [...map.values()].sort((a, b) => {
+    if (a.walletDebit === b.walletDebit) {
+      return a.operator.localeCompare(b.operator, 'id')
+    }
+    return a.walletDebit - b.walletDebit
+  })
+}
+
+function collectOperatorPrices(source: Record<string, unknown>, multiplier: number, minDebit: number): PriceOption[] {
+  const map = new Map<string, PriceOption>()
+
+  const pushPrice = (operator: string, providerPrice: number) => {
+    if (!Number.isFinite(providerPrice) || providerPrice <= 0) return
+
+    const walletDebit = calculateWalletDebit(providerPrice, multiplier, minDebit)
+    if (walletDebit <= 0) return
+
+    const normalizedOperator = operator.toLowerCase()
+    const existing = map.get(normalizedOperator)
+
+    if (!existing || walletDebit < existing.walletDebit) {
+      map.set(normalizedOperator, {
+        operator,
+        walletDebit,
+        providerPrice,
+      })
     }
   }
 
@@ -242,10 +291,26 @@ function collectOperatorPrices(source: Record<string, unknown>): PriceOption[] {
     }
   }
 
-  return [...map.values()].sort((a, b) => a.price - b.price)
+  return [...map.values()].sort((a, b) => {
+    if (a.walletDebit === b.walletDebit) {
+      return a.operator.localeCompare(b.operator, 'id')
+    }
+    return a.walletDebit - b.walletDebit
+  })
 }
 
-function parsePrices(payload: FiveSimPricesPayload | undefined, country?: string, product?: string): PriceOption[] {
+function parsePrices(
+  payload: FiveSimPricesPayload | undefined,
+  country: string | undefined,
+  product: string | undefined,
+  multiplier: number,
+  minDebit: number
+): PriceOption[] {
+  const sanitizedRows = parseCatalogPriceRows(payload)
+  if (sanitizedRows.length > 0) {
+    return sanitizedRows
+  }
+
   if (!payload) return []
   const root = asRecord(payload)
   if (!root) return []
@@ -265,7 +330,7 @@ function parsePrices(payload: FiveSimPricesPayload | undefined, country?: string
   candidates.push(root)
 
   for (const candidate of candidates) {
-    const rows = collectOperatorPrices(candidate)
+    const rows = collectOperatorPrices(candidate, multiplier, minDebit)
     if (rows.length > 0) return rows
   }
 
@@ -442,9 +507,7 @@ export default function NomorVirtualPage() {
   }, [products, productQuery])
 
   const activationReady = Boolean(selectedCountry && selectedProduct && selectedPrice)
-  const estimatedDebit = selectedPrice
-    ? calculateWalletDebit(selectedPrice.price, walletMultiplier, walletMinDebit)
-    : 0
+  const estimatedDebit = selectedPrice?.walletDebit ?? 0
   const likelyInsufficient = activationReady && walletBalance < estimatedDebit
 
   const filteredOrders = useMemo(() => {
@@ -535,13 +598,21 @@ export default function NomorVirtualPage() {
         setBannerError(res.message || 'Gagal memuat harga operator')
         return
       }
-      setPriceOptions(parsePrices(res.data as FiveSimPricesPayload, countryKey, productKey))
+      setPriceOptions(
+        parsePrices(
+          res.data as FiveSimPricesPayload,
+          countryKey,
+          productKey,
+          walletMultiplier,
+          walletMinDebit
+        )
+      )
     } catch (error: unknown) {
       setBannerError(resolveErrorMessage(error, 'Gagal memuat harga operator'))
     } finally {
       setPricesLoading(false)
     }
-  }, [])
+  }, [walletMinDebit, walletMultiplier])
 
   const loadOrders = useCallback(async (page: number) => {
     setOrdersLoading(true)
@@ -1151,11 +1222,11 @@ export default function NomorVirtualPage() {
                     priceOptions.map((priceOption, index) => {
                       const active =
                         selectedPrice?.operator === priceOption.operator &&
-                        selectedPrice?.price === priceOption.price
+                        selectedPrice?.walletDebit === priceOption.walletDebit
 
                       return (
                         <button
-                          key={`${priceOption.operator}-${priceOption.price}-${index}`}
+                          key={`${priceOption.operator}-${priceOption.walletDebit}-${index}`}
                           type="button"
                           onClick={() => {
                             clearBanner()
@@ -1171,7 +1242,7 @@ export default function NomorVirtualPage() {
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-semibold text-[#141414] truncate">{priceOption.operator}</span>
                             <span className="text-sm font-bold text-[#141414] shrink-0">
-                              {formatWalletRupiah(calculateWalletDebit(priceOption.price, walletMultiplier, walletMinDebit))}
+                              {formatWalletRupiah(priceOption.walletDebit)}
                             </span>
                           </div>
                         </button>
@@ -1418,7 +1489,7 @@ export default function NomorVirtualPage() {
                         <div className="text-sm font-extrabold text-[#141414]">
                           {(() => {
                             const debit = calculateWalletDebit(order.provider_price || 0, walletMultiplier, walletMinDebit)
-                            return debit > 0 ? formatWalletRupiah(debit) : '-'
+                            return debit > 0 ? formatWalletRupiah(debit) : 'Terpotong dari wallet'
                           })()}
                         </div>
                         <span className={`mt-1 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${status.className}`}>

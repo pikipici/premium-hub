@@ -211,6 +211,76 @@ func setupFiveSimService(t *testing.T) (*FiveSimService, *gorm.DB, *fakeFiveSimC
 	return svc, db, fakeClient, activeUser, otherUser
 }
 
+func TestFiveSimServiceGetCatalogPricesSanitizesProviderCost(t *testing.T) {
+	svc, _, fake, activeUser, _ := setupFiveSimService(t)
+	svc.cfg.FiveSimWalletPriceMultiplier = "18500"
+	svc.cfg.FiveSimWalletMinDebit = "1"
+
+	fake.prices = map[string]any{
+		"indonesia": map[string]any{
+			"twitter": map[string]any{
+				"virtual52": map[string]any{"cost": 0.0192, "count": 0, "rate": 0},
+				"virtual4":  map[string]any{"cost": 0.35, "count": 12, "rate": 40},
+			},
+		},
+	}
+
+	res, err := svc.GetCatalogPrices(context.Background(), activeUser.ID, "indonesia", "twitter")
+	if err != nil {
+		t.Fatalf("get catalog prices: %v", err)
+	}
+
+	if res.Currency != "IDR" {
+		t.Fatalf("unexpected currency: %s", res.Currency)
+	}
+	if res.Country != "indonesia" {
+		t.Fatalf("unexpected country: %s", res.Country)
+	}
+	if res.Product != "twitter" {
+		t.Fatalf("unexpected product: %s", res.Product)
+	}
+	if len(res.Prices) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(res.Prices))
+	}
+
+	rows := map[string]FiveSimCatalogPriceRow{}
+	for _, row := range res.Prices {
+		rows[row.Operator] = row
+	}
+
+	if rows["virtual52"].WalletDebit != 356 {
+		t.Fatalf("unexpected wallet debit virtual52: got %d want %d", rows["virtual52"].WalletDebit, 356)
+	}
+	if rows["virtual4"].WalletDebit != 6475 {
+		t.Fatalf("unexpected wallet debit virtual4: got %d want %d", rows["virtual4"].WalletDebit, 6475)
+	}
+	if rows["virtual52"].NumberCount == nil || *rows["virtual52"].NumberCount != 0 {
+		t.Fatalf("unexpected number_count virtual52: %#v", rows["virtual52"].NumberCount)
+	}
+	if rows["virtual4"].NumberCount == nil || *rows["virtual4"].NumberCount != 12 {
+		t.Fatalf("unexpected number_count virtual4: %#v", rows["virtual4"].NumberCount)
+	}
+}
+
+func TestFiveSimServiceGetCatalogPricesHandlesMalformedPayload(t *testing.T) {
+	svc, _, fake, activeUser, _ := setupFiveSimService(t)
+	fake.prices = map[string]any{
+		"indonesia": map[string]any{
+			"twitter": map[string]any{
+				"virtual52": map[string]any{"cost": "invalid"},
+			},
+		},
+	}
+
+	res, err := svc.GetCatalogPrices(context.Background(), activeUser.ID, "indonesia", "twitter")
+	if err != nil {
+		t.Fatalf("get catalog prices malformed: %v", err)
+	}
+	if len(res.Prices) != 0 {
+		t.Fatalf("expected empty rows for malformed payload, got %d", len(res.Prices))
+	}
+}
+
 func TestFiveSimServiceBuyActivationCreatesLocalOrder(t *testing.T) {
 	svc, db, fake, activeUser, _ := setupFiveSimService(t)
 	fake.buyActivationResp = &FiveSimOrderPayload{
