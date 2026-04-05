@@ -1,58 +1,66 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import api from '@/lib/api'
-import { formatRupiah } from '@/lib/utils'
-import { TrendingUp, ShoppingBag, Clock, AlertTriangle, DollarSign } from 'lucide-react'
+import { useState } from 'react'
+import AdminStyles from '@/components/admin/admin-styles'
+import AdminSidebar from '@/components/admin/admin-sidebar'
+import AdminTopbar from '@/components/admin/admin-topbar'
+import DashboardPage from '@/components/admin/dashboard-page'
+import ProdukPage from '@/components/admin/produk-page'
+import EditProdukPage from '@/components/admin/edit-produk-page'
+import StokPage from '@/components/admin/stok-page'
+import OrderPage from '@/components/admin/order-page'
+import GaransiPage from '@/components/admin/garansi-page'
+import PenggunaPage from '@/components/admin/pengguna-page'
+import PengaturanPage from '@/components/admin/pengaturan-page'
 
-interface DashboardStats {
-  active_orders: number
-  pending_orders: number
-  completed_orders: number
-  total_revenue: number
-  pending_claims: number
+const PAGES: Record<string, { title: string; sub: string }> = {
+  dashboard:     { title: 'Dashboard', sub: 'Sabtu, 4 April 2026' },
+  produk:        { title: 'Manajemen Produk', sub: 'Kelola semua produk' },
+  'edit-produk': { title: 'Edit Produk', sub: 'Ubah informasi produk secara lengkap' },
+  stok:          { title: 'Stok Akun', sub: 'Monitor dan tambah stok' },
+  order:         { title: 'Order', sub: 'Semua transaksi' },
+  garansi:       { title: 'Klaim Garansi', sub: 'Proses klaim pengguna' },
+  pengguna:      { title: 'Pengguna', sub: 'Daftar semua pengguna' },
+  pengaturan:    { title: 'Pengaturan', sub: 'Konfigurasi sistem' },
 }
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [toast, setToast] = useState({ show: false, message: '' })
 
-  useEffect(() => {
-    api.get('/admin/dashboard').then(res => {
-      if (res.data.success) setStats(res.data.data)
-    }).catch(() => {})
-  }, [])
+  const switchPage = (name: string) => {
+    setCurrentPage(name)
+  }
 
-  const cards = stats ? [
-    { icon: DollarSign, label: 'Total Revenue', value: formatRupiah(stats.total_revenue), color: '#C5EFD8', iconColor: '#22c55e' },
-    { icon: ShoppingBag, label: 'Order Aktif', value: stats.active_orders.toString(), color: '#C8E6F5', iconColor: '#3b82f6' },
-    { icon: Clock, label: 'Pending', value: stats.pending_orders.toString(), color: '#FAE88A', iconColor: '#eab308' },
-    { icon: TrendingUp, label: 'Selesai', value: stats.completed_orders.toString(), color: '#DDD5F3', iconColor: '#8b5cf6' },
-    { icon: AlertTriangle, label: 'Klaim Pending', value: stats.pending_claims.toString(), color: '#FDDAC8', iconColor: '#f97316' },
-  ] : []
+  const showToast = (message: string) => {
+    setToast({ show: true, message })
+    setTimeout(() => setToast({ show: false, message: '' }), 3000)
+  }
+
+  const page = PAGES[currentPage] || { title: currentPage, sub: '' }
 
   return (
-    <div>
-      <h1 className="text-2xl font-extrabold mb-6">Admin Dashboard</h1>
+    <>
+      <AdminStyles />
+      <div className="admin-page-wrapper">
+        {/* Toast */}
+        <div className={`admin-toast${toast.show ? ' show' : ''}`}>{toast.message}</div>
 
-      {!stats ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => <div key={i} className="h-28 bg-white rounded-2xl animate-pulse" />)}
+        <AdminSidebar currentPage={currentPage} onNavigate={switchPage} />
+
+        <div className="admin-main">
+          <AdminTopbar title={page.title} sub={page.sub} onNavigate={switchPage} />
+
+          {currentPage === 'dashboard' && <DashboardPage onNavigate={switchPage} />}
+          {currentPage === 'produk' && <ProdukPage onNavigate={switchPage} onEditProduk={(id) => switchPage('edit-produk')} />}
+          {currentPage === 'edit-produk' && <EditProdukPage onNavigate={switchPage} showToast={showToast} />}
+          {currentPage === 'stok' && <StokPage />}
+          {currentPage === 'order' && <OrderPage />}
+          {currentPage === 'garansi' && <GaransiPage />}
+          {currentPage === 'pengguna' && <PenggunaPage />}
+          {currentPage === 'pengaturan' && <PengaturanPage />}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {cards.map((c, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: c.color }}>
-                  <c.icon className="w-5 h-5" style={{ color: c.iconColor }} />
-                </div>
-              </div>
-              <div className="text-xl font-extrabold mb-0.5">{c.value}</div>
-              <div className="text-xs text-[#888] font-medium">{c.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      </div>
+    </>
   )
 }
