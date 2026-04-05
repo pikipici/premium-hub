@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,22 @@ import (
 
 	"premiumhub-api/config"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
+}
+
+type errReadCloser struct{}
+
+func (errReadCloser) Read(_ []byte) (int, error) {
+	return 0, errors.New("forced read error")
+}
+
+func (errReadCloser) Close() error {
+	return nil
+}
 
 func TestNewNeticonClientDefaults(t *testing.T) {
 	client := NewNeticonClient(&config.Config{})
@@ -89,6 +106,42 @@ func TestNeticonRequestDepositErrors(t *testing.T) {
 		_, _, err := client.RequestDeposit(context.Background(), 50000)
 		if err == nil || !strings.Contains(err.Error(), "kredensial tidak valid") {
 			t.Fatalf("expected provider reject error, got: %v", err)
+		}
+	})
+
+	t.Run("provider reject with default message", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"result":false,"message":"   "}`))
+		}))
+		defer server.Close()
+
+		client := NewNeticonClient(&config.Config{
+			NeticonBaseURL: server.URL,
+			NeticonAPIKey:  "NP_123",
+			NeticonUserID:  "MERCHANT_01",
+		})
+
+		_, _, err := client.RequestDeposit(context.Background(), 50000)
+		if err == nil || !strings.Contains(err.Error(), "request deposit ditolak") {
+			t.Fatalf("expected default reject message, got: %v", err)
+		}
+	})
+
+	t.Run("missing trx id", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"result":true,"trx_id":"   ","amount":50000}`))
+		}))
+		defer server.Close()
+
+		client := NewNeticonClient(&config.Config{
+			NeticonBaseURL: server.URL,
+			NeticonAPIKey:  "NP_123",
+			NeticonUserID:  "MERCHANT_01",
+		})
+
+		_, _, err := client.RequestDeposit(context.Background(), 50000)
+		if err == nil || !strings.Contains(err.Error(), "trx_id dari neticon kosong") {
+			t.Fatalf("expected missing trx_id error, got: %v", err)
 		}
 	})
 
@@ -198,11 +251,90 @@ func TestNeticonCheckStatusSuccessAndErrors(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid json response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`not-json`))
+		}))
+		defer server.Close()
+
+		client := NewNeticonClient(&config.Config{
+			NeticonBaseURL: server.URL,
+			NeticonAPIKey:  "NP_123",
+			NeticonUserID:  "MERCHANT_01",
+		})
+
+		_, _, err := client.CheckStatus(context.Background(), "TRX-JSON")
+		if err == nil || !strings.Contains(err.Error(), "response status neticon tidak valid") {
+			t.Fatalf("expected invalid response error, got: %v", err)
+		}
+	})
+
+	t.Run("post json transport error", func(t *testing.T) {
+		client := NewNeticonClient(&config.Config{
+			NeticonBaseURL: "https://example.com/qris",
+			NeticonAPIKey:  "NP_123",
+			NeticonUserID:  "MERCHANT_01",
+		})
+		httpClient := client.(*neticonHTTPClient)
+		httpClient.client = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("network fail")
+		})}
+
+		_, _, err := client.CheckStatus(context.Background(), "TRX-ERR")
+		if err == nil || !strings.Contains(err.Error(), "gagal menghubungi neticon") {
+			t.Fatalf("expected transport error, got: %v", err)
+		}
+	})
+
 	t.Run("missing config", func(t *testing.T) {
 		client := NewNeticonClient(&config.Config{})
 		_, _, err := client.CheckStatus(context.Background(), "TRX-004")
 		if err == nil || !strings.Contains(err.Error(), "konfigurasi") {
 			t.Fatalf("expected config error, got: %v", err)
+		}
+	})
+}
+
+func TestNeticonPostJSONInternalErrors(t *testing.T) {
+	client := NewNeticonClient(&config.Config{
+		NeticonBaseURL: "https://example.com/qris",
+		NeticonAPIKey:  "NP_123",
+		NeticonUserID:  "MERCHANT_01",
+	}).(*neticonHTTPClient)
+
+	t.Run("marshal error", func(t *testing.T) {
+		_, err := client.postJSON(context.Background(), map[string]interface{}{"bad": func() {}})
+		if err == nil {
+			t.Fatalf("expected marshal error")
+		}
+	})
+
+	t.Run("request build error", func(t *testing.T) {
+		client.endpoint = "http://[::1"
+		_, err := client.postJSON(context.Background(), map[string]interface{}{"ok": true})
+		if err == nil {
+			t.Fatalf("expected request build error")
+		}
+		client.endpoint = "https://example.com/qris"
+	})
+
+	t.Run("do error", func(t *testing.T) {
+		client.client = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("dial fail")
+		})}
+		_, err := client.postJSON(context.Background(), map[string]interface{}{"ok": true})
+		if err == nil || !strings.Contains(err.Error(), "gagal menghubungi neticon") {
+			t.Fatalf("expected do error, got: %v", err)
+		}
+	})
+
+	t.Run("read body error", func(t *testing.T) {
+		client.client = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: 200, Body: errReadCloser{}}, nil
+		})}
+		_, err := client.postJSON(context.Background(), map[string]interface{}{"ok": true})
+		if err == nil || !strings.Contains(err.Error(), "gagal membaca response neticon") {
+			t.Fatalf("expected read error, got: %v", err)
 		}
 	})
 }

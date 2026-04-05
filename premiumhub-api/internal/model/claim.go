@@ -4,10 +4,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Claim struct {
-	ID            uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID            uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	UserID        uuid.UUID  `gorm:"type:uuid;not null" json:"user_id"`
 	OrderID       uuid.UUID  `gorm:"type:uuid;not null" json:"order_id"`
 	Reason        string     `gorm:"size:50;not null" json:"reason"`
@@ -21,4 +22,11 @@ type Claim struct {
 	Order         Order      `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+func (c *Claim) BeforeCreate(_ *gorm.DB) error {
+	if c.ID == uuid.Nil {
+		c.ID = uuid.New()
+	}
+	return nil
 }

@@ -4,10 +4,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Order struct {
-	ID            uuid.UUID    `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID            uuid.UUID    `gorm:"type:uuid;primaryKey" json:"id"`
 	UserID        uuid.UUID    `gorm:"type:uuid;not null" json:"user_id"`
 	StockID       *uuid.UUID   `gorm:"type:uuid" json:"stock_id"`
 	PriceID       uuid.UUID    `gorm:"type:uuid;not null" json:"price_id"`
@@ -24,4 +25,11 @@ type Order struct {
 	Price         ProductPrice `gorm:"foreignKey:PriceID" json:"price,omitempty"`
 	CreatedAt     time.Time    `json:"created_at"`
 	UpdatedAt     time.Time    `json:"updated_at"`
+}
+
+func (o *Order) BeforeCreate(_ *gorm.DB) error {
+	if o.ID == uuid.Nil {
+		o.ID = uuid.New()
+	}
+	return nil
 }

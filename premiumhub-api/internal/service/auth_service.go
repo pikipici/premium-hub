@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"premiumhub-api/config"
@@ -137,6 +138,13 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, input ChangePasswordInput
 }
 
 func (s *AuthService) generateToken(user *model.User) (string, error) {
+	if s.cfg == nil {
+		return "", errors.New("config auth tidak valid")
+	}
+	if strings.TrimSpace(s.cfg.JWTSecret) == "" {
+		return "", errors.New("JWT secret belum diisi")
+	}
+
 	dur, _ := time.ParseDuration(s.cfg.JWTExpiry)
 	if dur == 0 {
 		dur = 24 * time.Hour

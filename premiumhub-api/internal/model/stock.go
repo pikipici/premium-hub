@@ -4,10 +4,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Stock struct {
-	ID          uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	ProductID   uuid.UUID  `gorm:"type:uuid;not null" json:"product_id"`
 	AccountType string     `gorm:"size:20;not null" json:"account_type"`
 	Email       string     `gorm:"size:150;not null" json:"email"`
@@ -19,4 +20,11 @@ type Stock struct {
 	ExpiresAt   *time.Time `json:"expires_at"`
 	Product     Product    `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
+}
+
+func (s *Stock) BeforeCreate(_ *gorm.DB) error {
+	if s.ID == uuid.Nil {
+		s.ID = uuid.New()
+	}
+	return nil
 }

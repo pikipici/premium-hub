@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
+	cryptoRand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ type WalletService struct {
 	notifRepo  *repository.NotificationRepo
 	neticon    NeticonClient
 }
+
+var walletRandReader io.Reader = cryptoRand.Reader
 
 func NewWalletService(
 	cfg *config.Config,
@@ -521,7 +524,7 @@ func normalizeIdempotencyKey(key string) string {
 
 func generateUniqueCode() (int, error) {
 	var b [2]byte
-	if _, err := rand.Read(b[:]); err != nil {
+	if _, err := io.ReadFull(walletRandReader, b[:]); err != nil {
 		return 0, err
 	}
 	raw := int(b[0])<<8 | int(b[1])
