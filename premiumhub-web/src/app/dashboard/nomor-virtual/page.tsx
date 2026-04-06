@@ -7,7 +7,6 @@ import {
   ArrowRight,
   CheckCircle2,
   CircleAlert,
-  Clock3,
   Loader2,
   RefreshCcw,
   Search,
@@ -29,7 +28,6 @@ import type {
 } from '@/types/fiveSim'
 
 type MainTab = 'catalog' | 'orders'
-type BuyTab = 'activation' | 'hosting' | 'reuse'
 type OrderStatusFilter = 'all' | 'PENDING' | 'RECEIVED' | 'FINISHED' | 'CANCELED'
 type OrderAction = 'check' | 'finish' | 'cancel' | 'ban'
 
@@ -444,7 +442,6 @@ export default function NomorVirtualPage() {
   const { walletBalance, setWalletBalance } = useAuthStore()
 
   const [mainTab, setMainTab] = useState<MainTab>('catalog')
-  const [buyTab, setBuyTab] = useState<BuyTab>('activation')
 
   const [countries, setCountries] = useState<CountryOption[]>([])
   const [products, setProducts] = useState<ProductOption[]>([])
@@ -463,11 +460,6 @@ export default function NomorVirtualPage() {
   const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<ProductOption | null>(null)
   const [selectedPrice, setSelectedPrice] = useState<PriceOption | null>(null)
-
-  const [maxPrice, setMaxPrice] = useState('')
-  const [forwarding, setForwarding] = useState(false)
-  const [reuseNumber, setReuseNumber] = useState('')
-  const [reuseProduct, setReuseProduct] = useState('')
 
   const [buying, setBuying] = useState(false)
   const [bannerError, setBannerError] = useState('')
@@ -676,8 +668,6 @@ export default function NomorVirtualPage() {
     setSelectedPrice(null)
     setProducts([])
     setPriceOptions([])
-    setMaxPrice('')
-    setForwarding(false)
     setInsufficientByServer(false)
   }
 
@@ -720,17 +710,13 @@ export default function NomorVirtualPage() {
     clearBanner()
     setBuying(true)
 
-    const parsedMaxPrice = asNumber(maxPrice)
-
     try {
       const res = await fiveSimService.buyActivation({
         country: selectedCountry.key,
         operator: selectedPrice.operator || DEFAULT_OPERATOR,
         product: selectedProduct.key,
-        forwarding,
         reuse: false,
         voice: false,
-        ...(parsedMaxPrice && parsedMaxPrice > 0 ? { max_price: parsedMaxPrice } : {}),
       })
 
       if (!res.success) {
@@ -744,72 +730,6 @@ export default function NomorVirtualPage() {
       resetCatalogSelection()
     } catch (error: unknown) {
       const message = resolveErrorMessage(error, 'Gagal membeli nomor activation')
-      setBannerError(message)
-      setInsufficientByServer(isInsufficientBalance(message))
-    } finally {
-      setBuying(false)
-    }
-  }
-
-  const handleHostingBuy = async () => {
-    if (!selectedCountry || !selectedProduct) return
-
-    clearBanner()
-    setBuying(true)
-
-    try {
-      const res = await fiveSimService.buyHosting({
-        country: selectedCountry.key,
-        operator: selectedPrice?.operator || DEFAULT_OPERATOR,
-        product: selectedProduct.key,
-      })
-
-      if (!res.success) {
-        const message = res.message || 'Gagal membeli nomor hosting'
-        setBannerError(message)
-        setInsufficientByServer(isInsufficientBalance(message))
-        return
-      }
-
-      await applyMutateSuccess(res.data, res.message || 'Nomor hosting berhasil dibeli')
-    } catch (error: unknown) {
-      const message = resolveErrorMessage(error, 'Gagal membeli nomor hosting')
-      setBannerError(message)
-      setInsufficientByServer(isInsufficientBalance(message))
-    } finally {
-      setBuying(false)
-    }
-  }
-
-  const handleReuseBuy = async () => {
-    const normalizedNumber = reuseNumber.trim()
-    const normalizedProduct = (reuseProduct.trim() || selectedProduct?.key || '').toLowerCase()
-
-    if (!normalizedNumber || !normalizedProduct) {
-      setBannerError('Isi nomor dan layanan untuk reuse')
-      return
-    }
-
-    clearBanner()
-    setBuying(true)
-
-    try {
-      const res = await fiveSimService.reuseNumber({
-        number: normalizedNumber,
-        product: normalizedProduct,
-      })
-
-      if (!res.success) {
-        const message = res.message || 'Gagal reuse nomor'
-        setBannerError(message)
-        setInsufficientByServer(isInsufficientBalance(message))
-        return
-      }
-
-      await applyMutateSuccess(res.data, res.message || 'Reuse nomor berhasil')
-      setReuseNumber('')
-    } catch (error: unknown) {
-      const message = resolveErrorMessage(error, 'Gagal reuse nomor')
       setBannerError(message)
       setInsufficientByServer(isInsufficientBalance(message))
     } finally {
@@ -1173,9 +1093,6 @@ export default function NomorVirtualPage() {
                           setSelectedPrice(null)
                           setPriceOptions([])
                           setInsufficientByServer(false)
-                          if (!reuseProduct.trim()) {
-                            setReuseProduct(product.key)
-                          }
                         }}
                         className={`w-full text-left rounded-xl border px-3 py-2.5 transition-colors ${
                           active
@@ -1253,155 +1170,55 @@ export default function NomorVirtualPage() {
               </div>
 
               <div className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
-                <div className="p-2 border-b border-[#EBEBEB] grid grid-cols-3 gap-1">
-                  {(['activation', 'hosting', 'reuse'] as BuyTab[]).map((tab) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setBuyTab(tab)}
-                      className={`rounded-lg px-2 py-2 text-xs font-semibold uppercase transition-colors ${
-                        buyTab === tab ? 'bg-[#141414] text-white' : 'text-[#666] hover:bg-[#F7F7F5]'
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
+                <header className="border-b border-[#EBEBEB] px-4 py-3">
+                  <h2 className="text-sm font-bold">Checkout Activation</h2>
+                  <p className="text-xs text-[#888] mt-0.5">Flow difokusin ke beli nomor OTP.</p>
+                </header>
+
+                <div className="p-4 space-y-3">
+                  <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3 text-sm space-y-1.5">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-[#888]">Negara</span>
+                      <span className="font-semibold text-right">{selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : '—'}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-[#888]">Layanan</span>
+                      <span className="font-semibold text-right">{selectedProduct?.name || '—'}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-[#888]">Operator</span>
+                      <span className="font-semibold text-right">{selectedPrice?.operator || '—'}</span>
+                    </div>
+                    <div className="flex justify-between gap-3 border-t border-[#EBEBEB] pt-2">
+                      <span className="text-[#555] font-semibold">Harga</span>
+                      <span className="font-extrabold text-[#141414] text-right">
+                        {selectedPrice ? formatWalletRupiah(estimatedDebit) : '—'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#888] leading-relaxed">
+                      Nominal ini yang akan dipotong dari wallet saat pembelian nomor berhasil.
+                    </p>
+                  </div>
+
+                  {(likelyInsufficient || insufficientByServer) && activationReady ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+                      Saldo wallet kemungkinan tidak cukup. Estimasi debit transaksi ini {formatWalletRupiah(estimatedDebit)}.
+                      <Link href="/dashboard/wallet" className="inline-flex items-center gap-1 ml-1 font-bold underline">
+                        Top Up <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={handleActivationBuy}
+                    disabled={!activationReady || buying}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#141414] text-white px-4 py-3 text-sm font-bold disabled:opacity-60"
+                  >
+                    {buying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
+                    {buying ? 'Memproses...' : 'Beli Nomor Activation'}
+                  </button>
                 </div>
-
-                {buyTab === 'activation' ? (
-                  <div className="p-4 space-y-3">
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wide text-[#888] mb-1.5">Batas Harga (opsional)</label>
-                      <input
-                        type="number"
-                        value={maxPrice}
-                        onChange={(event) => setMaxPrice(event.target.value)}
-                        placeholder="0.35 (opsional)"
-                        min="0"
-                        step="0.01"
-                        className="w-full rounded-xl border border-[#EBEBEB] px-3 py-2.5 text-sm outline-none focus:border-[#141414]"
-                      />
-                    </div>
-
-                    <label className="inline-flex items-center gap-2 text-sm text-[#333]">
-                      <input
-                        type="checkbox"
-                        checked={forwarding}
-                        onChange={(event) => setForwarding(event.target.checked)}
-                        className="h-4 w-4"
-                      />
-                      Call forwarding
-                    </label>
-
-                    <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3 text-sm space-y-1.5">
-                      <div className="flex justify-between gap-3">
-                        <span className="text-[#888]">Negara</span>
-                        <span className="font-semibold text-right">{selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : '—'}</span>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <span className="text-[#888]">Layanan</span>
-                        <span className="font-semibold text-right">{selectedProduct?.name || '—'}</span>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <span className="text-[#888]">Operator</span>
-                        <span className="font-semibold text-right">{selectedPrice?.operator || '—'}</span>
-                      </div>
-                      <div className="flex justify-between gap-3 border-t border-[#EBEBEB] pt-2">
-                        <span className="text-[#555] font-semibold">Harga</span>
-                        <span className="font-extrabold text-[#141414] text-right">
-                          {selectedPrice ? formatWalletRupiah(estimatedDebit) : '—'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#888] leading-relaxed">
-                        Nominal ini yang akan dipotong dari wallet saat pembelian nomor berhasil.
-                      </p>
-                    </div>
-
-                    {(likelyInsufficient || insufficientByServer) && activationReady ? (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
-                        Saldo wallet kemungkinan tidak cukup. Estimasi debit transaksi ini {formatWalletRupiah(estimatedDebit)}.
-                        <Link href="/dashboard/wallet" className="inline-flex items-center gap-1 ml-1 font-bold underline">
-                          Top Up <ArrowRight className="w-3 h-3" />
-                        </Link>
-                      </div>
-                    ) : null}
-
-                    <button
-                      type="button"
-                      onClick={handleActivationBuy}
-                      disabled={!activationReady || buying}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#141414] text-white px-4 py-3 text-sm font-bold disabled:opacity-60"
-                    >
-                      {buying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
-                      {buying ? 'Memproses...' : 'Beli Nomor Activation'}
-                    </button>
-                  </div>
-                ) : null}
-
-                {buyTab === 'hosting' ? (
-                  <div className="p-4 space-y-3">
-                    <p className="text-sm text-[#666]">Hosting pakai negara + layanan yang udah lo pilih di atas.</p>
-                    <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3 text-sm space-y-1.5">
-                      <div className="flex justify-between gap-3">
-                        <span className="text-[#888]">Negara</span>
-                        <span className="font-semibold text-right">{selectedCountry?.name || '—'}</span>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <span className="text-[#888]">Layanan</span>
-                        <span className="font-semibold text-right">{selectedProduct?.name || '—'}</span>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <span className="text-[#888]">Operator</span>
-                        <span className="font-semibold text-right">{selectedPrice?.operator || DEFAULT_OPERATOR}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleHostingBuy}
-                      disabled={!selectedCountry || !selectedProduct || buying}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#141414] text-white px-4 py-3 text-sm font-bold disabled:opacity-60"
-                    >
-                      {buying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock3 className="w-4 h-4" />}
-                      {buying ? 'Memproses...' : 'Beli Hosting'}
-                    </button>
-                  </div>
-                ) : null}
-
-                {buyTab === 'reuse' ? (
-                  <div className="p-4 space-y-3">
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wide text-[#888] mb-1.5">Nomor (dengan kode negara)</label>
-                      <input
-                        type="text"
-                        value={reuseNumber}
-                        onChange={(event) => setReuseNumber(event.target.value)}
-                        placeholder="+447000001111"
-                        className="w-full rounded-xl border border-[#EBEBEB] px-3 py-2.5 text-sm outline-none focus:border-[#141414]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wide text-[#888] mb-1.5">Layanan</label>
-                      <input
-                        type="text"
-                        value={reuseProduct}
-                        onChange={(event) => setReuseProduct(event.target.value)}
-                        placeholder="telegram"
-                        className="w-full rounded-xl border border-[#EBEBEB] px-3 py-2.5 text-sm outline-none focus:border-[#141414]"
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleReuseBuy}
-                      disabled={!reuseNumber.trim() || !reuseProduct.trim() || buying}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#141414] text-white px-4 py-3 text-sm font-bold disabled:opacity-60"
-                    >
-                      {buying ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
-                      {buying ? 'Memproses...' : 'Reuse Nomor'}
-                    </button>
-                  </div>
-                ) : null}
               </div>
 
               <div className="rounded-2xl border border-[#EBEBEB] bg-white p-3 text-xs text-[#666]">
