@@ -1,36 +1,572 @@
 "use client"
 
+import axios from 'axios'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { orderService, type AdminOrderStatus } from '@/services/orderService'
+import { productService } from '@/services/productService'
+import type { Order } from '@/types/order'
+
+type OrderFilter = 'all' | AdminOrderStatus
+
+type ProductLookup = Record<string, { name: string; icon: string }>
+
+const PAGE_LIMIT = 20
+
+const STATUS_FILTERS: { value: OrderFilter; label: string }[] = [
+  { value: 'all', label: 'Semua Status' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'active', label: 'Aktif' },
+  { value: 'completed', label: 'Selesai' },
+  { value: 'failed', label: 'Gagal' },
+]
+
+function formatRupiah(value: number) {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function formatDate(dateStr?: string | null) {
+  if (!dateStr) return '-'
+
+  const parsed = new Date(dateStr)
+  if (Number.isNaN(parsed.getTime())) return '-'
+
+  return parsed.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function shortOrderCode(id: string) {
+  if (!id) return '-'
+  if (id.startsWith('#')) return id
+  return `#${id.split('-')[0]?.toUpperCase() || id}`
+}
+
+function mapErrorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err)) {
+    const message = (err.response?.data as { message?: string } | undefined)?.message
+    if (message) return message
+  }
+
+  return fallback
+}
+
+function statusMeta(order: Order) {
+  if (order.payment_status === 'failed' || order.payment_status === 'expired' || order.order_status === 'failed') {
+    return { label: 'Gagal', className: 's-gagal' }
+  }
+
+  if (order.order_status === 'completed') {
+    return { label: 'Selesai', className: 's-proses' }
+  }
+
+  if (order.order_status === 'active') {
+    return { label: 'Aktif', className: 's-lunas' }
+  }
+
+  if (order.payment_status === 'paid') {
+    return { label: 'Lunas', className: 's-lunas' }
+  }
+
+  return { label: 'Pending', className: 's-pending' }
+}
+
+function paymentStatusLabel(value: Order['payment_status']) {
+  if (value === 'paid') return 'Paid'
+  if (value === 'failed') return 'Failed'
+  if (value === 'expired') return 'Expired'
+  return 'Pending'
+}
+
+function orderStatusLabel(value: Order['order_status']) {
+  if (value === 'active') return 'Active'
+  if (value === 'completed') return 'Completed'
+  if (value === 'failed') return 'Failed'
+  return 'Pending'
+}
+
+function escapeCsvValue(value: string) {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replaceAll('"', '""')}"`
+  }
+
+  return value
+}
+
+function accountPackage(order: Order) {
+  const duration = order.price?.duration
+  const accountType = order.price?.account_type
+
+  if (!duration && !accountType) return '-'
+  if (!duration) return accountType || '-'
+  if (!accountType) return `${duration} Bulan`
+
+  return `${duration} Bulan · ${accountType}`
+}
+
 export default function OrderPage() {
-  const ORDERS = [
-    { id: '#4821', buyer: 'Budi S.', email: 'budi@gmail.com', product: '🎬 Netflix', paket: '1 Bulan', total: 'Rp 25.000', tgl: '4 Apr 2026', status: 'Lunas', statusClass: 's-lunas' },
-    { id: '#4820', buyer: 'Rina A.', email: 'rina@gmail.com', product: '🎵 Spotify', paket: '1 Bulan', total: 'Rp 18.000', tgl: '4 Apr 2026', status: 'Pending', statusClass: 's-pending', actionClass: 'orange', actionLabel: 'Konfirmasi' },
-    { id: '#4819', buyer: 'Dian P.', email: 'dian@gmail.com', product: '🎮 Xbox', paket: '1 Bulan', total: 'Rp 45.000', tgl: '3 Apr 2026', status: 'Lunas', statusClass: 's-lunas' },
-    { id: '#4818', buyer: 'Fajar M.', email: 'fajar@gmail.com', product: '✨ Disney+', paket: '1 Bulan', total: 'Rp 20.000', tgl: '3 Apr 2026', status: 'Gagal', statusClass: 's-gagal' },
-  ]
+  const [orders, setOrders] = useState<Order[]>([])
+  const [productsByID, setProductsByID] = useState<ProductLookup>({})
+
+  const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [actionOrderID, setActionOrderID] = useState<string | null>(null)
+
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<OrderFilter>('all')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+
+  const resolveProduct = useCallback(
+    (order: Order) => {
+      const productID = order.price?.product_id
+      if (productID && productsByID[productID]) {
+        return productsByID[productID]
+      }
+
+      if (order.product?.name) {
+        return {
+          name: order.product.name,
+          icon: order.product.icon || '📦',
+        }
+      }
+
+      return {
+        name: productID ? `Produk ${productID.slice(0, 8)}` : 'Produk',
+        icon: order.product?.icon || '📦',
+      }
+    },
+    [productsByID]
+  )
+
+  const getBuyerName = (order: Order) => {
+    if (order.user?.name?.trim()) return order.user.name
+    if (order.user_id) return `User ${order.user_id.slice(0, 8)}`
+    return 'User'
+  }
+
+  const getBuyerEmail = (order: Order) => {
+    if (order.user?.email?.trim()) return order.user.email
+    return '-'
+  }
+
+  const loadProductLookup = useCallback(async () => {
+    try {
+      const res = await productService.adminList({ page: 1, limit: 200 })
+      if (!res.success) return
+
+      const mapped = res.data.reduce<ProductLookup>((acc, product) => {
+        acc[product.id] = {
+          name: product.name,
+          icon: product.icon || '📦',
+        }
+        return acc
+      }, {})
+
+      setProductsByID(mapped)
+    } catch {
+      // best effort only
+    }
+  }, [])
+
+  const loadOrders = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true
+
+      if (silent) {
+        setSyncing(true)
+      } else {
+        setLoading(true)
+      }
+
+      setError('')
+
+      try {
+        const res = await orderService.adminList({
+          page,
+          limit: PAGE_LIMIT,
+          status: statusFilter === 'all' ? undefined : statusFilter,
+        })
+
+        if (!res.success) {
+          setError(res.message || 'Gagal memuat daftar order')
+          return
+        }
+
+        setOrders(res.data)
+
+        const totalData = res.meta?.total ?? res.data.length
+        const resolvedTotalPages = Math.max(1, res.meta?.total_pages ?? 1)
+
+        setTotal(totalData)
+        setTotalPages(resolvedTotalPages)
+
+        if (page > resolvedTotalPages) {
+          setPage(resolvedTotalPages)
+        }
+      } catch (err) {
+        setError(mapErrorMessage(err, 'Gagal memuat daftar order admin'))
+      } finally {
+        setLoading(false)
+        setSyncing(false)
+      }
+    },
+    [page, statusFilter]
+  )
+
+  useEffect(() => {
+    void loadProductLookup()
+  }, [loadProductLookup])
+
+  useEffect(() => {
+    void loadOrders()
+  }, [loadOrders])
+
+  const filteredOrders = useMemo(() => {
+    const keyword = search.trim().toLowerCase()
+    if (!keyword) return orders
+
+    return orders.filter((order) => {
+      const product = resolveProduct(order)
+
+      const haystack = [
+        shortOrderCode(order.id),
+        order.id,
+        getBuyerName(order),
+        getBuyerEmail(order),
+        product.name,
+        order.price?.account_type || '',
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      return haystack.includes(keyword)
+    })
+  }, [orders, resolveProduct, search])
+
+  const refreshOrders = async () => {
+    await loadOrders({ silent: true })
+  }
+
+  const handleFilterChange = (value: OrderFilter) => {
+    setStatusFilter(value)
+    setPage(1)
+  }
+
+  const runOrderAction = async (order: Order, action: 'confirm' | 'send') => {
+    setActionOrderID(order.id)
+    setError('')
+
+    try {
+      const res = action === 'confirm'
+        ? await orderService.adminConfirm(order.id)
+        : await orderService.adminSendAccount(order.id)
+
+      if (!res.success) {
+        setError(res.message || 'Aksi order gagal dijalankan')
+        return
+      }
+
+      const orderCode = shortOrderCode(order.id)
+      setNotice(
+        action === 'confirm'
+          ? `Order ${orderCode} berhasil dikonfirmasi.`
+          : `Order ${orderCode} berhasil dikirim akun.`
+      )
+
+      await refreshOrders()
+    } catch (err) {
+      setError(
+        mapErrorMessage(
+          err,
+          action === 'confirm' ? 'Konfirmasi order gagal' : 'Kirim akun gagal'
+        )
+      )
+    } finally {
+      setActionOrderID(null)
+    }
+  }
+
+  const exportCurrentRows = () => {
+    if (filteredOrders.length === 0) {
+      setError('Tidak ada data order di halaman ini untuk diexport.')
+      return
+    }
+
+    const header = ['order_code', 'buyer_name', 'buyer_email', 'product', 'paket', 'total', 'payment_status', 'order_status', 'tanggal_order']
+
+    const rows = filteredOrders.map((order) => {
+      const product = resolveProduct(order)
+      return [
+        shortOrderCode(order.id),
+        getBuyerName(order),
+        getBuyerEmail(order),
+        product.name,
+        accountPackage(order),
+        String(order.total_price || 0),
+        paymentStatusLabel(order.payment_status),
+        orderStatusLabel(order.order_status),
+        formatDate(order.created_at),
+      ]
+    })
+
+    const csv = [header, ...rows]
+      .map((row) => row.map((col) => escapeCsvValue(col)).join(','))
+      .join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const href = URL.createObjectURL(blob)
+
+    const anchor = document.createElement('a')
+    anchor.href = href
+    anchor.download = `admin-orders-page-${page}.csv`
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+
+    URL.revokeObjectURL(href)
+    setNotice('Export CSV selesai untuk data order di halaman aktif.')
+  }
 
   return (
     <div className="page">
+      {!!notice && (
+        <div className="alert-bar" style={{ marginBottom: 12 }}>
+          ✅ <strong>{notice}</strong>
+          <button
+            className="link-btn"
+            style={{ marginLeft: 'auto', color: 'inherit' }}
+            onClick={() => setNotice('')}
+          >
+            tutup
+          </button>
+        </div>
+      )}
+
+      {!!error && (
+        <div
+          className="alert-bar"
+          style={{
+            marginBottom: 12,
+            background: '#FEF2F2',
+            borderColor: '#FECACA',
+            color: '#991B1B',
+          }}
+        >
+          ⚠️ <strong>{error}</strong>
+        </div>
+      )}
+
       <div className="admin-desktop-only">
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 14,
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="🔍 Cari order / pembeli / produk..."
+              style={{
+                fontFamily: 'inherit',
+                fontSize: 13,
+                padding: '8px 14px',
+                border: '1px solid var(--border)',
+                borderRadius: 9,
+                background: 'var(--white)',
+                outline: 'none',
+                width: 280,
+              }}
+            />
+
+            <select
+              value={statusFilter}
+              onChange={(event) => handleFilterChange(event.target.value as OrderFilter)}
+              style={{
+                fontFamily: 'inherit',
+                fontSize: 13,
+                padding: '8px 12px',
+                border: '1px solid var(--border)',
+                borderRadius: 9,
+                background: 'var(--white)',
+                outline: 'none',
+              }}
+            >
+              {STATUS_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="topbar-btn" onClick={refreshOrders} disabled={loading || syncing}>
+              {syncing ? 'Menyegarkan...' : 'Refresh'}
+            </button>
+            <button className="topbar-btn" onClick={exportCurrentRows} disabled={loading || syncing}>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
         <div className="card">
-          <div className="card-header"><h2>Semua Order</h2><div style={{ display: 'flex', gap: 8 }}><button className="topbar-btn">Export CSV</button><button className="topbar-btn primary">Filter</button></div></div>
+          <div className="card-header">
+            <h2>Semua Order</h2>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              Total: <strong style={{ color: 'var(--dark)' }}>{total}</strong> order
+            </div>
+          </div>
+
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Order</th><th>Pembeli</th><th>Produk</th><th>Paket</th><th>Total</th><th>Tgl Order</th><th>Status</th><th>Aksi</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Pembeli</th>
+                  <th>Produk</th>
+                  <th>Paket</th>
+                  <th>Total</th>
+                  <th>Tgl Order</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
               <tbody>
-                {ORDERS.map((o) => (
-                  <tr key={o.id}>
-                    <td><div className="order-id">{o.id}</div></td>
-                    <td><div className="order-buyer">{o.buyer}</div><div className="order-email">{o.email}</div></td>
-                    <td><span className="product-pill">{o.product}</span></td>
-                    <td>{o.paket}</td>
-                    <td style={{ fontWeight: 600 }}>{o.total}</td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{o.tgl}</td>
-                    <td><span className={`status-badge ${o.statusClass}`}>{o.status}</span></td>
-                    <td><button className={`action-btn${o.actionClass ? ` ${o.actionClass}` : ''}`}>{o.actionLabel || 'Detail'}</button></td>
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
+                      Memuat daftar order...
+                    </td>
                   </tr>
-                ))}
+                ) : filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
+                      Tidak ada order untuk filter saat ini.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredOrders.map((order) => {
+                    const product = resolveProduct(order)
+                    const buyerName = getBuyerName(order)
+                    const buyerEmail = getBuyerEmail(order)
+                    const currentStatus = statusMeta(order)
+                    const isRunning = actionOrderID === order.id
+
+                    const canConfirm = order.payment_status === 'pending' && order.order_status === 'pending'
+                    const canSendAccount =
+                      (order.payment_status === 'paid' || order.order_status === 'active') &&
+                      !order.stock_id
+
+                    return (
+                      <tr key={order.id}>
+                        <td>
+                          <div className="order-id">{shortOrderCode(order.id)}</div>
+                        </td>
+                        <td>
+                          <div className="order-buyer">{buyerName}</div>
+                          <div className="order-email">{buyerEmail}</div>
+                        </td>
+                        <td>
+                          <span className="product-pill">
+                            {product.icon} {product.name}
+                          </span>
+                        </td>
+                        <td>{accountPackage(order)}</td>
+                        <td style={{ fontWeight: 600 }}>{formatRupiah(order.total_price || 0)}</td>
+                        <td style={{ color: 'var(--muted)', fontSize: 12 }}>{formatDate(order.created_at)}</td>
+                        <td>
+                          <span className={`status-badge ${currentStatus.className}`}>{currentStatus.label}</span>
+                          <div style={{ marginTop: 4, fontSize: 10, color: 'var(--muted)' }}>
+                            pay:{paymentStatusLabel(order.payment_status)} · order:{orderStatusLabel(order.order_status)}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button className="action-btn" onClick={() => setSelectedOrder(order)}>
+                              Detail
+                            </button>
+
+                            {canConfirm && (
+                              <button
+                                className="action-btn orange"
+                                disabled={isRunning}
+                                onClick={() => runOrderAction(order, 'confirm')}
+                              >
+                                {isRunning ? 'Memproses...' : 'Konfirmasi'}
+                              </button>
+                            )}
+
+                            {!canConfirm && canSendAccount && (
+                              <button
+                                className="action-btn orange"
+                                disabled={isRunning}
+                                onClick={() => runOrderAction(order, 'send')}
+                              >
+                                {isRunning ? 'Memproses...' : 'Kirim Akun'}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 8,
+              borderTop: '1px solid var(--border)',
+              padding: '12px 20px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              Menampilkan <strong style={{ color: 'var(--dark)' }}>{filteredOrders.length}</strong> item · Page{' '}
+              <strong style={{ color: 'var(--dark)' }}>{page}</strong> /{' '}
+              <strong style={{ color: 'var(--dark)' }}>{totalPages}</strong>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="topbar-btn"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={page <= 1 || loading || syncing}
+              >
+                Sebelumnya
+              </button>
+              <button
+                className="topbar-btn"
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={page >= totalPages || loading || syncing}
+              >
+                Berikutnya
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -42,43 +578,284 @@ export default function OrderPage() {
             <div className="mobile-page-subtitle">Pantau transaksi harian</div>
           </div>
           <div className="mobile-inline-actions">
-            <button className="mobile-chip-btn">Filter</button>
-            <button className="mobile-chip-btn">Export</button>
+            <button className="mobile-chip-btn" onClick={refreshOrders} disabled={loading || syncing}>
+              {syncing ? 'Sync...' : 'Refresh'}
+            </button>
+            <button className="mobile-chip-btn" onClick={exportCurrentRows} disabled={loading || syncing}>
+              Export
+            </button>
+          </div>
+        </div>
+
+        <div className="mobile-card" style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              type="text"
+              className="form-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Cari order / pembeli / produk"
+            />
+
+            <select
+              className="form-select"
+              value={statusFilter}
+              onChange={(event) => handleFilterChange(event.target.value as OrderFilter)}
+            >
+              {STATUS_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
         <div className="mobile-card-list">
-          {ORDERS.map((o) => (
-            <article className="mobile-card" key={o.id}>
-              <div className="mobile-card-head">
-                <div>
-                  <div className="mobile-card-title">{o.id} · {o.buyer}</div>
-                  <div className="mobile-card-sub">{o.email} · {o.product}</div>
-                </div>
-                <span className={`status-badge ${o.statusClass}`}>{o.status}</span>
+          {loading ? (
+            <article className="mobile-card">
+              <div className="mobile-card-sub">Memuat daftar order...</div>
+            </article>
+          ) : filteredOrders.length === 0 ? (
+            <article className="mobile-card">
+              <div className="mobile-card-sub">Tidak ada order pada filter ini.</div>
+            </article>
+          ) : (
+            filteredOrders.map((order) => {
+              const product = resolveProduct(order)
+              const currentStatus = statusMeta(order)
+              const isRunning = actionOrderID === order.id
+
+              const canConfirm = order.payment_status === 'pending' && order.order_status === 'pending'
+              const canSendAccount =
+                (order.payment_status === 'paid' || order.order_status === 'active') &&
+                !order.stock_id
+
+              return (
+                <article className="mobile-card" key={order.id}>
+                  <div className="mobile-card-head">
+                    <div>
+                      <div className="mobile-card-title">
+                        {shortOrderCode(order.id)} · {getBuyerName(order)}
+                      </div>
+                      <div className="mobile-card-sub">{getBuyerEmail(order)}</div>
+                    </div>
+                    <span className={`status-badge ${currentStatus.className}`}>{currentStatus.label}</span>
+                  </div>
+
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Produk</span>
+                    <span className="mobile-card-value">
+                      {product.icon} {product.name}
+                    </span>
+                  </div>
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Paket</span>
+                    <span className="mobile-card-value">{accountPackage(order)}</span>
+                  </div>
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Tanggal</span>
+                    <span className="mobile-card-value">{formatDate(order.created_at)}</span>
+                  </div>
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Total</span>
+                    <span className="mobile-card-value">{formatRupiah(order.total_price || 0)}</span>
+                  </div>
+
+                  <div className="mobile-card-row" style={{ alignItems: 'flex-start' }}>
+                    <span className="mobile-card-label">State</span>
+                    <span className="mobile-card-value" style={{ maxWidth: '70%' }}>
+                      pay:{paymentStatusLabel(order.payment_status)} · order:{orderStatusLabel(order.order_status)}
+                    </span>
+                  </div>
+
+                  <div className="mobile-card-actions">
+                    <button className="action-btn" onClick={() => setSelectedOrder(order)}>
+                      Detail
+                    </button>
+
+                    {canConfirm && (
+                      <button
+                        className="action-btn orange"
+                        disabled={isRunning}
+                        onClick={() => runOrderAction(order, 'confirm')}
+                      >
+                        {isRunning ? 'Proses...' : 'Konfirmasi'}
+                      </button>
+                    )}
+
+                    {!canConfirm && canSendAccount && (
+                      <button
+                        className="action-btn orange"
+                        disabled={isRunning}
+                        onClick={() => runOrderAction(order, 'send')}
+                      >
+                        {isRunning ? 'Proses...' : 'Kirim Akun'}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              )
+            })
+          )}
+        </div>
+
+        <div className="mobile-card" style={{ marginTop: 10 }}>
+          <div className="mobile-card-row">
+            <span className="mobile-card-label">Total order</span>
+            <span className="mobile-card-value">{total}</span>
+          </div>
+          <div className="mobile-card-row">
+            <span className="mobile-card-label">Halaman</span>
+            <span className="mobile-card-value">
+              {page} / {totalPages}
+            </span>
+          </div>
+
+          <div className="mobile-card-actions" style={{ marginTop: 8 }}>
+            <button
+              className="action-btn"
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page <= 1 || loading || syncing}
+            >
+              Prev
+            </button>
+            <button
+              className="action-btn"
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={page >= totalPages || loading || syncing}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {selectedOrder && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(20,20,20,.35)',
+            zIndex: 120,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 12,
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: 560,
+              maxHeight: '90vh',
+              overflow: 'auto',
+            }}
+          >
+            <div className="card-header">
+              <h2>Detail Order {shortOrderCode(selectedOrder.id)}</h2>
+              <button className="action-btn" onClick={() => setSelectedOrder(null)}>
+                Tutup
+              </button>
+            </div>
+
+            <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Pembeli</span>
+                <span className="mobile-card-value">{getBuyerName(selectedOrder)}</span>
+              </div>
+
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Email</span>
+                <span className="mobile-card-value">{getBuyerEmail(selectedOrder)}</span>
+              </div>
+
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Produk</span>
+                <span className="mobile-card-value">
+                  {resolveProduct(selectedOrder).icon} {resolveProduct(selectedOrder).name}
+                </span>
               </div>
 
               <div className="mobile-card-row">
                 <span className="mobile-card-label">Paket</span>
-                <span className="mobile-card-value">{o.paket}</span>
-              </div>
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Tanggal</span>
-                <span className="mobile-card-value">{o.tgl}</span>
-              </div>
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Total</span>
-                <span className="mobile-card-value">{o.total}</span>
+                <span className="mobile-card-value">{accountPackage(selectedOrder)}</span>
               </div>
 
-              <div className="mobile-card-actions">
-                <button className="action-btn">Detail</button>
-                <button className={`action-btn${o.actionClass ? ` ${o.actionClass}` : ''}`}>{o.actionLabel || 'Lihat'}</button>
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Total</span>
+                <span className="mobile-card-value">{formatRupiah(selectedOrder.total_price || 0)}</span>
               </div>
-            </article>
-          ))}
+
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Payment</span>
+                <span className="mobile-card-value">{paymentStatusLabel(selectedOrder.payment_status)}</span>
+              </div>
+
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Order State</span>
+                <span className="mobile-card-value">{orderStatusLabel(selectedOrder.order_status)}</span>
+              </div>
+
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Dibuat</span>
+                <span className="mobile-card-value">{formatDate(selectedOrder.created_at)}</span>
+              </div>
+
+              {selectedOrder.stock && (
+                <>
+                  <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>Akun Terkait</div>
+
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Email Akun</span>
+                    <span className="mobile-card-value">{selectedOrder.stock.email}</span>
+                  </div>
+
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Profile</span>
+                    <span className="mobile-card-value">{selectedOrder.stock.profile_name || '-'}</span>
+                  </div>
+
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Expired</span>
+                    <span className="mobile-card-value">{formatDate(selectedOrder.stock.expires_at)}</span>
+                  </div>
+                </>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
+                <button className="topbar-btn" onClick={() => setSelectedOrder(null)}>
+                  Tutup
+                </button>
+
+                {selectedOrder.payment_status === 'pending' && selectedOrder.order_status === 'pending' && (
+                  <button
+                    className="topbar-btn primary"
+                    disabled={actionOrderID === selectedOrder.id}
+                    onClick={() => runOrderAction(selectedOrder, 'confirm')}
+                  >
+                    {actionOrderID === selectedOrder.id ? 'Memproses...' : 'Konfirmasi'}
+                  </button>
+                )}
+
+                {(selectedOrder.payment_status === 'paid' || selectedOrder.order_status === 'active') &&
+                  !selectedOrder.stock_id && (
+                    <button
+                      className="topbar-btn primary"
+                      disabled={actionOrderID === selectedOrder.id}
+                      onClick={() => runOrderAction(selectedOrder, 'send')}
+                    >
+                      {actionOrderID === selectedOrder.id ? 'Memproses...' : 'Kirim Akun'}
+                    </button>
+                  )}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
