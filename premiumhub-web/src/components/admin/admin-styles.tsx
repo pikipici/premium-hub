@@ -260,33 +260,31 @@ export default function AdminStyles() {
         .grid-2, .grid-2-eq, .edit-layout { grid-template-columns: 1fr; }
         .preview-col { position: static; }
       }
+
       @media (max-width: 768px) {
         .sidebar { display: none; }
         .admin-main { margin-left: 0; }
 
         .topbar {
-          height: auto;
-          min-height: 56px;
-          padding: 10px 14px;
-          gap: 10px;
-          align-items: center;
+          height: 48px;
+          min-height: 48px;
+          padding: 6px 10px;
+          gap: 8px;
         }
-        .topbar-left h1 { font-size: 15px; }
+        .topbar-left h1 { font-size: 14px; line-height: 1.2; }
         .topbar-left p { display: none; }
-        .topbar-right { gap: 8px; }
-        .topbar-btn { padding: 7px 10px; font-size: 12px; }
-        .topbar-right .topbar-btn.primary { display: none; }
+        .topbar-right { display: none; }
 
         .admin-mobile-nav {
           display: flex;
-          gap: 8px;
+          gap: 6px;
           overflow-x: auto;
           overflow-y: hidden;
-          padding: 10px 14px;
+          padding: 6px 10px 8px;
           border-bottom: 1px solid var(--border);
           background: var(--white);
           position: sticky;
-          top: 56px;
+          top: 48px;
           z-index: 85;
           scrollbar-width: none;
           -ms-overflow-style: none;
@@ -295,13 +293,13 @@ export default function AdminStyles() {
         .admin-mobile-nav-item {
           flex-shrink: 0;
           text-decoration: none;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 600;
           color: var(--muted);
           border: 1px solid var(--border);
           background: var(--bg);
           border-radius: 999px;
-          padding: 7px 12px;
+          padding: 5px 9px;
           white-space: nowrap;
         }
         .admin-mobile-nav-item.active {
@@ -310,29 +308,122 @@ export default function AdminStyles() {
           border-color: var(--dark);
         }
 
-        .page { padding: 16px 14px; }
-        .metrics { grid-template-columns: 1fr; }
+        .page { padding: 10px; }
+
+        .metrics {
+          grid-template-columns: 1fr;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        .metric-card {
+          border-radius: 10px;
+          padding: 12px;
+        }
+        .metric-top { margin-bottom: 8px; }
+        .metric-icon { width: 28px; height: 28px; font-size: 14px; }
+        .metric-label { font-size: 11px; }
+        .metric-value { font-size: 18px; margin-bottom: 2px; }
+        .metric-change { font-size: 11px; }
 
         .alert-bar {
           flex-direction: column;
           align-items: flex-start;
-          gap: 8px;
+          gap: 6px;
+          font-size: 12px;
+          padding: 8px 10px;
+          margin-bottom: 12px;
+          border-radius: 10px;
         }
 
-        .card-header {
-          padding: 12px 14px;
+        .grid-2,
+        .grid-2-eq {
+          gap: 10px;
+          margin-bottom: 10px;
         }
-        th, td {
-          padding-left: 14px;
-          padding-right: 14px;
+
+        .card { border-radius: 10px; }
+        .card-header { padding: 10px 12px; }
+        .card-header h2 { font-size: 13px; }
+        .link-btn { font-size: 11px; }
+
+        .chart-wrap { padding: 12px; }
+        .chart-tabs { margin-bottom: 10px; }
+        .chart-tab { font-size: 11px; padding: 4px 8px; }
+        .chart-area { height: 132px; gap: 4px; }
+        .bar-label { font-size: 9px; }
+
+        table { font-size: 12px; }
+        th {
+          font-size: 10px;
+          padding: 8px 12px;
         }
+        td {
+          padding: 10px 12px;
+        }
+        .order-email { font-size: 11px; }
+        .product-pill { font-size: 11px; padding: 2px 8px; }
+        .status-badge { font-size: 10px; padding: 3px 8px; }
+        .action-btn { font-size: 11px; padding: 4px 8px; }
 
         .stok-item,
         .garansi-item,
         .top-prod-item {
-          padding-left: 14px;
-          padding-right: 14px;
+          padding: 8px 12px;
+          gap: 10px;
         }
+        .stok-icon { width: 30px; font-size: 20px; }
+        .stok-name,
+        .garansi-name,
+        .top-prod-name { font-size: 12px; }
+        .stok-meta,
+        .garansi-detail,
+        .top-prod-sales { font-size: 10px; }
+        .stok-add-btn,
+        .g-approve,
+        .g-reject { font-size: 10px; padding: 4px 7px; }
+        .garansi-avatar { width: 28px; height: 28px; font-size: 11px; }
+        .top-prod-rev { font-size: 12px; }
+
+        .mini-stats { padding: 12px; }
+        .mini-stat { padding: 10px 0; }
+        .mini-stat-label { font-size: 11px; }
+        .mini-stat-value { font-size: 17px; }
+        .mini-stat-sub { font-size: 10px; }
+
+        .edit-page-header { margin-bottom: 12px; }
+        .edit-page-actions { width: 100%; }
+        .edit-page-actions .topbar-btn {
+          flex: 1;
+          justify-content: center;
+          font-size: 11px;
+          padding: 6px 8px;
+        }
+
+        .form-section-header { padding: 10px 12px; }
+        .form-section-header h3 { font-size: 13px; }
+        .form-section-sub { font-size: 10px; }
+        .form-section-body { padding: 12px; gap: 10px; }
+        .form-row-2,
+        .form-row-3,
+        .dur-editor-grid { grid-template-columns: 1fr; gap: 8px; }
+        .spec-row { grid-template-columns: 1fr; gap: 6px; }
+        .dynamic-row { align-items: stretch; }
+        .dynamic-row .btn-remove-row { width: 30px; height: 32px; }
+        .dur-editor-card,
+        .faq-editor-item,
+        .preview-card-body { padding: 10px; }
+        .preview-card-header { padding: 9px 12px; }
+        .icon-picker-wrap { flex-direction: column; align-items: flex-start; }
+        .icon-preview { width: 42px; height: 42px; font-size: 20px; }
+        .icon-opt { width: 32px; height: 32px; font-size: 16px; }
+      }
+
+      @media (max-width: 420px) {
+        .topbar { padding: 6px 8px; }
+        .topbar-left h1 { font-size: 13px; }
+        .admin-mobile-nav { padding: 6px 8px; }
+        .admin-mobile-nav-item { font-size: 10px; padding: 4px 8px; }
+        .page { padding: 8px; }
       }
     `}</style>
   )
