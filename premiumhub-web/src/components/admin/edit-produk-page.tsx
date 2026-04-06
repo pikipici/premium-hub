@@ -2,25 +2,19 @@
 
 import { useState } from 'react'
 
-interface ProductData {
-  name: string
-  tagline: string
-  icon: string
-  cat: string
-  priceOrig: string
-  price1: string
-}
-
-const PRODUCT_DATA: Record<string, ProductData> = {
-  netflix:  { name: 'Netflix Premium',   tagline: 'Shared 4K Ultra HD · 1 profil aktif', icon: '🎬', cat: 'Streaming',     priceOrig: 'Rp 54.000', price1: 'Rp 39.000' },
-  spotify:  { name: 'Spotify Premium',   tagline: 'Individual 1 Bulan',                  icon: '🎵', cat: 'Musik',          priceOrig: 'Rp 25.000', price1: 'Rp 18.000' },
-  disney:   { name: 'Disney+ Hotstar',   tagline: 'Premium Bundle',                       icon: '✨', cat: 'Streaming',     priceOrig: 'Rp 30.000', price1: 'Rp 20.000' },
-  xbox:     { name: 'Xbox Game Pass',    tagline: 'Ultimate 1 Bulan',                     icon: '🎮', cat: 'Gaming',        priceOrig: 'Rp 65.000', price1: 'Rp 45.000' },
-  canva:    { name: 'Canva Pro',         tagline: 'Team 1 Bulan',                         icon: '🎨', cat: 'Produktivitas', priceOrig: 'Rp 45.000', price1: 'Rp 30.000' },
-  youtube:  { name: 'YouTube Premium',   tagline: 'Individual 1 Bulan',                   icon: '▶️', cat: 'Streaming',     priceOrig: 'Rp 32.000', price1: 'Rp 22.000' },
-}
-
 const ICONS = ['🎬', '🎵', '📺', '🎮', '🎨', '▶️', '☁️', '🔐', '📧']
+
+declare global {
+  interface Window {
+    __removeRow?: (el: HTMLElement) => void
+    updatePreview?: () => void
+    addFeature?: () => void
+    addSpec?: () => void
+    addDuration?: () => void
+    addTrust?: () => void
+    addFaq?: () => void
+  }
+}
 
 interface EditProdukPageProps {
   onNavigate: (page: string) => void
@@ -29,7 +23,7 @@ interface EditProdukPageProps {
 
 export default function EditProdukPage({ onNavigate, showToast }: EditProdukPageProps) {
   const [selectedIcon, setSelectedIcon] = useState('🎬')
-  const [breadcrumbName, setBreadcrumbName] = useState('Netflix Premium')
+  const breadcrumbName = 'Netflix Premium'
 
   const updatePreview = () => {
     const nameEl = document.getElementById('f-name') as HTMLInputElement | null
@@ -83,85 +77,81 @@ export default function EditProdukPage({ onNavigate, showToast }: EditProdukPage
     if (prevIcon) prevIcon.textContent = icon
   }
 
-  const openEditProduk = (id: string) => {
-    const d = PRODUCT_DATA[id] || PRODUCT_DATA.netflix
-    const nameEl = document.getElementById('f-name') as HTMLInputElement | null
-    const taglineEl = document.getElementById('f-tagline') as HTMLInputElement | null
-    const priceOrigEl = document.getElementById('f-price-orig') as HTMLInputElement | null
-    const catEl = document.getElementById('f-category') as HTMLSelectElement | null
-
-    if (nameEl) nameEl.value = d.name
-    if (taglineEl) taglineEl.value = d.tagline
-    if (priceOrigEl) priceOrigEl.value = d.priceOrig
-    if (catEl) {
-      for (let i = 0; i < catEl.options.length; i++) {
-        if (catEl.options[i].text === d.cat) { catEl.selectedIndex = i; break }
-      }
-    }
-
-    const iconPreview = document.getElementById('iconPreview')
-    if (iconPreview) iconPreview.textContent = d.icon
-    setSelectedIcon(d.icon)
-    setBreadcrumbName(d.name)
-    updatePreview()
-  }
-
   const saveProduct = () => {
     const nameEl = document.getElementById('f-name') as HTMLInputElement | null
     showToast('✓ Produk "' + (nameEl?.value || '') + '" berhasil disimpan')
   }
 
   // Expose functions globally for inline onclick handlers
-  ;(window as any).__removeRow = function(el: HTMLElement) {
-    const target = el.closest('.dynamic-row') || el.closest('.spec-row') || el.closest('.faq-editor-item')
-    if (target) target.remove()
-    else el.remove()
-    updatePreview()
-  }
-  ;(window as any).updatePreview = updatePreview
-  ;(window as any).addFeature = function() {
-    const list = document.getElementById('features-list')
-    if (!list) return
-    if (list.children.length >= 8) { alert('Maksimal 8 fitur'); return }
-    const row = document.createElement('div')
-    row.className = 'dynamic-row'
-    row.innerHTML = '<input type="text" class="form-input" placeholder="Fitur baru..." oninput="updatePreview()"><button class="btn-remove-row" onclick="window.__removeRow(this)">✕</button>'
-    list.appendChild(row)
-  }
-  ;(window as any).addSpec = function() {
-    const list = document.getElementById('specs-list')
-    if (!list) return
-    const row = document.createElement('div')
-    row.className = 'spec-row'
-    row.innerHTML = '<input type="text" class="form-input" placeholder="Label..."><input type="text" class="form-input" placeholder="Nilai..."><button class="btn-remove-row" onclick="window.__removeRow(this)">✕</button>'
-    list.appendChild(row)
-  }
-  ;(window as any).addDuration = function() {
-    const list = document.getElementById('durations-list')
-    if (!list) return
-    if (list.children.length >= 4) { alert('Maksimal 4 paket durasi'); return }
-    const n = list.children.length + 1
-    const card = document.createElement('div')
-    card.className = 'dur-editor-card'
-    card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><span style="font-size:12px;font-weight:700;">Paket ${n}</span><button class="btn-remove-row" onclick="this.closest('.dur-editor-card').remove()">✕</button></div><span class="dur-label-sm">Label</span><input type="text" class="dur-input" value=""><span class="dur-label-sm">Harga Tampil</span><input type="text" class="dur-input" value="" oninput="updatePreview()"><span class="dur-label-sm">Teks Hemat</span><input type="text" class="dur-input" value="">`
-    list.appendChild(card)
-  }
-  ;(window as any).addTrust = function() {
-    const list = document.getElementById('trust-list')
-    if (!list) return
-    const row = document.createElement('div')
-    row.className = 'dynamic-row'
-    row.innerHTML = '<input type="text" class="form-input" style="max-width:52px;" value="✨"><input type="text" class="form-input" placeholder="Teks trust..."><button class="btn-remove-row" onclick="window.__removeRow(this)">✕</button>'
-    list.appendChild(row)
-  }
-  ;(window as any).addFaq = function() {
-    const list = document.getElementById('faq-list')
-    if (!list) return
-    const n = list.children.length + 1
-    const item = document.createElement('div')
-    item.className = 'faq-editor-item'
-    item.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><label class="form-label" style="margin:0;">Pertanyaan ${n}</label><button class="btn-remove-row" onclick="this.closest('.faq-editor-item').remove()">✕</button></div><input type="text" class="form-input" placeholder="Pertanyaan..."><textarea class="form-textarea" rows="2" placeholder="Jawaban..."></textarea>`
-    list.appendChild(item)
+  if (typeof window !== 'undefined') {
+    window.__removeRow = (el: HTMLElement) => {
+      const target = el.closest('.dynamic-row') || el.closest('.spec-row') || el.closest('.faq-editor-item')
+      if (target) target.remove()
+      else el.remove()
+      updatePreview()
+    }
+
+    window.updatePreview = updatePreview
+
+    window.addFeature = () => {
+      const list = document.getElementById('features-list')
+      if (!list) return
+      if (list.children.length >= 8) {
+        alert('Maksimal 8 fitur')
+        return
+      }
+
+      const row = document.createElement('div')
+      row.className = 'dynamic-row'
+      row.innerHTML = '<input type="text" class="form-input" placeholder="Fitur baru..." oninput="updatePreview()"><button class="btn-remove-row" onclick="window.__removeRow(this)">✕</button>'
+      list.appendChild(row)
+    }
+
+    window.addSpec = () => {
+      const list = document.getElementById('specs-list')
+      if (!list) return
+
+      const row = document.createElement('div')
+      row.className = 'spec-row'
+      row.innerHTML = '<input type="text" class="form-input" placeholder="Label..."><input type="text" class="form-input" placeholder="Nilai..."><button class="btn-remove-row" onclick="window.__removeRow(this)">✕</button>'
+      list.appendChild(row)
+    }
+
+    window.addDuration = () => {
+      const list = document.getElementById('durations-list')
+      if (!list) return
+      if (list.children.length >= 4) {
+        alert('Maksimal 4 paket durasi')
+        return
+      }
+
+      const n = list.children.length + 1
+      const card = document.createElement('div')
+      card.className = 'dur-editor-card'
+      card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><span style="font-size:12px;font-weight:700;">Paket ${n}</span><button class="btn-remove-row" onclick="this.closest('.dur-editor-card').remove()">✕</button></div><span class="dur-label-sm">Label</span><input type="text" class="dur-input" value=""><span class="dur-label-sm">Harga Tampil</span><input type="text" class="dur-input" value="" oninput="updatePreview()"><span class="dur-label-sm">Teks Hemat</span><input type="text" class="dur-input" value="">`
+      list.appendChild(card)
+    }
+
+    window.addTrust = () => {
+      const list = document.getElementById('trust-list')
+      if (!list) return
+
+      const row = document.createElement('div')
+      row.className = 'dynamic-row'
+      row.innerHTML = '<input type="text" class="form-input" style="max-width:52px;" value="✨"><input type="text" class="form-input" placeholder="Teks trust..."><button class="btn-remove-row" onclick="window.__removeRow(this)">✕</button>'
+      list.appendChild(row)
+    }
+
+    window.addFaq = () => {
+      const list = document.getElementById('faq-list')
+      if (!list) return
+
+      const n = list.children.length + 1
+      const item = document.createElement('div')
+      item.className = 'faq-editor-item'
+      item.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;"><label class="form-label" style="margin:0;">Pertanyaan ${n}</label><button class="btn-remove-row" onclick="this.closest('.faq-editor-item').remove()">✕</button></div><input type="text" class="form-input" placeholder="Pertanyaan..."><textarea class="form-textarea" rows="2" placeholder="Jawaban..."></textarea>`
+      list.appendChild(item)
+    }
   }
 
   return (
@@ -224,10 +214,10 @@ export default function EditProdukPage({ onNavigate, showToast }: EditProdukPage
                 <label className="form-label">Daftar Fitur (maks 8 item)</label>
                 <div className="dynamic-list" id="features-list">
                   {['Kualitas 4K Ultra HD + HDR', 'Audio Dolby Atmos', '1 profil eksklusif untukmu', 'Streaming di semua perangkat', 'Pengiriman otomatis instan', 'Garansi penuh 30 hari', 'CS responsif 24/7', 'Download offline tersedia'].map((f, i) => (
-                    <div className="dynamic-row" key={i}><input type="text" className="form-input" defaultValue={f} onInput={updatePreview} /><button className="btn-remove-row" onClick={(e) => { (window as any).__removeRow?.(e.currentTarget) }}>✕</button></div>
+                    <div className="dynamic-row" key={i}><input type="text" className="form-input" defaultValue={f} onInput={updatePreview} /><button className="btn-remove-row" onClick={(e) => { window.__removeRow?.(e.currentTarget) }}>✕</button></div>
                   ))}
                 </div>
-                <button className="btn-add-row" onClick={() => (window as any).addFeature?.()}>+ Tambah Fitur</button>
+                <button className="btn-add-row" onClick={() => window.addFeature?.()}>+ Tambah Fitur</button>
               </div>
             </div>
           </div>
@@ -256,10 +246,10 @@ export default function EditProdukPage({ onNavigate, showToast }: EditProdukPage
                     ['Garansi', '30 hari — ganti akun jika bermasalah'],
                     ['Metode Pembayaran', 'Transfer Bank · GoPay · OVO · DANA · QRIS'],
                   ].map((s, i) => (
-                    <div className="spec-row" key={i}><input type="text" className="form-input" defaultValue={s[0]} /><input type="text" className="form-input" defaultValue={s[1]} /><button className="btn-remove-row" onClick={(e) => { (window as any).__removeRow?.(e.currentTarget) }}>✕</button></div>
+                    <div className="spec-row" key={i}><input type="text" className="form-input" defaultValue={s[0]} /><input type="text" className="form-input" defaultValue={s[1]} /><button className="btn-remove-row" onClick={(e) => { window.__removeRow?.(e.currentTarget) }}>✕</button></div>
                   ))}
                 </div>
-                <button className="btn-add-row" onClick={() => (window as any).addSpec?.()}>+ Tambah Baris Spek</button>
+                <button className="btn-add-row" onClick={() => window.addSpec?.()}>+ Tambah Baris Spek</button>
               </div>
             </div>
           </div>
@@ -290,7 +280,7 @@ export default function EditProdukPage({ onNavigate, showToast }: EditProdukPage
                     </div>
                   ))}
                 </div>
-                <button className="btn-add-row" onClick={() => (window as any).addDuration?.()} style={{ marginTop: 8 }}>+ Tambah Paket Durasi</button>
+                <button className="btn-add-row" onClick={() => window.addDuration?.()} style={{ marginTop: 8 }}>+ Tambah Paket Durasi</button>
               </div>
             </div>
           </div>
@@ -308,10 +298,10 @@ export default function EditProdukPage({ onNavigate, showToast }: EditProdukPage
                     ['🔒', 'Pembayaran 100% aman'],
                     ['💬', 'CS responsif 24/7'],
                   ].map((t, i) => (
-                    <div className="dynamic-row" key={i}><input type="text" className="form-input" style={{ maxWidth: 52 }} defaultValue={t[0]} /><input type="text" className="form-input" defaultValue={t[1]} /><button className="btn-remove-row" onClick={(e) => { (window as any).__removeRow?.(e.currentTarget) }}>✕</button></div>
+                    <div className="dynamic-row" key={i}><input type="text" className="form-input" style={{ maxWidth: 52 }} defaultValue={t[0]} /><input type="text" className="form-input" defaultValue={t[1]} /><button className="btn-remove-row" onClick={(e) => { window.__removeRow?.(e.currentTarget) }}>✕</button></div>
                   ))}
                 </div>
-                <button className="btn-add-row" onClick={() => (window as any).addTrust?.()}>+ Tambah Item Trust</button>
+                <button className="btn-add-row" onClick={() => window.addTrust?.()}>+ Tambah Item Trust</button>
               </div>
             </div>
           </div>
@@ -334,7 +324,7 @@ export default function EditProdukPage({ onNavigate, showToast }: EditProdukPage
                   </div>
                 ))}
               </div>
-              <button className="btn-add-row" onClick={() => (window as any).addFaq?.()}>+ Tambah Pertanyaan FAQ</button>
+              <button className="btn-add-row" onClick={() => window.addFaq?.()}>+ Tambah Pertanyaan FAQ</button>
             </div>
           </div>
 
