@@ -8,20 +8,27 @@ const CHART_DAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
 export default function DashboardPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const [chartActiveTab, setChartActiveTab] = useState('7 Hari')
   const chartRef = useRef<HTMLDivElement>(null)
+  const mobileChartRef = useRef<HTMLDivElement>(null)
+
+  const renderChart = (target: HTMLDivElement | null, maxHeight: number) => {
+    if (!target || CHART_DATA.length === 0) return
+
+    const maxVal = Math.max(...CHART_DATA)
+    target.innerHTML = ''
+
+    CHART_DATA.forEach((v, i) => {
+      const h = Math.max(12, Math.round((v / maxVal) * maxHeight))
+      const isToday = i === CHART_DATA.length - 1
+      const wrap = document.createElement('div')
+      wrap.className = 'bar-wrap'
+      wrap.innerHTML = `<div class="bar ${isToday ? 'highlight' : ''}" style="height:${h}px;background:${isToday ? 'var(--orange)' : 'var(--bg)'};"><div class="chart-tooltip">Rp ${v.toLocaleString('id')}</div></div><div class="bar-label">${CHART_DAYS[i]}</div>`
+      target.appendChild(wrap)
+    })
+  }
 
   useEffect(() => {
-    if (chartRef.current && CHART_DATA.length > 0) {
-      const maxVal = Math.max(...CHART_DATA)
-      chartRef.current.innerHTML = ''
-      CHART_DATA.forEach((v, i) => {
-        const h = Math.round((v / maxVal) * 140)
-        const isToday = i === CHART_DATA.length - 1
-        const wrap = document.createElement('div')
-        wrap.className = 'bar-wrap'
-        wrap.innerHTML = `<div class="bar ${isToday ? 'highlight' : ''}" style="height:${h}px;background:${isToday ? 'var(--orange)' : 'var(--bg)'};"><div class="chart-tooltip">Rp ${v.toLocaleString('id')}</div></div><div class="bar-label">${CHART_DAYS[i]}</div>`
-        chartRef.current!.appendChild(wrap)
-      })
-    }
+    renderChart(chartRef.current, 140)
+    renderChart(mobileChartRef.current, 92)
   }, [chartActiveTab])
 
   return (
@@ -40,6 +47,23 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (page: strin
           <div className="mobile-kpi-card"><div className="mobile-kpi-label">Order Baru</div><div className="mobile-kpi-value">47</div><div className="mobile-kpi-change up">↑ 12</div></div>
           <div className="mobile-kpi-card"><div className="mobile-kpi-label">Klaim Pending</div><div className="mobile-kpi-value">2</div><div className="mobile-kpi-change warn">Perlu action</div></div>
           <div className="mobile-kpi-card"><div className="mobile-kpi-label">Pengguna Aktif</div><div className="mobile-kpi-value">3.241</div><div className="mobile-kpi-change up">↑ 84</div></div>
+        </div>
+
+        <div className="mobile-card" style={{ marginBottom: 10 }}>
+          <div className="mobile-card-head" style={{ marginBottom: 6 }}>
+            <div>
+              <div className="mobile-card-title">Grafik Pendapatan</div>
+              <div className="mobile-card-sub">Trend {chartActiveTab.toLowerCase()}</div>
+            </div>
+          </div>
+          <div className="chart-tabs mobile-chart-tabs">
+            <button className={`chart-tab${chartActiveTab === '7 Hari' ? ' active' : ''}`} onClick={() => setChartActiveTab('7 Hari')}>7 Hari</button>
+            <button className={`chart-tab${chartActiveTab === '30 Hari' ? ' active' : ''}`} onClick={() => setChartActiveTab('30 Hari')}>30 Hari</button>
+            <button className={`chart-tab${chartActiveTab === '3 Bulan' ? ' active' : ''}`} onClick={() => setChartActiveTab('3 Bulan')}>3 Bulan</button>
+          </div>
+          <div className="chart-wrap mobile-chart-wrap">
+            <div className="chart-area mobile-chart-area" ref={mobileChartRef} />
+          </div>
         </div>
 
         <div className="mobile-quick-grid">

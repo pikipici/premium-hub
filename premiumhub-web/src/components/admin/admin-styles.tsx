@@ -96,6 +96,11 @@ export default function AdminStyles() {
       .mobile-quick-btn strong { display: block; font-size: 12px; margin-bottom: 2px; color: var(--dark); }
       .mobile-quick-btn span { font-size: 10px; color: var(--muted); }
 
+      .mobile-chart-tabs { margin-bottom: 8px; }
+      .mobile-chart-tabs .chart-tab { padding: 4px 8px; font-size: 10px; }
+      .mobile-chart-wrap { padding: 2px 0 0; }
+      .mobile-chart-area { height: 104px; gap: 4px; }
+
       .mobile-fab { position: fixed; right: 14px; bottom: 76px; z-index: 88; border: none; border-radius: 999px; background: var(--orange); color: #fff; font-weight: 700; font-size: 12px; padding: 10px 14px; box-shadow: 0 10px 20px rgba(20,20,20,.18); }
 
       /* PAGE */
@@ -405,6 +410,9 @@ export default function AdminStyles() {
         .chart-tabs { margin-bottom: 10px; }
         .chart-tab { font-size: 11px; padding: 4px 8px; }
         .chart-area { height: 132px; gap: 4px; }
+        .mobile-chart-wrap { padding: 0; }
+        .mobile-chart-area { height: 96px; }
+        .mobile-chart-tabs .chart-tab { font-size: 10px; padding: 3px 7px; }
         .bar-label { font-size: 9px; }
 
         table { font-size: 12px; }
