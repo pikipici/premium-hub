@@ -17,33 +17,79 @@ const PRODUKS = [
 export default function ProdukPage({ onNavigate, onEditProduk }: ProdukPageProps) {
   return (
     <div className="page">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input type="text" placeholder="🔍  Cari produk..." style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 14px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none', width: 240 }} />
-          <select style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none' }}><option>Semua Kategori</option><option>Streaming</option><option>Musik</option><option>Gaming</option><option>Produktivitas</option></select>
-          <select style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none' }}><option>Semua Status</option><option>Aktif</option><option>Nonaktif</option></select>
+      <div className="admin-desktop-only">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input type="text" placeholder="🔍  Cari produk..." style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 14px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none', width: 240 }} />
+            <select style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none' }}><option>Semua Kategori</option><option>Streaming</option><option>Musik</option><option>Gaming</option><option>Produktivitas</option></select>
+            <select style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none' }}><option>Semua Status</option><option>Aktif</option><option>Nonaktif</option></select>
+          </div>
+          <button className="topbar-btn primary">+ Tambah Produk Baru</button>
         </div>
-        <button className="topbar-btn primary">+ Tambah Produk Baru</button>
+        <div className="card">
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Produk</th><th>Kategori</th><th>Harga Mulai</th><th>Stok</th><th>Terjual</th><th>Status</th><th>Aksi</th></tr></thead>
+              <tbody>
+                {PRODUKS.map((p) => (
+                  <tr key={p.id}>
+                    <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 22 }}>{p.icon}</span><div><div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div><div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.sub}</div></div></div></td>
+                    <td><span className="product-pill">{p.cat}</span></td>
+                    <td style={{ fontWeight: 600 }}>{p.price}</td>
+                    <td><span style={{ color: p.stokColor, fontWeight: 600 }}>{p.stok}{p.stokWarn ? ' ⚠' : ''}</span></td>
+                    <td>{p.terjual}</td>
+                    <td><span className={`status-badge ${p.statusClass}`}>{p.status}</span></td>
+                    <td><div style={{ display: 'flex', gap: 6 }}><button className="action-btn" onClick={() => onEditProduk(p.id)}>✏ Edit</button><button className={`action-btn${p.actionClass ? ` ${p.actionClass}` : ''}`} style={p.actionStyle} onClick={() => {}}>{p.actionLabel}</button></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-      <div className="card">
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>Produk</th><th>Kategori</th><th>Harga Mulai</th><th>Stok</th><th>Terjual</th><th>Status</th><th>Aksi</th></tr></thead>
-            <tbody>
-              {PRODUKS.map((p) => (
-                <tr key={p.id}>
-                  <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 22 }}>{p.icon}</span><div><div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div><div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.sub}</div></div></div></td>
-                  <td><span className="product-pill">{p.cat}</span></td>
-                  <td style={{ fontWeight: 600 }}>{p.price}</td>
-                  <td><span style={{ color: p.stokColor, fontWeight: 600 }}>{p.stok}{p.stokWarn ? ' ⚠' : ''}</span></td>
-                  <td>{p.terjual}</td>
-                  <td><span className={`status-badge ${p.statusClass}`}>{p.status}</span></td>
-                  <td><div style={{ display: 'flex', gap: 6 }}><button className="action-btn" onClick={() => onEditProduk(p.id)}>✏ Edit</button><button className="action-btn" style={p.actionStyle} onClick={() => {}}>{p.actionLabel}</button></div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+      <div className="admin-mobile-only">
+        <div className="mobile-page-head">
+          <div>
+            <div className="mobile-page-title">Produk</div>
+            <div className="mobile-page-subtitle">Kelola katalog premium</div>
+          </div>
+          <button className="mobile-chip-btn primary" onClick={() => onNavigate('produk')}>+ Baru</button>
         </div>
+
+        <div className="mobile-card-list">
+          {PRODUKS.map((p) => (
+            <article className="mobile-card" key={p.id}>
+              <div className="mobile-card-head">
+                <div>
+                  <div className="mobile-card-title">{p.icon} {p.name}</div>
+                  <div className="mobile-card-sub">{p.sub}</div>
+                </div>
+                <span className={`status-badge ${p.statusClass}`}>{p.status}</span>
+              </div>
+
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Kategori</span>
+                <span className="mobile-card-value">{p.cat}</span>
+              </div>
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Harga</span>
+                <span className="mobile-card-value">{p.price}</span>
+              </div>
+              <div className="mobile-card-row">
+                <span className="mobile-card-label">Stok / Terjual</span>
+                <span className="mobile-card-value" style={{ color: p.stokColor }}>{p.stok} / {p.terjual}</span>
+              </div>
+
+              <div className="mobile-card-actions">
+                <button className="action-btn" onClick={() => onEditProduk(p.id)}>Edit</button>
+                <button className={`action-btn${p.actionClass ? ` ${p.actionClass}` : ''}`} style={p.actionStyle}>{p.actionLabel}</button>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <button className="mobile-fab" onClick={() => onNavigate('produk')}>+ Produk</button>
       </div>
     </div>
   )

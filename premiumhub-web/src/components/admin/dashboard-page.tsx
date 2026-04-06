@@ -26,6 +26,58 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (page: strin
 
   return (
     <div className="page">
+      <div className="admin-mobile-only">
+        <div className="mobile-page-head">
+          <div>
+            <div className="mobile-page-title">Ringkasan Hari Ini</div>
+            <div className="mobile-page-subtitle">Pantau performa toko secara cepat</div>
+          </div>
+          <button className="mobile-chip-btn primary" onClick={() => onNavigate('order')}>Lihat Order</button>
+        </div>
+
+        <div className="mobile-kpi-grid">
+          <div className="mobile-kpi-card"><div className="mobile-kpi-label">Pendapatan</div><div className="mobile-kpi-value">Rp 1,24 jt</div><div className="mobile-kpi-change up">↑ 18%</div></div>
+          <div className="mobile-kpi-card"><div className="mobile-kpi-label">Order Baru</div><div className="mobile-kpi-value">47</div><div className="mobile-kpi-change up">↑ 12</div></div>
+          <div className="mobile-kpi-card"><div className="mobile-kpi-label">Klaim Pending</div><div className="mobile-kpi-value">2</div><div className="mobile-kpi-change warn">Perlu action</div></div>
+          <div className="mobile-kpi-card"><div className="mobile-kpi-label">Pengguna Aktif</div><div className="mobile-kpi-value">3.241</div><div className="mobile-kpi-change up">↑ 84</div></div>
+        </div>
+
+        <div className="mobile-quick-grid">
+          <button className="mobile-quick-btn" onClick={() => onNavigate('order')}><strong>Order</strong><span>Kelola transaksi</span></button>
+          <button className="mobile-quick-btn" onClick={() => onNavigate('stok')}><strong>Stok</strong><span>Cek stok kritis</span></button>
+          <button className="mobile-quick-btn" onClick={() => onNavigate('garansi')}><strong>Garansi</strong><span>Proses klaim</span></button>
+          <button className="mobile-quick-btn" onClick={() => onNavigate('produk')}><strong>Produk</strong><span>Edit katalog</span></button>
+        </div>
+
+        <div className="mobile-card-list">
+          <article className="mobile-card">
+            <div className="mobile-card-head">
+              <div>
+                <div className="mobile-card-title">Stok Kritis</div>
+                <div className="mobile-card-sub">Butuh restock cepat</div>
+              </div>
+              <span className="status-badge s-gagal">3 Item</span>
+            </div>
+            <div className="mobile-card-row"><span className="mobile-card-label">Disney+ Hotstar</span><span className="mobile-card-value">3 akun</span></div>
+            <div className="mobile-card-row"><span className="mobile-card-label">Xbox Game Pass</span><span className="mobile-card-value">2 akun</span></div>
+            <div className="mobile-card-row"><span className="mobile-card-label">Canva Pro</span><span className="mobile-card-value">7 akun</span></div>
+          </article>
+
+          <article className="mobile-card">
+            <div className="mobile-card-head">
+              <div>
+                <div className="mobile-card-title">Order Terbaru</div>
+                <div className="mobile-card-sub">Update terakhir 5 menit lalu</div>
+              </div>
+            </div>
+            <div className="mobile-card-row"><span className="mobile-card-label">#4821 · Budi S.</span><span className="mobile-card-value">Rp 25.000</span></div>
+            <div className="mobile-card-row"><span className="mobile-card-label">#4820 · Rina A.</span><span className="mobile-card-value">Rp 18.000</span></div>
+            <div className="mobile-card-actions"><button className="action-btn" onClick={() => onNavigate('order')}>Lihat Semua</button></div>
+          </article>
+        </div>
+      </div>
+
+      <div className="admin-desktop-only">
       <div className="alert-bar">
         ⚠️ <strong>3 produk stok kritis</strong> — Disney+, Xbox Game Pass, dan Canva Pro tersisa ≤ 3 akun.
         <a onClick={() => onNavigate('stok')}>Tambah stok sekarang →</a>
@@ -126,6 +178,7 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (page: strin
             <div className="top-prod-item"><div className="top-prod-rank">5</div><div className="top-prod-icon">▶️</div><div className="top-prod-info"><div className="top-prod-name">YouTube Premium</div><div className="top-prod-sales">106 terjual</div></div><div className="top-prod-rev">Rp 2,3 jt</div></div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

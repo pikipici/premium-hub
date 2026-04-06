@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/authStore'
 import AdminStyles from '@/components/admin/admin-styles'
 import AdminSidebar from '@/components/admin/admin-sidebar'
 import AdminTopbar from '@/components/admin/admin-topbar'
-import AdminMobileNav from '@/components/admin/admin-mobile-nav'
+import AdminMobileBottomNav from '@/components/admin/admin-mobile-bottom-nav'
 
 type PageMeta = {
   title: string
@@ -76,8 +76,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div className="admin-main">
           <AdminTopbar title={page.title} sub={page.sub} />
-          <AdminMobileNav />
           {children}
+          <AdminMobileBottomNav />
         </div>
       </div>
     </>
