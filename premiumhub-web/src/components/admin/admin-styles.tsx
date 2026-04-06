@@ -57,6 +57,11 @@ export default function AdminStyles() {
       .notif-btn:hover { border-color: var(--dark); }
       .notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: var(--orange); border-radius: 50%; border: 1.5px solid white; }
 
+      /* MOBILE NAV */
+      .admin-mobile-nav {
+        display: none;
+      }
+
       /* PAGE */
       .page { padding: 28px 32px; }
 
@@ -258,9 +263,76 @@ export default function AdminStyles() {
       @media (max-width: 768px) {
         .sidebar { display: none; }
         .admin-main { margin-left: 0; }
-        .topbar { padding: 0 16px; }
-        .page { padding: 20px 16px; }
+
+        .topbar {
+          height: auto;
+          min-height: 56px;
+          padding: 10px 14px;
+          gap: 10px;
+          align-items: center;
+        }
+        .topbar-left h1 { font-size: 15px; }
+        .topbar-left p { display: none; }
+        .topbar-right { gap: 8px; }
+        .topbar-btn { padding: 7px 10px; font-size: 12px; }
+        .topbar-right .topbar-btn.primary { display: none; }
+
+        .admin-mobile-nav {
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding: 10px 14px;
+          border-bottom: 1px solid var(--border);
+          background: var(--white);
+          position: sticky;
+          top: 56px;
+          z-index: 85;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .admin-mobile-nav::-webkit-scrollbar { display: none; }
+        .admin-mobile-nav-item {
+          flex-shrink: 0;
+          text-decoration: none;
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--muted);
+          border: 1px solid var(--border);
+          background: var(--bg);
+          border-radius: 999px;
+          padding: 7px 12px;
+          white-space: nowrap;
+        }
+        .admin-mobile-nav-item.active {
+          color: #fff;
+          background: var(--dark);
+          border-color: var(--dark);
+        }
+
+        .page { padding: 16px 14px; }
         .metrics { grid-template-columns: 1fr; }
+
+        .alert-bar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+        }
+
+        .card-header {
+          padding: 12px 14px;
+        }
+        th, td {
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+
+        .stok-item,
+        .garansi-item,
+        .top-prod-item {
+          padding-left: 14px;
+          padding-right: 14px;
+        }
       }
     `}</style>
   )
