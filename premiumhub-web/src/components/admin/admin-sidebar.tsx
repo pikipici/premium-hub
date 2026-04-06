@@ -1,53 +1,82 @@
 "use client"
 
-interface AdminSidebarProps {
-  currentPage: string
-  onNavigate: (page: string) => void
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+type NavItem = {
+  href: string
+  label: string
+  icon: string
+  badge?: string
+  badgeClassName?: string
 }
 
-export default function AdminSidebar({ currentPage, onNavigate }: AdminSidebarProps) {
+type NavSection = {
+  label: string
+  items: NavItem[]
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: 'Overview',
+    items: [
+      { href: '/admin', label: 'Dashboard', icon: '▦' },
+    ],
+  },
+  {
+    label: 'Katalog',
+    items: [
+      { href: '/admin/produk', label: 'Produk', icon: '◈' },
+      { href: '/admin/stok', label: 'Stok Akun', icon: '◧', badge: '3', badgeClassName: ' yellow' },
+    ],
+  },
+  {
+    label: 'Transaksi',
+    items: [
+      { href: '/admin/order', label: 'Order', icon: '◉', badge: '5' },
+      { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌', badge: '2' },
+    ],
+  },
+  {
+    label: 'Akun',
+    items: [
+      { href: '/admin/pengguna', label: 'Pengguna', icon: '◎' },
+      { href: '/admin/pengaturan', label: 'Pengaturan', icon: '◫' },
+    ],
+  },
+]
+
+function isNavActive(pathname: string, href: string) {
+  if (href === '/admin') return pathname === '/admin'
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+export default function AdminSidebar() {
+  const pathname = usePathname()
+
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
         <div className="logo-text">Premium<span>Hub</span></div>
         <div className="admin-tag">Admin Panel</div>
       </div>
-      <div className="nav-section">
-        <span className="nav-section-label">Overview</span>
-        <a className={`nav-item${currentPage === 'dashboard' ? ' active' : ''}`} onClick={() => onNavigate('dashboard')}>
-          <span className="nav-icon">▦</span> Dashboard
-        </a>
-      </div>
-      <div className="nav-section">
-        <span className="nav-section-label">Katalog</span>
-        <a className={`nav-item${currentPage === 'produk' ? ' active' : ''}`} onClick={() => onNavigate('produk')}>
-          <span className="nav-icon">◈</span> Produk
-        </a>
-        <a className={`nav-item${currentPage === 'stok' ? ' active' : ''}`} onClick={() => onNavigate('stok')}>
-          <span className="nav-icon">◧</span> Stok Akun
-          <span className="nav-badge yellow">3</span>
-        </a>
-      </div>
-      <div className="nav-section">
-        <span className="nav-section-label">Transaksi</span>
-        <a className={`nav-item${currentPage === 'order' ? ' active' : ''}`} onClick={() => onNavigate('order')}>
-          <span className="nav-icon">◉</span> Order
-          <span className="nav-badge">5</span>
-        </a>
-        <a className={`nav-item${currentPage === 'garansi' ? ' active' : ''}`} onClick={() => onNavigate('garansi')}>
-          <span className="nav-icon">◌</span> Klaim Garansi
-          <span className="nav-badge">2</span>
-        </a>
-      </div>
-      <div className="nav-section">
-        <span className="nav-section-label">Akun</span>
-        <a className={`nav-item${currentPage === 'pengguna' ? ' active' : ''}`} onClick={() => onNavigate('pengguna')}>
-          <span className="nav-icon">◎</span> Pengguna
-        </a>
-        <a className={`nav-item${currentPage === 'pengaturan' ? ' active' : ''}`} onClick={() => onNavigate('pengaturan')}>
-          <span className="nav-icon">◫</span> Pengaturan
-        </a>
-      </div>
+
+      {NAV_SECTIONS.map((section) => (
+        <div className="nav-section" key={section.label}>
+          <span className="nav-section-label">{section.label}</span>
+
+          {section.items.map((item) => {
+            const active = isNavActive(pathname, item.href)
+            return (
+              <Link key={item.href} href={item.href} className={`nav-item${active ? ' active' : ''}`}>
+                <span className="nav-icon">{item.icon}</span> {item.label}
+                {item.badge && <span className={`nav-badge${item.badgeClassName ?? ''}`}>{item.badge}</span>}
+              </Link>
+            )
+          })}
+        </div>
+      ))}
+
       <div className="sidebar-bottom">
         <div className="admin-profile">
           <div className="admin-avatar">A</div>
