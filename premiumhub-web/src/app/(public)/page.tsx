@@ -1,136 +1,618 @@
 "use client"
 
-import Navbar from '@/components/layout/Navbar'
-import Footer from '@/components/layout/Footer'
-import ProductCard from '@/components/shared/ProductCard'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { productService } from '@/services/productService'
-import type { Product } from '@/types/product'
-import { ShieldCheck, Zap, Clock, Star } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import {
+  ArrowRight,
+  BadgeCheck,
+  Check,
+  Copy,
+  CreditCard,
+  Globe,
+  Headphones,
+  Shield,
+  Wallet,
+  X,
+  Zap,
+} from 'lucide-react'
+
+import Footer from '@/components/layout/Footer'
+import Navbar from '@/components/layout/Navbar'
+
+type PanelTab = 'country' | 'number' | 'sms'
+
+type Country = {
+  key: string
+  flag: string
+  name: string
+  dialCode: string
+}
+
+type OtpCard = {
+  app: string
+  icon: string
+  iconClassName: string
+  before: string
+  code: string
+  after?: string
+}
+
+type SmsItem = {
+  sender: string
+  senderTag: string
+  senderTagClassName: string
+  time: string
+  before: string
+  code: string
+  after?: string
+}
+
+const otpCards: OtpCard[] = [
+  {
+    app: 'Instagram',
+    icon: 'IG',
+    iconClassName: 'bg-gradient-to-br from-orange-400 via-rose-500 to-fuchsia-600 text-white',
+    before: 'Use',
+    code: '645 829',
+    after: 'to verify your Instagram account.',
+  },
+  {
+    app: 'WhatsApp',
+    icon: 'WA',
+    iconClassName: 'bg-[#25D366] text-white',
+    before: 'Your WhatsApp code is',
+    code: '392-847',
+    after: "Don't share this code.",
+  },
+  {
+    app: 'Netflix',
+    icon: 'N',
+    iconClassName: 'bg-[#E50914] text-white',
+    before: 'Your Netflix verification code is',
+    code: '295206',
+  },
+  {
+    app: 'Telegram',
+    icon: 'TG',
+    iconClassName: 'bg-[#229ED9] text-white',
+    before: 'Login code:',
+    code: '71849',
+    after: 'Do not give this code to anyone.',
+  },
+  {
+    app: 'PayPal',
+    icon: 'PP',
+    iconClassName: 'bg-[#003087] text-white',
+    before: 'Your PayPal security code is',
+    code: '481726',
+    after: 'It expires in 10 minutes.',
+  },
+]
+
+const countries: Country[] = [
+  { key: 'US', flag: '🇺🇸', name: 'Amerika Serikat', dialCode: '+1' },
+  { key: 'GB', flag: '🇬🇧', name: 'Inggris', dialCode: '+44' },
+  { key: 'ID', flag: '🇮🇩', name: 'Indonesia', dialCode: '+62' },
+  { key: 'IN', flag: '🇮🇳', name: 'India', dialCode: '+91' },
+  { key: 'RU', flag: '🇷🇺', name: 'Rusia', dialCode: '+7' },
+  { key: 'DE', flag: '🇩🇪', name: 'Jerman', dialCode: '+49' },
+  { key: 'FR', flag: '🇫🇷', name: 'Prancis', dialCode: '+33' },
+  { key: 'BR', flag: '🇧🇷', name: 'Brasil', dialCode: '+55' },
+  { key: 'CA', flag: '🇨🇦', name: 'Kanada', dialCode: '+1' },
+  { key: 'AU', flag: '🇦🇺', name: 'Australia', dialCode: '+61' },
+  { key: 'JP', flag: '🇯🇵', name: 'Jepang', dialCode: '+81' },
+  { key: 'SG', flag: '🇸🇬', name: 'Singapura', dialCode: '+65' },
+]
+
+const numbers = [
+  '+1 415 823 9047',
+  '+1 650 341 7762',
+  '+1 213 940 5581',
+  '+1 312 674 2209',
+  '+1 718 503 8834',
+  '+1 646 287 4401',
+  '+1 408 119 6653',
+  '+1 202 876 3318',
+]
+
+const smsItems: SmsItem[] = [
+  {
+    sender: 'Google',
+    senderTag: 'G',
+    senderTagClassName: 'bg-[#FFE6DE] text-[#FF5733]',
+    time: '2 menit lalu',
+    before: 'Your Google verification code is',
+    code: '847291',
+  },
+  {
+    sender: 'Uber',
+    senderTag: 'U',
+    senderTagClassName: 'bg-[#FFF3CD] text-[#D97706]',
+    time: '5 menit lalu',
+    before: 'Code Uber:',
+    code: '1597',
+  },
+  {
+    sender: 'Netflix',
+    senderTag: 'N',
+    senderTagClassName: 'bg-[#FEE2E2] text-[#DC2626]',
+    time: '12 menit lalu',
+    before: 'Your Netflix verification code is',
+    code: '295206',
+  },
+  {
+    sender: 'Shopee',
+    senderTag: 'S',
+    senderTagClassName: 'bg-[#D1FAE5] text-[#059669]',
+    time: '18 menit lalu',
+    before: '[Shopee] Your verification code is',
+    code: '304918',
+    after: 'Valid for 5 minutes.',
+  },
+]
 
 export default function LandingPage() {
-  const [products, setProducts] = useState<Product[]>([])
+  const [tab, setTab] = useState<PanelTab>('country')
+  const [countryQuery, setCountryQuery] = useState('')
+  const [activeCountry, setActiveCountry] = useState(countries[0].key)
+  const [activeNumber, setActiveNumber] = useState(numbers[0])
+  const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    productService.list({ limit: 6 }).then(res => {
-      if (res.success) setProducts(res.data)
-    }).catch(() => {})
-  }, [])
+  const filteredCountries = useMemo(() => {
+    const query = countryQuery.trim().toLowerCase()
+    if (!query) return countries
+
+    return countries.filter((country) => {
+      const haystack = `${country.name} ${country.dialCode}`.toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [countryQuery])
+
+  const selectedCountry =
+    filteredCountries.find((country) => country.key === activeCountry) ??
+    filteredCountries[0] ??
+    countries.find((country) => country.key === activeCountry) ??
+    countries[0]
+
+  const handleCopyNumber = async () => {
+    try {
+      await navigator.clipboard.writeText(activeNumber)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setCopied(false)
+    }
+  }
 
   return (
     <>
       <Navbar />
 
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-white to-[#F7F7F5]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
-          <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-[#FFF3EF] text-[#FF5733] text-xs font-bold px-4 py-2 rounded-full mb-6 uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5" /> Akun Premium Instan
+      <main className="overflow-hidden bg-white">
+        <section className="mx-auto grid w-full max-w-7xl gap-10 px-4 pb-8 pt-12 sm:px-6 md:grid-cols-2 md:items-center md:px-8 md:pt-16 lg:px-10">
+          <div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#FF573333] bg-[#FFF0ED] px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#FF5733]">
+              <span className="h-2 w-2 rounded-full bg-[#22C55E] shadow-[0_0_0_5px_rgba(34,197,94,0.16)]" />
+              50.000+ nomor terkirim
             </div>
-            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-6 tracking-tight">
-              Akun Premium{' '}
-              <span className="text-[#FF5733]">Terpercaya</span>{' '}
-              dengan Harga Terjangkau
+
+            <h1 className="mb-5 text-4xl font-extrabold leading-tight tracking-tight text-[#141414] sm:text-5xl">
+              Terima SMS <span className="text-[#FF5733]">OTP</span>
+              <br />
+              ke nomor virtual
+              <br />
+              dari seluruh dunia
             </h1>
-            <p className="text-lg text-[#888] mb-10 max-w-xl mx-auto leading-relaxed">
-              Netflix, Spotify, Disney+, dan puluhan layanan premium lainnya. Pengiriman otomatis, garansi 30 hari.
+
+            <p className="mb-2 text-[15px] leading-relaxed text-[#888]">
+              Verifikasi akun tanpa nomor HP asli.
+              <br className="hidden sm:block" />
+              Tersedia untuk 100+ negara, instan &lt; 30 detik.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/katalog" className="inline-flex items-center justify-center px-8 py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all hover:shadow-lg hover:shadow-[#FF5733]/25 text-sm">
-                Jelajahi Katalog
+
+            <p className="mb-8 text-sm leading-relaxed text-[#888]">
+              WhatsApp, Telegram, Instagram, TikTok, PayPal, Google,
+              <br className="hidden sm:block" />
+              Facebook, Uber, Netflix, dan ratusan platform lainnya.
+            </p>
+
+            <div className="mb-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/register"
+                className="inline-flex items-center justify-center rounded-full bg-[#FF5733] px-7 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(255,87,51,0.28)] transition hover:-translate-y-0.5 hover:bg-[#D94420]"
+              >
+                🚀 Beli Akses
               </Link>
-              <Link href="/faq" className="inline-flex items-center justify-center px-8 py-4 bg-[#141414] text-white font-bold rounded-full hover:bg-[#2a2a2a] transition-all text-sm">
-                Cara Kerja
+              <Link
+                href="/katalog"
+                className="inline-flex items-center justify-center rounded-full border border-[#EBEBEB] px-7 py-3.5 text-sm font-semibold text-[#141414] transition hover:border-[#141414] hover:bg-[#F7F7F5]"
+              >
+                ✨ Coba Gratis
               </Link>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Stats */}
-      <section className="border-y border-[#EBEBEB] bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { value: '10K+', label: 'Pelanggan Aktif' },
-              { value: '50K+', label: 'Akun Terjual' },
-              { value: '30 Hari', label: 'Garansi' },
-              { value: '⚡ Instan', label: 'Pengiriman' },
-            ].map((s, i) => (
-              <div key={i}>
-                <div className="text-2xl md:text-3xl font-extrabold text-[#141414]">{s.value}</div>
-                <div className="text-xs text-[#888] mt-1 font-medium">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Products */}
-      <section className="py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-extrabold mb-3">Produk Populer</h2>
-            <p className="text-[#888] text-sm">Pilih layanan premium favoritmu</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-          <div className="text-center mt-10">
-            <Link href="/katalog" className="inline-flex items-center px-6 py-3 border-2 border-[#141414] text-[#141414] font-bold rounded-full hover:bg-[#141414] hover:text-white transition-all text-sm">
-              Lihat Semua Produk →
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-16 bg-white border-y border-[#EBEBEB]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-extrabold mb-3">Cara Kerja</h2>
-            <p className="text-[#888] text-sm">3 langkah mudah untuk mendapat akun premium</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { icon: <Star className="w-6 h-6" />, title: 'Pilih Produk', desc: 'Pilih layanan premium dan tipe akun yang kamu inginkan.' },
-              { icon: <Zap className="w-6 h-6" />, title: 'Bayar', desc: 'Lakukan pembayaran melalui metode yang tersedia.' },
-              { icon: <ShieldCheck className="w-6 h-6" />, title: 'Terima Akun', desc: 'Akun langsung terkirim otomatis setelah pembayaran.' },
-            ].map((step, i) => (
-              <div key={i} className="text-center p-8 rounded-2xl hover:bg-[#F7F7F5] transition-colors">
-                <div className="w-14 h-14 bg-[#FFF3EF] text-[#FF5733] rounded-2xl flex items-center justify-center mx-auto mb-5">
-                  {step.icon}
+            <div className="flex flex-wrap gap-x-8 gap-y-4">
+              {[
+                { value: '100+', label: 'Negara tersedia' },
+                { value: '50k+', label: 'Nomor terkirim' },
+                { value: '<30s', label: 'Waktu terima OTP' },
+              ].map((stat) => (
+                <div key={stat.label}>
+                  <div className="text-2xl font-extrabold tracking-tight text-[#141414]">{stat.value}</div>
+                  <div className="mt-0.5 text-xs text-[#888]">{stat.label}</div>
                 </div>
-                <div className="text-xs font-bold text-[#FF5733] mb-2">STEP {i + 1}</div>
-                <h3 className="text-lg font-bold mb-2">{step.title}</h3>
-                <p className="text-sm text-[#888] leading-relaxed">{step.desc}</p>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute -right-16 inset-y-0 hidden rounded-l-[40px] bg-gradient-to-br from-[#FFE8E0] via-[#FFCDB8] to-[#FFE5D5] md:block" />
+            <div className="relative z-10 flex gap-3 overflow-x-auto pb-2 md:flex-col md:overflow-visible md:pb-0">
+              {otpCards.map((card) => (
+                <article
+                  key={card.app}
+                  className="min-w-[250px] rounded-2xl border border-[#f5f5f5] bg-white p-4 shadow-[0_8px_32px_rgba(20,20,20,0.10)] transition hover:-translate-y-0.5 md:min-w-0"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${card.iconClassName}`}>
+                      {card.icon}
+                    </div>
+                    <div>
+                      <h3 className="mb-1 text-sm font-extrabold text-[#141414]">{card.app}</h3>
+                      <p className="text-xs leading-relaxed text-[#888]">
+                        {card.before}{' '}
+                        <span className="rounded bg-[#FFF0ED] px-1.5 py-0.5 text-[11px] font-extrabold text-[#FF5733]">
+                          {card.code}
+                        </span>{' '}
+                        {card.after}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="hidden border-y border-[#EBEBEB] bg-[#F7F7F5] md:block">
+          <div className="mx-auto grid w-full max-w-7xl grid-cols-3 gap-5 px-6 py-4 lg:grid-cols-6 lg:px-10">
+            {[
+              { icon: <Globe className="h-4 w-4" />, label: '100+ Negara' },
+              { icon: <Zap className="h-4 w-4" />, label: 'OTP <30 Detik' },
+              { icon: <Shield className="h-4 w-4" />, label: '100% Anonim' },
+              { icon: <CreditCard className="h-4 w-4" />, label: 'QRIS / GoPay / Dana' },
+              { icon: <Headphones className="h-4 w-4" />, label: 'Support 24/7' },
+              { icon: <BadgeCheck className="h-4 w-4" />, label: '50.000+ Terkirim' },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center gap-2 text-sm font-semibold text-[#2a2a2a]">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#EBEBEB] bg-white text-[#FF5733]">
+                  {item.icon}
+                </span>
+                {item.label}
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA */}
-      <section className="py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-[#141414] rounded-3xl p-10 md:p-16 text-center text-white">
-            <div className="inline-flex items-center gap-2 bg-white/10 text-xs font-bold px-4 py-2 rounded-full mb-6 uppercase tracking-wider">
-              <Clock className="w-3.5 h-3.5" /> Garansi 30 Hari
+        <section id="panel" className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 md:px-8 lg:px-10 lg:py-16">
+          <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="mb-2 inline-flex rounded-full border border-[#FF573326] bg-[#FFF0ED] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5733]">
+                🌐 Live Preview
+              </div>
+              <h2 className="text-3xl font-extrabold tracking-tight text-[#141414]">Pilih negara & lihat nomor tersedia</h2>
+              <p className="mt-1 text-sm text-[#888]">
+                Pilih negara, salin nomor, dan gunakan untuk verifikasi platform favoritmu.
+              </p>
             </div>
-            <h2 className="text-3xl md:text-4xl font-extrabold mb-4">Siap Berlangganan Premium?</h2>
-            <p className="text-gray-400 mb-8 max-w-md mx-auto text-sm leading-relaxed">
-              Gabung ribuan pelanggan yang sudah menikmati akun premium dengan harga terjangkau.
-            </p>
-            <Link href="/register" className="inline-flex items-center px-8 py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all hover:shadow-lg text-sm">
-              Daftar Sekarang — Gratis
+            <Link
+              href="/katalog"
+              className="inline-flex items-center gap-1 self-start rounded-full border border-[#FF573333] px-4 py-2 text-sm font-semibold text-[#FF5733] transition hover:bg-[#FFF0ED]"
+            >
+              Lihat semua negara <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-        </div>
-      </section>
+
+          <div className="mb-3 flex rounded-xl border border-[#EBEBEB] bg-[#F7F7F5] p-1 md:hidden">
+            {([
+              { key: 'country', label: '🌍 Negara' },
+              { key: 'number', label: '📞 Nomor' },
+              { key: 'sms', label: '✉️ SMS' },
+            ] as { key: PanelTab; label: string }[]).map((tabItem) => (
+              <button
+                key={tabItem.key}
+                type="button"
+                onClick={() => setTab(tabItem.key)}
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                  tab === tabItem.key ? 'bg-white text-[#FF5733] shadow-sm' : 'text-[#888]'
+                }`}
+              >
+                {tabItem.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid overflow-hidden rounded-2xl border border-[#EBEBEB] md:grid-cols-[220px_1fr_1fr]">
+            <div className={`border-b border-[#EBEBEB] bg-white md:border-b-0 md:border-r ${tab !== 'country' ? 'hidden md:block' : ''}`}>
+              <div className="border-b border-[#EBEBEB] p-3">
+                <input
+                  value={countryQuery}
+                  onChange={(event) => setCountryQuery(event.target.value)}
+                  placeholder="🔍 Cari negara..."
+                  className="w-full rounded-lg border border-[#EBEBEB] bg-[#F7F7F5] px-3 py-2 text-sm text-[#141414] outline-none transition focus:border-[#FF5733]"
+                />
+              </div>
+              <div className="max-h-[420px] overflow-y-auto py-1">
+                {filteredCountries.map((country) => {
+                  const isActive = country.key === selectedCountry.key
+                  return (
+                    <button
+                      key={country.key}
+                      type="button"
+                      onClick={() => setActiveCountry(country.key)}
+                      className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition ${
+                        isActive
+                          ? 'border-r-2 border-r-[#FF5733] bg-[#FFF0ED] font-semibold text-[#141414]'
+                          : 'text-[#2a2a2a] hover:bg-[#F7F7F5]'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{country.flag}</span>
+                        {country.name}
+                      </span>
+                      <span className="text-xs text-[#888]">{country.dialCode}</span>
+                    </button>
+                  )
+                })}
+                {filteredCountries.length === 0 && (
+                  <div className="px-3 py-6 text-center text-sm text-[#888]">Negara tidak ditemukan.</div>
+                )}
+              </div>
+            </div>
+
+            <div className={`border-b border-[#EBEBEB] bg-white md:border-b-0 md:border-r ${tab !== 'number' ? 'hidden md:block' : ''}`}>
+              <div className="sticky top-0 border-b border-[#EBEBEB] bg-[#F7F7F5] px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#888]">
+                Nomor tersedia
+              </div>
+              <div className="max-h-[420px] overflow-y-auto">
+                {numbers.map((number) => {
+                  const isActive = number === activeNumber
+                  return (
+                    <button
+                      key={number}
+                      type="button"
+                      onClick={() => setActiveNumber(number)}
+                      className={`flex w-full items-center justify-between border-b border-[#F1F5F9] px-4 py-3 text-left text-sm transition ${
+                        isActive
+                          ? 'border-r-2 border-r-[#FF5733] bg-[#FFF0ED] font-semibold text-[#141414]'
+                          : 'text-[#2a2a2a] hover:bg-[#F7F7F5]'
+                      }`}
+                    >
+                      <span>📞 {number}</span>
+                      <span className="text-lg font-bold text-[#FF5733]">›</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className={`bg-white ${tab !== 'sms' ? 'hidden md:block' : ''}`}>
+              <div className="sticky top-0 border-b border-[#EBEBEB] bg-[#F7F7F5] px-4 py-3">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-bold text-[#141414]">
+                    <span className="text-base">{selectedCountry.flag}</span>
+                    {activeNumber}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyNumber}
+                    className="inline-flex items-center gap-1 rounded-md border border-[#FF573333] bg-[#FFF0ED] px-2.5 py-1 text-xs font-semibold text-[#FF5733] transition hover:bg-[#FF5733] hover:text-white"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copied ? 'Tersalin!' : 'Salin'}
+                  </button>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-[#DCFCE7] px-2.5 py-1 text-[11px] font-bold text-[#16A34A]">
+                  ● Aktif
+                </span>
+              </div>
+
+              <div className="max-h-[420px] overflow-y-auto">
+                {smsItems.map((item) => (
+                  <article key={`${item.sender}-${item.code}`} className="border-b border-[#F1F5F9] px-4 py-4">
+                    <div className="mb-1.5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm font-bold text-[#141414]">
+                        <span className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-[11px] ${item.senderTagClassName}`}>
+                          {item.senderTag}
+                        </span>
+                        {item.sender}
+                      </div>
+                      <span className="text-xs text-[#888]">{item.time}</span>
+                    </div>
+                    <p className="text-sm leading-relaxed text-[#2a2a2a]">
+                      {item.before}{' '}
+                      <span className="rounded-md border border-[#FF573326] bg-[#FFF0ED] px-2 py-0.5 text-xs font-extrabold text-[#FF5733]">
+                        {item.code}
+                      </span>{' '}
+                      {item.after}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="pricing" className="relative overflow-hidden bg-[#141414] px-4 py-16 sm:px-6 md:px-8 lg:px-10">
+          <div className="absolute -right-28 top-1/2 h-[420px] w-[420px] -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,87,51,0.15)_0%,transparent_70%)]" />
+          <div className="absolute -bottom-20 -left-20 h-[260px] w-[260px] rounded-full bg-[radial-gradient(circle,rgba(255,87,51,0.12)_0%,transparent_70%)]" />
+
+          <div className="relative mx-auto w-full max-w-7xl">
+            <div className="mb-10 text-center">
+              <div className="mb-3 inline-flex rounded-full border border-[#FF573333] bg-[#FF573326] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FFB8A8]">
+                💳 Harga
+              </div>
+              <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                Pilih paket yang sesuai
+                <br />
+                kebutuhanmu
+              </h2>
+              <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-white/60">
+                Nomor sementara atau sewa jangka panjang — harga transparan, tanpa biaya tersembunyi.
+              </p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
+              <article className="relative rounded-3xl border-2 border-[#FF5733] bg-white p-7 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                <span className="absolute right-5 top-5 rounded-full bg-[#FF5733] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-white">
+                  Populer
+                </span>
+                <h3 className="text-xl font-extrabold text-[#141414]">Nomor Sementara (OTP 1x)</h3>
+                <p className="mt-1 text-sm font-semibold text-[#FF5733]">🌍 Semua negara tersedia</p>
+                <p className="mt-4 text-xs text-[#888]">mulai dari</p>
+                <p className="text-4xl font-extrabold tracking-tight text-[#141414]">
+                  Rp 1.200 <span className="text-base font-medium text-[#888]">/ OTP</span>
+                </p>
+
+                <div className="mt-6 space-y-3">
+                  {[
+                    { ok: true, label: 'Waktu terima SMS', value: 'Hingga 20 menit' },
+                    { ok: false, label: 'Nomor permanen', value: 'Hanya sekali pakai' },
+                    { ok: true, label: '100+ negara', value: 'Termasuk US, UK, ID' },
+                    { ok: true, label: 'Semua platform', value: 'WA, IG, TG, Gmail, dll' },
+                  ].map((feature) => (
+                    <div key={feature.label} className="flex items-start gap-2.5">
+                      <span
+                        className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full ${
+                          feature.ok ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEE2E2] text-[#EF4444]'
+                        }`}
+                      >
+                        {feature.ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-[#141414]">{feature.label}</p>
+                        <p className="text-xs text-[#888]">{feature.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <Link
+                  href="/register"
+                  className="mt-7 inline-flex w-full items-center justify-center rounded-full bg-[#FF5733] px-5 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#D94420]"
+                >
+                  Beli Sekarang
+                </Link>
+              </article>
+
+              <article className="rounded-3xl bg-white p-7 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                <h3 className="text-xl font-extrabold text-[#141414]">Nomor Sewa Bulanan</h3>
+                <p className="mt-1 text-sm font-semibold text-[#FF5733]">🇺🇸 Amerika / Eropa</p>
+                <p className="mt-4 text-xs text-[#888]">mulai dari</p>
+                <p className="text-4xl font-extrabold tracking-tight text-[#141414]">
+                  Rp 45.000 <span className="text-base font-medium text-[#888]">/ bulan</span>
+                </p>
+
+                <div className="mt-6 space-y-3">
+                  {[
+                    { ok: true, label: 'Nomor permanen 30 hari', value: 'Pakai berulang kali' },
+                    { ok: true, label: 'SMS tak terbatas', value: 'Terima OTP berulang' },
+                    { ok: true, label: 'Perpanjangan mudah', value: '1 klik dari dashboard' },
+                    { ok: false, label: 'Telepon masuk', value: 'Hanya untuk SMS' },
+                  ].map((feature) => (
+                    <div key={feature.label} className="flex items-start gap-2.5">
+                      <span
+                        className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full ${
+                          feature.ok ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEE2E2] text-[#EF4444]'
+                        }`}
+                      >
+                        {feature.ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-[#141414]">{feature.label}</p>
+                        <p className="text-xs text-[#888]">{feature.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-7 grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-xl bg-[#229ED9] px-4 py-3 text-sm font-bold text-white transition hover:opacity-90"
+                  >
+                    Notif Telegram
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-xl border border-[#EBEBEB] bg-white px-4 py-3 text-sm font-bold text-[#141414] transition hover:bg-[#F7F7F5]"
+                  >
+                    Email Saya
+                  </button>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="how" className="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 md:px-8 lg:px-10 lg:py-20">
+          <div className="mb-10 text-center">
+            <div className="mb-3 inline-flex rounded-full border border-[#FF573326] bg-[#FFF0ED] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5733]">
+              ⚡ Cara Kerja
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-[#141414] sm:text-4xl">
+              Empat langkah mudah — dari daftar
+              <br />
+              sampai OTP masuk ke dashboard kamu.
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[#888]">
+              Tidak perlu verifikasi ribet. Mulai dalam hitungan menit.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                title: 'Daftar & Isi Saldo',
+                desc: 'Buat akun gratis dan isi saldo wallet via transfer bank, e-wallet, QRIS, atau pulsa.',
+              },
+              {
+                title: 'Pilih Negara & Platform',
+                desc: 'Tentukan negara asal nomor dan platform yang ingin diverifikasi, lalu pilih tipe nomor.',
+              },
+              {
+                title: 'Gunakan Nomor',
+                desc: 'Nomor aktif langsung muncul di dashboard. Gunakan untuk mendaftar atau verifikasi akunmu.',
+              },
+              {
+                title: 'Terima OTP Instan',
+                desc: 'SMS OTP tampil di dashboard dalam hitungan detik. Salin kode dan selesai.',
+              },
+            ].map((step, index) => (
+              <article
+                key={step.title}
+                className="rounded-3xl border border-[#EBEBEB] bg-[#F7F7F5] p-6 transition hover:-translate-y-1 hover:border-[#FF573333] hover:shadow-[0_12px_32px_rgba(255,87,51,0.10)]"
+              >
+                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#FF5733] text-lg font-extrabold text-white shadow-[0_8px_20px_rgba(255,87,51,0.26)]">
+                  {index + 1}
+                </div>
+                <h3 className="mb-2 text-base font-extrabold text-[#141414]">{step.title}</h3>
+                <p className="text-sm leading-relaxed text-[#888]">{step.desc}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-10 flex justify-center">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 rounded-full bg-[#141414] px-7 py-3.5 text-sm font-extrabold text-white transition hover:bg-black"
+            >
+              <Wallet className="h-4 w-4" />
+              Mulai Sekarang
+            </Link>
+          </div>
+        </section>
+      </main>
 
       <Footer />
     </>
