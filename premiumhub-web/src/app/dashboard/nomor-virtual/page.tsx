@@ -122,6 +122,16 @@ function toTitleCase(value: string): string {
     .join(' ')
 }
 
+function toOperatorDisplayName(operator: string | undefined): string | undefined {
+  const normalized = asString(operator)
+  if (!normalized) return undefined
+
+  const virtualMatch = normalized.match(/^virtual(\d+)$/i)
+  if (!virtualMatch) return normalized
+
+  return `DigiMarket SmS ${virtualMatch[1]}`
+}
+
 function isoToFlag(iso?: string): string {
   if (!iso || iso.length !== 2) return '🌐'
   return iso
@@ -975,7 +985,7 @@ export default function NomorVirtualPage() {
               <div>
                 <p className="text-[11px] text-[#888] uppercase tracking-wide">Operator/Harga</p>
                 <p className="text-sm font-semibold text-[#141414]">
-                  {selectedPrice ? `${selectedPrice.operator} · ${formatWalletRupiah(estimatedDebit)}` : 'Pilih harga'}
+                  {selectedPrice ? `${toOperatorDisplayName(selectedPrice.operator)} · ${formatWalletRupiah(estimatedDebit)}` : 'Pilih harga'}
                 </p>
               </div>
             </div>
@@ -1157,7 +1167,7 @@ export default function NomorVirtualPage() {
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-[#141414] truncate">{priceOption.operator}</span>
+                            <span className="text-sm font-semibold text-[#141414] truncate">{toOperatorDisplayName(priceOption.operator)}</span>
                             <span className="text-sm font-bold text-[#141414] shrink-0">
                               {formatWalletRupiah(priceOption.walletDebit)}
                             </span>
@@ -1187,7 +1197,7 @@ export default function NomorVirtualPage() {
                     </div>
                     <div className="flex justify-between gap-3">
                       <span className="text-[#888]">Operator</span>
-                      <span className="font-semibold text-right">{selectedPrice?.operator || '—'}</span>
+                      <span className="font-semibold text-right">{toOperatorDisplayName(selectedPrice?.operator) || '—'}</span>
                     </div>
                     <div className="flex justify-between gap-3 border-t border-[#EBEBEB] pt-2">
                       <span className="text-[#555] font-semibold">Harga</span>
@@ -1297,7 +1307,7 @@ export default function NomorVirtualPage() {
                         <div className="text-xs text-[#888] mt-1 flex flex-wrap gap-x-2 gap-y-1">
                           <span>#{order.provider_order_id}</span>
                           <span>• {toTitleCase(order.country || '-')}</span>
-                          <span>• {order.operator || '-'}</span>
+                          <span>• {toOperatorDisplayName(order.operator) || '-'}</span>
                           <span>• {formatOrderDate(order.created_at)}</span>
                         </div>
                       </div>
