@@ -11,7 +11,7 @@ export default function Footer() {
               <div className="w-8 h-8 bg-[#FF5733] rounded-xl flex items-center justify-center">
                 <ShoppingBag className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xl font-extrabold">Premium<span className="text-[#FF5733]">Hub</span></span>
+              <span className="text-xl font-extrabold">Digi<span className="text-[#FF5733]">Market</span></span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
               Platform marketplace akun premium terpercaya dengan garansi 30 hari.
@@ -47,7 +47,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-gray-500">© 2026 PremiumHub. All rights reserved.</p>
+          <p className="text-sm text-gray-500">© 2026 DigiMarket. All rights reserved.</p>
           <div className="flex gap-6">
             <span className="text-sm text-gray-500">🇮🇩 Indonesia</span>
           </div>

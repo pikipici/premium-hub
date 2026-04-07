@@ -37,7 +37,7 @@ export default function Navbar() {
             <div className="w-8 h-8 bg-[#FF5733] rounded-xl flex items-center justify-center">
               <ShoppingBag className="w-4 h-4 text-white" />
             </div>
-            <span className="text-xl font-extrabold">Premium<span className="text-[#FF5733]">Hub</span></span>
+            <span className="text-xl font-extrabold">Digi<span className="text-[#FF5733]">Market</span></span>
           </Link>
 
           {/* Desktop Nav */}

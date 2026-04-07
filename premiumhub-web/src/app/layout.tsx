@@ -10,7 +10,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "PremiumHub — Akun Premium Terpercaya",
+  title: "DigiMarket — Akun Premium Terpercaya",
   description: "Marketplace akun premium Netflix, Spotify, Disney+, YouTube Premium, Canva Pro dengan harga terjangkau dan garansi 30 hari.",
 };
 

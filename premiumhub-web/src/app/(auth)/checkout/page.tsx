@@ -252,7 +252,7 @@ export default function CheckoutPage() {
           </button>
 
           <p className="text-xs text-center text-[#888] mt-4">
-            Dengan melanjutkan, kamu menyetujui syarat dan ketentuan PremiumHub.
+            Dengan melanjutkan, kamu menyetujui syarat dan ketentuan DigiMarket.
           </p>
         </div>
       </section>

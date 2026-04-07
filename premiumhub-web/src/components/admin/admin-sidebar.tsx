@@ -57,7 +57,7 @@ export default function AdminSidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="logo-text">Premium<span>Hub</span></div>
+        <div className="logo-text">Digi<span>Market</span></div>
         <div className="admin-tag">Admin Panel</div>
       </div>
 
