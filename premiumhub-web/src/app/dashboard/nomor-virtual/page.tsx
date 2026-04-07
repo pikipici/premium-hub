@@ -129,7 +129,7 @@ function toOperatorDisplayName(operator: string | undefined): string | undefined
   const virtualMatch = normalized.match(/^virtual(\d+)$/i)
   if (!virtualMatch) return normalized
 
-  return `DigiMarket SmS ${virtualMatch[1]}`
+  return `DigiMarket SIM ${virtualMatch[1]}`
 }
 
 function isoToFlag(iso?: string): string {
