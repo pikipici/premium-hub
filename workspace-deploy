@@ -132,6 +132,15 @@ FORCE_FE_BUILD="${FORCE_FE_BUILD:-0}"
 FORCE_BE_BUILD="${FORCE_BE_BUILD:-0}"
 FORCE_NPM_CI="${FORCE_NPM_CI:-0}"
 
+# Workspace service runtime mode
+# - API: auto|go-run|binary
+# - WEB: auto|dev|prod
+WORKSPACE_API_RUN_MODE="${WORKSPACE_API_RUN_MODE:-auto}"
+WORKSPACE_WEB_RUN_MODE="${WORKSPACE_WEB_RUN_MODE:-auto}"
+
+EXPECT_BE_BINARY_ARTIFACT=1
+EXPECT_FE_BUILD_ARTIFACT=1
+
 DEPLOY_STATE_DIR="${DEPLOY_STATE_DIR:-${PROJECT_ROOT}/.deploy-state}"
 LAST_SUCCESS_COMMIT_FILE="${LAST_SUCCESS_COMMIT_FILE:-${DEPLOY_STATE_DIR}/workspace-last-success-commit}"
 
@@ -176,6 +185,43 @@ wait_for_http() {
 
   log_err "${label} tidak healthy setelah ${attempts} percobaan: ${url}"
   return 1
+}
+
+service_execstart_value() {
+  local svc="$1"
+  systemctl --user show -p ExecStart --value "${svc}" 2>/dev/null || true
+}
+
+detect_api_run_mode_from_execstart() {
+  local execstart="$1"
+
+  if grep -qiE '\bgo run\b' <<<"${execstart}"; then
+    echo "go-run"
+    return 0
+  fi
+
+  if grep -qiE 'workspace-premiumhub-api|/bin/premiumhub-api' <<<"${execstart}"; then
+    echo "binary"
+    return 0
+  fi
+
+  echo "unknown"
+}
+
+detect_web_run_mode_from_execstart() {
+  local execstart="$1"
+
+  if grep -qiE '\bnpm run dev\b|\bnext dev\b' <<<"${execstart}"; then
+    echo "dev"
+    return 0
+  fi
+
+  if grep -qiE '\bnpm run start\b|\bnext start\b' <<<"${execstart}"; then
+    echo "prod"
+    return 0
+  fi
+
+  echo "unknown"
 }
 
 git_is_dirty() {
@@ -265,6 +311,57 @@ for svc in "${SERVICES[@]}"; do
     log_warn "Service ${svc} belum terdaftar aktif. Pastikan unit file sudah dibuat."
   fi
 done
+
+API_EXECSTART_VALUE="$(service_execstart_value "workspace-premiumhub-api.service")"
+WEB_EXECSTART_VALUE="$(service_execstart_value "workspace-premiumhub-web.service")"
+
+if [[ "${WORKSPACE_API_RUN_MODE}" == "auto" ]]; then
+  WORKSPACE_API_RUN_MODE="$(detect_api_run_mode_from_execstart "${API_EXECSTART_VALUE}")"
+fi
+if [[ "${WORKSPACE_WEB_RUN_MODE}" == "auto" ]]; then
+  WORKSPACE_WEB_RUN_MODE="$(detect_web_run_mode_from_execstart "${WEB_EXECSTART_VALUE}")"
+fi
+
+case "${WORKSPACE_API_RUN_MODE}" in
+  go-run|binary)
+    ;;
+  unknown)
+    log_warn "API service mode tidak terdeteksi jelas dari ExecStart. Default validation tetap jalan."
+    ;;
+  *)
+    log_err "WORKSPACE_API_RUN_MODE tidak valid: ${WORKSPACE_API_RUN_MODE} (allowed: auto|go-run|binary)"
+    exit 1
+    ;;
+esac
+
+case "${WORKSPACE_WEB_RUN_MODE}" in
+  dev|prod)
+    ;;
+  unknown)
+    log_warn "Web service mode tidak terdeteksi jelas dari ExecStart. Default validation tetap jalan."
+    ;;
+  *)
+    log_err "WORKSPACE_WEB_RUN_MODE tidak valid: ${WORKSPACE_WEB_RUN_MODE} (allowed: auto|dev|prod)"
+    exit 1
+    ;;
+esac
+
+if [[ "${WORKSPACE_API_RUN_MODE}" == "go-run" ]]; then
+  EXPECT_BE_BINARY_ARTIFACT=0
+fi
+if [[ "${WORKSPACE_WEB_RUN_MODE}" == "dev" ]]; then
+  EXPECT_FE_BUILD_ARTIFACT=0
+fi
+
+log_info "Workspace API mode: ${WORKSPACE_API_RUN_MODE}"
+log_info "Workspace Web mode: ${WORKSPACE_WEB_RUN_MODE}"
+
+if [[ "${EXPECT_BE_BINARY_ARTIFACT}" == "0" ]]; then
+  log_warn "API service mode go-run -> binary artifact bukan runtime source of truth"
+fi
+if [[ "${EXPECT_FE_BUILD_ARTIFACT}" == "0" ]]; then
+  log_warn "Web service mode dev -> .next/BUILD_ID bukan runtime source of truth"
+fi
 
 step_done "PRECHECK"
 
@@ -419,12 +516,17 @@ if [[ "${FORCE_BE_BUILD}" == "1" ]]; then
   PLAN_REASON="${PLAN_REASON} + FORCE_BE_BUILD"
 fi
 
-if [[ "${SHOULD_BUILD_FE}" == "0" && ! -f "${FRONTEND_DIR}/.next/BUILD_ID" ]]; then
+if [[ "${SHOULD_BUILD_FE}" == "0" && "${EXPECT_FE_BUILD_ARTIFACT}" == "1" && ! -f "${FRONTEND_DIR}/.next/BUILD_ID" ]]; then
   log_warn "FE artifact .next/BUILD_ID tidak ada -> force FE build"
   SHOULD_BUILD_FE=1
 fi
 
-if [[ "${SHOULD_BUILD_BE}" == "0" && ! -x "${BACKEND_DIR}/bin/workspace-premiumhub-api" ]]; then
+if [[ "${SHOULD_BUILD_FE}" == "0" && "${EXPECT_FE_BUILD_ARTIFACT}" == "0" && ! -d "${FRONTEND_DIR}/node_modules" ]]; then
+  log_warn "Web mode dev + node_modules tidak ada -> force FE prep step"
+  SHOULD_BUILD_FE=1
+fi
+
+if [[ "${SHOULD_BUILD_BE}" == "0" && "${EXPECT_BE_BINARY_ARTIFACT}" == "1" && ! -x "${BACKEND_DIR}/bin/workspace-premiumhub-api" ]]; then
   log_warn "BE artifact bin/workspace-premiumhub-api tidak ada -> force BE build"
   SHOULD_BUILD_BE=1
 fi
@@ -455,6 +557,7 @@ fi
 
 log_info "Plan reason: ${PLAN_REASON}"
 log_info "Build plan: FE=${SHOULD_BUILD_FE}, BE=${SHOULD_BUILD_BE}, npm_ci=${NEEDS_NPM_CI} (${NPM_CI_REASON})"
+log_info "Service alignment: web_mode=${WORKSPACE_WEB_RUN_MODE} expect_fe_artifact=${EXPECT_FE_BUILD_ARTIFACT}, api_mode=${WORKSPACE_API_RUN_MODE} expect_be_artifact=${EXPECT_BE_BINARY_ARTIFACT}"
 
 if is_worktree_dirty; then
   log_warn "Working tree masih dirty/untracked. Untuk baseline paling stabil, commit dulu perubahan."
@@ -474,8 +577,12 @@ if [[ "${SHOULD_BUILD_FE}" == "1" ]]; then
     log_info "Skipping npm ci (${NPM_CI_REASON})"
   fi
 
-  log_info "Starting frontend build (npm run build)..."
-  npm run build
+  if [[ "${WORKSPACE_WEB_RUN_MODE}" == "dev" ]]; then
+    log_info "Workspace web mode=dev -> skip npm run build (artifact tidak dipakai service)"
+  else
+    log_info "Starting frontend build (npm run build)..."
+    npm run build
+  fi
 
   step_done "BUILD FRONTEND"
 else
@@ -494,9 +601,17 @@ if [[ "${SHOULD_BUILD_BE}" == "1" ]]; then
     log_info "Skipping go mod tidy (set RUN_GO_MOD_TIDY=1 jika diperlukan)"
   fi
 
-  mkdir -p bin
-  log_info "Starting backend build (go build -o bin/workspace-premiumhub-api ${BACKEND_ENTRY})..."
-  go build -o bin/workspace-premiumhub-api "${BACKEND_ENTRY}"
+  if [[ "${WORKSPACE_API_RUN_MODE}" == "go-run" ]]; then
+    TMP_BE_CHECK_BIN="$(mktemp /tmp/workspace-premiumhub-api-compile-check.XXXXXX)"
+    rm -f "${TMP_BE_CHECK_BIN}"
+    log_info "Workspace API mode=go-run -> compile-check backend (tanpa artifact runtime)"
+    go build -o "${TMP_BE_CHECK_BIN}" "${BACKEND_ENTRY}"
+    rm -f "${TMP_BE_CHECK_BIN}"
+  else
+    mkdir -p bin
+    log_info "Starting backend build (go build -o bin/workspace-premiumhub-api ${BACKEND_ENTRY})..."
+    go build -o bin/workspace-premiumhub-api "${BACKEND_ENTRY}"
+  fi
 
   step_done "BUILD BACKEND"
 else
@@ -506,11 +621,19 @@ fi
 # ---------- Smoke Test ----------
 step_start "SMOKE TEST"
 
-log_info "Checking FE build artifact (.next/BUILD_ID)..."
-[[ -f "${FRONTEND_DIR}/.next/BUILD_ID" ]]
+if [[ "${EXPECT_FE_BUILD_ARTIFACT}" == "1" ]]; then
+  log_info "Checking FE build artifact (.next/BUILD_ID)..."
+  [[ -f "${FRONTEND_DIR}/.next/BUILD_ID" ]]
+else
+  log_info "Skipping FE artifact check (web mode dev)"
+fi
 
-log_info "Checking BE build artifact (bin/workspace-premiumhub-api)..."
-[[ -x "${BACKEND_DIR}/bin/workspace-premiumhub-api" ]]
+if [[ "${EXPECT_BE_BINARY_ARTIFACT}" == "1" ]]; then
+  log_info "Checking BE build artifact (bin/workspace-premiumhub-api)..."
+  [[ -x "${BACKEND_DIR}/bin/workspace-premiumhub-api" ]]
+else
+  log_info "Skipping BE binary artifact check (api mode go-run)"
+fi
 
 step_done "SMOKE TEST"
 
