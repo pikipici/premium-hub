@@ -82,7 +82,7 @@ export default function DashboardPage() {
           <div className="text-center py-10">
             <AlertTriangle className="w-10 h-10 text-[#EBEBEB] mx-auto mb-3" />
             <p className="text-sm text-[#888]">Belum ada order</p>
-            <Link href="/katalog" className="text-sm text-[#FF5733] font-medium mt-2 inline-block hover:underline">Belanja Sekarang →</Link>
+            <Link href="/product/prem-apps" className="text-sm text-[#FF5733] font-medium mt-2 inline-block hover:underline">Belanja Sekarang →</Link>
           </div>
         ) : (
           <div className="space-y-3">

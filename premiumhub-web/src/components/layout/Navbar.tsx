@@ -42,7 +42,7 @@ export default function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/katalog" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">Katalog</Link>
+            <Link href="/product/prem-apps" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">Apps</Link>
             <Link href="/convert" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">Convert Aset</Link>
             <Link href="/faq" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">FAQ</Link>
           </div>
@@ -89,7 +89,7 @@ export default function Navbar() {
         {/* Mobile menu */}
         {open && (
           <div className="md:hidden pb-4 border-t border-[#EBEBEB] mt-2 pt-4 space-y-3">
-            <Link href="/katalog" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Katalog</Link>
+            <Link href="/product/prem-apps" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Apps</Link>
             <Link href="/convert" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Convert Aset</Link>
             <Link href="/faq" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>FAQ</Link>
             {showAuthenticated ? (

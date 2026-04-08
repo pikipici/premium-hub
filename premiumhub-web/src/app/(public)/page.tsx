@@ -31,7 +31,7 @@ export default function HomePage() {
               Masuk ke Nokos <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/katalog"
+              href="/product/prem-apps"
               className="inline-flex items-center justify-center rounded-full border border-[#EBEBEB] px-7 py-3.5 text-sm font-semibold text-[#141414] transition hover:border-[#141414] hover:bg-[#F7F7F5]"
             >
               Lihat Katalog

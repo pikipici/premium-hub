@@ -84,7 +84,7 @@ function OrderSuksesContent() {
             <Link href="/dashboard" className="flex-1 py-3 bg-[#141414] text-white font-bold rounded-full text-sm text-center hover:bg-[#2a2a2a] transition-colors">
               Dashboard
             </Link>
-            <Link href="/katalog" className="flex-1 py-3 border-2 border-[#141414] text-[#141414] font-bold rounded-full text-sm text-center hover:bg-[#141414] hover:text-white transition-all">
+            <Link href="/product/prem-apps" className="flex-1 py-3 border-2 border-[#141414] text-[#141414] font-bold rounded-full text-sm text-center hover:bg-[#141414] hover:text-white transition-all">
               Belanja Lagi
             </Link>
           </div>

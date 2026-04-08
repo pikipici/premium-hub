@@ -36,7 +36,7 @@ export default function CheckoutPage() {
     }
 
     if (!item) {
-      router.replace('/katalog')
+      router.replace('/product/prem-apps')
     }
   }, [hasHydrated, isAuthenticated, item, router])
 

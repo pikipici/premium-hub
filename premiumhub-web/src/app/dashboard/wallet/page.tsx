@@ -373,7 +373,7 @@ export default function WalletPage() {
               <p className="text-xs text-white/60">Nggak perlu redirect payment gateway tiap transaksi.</p>
             </div>
             <Link
-              href="/katalog"
+              href="/product/prem-apps"
               className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#141414] hover:opacity-90"
             >
               Beli Sekarang
