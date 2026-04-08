@@ -10,7 +10,7 @@ export default function ProductCard({ product }: { product: Product }) {
     : 0
 
   return (
-    <Link href={`/produk/${product.slug}`} className="group block">
+    <Link href={`/product/prem-apps/${product.slug}`} className="group block">
       <div
         className="relative rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-transparent hover:border-[#EBEBEB]"
         style={{ backgroundColor: product.color || '#F7F7F5' }}
