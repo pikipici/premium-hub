@@ -34,10 +34,6 @@ function resolvePageMeta(pathname: string): PageMeta {
     return { title: 'Control Convert', sub: 'Kelola fee, limit, channel, dan queue convert' }
   }
 
-  if (pathname.startsWith('/admin/konversi-pulsa')) {
-    return { title: 'Konversi Pulsa', sub: 'Verifikasi dan proses transaksi konversi' }
-  }
-
   if (pathname.startsWith('/admin/garansi')) {
     return { title: 'Klaim Garansi', sub: 'Proses klaim pengguna' }
   }

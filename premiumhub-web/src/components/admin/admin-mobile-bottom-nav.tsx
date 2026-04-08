@@ -23,8 +23,7 @@ const ITEMS: Item[] = [
       pathname.startsWith('/admin/pengaturan') ||
       pathname.startsWith('/admin/pengguna') ||
       pathname.startsWith('/admin/garansi') ||
-      pathname.startsWith('/admin/convert') ||
-      pathname.startsWith('/admin/konversi-pulsa'),
+      pathname.startsWith('/admin/convert'),
   },
 ]
 

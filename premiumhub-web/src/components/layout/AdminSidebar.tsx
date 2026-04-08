@@ -10,7 +10,7 @@ const MENU = [
   { href: '/admin/produk', icon: Package, label: 'Produk' },
   { href: '/admin/stok', icon: Database, label: 'Stok' },
   { href: '/admin/order', icon: ShoppingCart, label: 'Order' },
-  { href: '/admin/konversi-pulsa', icon: RefreshCw, label: 'Konversi Pulsa' },
+  { href: '/admin/convert/orders', icon: RefreshCw, label: 'Konversi Pulsa' },
   { href: '/admin/garansi', icon: ShieldCheck, label: 'Garansi' },
   { href: '/admin/pengguna', icon: Users, label: 'Pengguna' },
   { href: '/admin/pengaturan', icon: Settings, label: 'Pengaturan' },

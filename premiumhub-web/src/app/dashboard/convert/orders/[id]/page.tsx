@@ -135,7 +135,7 @@ export default async function DashboardConvertOrderDetailPage({ params, searchPa
             Hubungi Support
           </button>
           <Link
-            href="/convert"
+            href={`/product/convert/${asset}`}
             className="inline-flex items-center justify-center rounded-lg border border-[#EBEBEB] bg-white px-4 py-2.5 text-sm font-bold text-[#141414] hover:bg-[#FAFAF8]"
           >
             Buat Order Baru

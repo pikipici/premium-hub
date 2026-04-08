@@ -1,14 +1,14 @@
 "use client"
 
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { useAuthStore } from '@/store/authStore'
 
-type ConvertAssetType = 'pulsa' | 'paypal' | 'crypto'
+export type ConvertAssetType = 'pulsa' | 'paypal' | 'crypto'
 type BankKey = 'bca' | 'bni' | 'bri' | 'mandiri' | 'cimb'
 
 type AssetConfig = {
@@ -115,20 +115,24 @@ function formatRupiah(value: number) {
   return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
 }
 
-function normalizeAssetType(rawType: string | null): ConvertAssetType | null {
-  if (rawType === 'pulsa' || rawType === 'paypal' || rawType === 'crypto') return rawType
-  return null
+const ASSET_ROUTES: Record<ConvertAssetType, string> = {
+  pulsa: '/product/convert/pulsa',
+  paypal: '/product/convert/paypal',
+  crypto: '/product/convert/crypto',
 }
 
-export default function ConvertPage() {
+type ConvertPageProps = {
+  assetType?: ConvertAssetType
+}
+
+export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: ConvertPageProps) {
   const { isAuthenticated, hasHydrated, user } = useAuthStore()
   const isMember = hasHydrated && isAuthenticated
 
   const pathname = usePathname()
   const router = useRouter()
-  const searchParams = useSearchParams()
 
-  const assetType = normalizeAssetType(searchParams.get('type')) ?? 'pulsa'
+  const assetType = forcedAssetType
 
   const [amount, setAmount] = useState<number>(0)
   const [bank, setBank] = useState<BankKey>('bca')
@@ -252,9 +256,10 @@ export default function ConvertPage() {
     closeReview()
     setAttemptedReview(false)
 
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('type', nextType)
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    const targetRoute = ASSET_ROUTES[nextType]
+    if (pathname === targetRoute) return
+
+    router.replace(targetRoute, { scroll: false })
   }
 
   const openReview = () => {
@@ -323,7 +328,7 @@ export default function ConvertPage() {
       }
 
       params.set('orderId', orderId)
-      router.push(`/convert/track/${trackingToken}?${params.toString()}`)
+      router.push(`/product/convert/track/${trackingToken}?${params.toString()}`)
     }, 500)
   }
 
