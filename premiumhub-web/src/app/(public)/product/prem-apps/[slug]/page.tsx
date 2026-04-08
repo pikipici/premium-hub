@@ -54,7 +54,7 @@ export default function PremAppsProductDetailPage() {
       accountType: selectedPrice.account_type as 'shared' | 'private',
       price: selectedPrice.price,
     })
-    router.push('/checkout')
+    router.push('/product/prem-apps/checkout')
   }
 
   if (loading) {

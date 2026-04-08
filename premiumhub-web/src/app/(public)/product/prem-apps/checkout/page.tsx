@@ -79,7 +79,7 @@ export default function CheckoutPage() {
       if (paymentMethod === 'wallet') {
         if (orderRes.data.payment_status === 'paid' || orderRes.data.order_status === 'active') {
           clearCart()
-          router.push(`/order-sukses?id=${orderRes.data.id}`)
+          router.push(`/product/prem-apps/checkout/success?id=${orderRes.data.id}`)
           return
         }
 
@@ -100,7 +100,7 @@ export default function CheckoutPage() {
       await paymentService.simulate(orderRes.data.id)
 
       clearCart()
-      router.push(`/order-sukses?id=${orderRes.data.id}`)
+      router.push(`/product/prem-apps/checkout/success?id=${orderRes.data.id}`)
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const message = (err.response?.data as { message?: string } | undefined)?.message
