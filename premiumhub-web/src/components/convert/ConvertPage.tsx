@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
@@ -241,9 +241,13 @@ export default function ConvertPage() {
     }
   }, [showConfirm, validationError, quote.normalizedAmount, selectedAsset.minAmount])
 
-  const switchAssetType = (nextType: ConvertAssetType) => {
+  const closeReview = () => {
     setShowConfirm(false)
     setAgree(false)
+  }
+
+  const switchAssetType = (nextType: ConvertAssetType) => {
+    closeReview()
     setAttemptedReview(false)
 
     const params = new URLSearchParams(searchParams.toString())
@@ -257,6 +261,27 @@ export default function ConvertPage() {
     setAgree(false)
     setShowConfirm(true)
   }
+
+  useEffect(() => {
+    if (!showConfirm) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowConfirm(false)
+        setAgree(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeydown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeydown)
+    }
+  }, [showConfirm])
 
   const canProceedAsGuest = !guestBlocked
 
@@ -315,7 +340,7 @@ export default function ConvertPage() {
                       value={amount || ''}
                       onChange={(event) => {
                         setAmount(Number(event.target.value) || 0)
-                        if (attemptedReview) setShowConfirm(false)
+                        if (attemptedReview) closeReview()
                       }}
                       placeholder="0"
                       className="w-full bg-transparent text-2xl font-extrabold tracking-tight text-[#141414] outline-none placeholder:text-[#C9C9C5]"
@@ -331,7 +356,7 @@ export default function ConvertPage() {
                         type="button"
                         onClick={() => {
                           setAmount(quickAmount)
-                          if (attemptedReview) setShowConfirm(false)
+                          if (attemptedReview) closeReview()
                         }}
                         className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                           amount === quickAmount
@@ -622,68 +647,109 @@ export default function ConvertPage() {
                 </div>
               </div>
 
-              {showConfirm ? (
-                <div className="mt-4 rounded-2xl border border-[#EBEBEB] bg-white p-5">
-                  <h3 className="text-sm font-bold text-[#141414]">✅ Konfirmasi Order</h3>
-
-                  <div className="my-4 rounded-xl bg-[#FAFAF8] p-4 text-center">
-                    <p className="text-xs text-[#888]">Kamu kirim</p>
-                    <p className="mt-1 text-2xl font-extrabold text-[#141414]">{formatRupiah(quote.normalizedAmount)}</p>
-                    <p className="my-1 text-lg text-[#FF5733]">↓</p>
-                    <p className="text-2xl font-extrabold text-emerald-600">{formatRupiah(quote.totalReceived)}</p>
-                    <p className="mt-1 text-xs text-[#888]">masuk ke rekening {selectedBank.label}</p>
-                  </div>
-
-                  <label className="mb-4 flex items-start gap-2 text-xs text-[#777]">
-                    <input
-                      type="checkbox"
-                      checked={agree}
-                      onChange={(event) => setAgree(event.target.checked)}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      Saya menyetujui syarat layanan convert aset dan memahami transaksi yang diproses tidak bisa dibatalkan.
-                    </span>
-                  </label>
-
-                  {isMember ? (
-                    <button
-                      type="button"
-                      disabled={!agree}
-                      className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Konfirmasi & Buat Order
-                    </button>
-                  ) : canProceedAsGuest ? (
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        disabled={!agree}
-                        className="w-full rounded-full bg-[#141414] px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Lanjut sebagai tamu (+{formatRupiah(GUEST_SURCHARGE)})
-                      </button>
-                      <Link
-                        href="/login"
-                        className="inline-flex w-full items-center justify-center rounded-full border border-[#FF5733] bg-white px-4 py-3 text-sm font-extrabold text-[#FF5733]"
-                      >
-                        Login dulu biar lebih hemat
-                      </Link>
-                    </div>
-                  ) : (
-                    <Link
-                      href="/login"
-                      className="inline-flex w-full items-center justify-center rounded-full bg-[#141414] px-4 py-3 text-sm font-extrabold text-white"
-                    >
-                      Login untuk lanjut transaksi
-                    </Link>
-                  )}
-                </div>
-              ) : null}
+              <p className="mt-4 text-xs text-[#888]">
+                Klik <strong>Review Quote</strong> untuk buka modal konfirmasi tanpa perlu scroll ke bawah.
+              </p>
             </section>
           </div>
         </section>
       </main>
+
+      {showConfirm ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6">
+          <button
+            type="button"
+            aria-label="Tutup modal konfirmasi"
+            onClick={closeReview}
+            className="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
+          />
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Konfirmasi order convert"
+            className="relative z-[81] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#EBEBEB] bg-white p-5 shadow-2xl sm:p-6"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-base font-extrabold text-[#141414]">✅ Konfirmasi Order</h3>
+              <button
+                type="button"
+                onClick={closeReview}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#EBEBEB] text-sm font-bold text-[#666] hover:border-[#FF5733] hover:text-[#FF5733]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl bg-[#FAFAF8] p-4 text-center">
+              <p className="text-xs text-[#888]">Kamu kirim</p>
+              <p className="mt-1 text-2xl font-extrabold text-[#141414]">{formatRupiah(quote.normalizedAmount)}</p>
+              <p className="my-1 text-lg text-[#FF5733]">↓</p>
+              <p className="text-2xl font-extrabold text-emerald-600">{formatRupiah(quote.totalReceived)}</p>
+              <p className="mt-1 text-xs text-[#888]">masuk ke rekening {selectedBank.label}</p>
+            </div>
+
+            <div className="mt-3 space-y-1 rounded-xl border border-[#EBEBEB] bg-white px-3 py-3 text-xs text-[#666]">
+              <p>
+                Aset: <strong className="text-[#141414]">{selectedAsset.label}</strong>
+              </p>
+              <p>
+                Estimasi proses: <strong className="text-[#141414]">{selectedAsset.eta}</strong>
+              </p>
+              <p>
+                Biaya akses: <strong className="text-[#141414]">{isMember ? 'Member (gratis surcharge)' : 'Guest'}</strong>
+              </p>
+            </div>
+
+            <label className="mt-4 flex items-start gap-2 text-xs text-[#777]">
+              <input
+                type="checkbox"
+                checked={agree}
+                onChange={(event) => setAgree(event.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Saya menyetujui syarat layanan convert aset dan memahami transaksi yang diproses tidak bisa dibatalkan.
+              </span>
+            </label>
+
+            <div className="mt-4">
+              {isMember ? (
+                <button
+                  type="button"
+                  disabled={!agree}
+                  className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Konfirmasi & Buat Order
+                </button>
+              ) : canProceedAsGuest ? (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    disabled={!agree}
+                    className="w-full rounded-full bg-[#141414] px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Lanjut sebagai tamu (+{formatRupiah(GUEST_SURCHARGE)})
+                  </button>
+                  <Link
+                    href="/login"
+                    className="inline-flex w-full items-center justify-center rounded-full border border-[#FF5733] bg-white px-4 py-3 text-sm font-extrabold text-[#FF5733]"
+                  >
+                    Login dulu biar lebih hemat
+                  </Link>
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-[#141414] px-4 py-3 text-sm font-extrabold text-white"
+                >
+                  Login untuk lanjut transaksi
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <Footer />
     </>
