@@ -32,7 +32,7 @@ export default function Footer() {
             <h4 className="font-semibold mb-4 text-sm">Bantuan</h4>
             <div className="space-y-2">
               <Link href="/faq" className="block text-sm text-gray-400 hover:text-white transition-colors">FAQ</Link>
-              <Link href="/faq" className="block text-sm text-gray-400 hover:text-white transition-colors">Cara Kerja</Link>
+              <Link href="/convert-pulsa" className="block text-sm text-gray-400 hover:text-white transition-colors">Convert Pulsa</Link>
               <Link href="/faq" className="block text-sm text-gray-400 hover:text-white transition-colors">Kontak</Link>
             </div>
           </div>

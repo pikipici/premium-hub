@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Package, Database, ShoppingCart, ShieldCheck, Users, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Package, Database, ShoppingCart, ShieldCheck, Users, Settings, LogOut, RefreshCw } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 
 const MENU = [
@@ -10,6 +10,7 @@ const MENU = [
   { href: '/admin/produk', icon: Package, label: 'Produk' },
   { href: '/admin/stok', icon: Database, label: 'Stok' },
   { href: '/admin/order', icon: ShoppingCart, label: 'Order' },
+  { href: '/admin/konversi-pulsa', icon: RefreshCw, label: 'Konversi Pulsa' },
   { href: '/admin/garansi', icon: ShieldCheck, label: 'Garansi' },
   { href: '/admin/pengguna', icon: Users, label: 'Pengguna' },
   { href: '/admin/pengaturan', icon: Settings, label: 'Pengaturan' },

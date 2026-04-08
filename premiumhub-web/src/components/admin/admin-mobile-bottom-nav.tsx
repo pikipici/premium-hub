@@ -22,7 +22,8 @@ const ITEMS: Item[] = [
     match: (pathname) =>
       pathname.startsWith('/admin/pengaturan') ||
       pathname.startsWith('/admin/pengguna') ||
-      pathname.startsWith('/admin/garansi'),
+      pathname.startsWith('/admin/garansi') ||
+      pathname.startsWith('/admin/konversi-pulsa'),
   },
 ]
 

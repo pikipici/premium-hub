@@ -8,6 +8,7 @@ const ROUTE_MAP: Record<string, string> = {
   produk: '/admin/produk',
   stok: '/admin/stok',
   order: '/admin/order',
+  'konversi-pulsa': '/admin/konversi-pulsa',
   garansi: '/admin/garansi',
   pengguna: '/admin/pengguna',
   pengaturan: '/admin/pengaturan',

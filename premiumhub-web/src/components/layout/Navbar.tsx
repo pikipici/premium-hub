@@ -43,6 +43,7 @@ export default function Navbar() {
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8">
             <Link href="/katalog" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">Katalog</Link>
+            <Link href="/convert-pulsa" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">Convert Pulsa</Link>
             <Link href="/faq" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">FAQ</Link>
           </div>
 
@@ -89,11 +90,13 @@ export default function Navbar() {
         {open && (
           <div className="md:hidden pb-4 border-t border-[#EBEBEB] mt-2 pt-4 space-y-3">
             <Link href="/katalog" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Katalog</Link>
+            <Link href="/convert-pulsa" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Convert Pulsa</Link>
             <Link href="/faq" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>FAQ</Link>
             {showAuthenticated ? (
               <>
                 <Link href="/dashboard" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Dashboard</Link>
                 <Link href="/dashboard/wallet" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Wallet</Link>
+                <Link href="/dashboard/wallet/konversi-pulsa" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Konversi Pulsa</Link>
                 <Link href="/dashboard/nomor-virtual" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Nomor Virtual</Link>
                 {user?.role === 'admin' && <Link href="/admin" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Admin Panel</Link>}
                 <button onClick={handleLogout} className="block text-sm font-medium text-red-500 py-2" disabled={logouting}>Logout</button>
