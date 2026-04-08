@@ -90,18 +90,40 @@ on_error() {
 trap 'on_error "$LINENO" "$BASH_COMMAND" "$?"' ERR
 
 # ---------- Config ----------
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_WORKSPACE_ROOT=""
+
+WS_WEB_DIR="$(systemctl --user show -p WorkingDirectory --value workspace-premiumhub-web.service 2>/dev/null || true)"
+WS_API_DIR="$(systemctl --user show -p WorkingDirectory --value workspace-premiumhub-api.service 2>/dev/null || true)"
+
+if [[ -n "${WS_WEB_DIR}" ]]; then
+  DEFAULT_WORKSPACE_ROOT="$(dirname "${WS_WEB_DIR}")"
+elif [[ -n "${WS_API_DIR}" ]]; then
+  DEFAULT_WORKSPACE_ROOT="$(dirname "${WS_API_DIR}")"
+else
+  DEFAULT_WORKSPACE_ROOT="${SCRIPT_ROOT}"
+fi
+
+PROJECT_ROOT="${PROJECT_ROOT:-${DEFAULT_WORKSPACE_ROOT}}"
 BRANCH="${BRANCH:-main}"
 
 FRONTEND_DIR="${PROJECT_ROOT}/premiumhub-web"
 BACKEND_DIR="${PROJECT_ROOT}/premiumhub-api"
 
-# Optional git update (default OFF for local workspace safety)
-PULL_LATEST="${PULL_LATEST:-0}"
-
 # Build behavior
 RUN_GO_MOD_TIDY="${RUN_GO_MOD_TIDY:-0}"   # default: jangan mutate deps saat deploy
 NPM_FLAGS="${NPM_FLAGS:---include=dev --no-audit --no-fund}"
+
+# Git update behavior (deterministic by default)
+# - ff-only   : aman, gagal kalau diverged (default)
+# - rebase    : pull --rebase
+# - hard-reset: paksa samakan ke origin/<branch> (drop local changes)
+GIT_UPDATE_MODE="${GIT_UPDATE_MODE:-ff-only}"
+
+# Default ketat: stop kalau working tree kotor supaya deploy bisa diprediksi
+ALLOW_DIRTY_TREE="${ALLOW_DIRTY_TREE:-0}"
+AUTO_STASH="${AUTO_STASH:-0}"
+SHOW_GIT_SUMMARY="${SHOW_GIT_SUMMARY:-1}"
 
 # Deterministic build plan controls
 AUTO_DETECT_CHANGES="${AUTO_DETECT_CHANGES:-1}"
@@ -154,6 +176,14 @@ wait_for_http() {
 
   log_err "${label} tidak healthy setelah ${attempts} percobaan: ${url}"
   return 1
+}
+
+git_is_dirty() {
+  [[ -n "$(git status --porcelain)" ]]
+}
+
+git_head_summary() {
+  git show -s --format='%h %ci %s' "$1"
 }
 
 collect_changed_files() {
@@ -217,6 +247,15 @@ command -v sort >/dev/null
 BACKEND_ENTRY="$(find_backend_entry)" || { log_err "Entry backend tidak ditemukan (cmd/main.go atau main.go)"; exit 1; }
 log_info "Backend entry: ${BACKEND_ENTRY}"
 
+if [[ -f "${BACKEND_DIR}/go.mod" ]]; then
+  GO_DIRECTIVE="$(awk '/^go[[:space:]]+[0-9]+(\.[0-9]+){1,2}$/ {print $2; exit}' "${BACKEND_DIR}/go.mod" || true)"
+  if [[ -z "${GO_DIRECTIVE}" ]]; then
+    log_warn "go.mod directive tidak terbaca valid. Contoh valid: 'go 1.22.6'"
+  else
+    log_info "go.mod directive: ${GO_DIRECTIVE}"
+  fi
+fi
+
 for svc in "${SERVICES[@]}"; do
   [[ "${svc}" == workspace-* ]] || {
     log_err "Unsafe service target terdeteksi: ${svc}"
@@ -229,41 +268,81 @@ done
 
 step_done "PRECHECK"
 
-# ---------- Optional Pull latest code ----------
-if [[ "${PULL_LATEST}" == "1" ]]; then
-  step_start "PULL LATEST CODE"
-  cd "${PROJECT_ROOT}"
+# ---------- Pull latest code ----------
+step_start "PULL LATEST CODE"
+cd "${PROJECT_ROOT}"
 
-  STASH_CREATED=0
-  STASH_REF=""
+STASH_CREATED=0
+STASH_REF=""
 
-  log_info "Starting git update on branch: ${BRANCH}"
-  git fetch origin "${BRANCH}"
-  git checkout "${BRANCH}"
+log_info "Starting git update on branch: ${BRANCH}"
+git fetch origin "${BRANCH}"
+git checkout "${BRANCH}"
 
-  if ! git diff --quiet || ! git diff --cached --quiet; then
-    log_warn "Working tree kotor, auto-stash sebelum pull --rebase"
-    STASH_REF="workspace-deploy-autostash-$(date +%s)"
-    git stash push -u -m "${STASH_REF}"
-    STASH_CREATED=1
-  fi
-
-  git pull --rebase origin "${BRANCH}"
-
-  if [[ "${STASH_CREATED}" == "1" ]]; then
-    log_info "Mencoba restore perubahan lokal (git stash pop)..."
-    if git stash pop; then
-      log_ok "Perubahan lokal berhasil direstore"
-    else
-      log_warn "Stash pop conflict. Periksa manual via 'git status' dan 'git stash list'"
-      exit 1
-    fi
-  fi
-
-  step_done "PULL LATEST CODE"
-else
-  log_info "PULL_LATEST=0 (default) -> skip git pull supaya workspace changes aman"
+if [[ "${SHOW_GIT_SUMMARY}" == "1" ]]; then
+  log_info "Local HEAD : $(git_head_summary HEAD)"
+  log_info "Remote HEAD: $(git_head_summary "origin/${BRANCH}")"
 fi
+
+if git_is_dirty; then
+  if [[ "${ALLOW_DIRTY_TREE}" == "1" ]]; then
+    if [[ "${AUTO_STASH}" == "1" ]]; then
+      log_warn "Working tree kotor, AUTO_STASH=1 -> stash sebelum update"
+      STASH_REF="workspace-deploy-autostash-$(date +%s)"
+      git stash push -u -m "${STASH_REF}"
+      STASH_CREATED=1
+    else
+      log_warn "Working tree kotor, ALLOW_DIRTY_TREE=1 + AUTO_STASH=0 -> lanjut tanpa stash"
+    fi
+  else
+    log_err "Working tree kotor. Workspace deploy dihentikan biar deterministic."
+    git status --short || true
+    log_err "Override (jika sadar risikonya): ALLOW_DIRTY_TREE=1 (opsional AUTO_STASH=1)"
+    exit 1
+  fi
+fi
+
+case "${GIT_UPDATE_MODE}" in
+  ff-only)
+    git pull --ff-only origin "${BRANCH}"
+    ;;
+  rebase)
+    git pull --rebase origin "${BRANCH}"
+    ;;
+  hard-reset)
+    log_warn "GIT_UPDATE_MODE=hard-reset -> reset ke origin/${BRANCH} (local changes dibuang)"
+    git reset --hard "origin/${BRANCH}"
+    git clean -fd
+    ;;
+  *)
+    log_err "GIT_UPDATE_MODE tidak valid: ${GIT_UPDATE_MODE}. Gunakan: ff-only|rebase|hard-reset"
+    exit 1
+    ;;
+esac
+
+if [[ "${STASH_CREATED}" == "1" ]]; then
+  log_info "Mencoba restore perubahan lokal (git stash pop)..."
+  if git stash pop; then
+    log_ok "Perubahan lokal berhasil direstore"
+  else
+    log_warn "Stash pop conflict. Periksa manual via 'git status' dan 'git stash list'"
+    exit 1
+  fi
+fi
+
+LOCAL_HEAD="$(git rev-parse HEAD)"
+REMOTE_HEAD="$(git rev-parse "origin/${BRANCH}")"
+if [[ "${LOCAL_HEAD}" == "${REMOTE_HEAD}" ]]; then
+  log_ok "HEAD synced ke origin/${BRANCH}: $(git rev-parse --short HEAD)"
+else
+  log_warn "HEAD lokal beda dari origin/${BRANCH}. local=$(git rev-parse --short "${LOCAL_HEAD}") remote=$(git rev-parse --short "${REMOTE_HEAD}")"
+fi
+
+if [[ "${SHOW_GIT_SUMMARY}" == "1" ]]; then
+  log_info "Deploy commit: $(git_head_summary HEAD)"
+fi
+
+step_done "PULL LATEST CODE"
 
 # ---------- Build Plan (deterministic) ----------
 step_start "PLAN BUILD STRATEGY"
