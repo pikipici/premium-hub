@@ -29,3 +29,6 @@ node_modules/
 # Private files
 PROJECT_SPEC.md
 setup.sh
+
+# Deploy runtime state (local-only)
+.deploy-state/
