@@ -125,7 +125,6 @@ LAST_SUCCESS_COMMIT_FILE="${LAST_SUCCESS_COMMIT_FILE:-${DEPLOY_STATE_DIR}/main-l
 # Health check targets
 FE_HEALTH_URL="${FE_HEALTH_URL:-http://127.0.0.1:3002/}"
 BE_HEALTH_URL="${BE_HEALTH_URL:-http://127.0.0.1:8081/healthz}"
-BE_HEALTH_FALLBACK_URL="${BE_HEALTH_FALLBACK_URL:-http://127.0.0.1:8081/api/v1/products}"
 
 # Service names (user-level systemd)
 SERVICES=(
@@ -508,11 +507,8 @@ step_start "POST-RESTART HEALTHCHECK"
 log_info "Checking frontend endpoint: ${FE_HEALTH_URL}"
 wait_for_http "${FE_HEALTH_URL}" "Frontend" 20 1
 
-log_info "Checking backend endpoint: ${BE_HEALTH_URL}"
-if ! wait_for_http "${BE_HEALTH_URL}" "Backend(primary)" 10 1; then
-  log_warn "Primary backend health failed, trying fallback: ${BE_HEALTH_FALLBACK_URL}"
-  wait_for_http "${BE_HEALTH_FALLBACK_URL}" "Backend(fallback)" 10 1
-fi
+log_info "Checking backend health endpoint: ${BE_HEALTH_URL}"
+wait_for_http "${BE_HEALTH_URL}" "Backend(healthz)" 10 1
 
 step_done "POST-RESTART HEALTHCHECK"
 

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"net/http"
 	"strings"
 
 	"premiumhub-api/config"
@@ -16,6 +17,13 @@ import (
 func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.CORS(cfg.FrontendURL))
+
+	r.GET("/healthz", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"ok":      true,
+			"service": "premiumhub-api",
+		})
+	})
 
 	// Repositories
 	userRepo := repository.NewUserRepo(db)

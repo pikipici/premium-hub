@@ -43,6 +43,9 @@ func TestSetupProductionDisablesSimulateRoute(t *testing.T) {
 		t.Fatalf("simulate route should be disabled in production")
 	}
 
+	if !hasRoute(routes, "GET", "/healthz") {
+		t.Fatalf("health route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/auth/google") {
 		t.Fatalf("google auth route should exist")
 	}
