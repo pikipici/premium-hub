@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # Premium Hub Workspace Deploy Script (isolated)
 # - ONLY targets workspace services
 # - NEVER touches runtime services (premiumhub-*.service)
-# - Optional pull/build steps via env toggles
+# - Build behavior aligned with deploy.sh (always FE+BE build + smoke test)
 # =============================================================
 
 # ---------- Terminal colors ----------
@@ -51,11 +51,8 @@ BACKEND_DIR="${PROJECT_ROOT}/premiumhub-api"
 # Optional git update (default OFF for local workspace safety)
 PULL_LATEST="${PULL_LATEST:-0}"
 
-# Build toggles
-RUN_NPM_INSTALL="${RUN_NPM_INSTALL:-1}"
-RUN_FE_BUILD="${RUN_FE_BUILD:-1}"
-RUN_BE_BUILD="${RUN_BE_BUILD:-1}"
-RUN_GO_MOD_TIDY="${RUN_GO_MOD_TIDY:-0}"
+# Build behavior
+RUN_GO_MOD_TIDY="${RUN_GO_MOD_TIDY:-0}"   # default: jangan mutate deps saat deploy
 NPM_FLAGS="${NPM_FLAGS:---include=dev --no-audit --no-fund}"
 
 # Health targets (workspace ports)
@@ -164,52 +161,45 @@ else
   log_info "PULL_LATEST=0 (default) -> skip git pull supaya workspace changes aman"
 fi
 
-# ---------- Frontend install/build ----------
-if [[ "${RUN_NPM_INSTALL}" == "1" || "${RUN_FE_BUILD}" == "1" ]]; then
-  step_start "FRONTEND PREP/BUILD"
-  cd "${FRONTEND_DIR}"
+# ---------- Build Frontend ----------
+step_start "BUILD FRONTEND"
+cd "${FRONTEND_DIR}"
 
-  if [[ "${RUN_NPM_INSTALL}" == "1" ]]; then
-    log_info "Installing frontend dependencies (npm ci ${NPM_FLAGS})..."
-    npm ci ${NPM_FLAGS}
-  else
-    log_info "RUN_NPM_INSTALL=0 -> skip npm ci"
-  fi
+log_info "Installing frontend dependencies (npm ci ${NPM_FLAGS})..."
+npm ci ${NPM_FLAGS}
 
-  if [[ "${RUN_FE_BUILD}" == "1" ]]; then
-    log_info "Starting frontend build (npm run build)..."
-    npm run build
-    [[ -f "${FRONTEND_DIR}/.next/BUILD_ID" ]]
-  else
-    log_info "RUN_FE_BUILD=0 -> skip frontend build"
-  fi
+log_info "Starting frontend build (npm run build)..."
+npm run build
 
-  step_done "FRONTEND PREP/BUILD"
+step_done "BUILD FRONTEND"
+
+# ---------- Build Backend ----------
+step_start "BUILD BACKEND"
+cd "${BACKEND_DIR}"
+
+if [[ "${RUN_GO_MOD_TIDY}" == "1" ]]; then
+  log_info "RUN_GO_MOD_TIDY=1 -> running go mod tidy..."
+  go mod tidy
 else
-  log_info "Frontend prep/build skipped (RUN_NPM_INSTALL=0 and RUN_FE_BUILD=0)"
+  log_info "Skipping go mod tidy (set RUN_GO_MOD_TIDY=1 jika diperlukan)"
 fi
 
-# ---------- Backend build ----------
-if [[ "${RUN_BE_BUILD}" == "1" ]]; then
-  step_start "BUILD BACKEND"
-  cd "${BACKEND_DIR}"
+mkdir -p bin
+log_info "Starting backend build (go build -o bin/workspace-premiumhub-api ${BACKEND_ENTRY})..."
+go build -o bin/workspace-premiumhub-api "${BACKEND_ENTRY}"
 
-  if [[ "${RUN_GO_MOD_TIDY}" == "1" ]]; then
-    log_info "RUN_GO_MOD_TIDY=1 -> running go mod tidy..."
-    go mod tidy
-  else
-    log_info "Skipping go mod tidy (set RUN_GO_MOD_TIDY=1 jika diperlukan)"
-  fi
+step_done "BUILD BACKEND"
 
-  mkdir -p bin
-  log_info "Compile check backend (go build -o bin/workspace-premiumhub-api ${BACKEND_ENTRY})..."
-  go build -o bin/workspace-premiumhub-api "${BACKEND_ENTRY}"
-  [[ -x "${BACKEND_DIR}/bin/workspace-premiumhub-api" ]]
+# ---------- Smoke Test ----------
+step_start "SMOKE TEST"
 
-  step_done "BUILD BACKEND"
-else
-  log_info "RUN_BE_BUILD=0 -> skip backend build"
-fi
+log_info "Checking FE build artifact (.next/BUILD_ID)..."
+[[ -f "${FRONTEND_DIR}/.next/BUILD_ID" ]]
+
+log_info "Checking BE build artifact (bin/workspace-premiumhub-api)..."
+[[ -x "${BACKEND_DIR}/bin/workspace-premiumhub-api" ]]
+
+step_done "SMOKE TEST"
 
 # ---------- Restart Workspace Services ----------
 step_start "RESTART WORKSPACE SERVICES"
