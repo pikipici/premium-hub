@@ -148,6 +148,7 @@ export default function ConvertPage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [agree, setAgree] = useState(false)
   const [attemptedReview, setAttemptedReview] = useState(false)
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
 
   const selectedAsset = ASSETS[assetType]
   const selectedBank = BANKS.find((item) => item.key === bank) ?? BANKS[0]
@@ -244,6 +245,7 @@ export default function ConvertPage() {
   const closeReview = () => {
     setShowConfirm(false)
     setAgree(false)
+    setIsSubmittingOrder(false)
   }
 
   const switchAssetType = (nextType: ConvertAssetType) => {
@@ -259,6 +261,7 @@ export default function ConvertPage() {
     setAttemptedReview(true)
     if (validationError) return
     setAgree(false)
+    setIsSubmittingOrder(false)
     setShowConfirm(true)
   }
 
@@ -272,6 +275,7 @@ export default function ConvertPage() {
       if (event.key === 'Escape') {
         setShowConfirm(false)
         setAgree(false)
+        setIsSubmittingOrder(false)
       }
     }
 
@@ -284,6 +288,44 @@ export default function ConvertPage() {
   }, [showConfirm])
 
   const canProceedAsGuest = !guestBlocked
+
+  const proceedAfterConfirm = (mode: 'member' | 'guest') => {
+    if (!agree || isSubmittingOrder) return
+
+    setIsSubmittingOrder(true)
+
+    const now = Date.now()
+    const orderId = `CVT-${String(now).slice(-8)}`
+    const trackingToken = `${assetType}-${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`
+
+    const params = new URLSearchParams()
+    params.set('asset', assetType)
+    params.set('amount', String(quote.normalizedAmount))
+    params.set('receive', String(quote.totalReceived))
+    params.set('bank', selectedBank.label)
+    params.set('eta', selectedAsset.eta)
+
+    if (assetType === 'pulsa') {
+      params.set('channel', pulsaProvider)
+      params.set('source', pulsaSenderPhone || '-')
+    } else if (assetType === 'paypal') {
+      params.set('channel', paypalFlowType)
+      params.set('source', paypalEmail || '-')
+    } else {
+      params.set('channel', `${cryptoAsset}-${cryptoNetwork}`)
+      params.set('source', cryptoWalletAddress || '-')
+    }
+
+    window.setTimeout(() => {
+      if (mode === 'member') {
+        router.push(`/dashboard/convert/orders/${orderId}?${params.toString()}`)
+        return
+      }
+
+      params.set('orderId', orderId)
+      router.push(`/convert/track/${trackingToken}?${params.toString()}`)
+    }, 500)
+  }
 
   return (
     <>
@@ -717,19 +759,21 @@ export default function ConvertPage() {
               {isMember ? (
                 <button
                   type="button"
-                  disabled={!agree}
+                  disabled={!agree || isSubmittingOrder}
+                  onClick={() => proceedAfterConfirm('member')}
                   className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Konfirmasi & Buat Order
+                  {isSubmittingOrder ? 'Menyiapkan order...' : 'Konfirmasi & Buat Order'}
                 </button>
               ) : canProceedAsGuest ? (
                 <div className="space-y-2">
                   <button
                     type="button"
-                    disabled={!agree}
+                    disabled={!agree || isSubmittingOrder}
+                    onClick={() => proceedAfterConfirm('guest')}
                     className="w-full rounded-full bg-[#141414] px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Lanjut sebagai tamu (+{formatRupiah(GUEST_SURCHARGE)})
+                    {isSubmittingOrder ? 'Menyiapkan order tamu...' : `Lanjut sebagai tamu (+${formatRupiah(GUEST_SURCHARGE)})`}
                   </button>
                   <Link
                     href="/login"
