@@ -189,34 +189,26 @@ export default function LandingPage() {
       <Navbar />
 
       <main className="overflow-hidden bg-white">
-        <section className="mx-auto grid w-full max-w-7xl gap-10 px-4 pb-8 pt-12 sm:px-6 md:grid-cols-2 md:items-center md:px-8 md:pt-16 lg:px-10">
+        <section className="mx-auto grid w-full max-w-7xl gap-7 px-4 pb-8 pt-10 sm:gap-10 sm:px-6 md:grid-cols-2 md:items-center md:px-8 md:pt-16 lg:px-10">
           <div>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#FF573333] bg-[#FFF0ED] px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#FF5733]">
               <span className="h-2 w-2 rounded-full bg-[#22C55E] shadow-[0_0_0_5px_rgba(34,197,94,0.16)]" />
               50.000+ nomor terkirim
             </div>
 
-            <h1 className="mb-5 text-4xl font-extrabold leading-tight tracking-tight text-[#141414] sm:text-5xl">
-              Terima SMS <span className="text-[#FF5733]">OTP</span>
-              <br />
-              ke nomor virtual
-              <br />
-              dari seluruh dunia
+            <h1 className="mb-4 text-[2rem] font-extrabold leading-[1.12] tracking-tight text-[#141414] sm:mb-5 sm:text-5xl sm:leading-tight">
+              Terima SMS <span className="text-[#FF5733]">OTP</span> ke nomor virtual dari seluruh dunia
             </h1>
 
             <p className="mb-2 text-[15px] leading-relaxed text-[#888]">
-              Verifikasi akun tanpa nomor HP asli.
-              <br className="hidden sm:block" />
-              Tersedia untuk 100+ negara, instan &lt; 30 detik.
+              Verifikasi akun tanpa nomor HP asli. Tersedia untuk 100+ negara, instan &lt; 30 detik.
             </p>
 
-            <p className="mb-8 text-sm leading-relaxed text-[#888]">
-              WhatsApp, Telegram, Instagram, TikTok, PayPal, Google,
-              <br className="hidden sm:block" />
-              Facebook, Uber, Netflix, dan ratusan platform lainnya.
+            <p className="mb-7 text-sm leading-relaxed text-[#888] sm:mb-8">
+              WhatsApp, Telegram, Instagram, TikTok, PayPal, Google, Facebook, Uber, Netflix, dan ratusan platform lainnya.
             </p>
 
-            <div className="mb-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mb-7 flex flex-col gap-3 sm:mb-8 sm:max-w-md sm:flex-row">
               <Link
                 href="/register"
                 className="inline-flex items-center justify-center rounded-full bg-[#FF5733] px-7 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(255,87,51,0.28)] transition hover:-translate-y-0.5 hover:bg-[#D94420]"
@@ -231,15 +223,15 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            <div className="flex flex-wrap gap-x-8 gap-y-4">
+            <div className="grid max-w-md grid-cols-3 gap-3 sm:gap-4">
               {[
                 { value: '100+', label: 'Negara tersedia' },
                 { value: '50k+', label: 'Nomor terkirim' },
-                { value: '<30s', label: 'Waktu terima OTP' },
+                { value: '<30s', label: 'Waktu OTP' },
               ].map((stat) => (
-                <div key={stat.label}>
-                  <div className="text-2xl font-extrabold tracking-tight text-[#141414]">{stat.value}</div>
-                  <div className="mt-0.5 text-xs text-[#888]">{stat.label}</div>
+                <div key={stat.label} className="rounded-xl bg-[#FAFAF9] px-2 py-2.5 text-center sm:bg-transparent sm:px-0 sm:py-0 sm:text-left">
+                  <div className="text-xl font-extrabold tracking-tight text-[#141414] sm:text-2xl">{stat.value}</div>
+                  <div className="mt-0.5 text-[11px] text-[#888] sm:text-xs">{stat.label}</div>
                 </div>
               ))}
             </div>
@@ -247,11 +239,11 @@ export default function LandingPage() {
 
           <div className="relative">
             <div className="absolute -right-16 inset-y-0 hidden rounded-l-[40px] bg-gradient-to-br from-[#FFE8E0] via-[#FFCDB8] to-[#FFE5D5] md:block" />
-            <div className="relative z-10 flex gap-3 overflow-x-auto pb-2 md:flex-col md:overflow-visible md:pb-0">
+            <div className="relative z-10 grid gap-3 sm:grid-cols-2 md:flex md:flex-col md:overflow-visible md:pb-0">
               {otpCards.map((card) => (
                 <article
                   key={card.app}
-                  className="min-w-[250px] rounded-2xl border border-[#f5f5f5] bg-white p-4 shadow-[0_8px_32px_rgba(20,20,20,0.10)] transition hover:-translate-y-0.5 md:min-w-0"
+                  className="rounded-2xl border border-[#f5f5f5] bg-white p-4 shadow-[0_8px_32px_rgba(20,20,20,0.10)] transition hover:-translate-y-0.5"
                 >
                   <div className="flex items-start gap-3">
                     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${card.iconClassName}`}>
@@ -300,7 +292,7 @@ export default function LandingPage() {
               <div className="mb-2 inline-flex rounded-full border border-[#FF573326] bg-[#FFF0ED] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5733]">
                 🌐 Live Preview
               </div>
-              <h2 className="text-3xl font-extrabold tracking-tight text-[#141414]">Pilih negara & lihat nomor tersedia</h2>
+              <h2 className="text-[1.72rem] font-extrabold leading-tight tracking-tight text-[#141414] sm:text-3xl">Pilih negara & lihat nomor tersedia</h2>
               <p className="mt-1 text-sm text-[#888]">
                 Pilih negara, salin nomor, dan gunakan untuk verifikasi platform favoritmu.
               </p>
@@ -342,7 +334,7 @@ export default function LandingPage() {
                   className="w-full rounded-lg border border-[#EBEBEB] bg-[#F7F7F5] px-3 py-2 text-sm text-[#141414] outline-none transition focus:border-[#FF5733]"
                 />
               </div>
-              <div className="max-h-[420px] overflow-y-auto py-1">
+              <div className="max-h-[340px] overflow-y-auto py-1 md:max-h-[420px]">
                 {filteredCountries.map((country) => {
                   const isActive = country.key === selectedCountry.key
                   return (
@@ -374,7 +366,7 @@ export default function LandingPage() {
               <div className="sticky top-0 border-b border-[#EBEBEB] bg-[#F7F7F5] px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#888]">
                 Nomor tersedia
               </div>
-              <div className="max-h-[420px] overflow-y-auto">
+              <div className="max-h-[340px] overflow-y-auto md:max-h-[420px]">
                 {numbers.map((number) => {
                   const isActive = number === activeNumber
                   return (
@@ -417,7 +409,7 @@ export default function LandingPage() {
                 </span>
               </div>
 
-              <div className="max-h-[420px] overflow-y-auto">
+              <div className="max-h-[340px] overflow-y-auto md:max-h-[420px]">
                 {smsItems.map((item) => (
                   <article key={`${item.sender}-${item.code}`} className="border-b border-[#F1F5F9] px-4 py-4">
                     <div className="mb-1.5 flex items-center justify-between gap-3">
@@ -443,7 +435,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="pricing" className="relative overflow-hidden bg-[#141414] px-4 py-16 sm:px-6 md:px-8 lg:px-10">
+        <section id="pricing" className="relative overflow-hidden bg-[#141414] px-4 py-14 sm:px-6 md:px-8 lg:px-10 lg:py-16">
           <div className="absolute -right-28 top-1/2 h-[420px] w-[420px] -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,87,51,0.15)_0%,transparent_70%)]" />
           <div className="absolute -bottom-20 -left-20 h-[260px] w-[260px] rounded-full bg-[radial-gradient(circle,rgba(255,87,51,0.12)_0%,transparent_70%)]" />
 
@@ -452,10 +444,8 @@ export default function LandingPage() {
               <div className="mb-3 inline-flex rounded-full border border-[#FF573333] bg-[#FF573326] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FFB8A8]">
                 💳 Harga
               </div>
-              <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                Pilih paket yang sesuai
-                <br />
-                kebutuhanmu
+              <h2 className="text-[1.72rem] font-extrabold leading-tight tracking-tight text-white sm:text-4xl">
+                Pilih paket yang sesuai kebutuhanmu
               </h2>
               <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-white/60">
                 Nomor sementara atau sewa jangka panjang — harga transparan, tanpa biaya tersembunyi.
@@ -463,14 +453,14 @@ export default function LandingPage() {
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
-              <article className="relative rounded-3xl border-2 border-[#FF5733] bg-white p-7 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+              <article className="relative rounded-3xl border-2 border-[#FF5733] bg-white p-5 pt-11 shadow-[0_16px_40px_rgba(0,0,0,0.25)] sm:p-7 sm:pt-7">
                 <span className="absolute right-5 top-5 rounded-full bg-[#FF5733] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-white">
                   Populer
                 </span>
                 <h3 className="text-xl font-extrabold text-[#141414]">Nomor Sementara (OTP 1x)</h3>
                 <p className="mt-1 text-sm font-semibold text-[#FF5733]">🌍 Semua negara tersedia</p>
                 <p className="mt-4 text-xs text-[#888]">mulai dari</p>
-                <p className="text-4xl font-extrabold tracking-tight text-[#141414]">
+                <p className="text-[2rem] font-extrabold tracking-tight text-[#141414] sm:text-4xl">
                   Rp 1.200 <span className="text-base font-medium text-[#888]">/ OTP</span>
                 </p>
 
@@ -505,11 +495,11 @@ export default function LandingPage() {
                 </Link>
               </article>
 
-              <article className="rounded-3xl bg-white p-7 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+              <article className="rounded-3xl bg-white p-5 shadow-[0_16px_40px_rgba(0,0,0,0.25)] sm:p-7">
                 <h3 className="text-xl font-extrabold text-[#141414]">Nomor Sewa Bulanan</h3>
                 <p className="mt-1 text-sm font-semibold text-[#FF5733]">🇺🇸 Amerika / Eropa</p>
                 <p className="mt-4 text-xs text-[#888]">mulai dari</p>
-                <p className="text-4xl font-extrabold tracking-tight text-[#141414]">
+                <p className="text-[2rem] font-extrabold tracking-tight text-[#141414] sm:text-4xl">
                   Rp 45.000 <span className="text-base font-medium text-[#888]">/ bulan</span>
                 </p>
 
@@ -560,10 +550,8 @@ export default function LandingPage() {
             <div className="mb-3 inline-flex rounded-full border border-[#FF573326] bg-[#FFF0ED] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5733]">
               ⚡ Cara Kerja
             </div>
-            <h2 className="text-3xl font-extrabold tracking-tight text-[#141414] sm:text-4xl">
-              Empat langkah mudah — dari daftar
-              <br />
-              sampai OTP masuk ke dashboard kamu.
+            <h2 className="text-[1.72rem] font-extrabold leading-tight tracking-tight text-[#141414] sm:text-4xl">
+              Empat langkah mudah — dari daftar sampai OTP masuk ke dashboard kamu.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[#888]">
               Tidak perlu verifikasi ribet. Mulai dalam hitungan menit.
@@ -591,7 +579,7 @@ export default function LandingPage() {
             ].map((step, index) => (
               <article
                 key={step.title}
-                className="rounded-3xl border border-[#EBEBEB] bg-[#F7F7F5] p-6 transition hover:-translate-y-1 hover:border-[#FF573333] hover:shadow-[0_12px_32px_rgba(255,87,51,0.10)]"
+                className="rounded-3xl border border-[#EBEBEB] bg-[#F7F7F5] p-5 transition hover:-translate-y-1 hover:border-[#FF573333] hover:shadow-[0_12px_32px_rgba(255,87,51,0.10)] sm:p-6"
               >
                 <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#FF5733] text-lg font-extrabold text-white shadow-[0_8px_20px_rgba(255,87,51,0.26)]">
                   {index + 1}
