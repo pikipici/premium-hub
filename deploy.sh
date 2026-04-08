@@ -91,8 +91,24 @@ on_error() {
 trap 'on_error "$LINENO" "$BASH_COMMAND" "$?"' ERR
 
 # ---------- Config ----------
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_RUNTIME_ROOT="/home/ubuntu/premium-hub"
+# Backward compatibility: DEPLOY_TARGET_ROOT tetap didukung, tapi runtime root jadi sumber kebenaran.
+RUNTIME_ROOT="${RUNTIME_ROOT:-${DEPLOY_TARGET_ROOT:-${DEFAULT_RUNTIME_ROOT}}}"
 BRANCH="${BRANCH:-main}"
+
+if [[ ! -d "${RUNTIME_ROOT}" ]]; then
+  log_err "Runtime project root tidak ditemukan: ${RUNTIME_ROOT}"
+  log_err "Set env RUNTIME_ROOT=/path/to/premium-hub jika lokasi runtime berbeda"
+  exit 1
+fi
+
+PROJECT_ROOT="$(cd "${RUNTIME_ROOT}" && pwd)"
+
+if [[ "${SCRIPT_ROOT}" != "${PROJECT_ROOT}" ]]; then
+  log_info "Script source: ${SCRIPT_ROOT}"
+  log_info "Deploy target fixed ke runtime: ${PROJECT_ROOT}"
+fi
 
 FRONTEND_DIR="${PROJECT_ROOT}/premiumhub-web"
 BACKEND_DIR="${PROJECT_ROOT}/premiumhub-api"
@@ -228,6 +244,7 @@ command -v systemctl >/dev/null
 command -v awk >/dev/null
 command -v sort >/dev/null
 
+[[ -d "${PROJECT_ROOT}/.git" ]] || { log_err "Runtime root bukan git repository: ${PROJECT_ROOT}"; exit 1; }
 [[ -d "${FRONTEND_DIR}" ]] || { log_err "Frontend dir tidak ditemukan: ${FRONTEND_DIR}"; exit 1; }
 [[ -d "${BACKEND_DIR}" ]] || { log_err "Backend dir tidak ditemukan: ${BACKEND_DIR}"; exit 1; }
 
