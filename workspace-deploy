@@ -28,15 +28,55 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
 log_err()  { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 
-step_start() { log_info "===== $1: START ====="; }
-step_done()  { log_ok   "===== $1: DONE ====="; }
+DEPLOY_START_TS="$(date +%s)"
+CURRENT_STEP_NAME=""
+CURRENT_STEP_START_TS=0
+
+format_duration() {
+  local total_sec="${1:-0}"
+  local h=$((total_sec / 3600))
+  local m=$(((total_sec % 3600) / 60))
+  local s=$((total_sec % 60))
+
+  if ((h > 0)); then
+    printf "%dh %dm %02ds" "${h}" "${m}" "${s}"
+  elif ((m > 0)); then
+    printf "%dm %02ds" "${m}" "${s}"
+  else
+    printf "%ds" "${s}"
+  fi
+}
+
+step_start() {
+  CURRENT_STEP_NAME="$1"
+  CURRENT_STEP_START_TS="$(date +%s)"
+  log_info "===== ${CURRENT_STEP_NAME}: START ====="
+}
+
+step_done() {
+  local step_name="${1:-${CURRENT_STEP_NAME}}"
+  local step_end_ts="$(date +%s)"
+  local step_elapsed=0
+
+  if [[ "${CURRENT_STEP_START_TS}" =~ ^[0-9]+$ ]] && ((CURRENT_STEP_START_TS > 0)); then
+    step_elapsed=$((step_end_ts - CURRENT_STEP_START_TS))
+  fi
+
+  log_ok "===== ${step_name}: DONE ($(format_duration "${step_elapsed}")) ====="
+  CURRENT_STEP_NAME=""
+  CURRENT_STEP_START_TS=0
+}
 
 on_error() {
   local line="$1"
   local cmd="$2"
   local code="$3"
+  local now_ts="$(date +%s)"
+  local total_elapsed=$((now_ts - DEPLOY_START_TS))
+
   log_err "Workspace deploy gagal di line ${line} (exit ${code})"
   log_err "Command: ${cmd}"
+  log_err "Elapsed before failure: $(format_duration "${total_elapsed}")"
   exit "${code}"
 }
 trap 'on_error "$LINENO" "$BASH_COMMAND" "$?"' ERR
@@ -225,4 +265,8 @@ fi
 
 step_done "POST-RESTART HEALTHCHECK"
 
+DEPLOY_END_TS="$(date +%s)"
+DEPLOY_TOTAL_SEC=$((DEPLOY_END_TS - DEPLOY_START_TS))
+
 log_ok "WORKSPACE DEPLOY COMPLETED ✅ (runtime asli tidak disentuh)"
+log_info "Total deploy duration: $(format_duration "${DEPLOY_TOTAL_SEC}")"
