@@ -54,9 +54,9 @@ export default function GaransiPage() {
                 <span className="status-badge s-pending">Pending</span>
               </div>
 
-              <div className="mobile-card-row" style={{ alignItems: 'flex-start' }}>
+              <div className="mobile-card-row">
                 <span className="mobile-card-label">Keluhan</span>
-                <span className="mobile-card-value" style={{ maxWidth: '66%' }}>{c.keluhan}</span>
+                <span className="mobile-card-value">{c.keluhan}</span>
               </div>
               <div className="mobile-card-row">
                 <span className="mobile-card-label">Tanggal klaim</span>

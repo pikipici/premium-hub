@@ -357,7 +357,7 @@ export default function ProdukPage() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari nama / slug produk"
             />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
               <select className="form-select" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
                 <option value="all">Semua Kategori</option>
                 {CATEGORY_OPTIONS.map((opt) => (
@@ -407,7 +407,7 @@ export default function ProdukPage() {
                   <div className="mobile-card-actions">
                     <button className="action-btn" onClick={() => openEdit(p)}>Edit</button>
                     <button className={`action-btn${p.is_active ? '' : ' orange'}`} onClick={() => toggleActive(p)}>
-                      {p.is_active ? 'Off' : 'On'}
+                      {p.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                     </button>
                     <button className="action-btn" style={{ color: 'var(--red)', borderColor: '#FECACA' }} onClick={() => archiveProduct(p)}>
                       Arsip

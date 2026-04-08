@@ -662,11 +662,13 @@ export default function OrderPage() {
                     <span className="mobile-card-value">{formatRupiah(order.total_price || 0)}</span>
                   </div>
 
-                  <div className="mobile-card-row" style={{ alignItems: 'flex-start' }}>
-                    <span className="mobile-card-label">State</span>
-                    <span className="mobile-card-value" style={{ maxWidth: '70%' }}>
-                      pay:{paymentStatusLabel(order.payment_status)} · order:{orderStatusLabel(order.order_status)}
-                    </span>
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Payment</span>
+                    <span className="mobile-card-value">{paymentStatusLabel(order.payment_status)}</span>
+                  </div>
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Order</span>
+                    <span className="mobile-card-value">{orderStatusLabel(order.order_status)}</span>
                   </div>
 
                   <div className="mobile-card-actions">

@@ -72,16 +72,62 @@ export default function AdminStyles() {
       .mobile-card-list { display: flex; flex-direction: column; gap: 8px; }
       .mobile-card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
       .mobile-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-      .mobile-card-title { font-size: 12px; font-weight: 700; color: var(--dark); }
-      .mobile-card-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
-      .mobile-card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 11px; }
-      .mobile-card-label { color: var(--muted); }
-      .mobile-card-value { color: var(--dark); font-weight: 600; text-align: right; }
-      .mobile-card-actions { display: flex; gap: 6px; margin-top: 10px; }
+      .mobile-card-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--dark);
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .mobile-card-sub {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 2px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .mobile-card-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 6px;
+        font-size: 11px;
+      }
+      .mobile-card-label {
+        color: var(--muted);
+        flex: 0 0 84px;
+        min-width: 84px;
+      }
+      .mobile-card-value {
+        color: var(--dark);
+        font-weight: 600;
+        text-align: right;
+        flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .mobile-card-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        margin-top: 10px;
+      }
       .mobile-card-actions .action-btn,
       .mobile-card-actions .g-approve,
       .mobile-card-actions .g-reject,
-      .mobile-card-actions .stok-add-btn { flex: 1; justify-content: center; text-align: center; }
+      .mobile-card-actions .stok-add-btn {
+        width: 100%;
+        min-width: 0;
+        justify-content: center;
+        text-align: center;
+      }
+      .mobile-card-actions > :nth-child(3):last-child {
+        grid-column: 1 / -1;
+      }
 
       .mobile-kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
       .mobile-kpi-card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
