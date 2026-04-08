@@ -34,6 +34,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Transaksi',
     items: [
       { href: '/admin/order', label: 'Order', icon: '◉', badge: '5' },
+      { href: '/admin/convert', label: 'Control Convert', icon: '⇄', badge: '14', badgeClassName: ' yellow' },
       { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌', badge: '2' },
     ],
   },

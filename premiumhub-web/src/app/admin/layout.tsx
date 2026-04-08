@@ -30,6 +30,10 @@ function resolvePageMeta(pathname: string): PageMeta {
     return { title: 'Order', sub: 'Semua transaksi' }
   }
 
+  if (pathname.startsWith('/admin/convert')) {
+    return { title: 'Control Convert', sub: 'Kelola fee, limit, channel, dan queue convert' }
+  }
+
   if (pathname.startsWith('/admin/konversi-pulsa')) {
     return { title: 'Konversi Pulsa', sub: 'Verifikasi dan proses transaksi konversi' }
   }

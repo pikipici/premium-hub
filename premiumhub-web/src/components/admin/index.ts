@@ -9,6 +9,10 @@ import OrderPage from './order-page'
 import GaransiPage from './garansi-page'
 import PenggunaPage from './pengguna-page'
 import PengaturanPage from './pengaturan-page'
+import ConvertControlPage from './convert-control-page'
+import ConvertOrdersPage from './convert-orders-page'
+import ConvertPricingPage from './convert-pricing-page'
+import ConvertLimitsPage from './convert-limits-page'
 
 export {
   AdminStyles,
@@ -22,4 +26,8 @@ export {
   GaransiPage,
   PenggunaPage,
   PengaturanPage,
+  ConvertControlPage,
+  ConvertOrdersPage,
+  ConvertPricingPage,
+  ConvertLimitsPage,
 }

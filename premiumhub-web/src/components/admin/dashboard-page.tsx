@@ -68,6 +68,7 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (page: strin
 
         <div className="mobile-quick-grid">
           <button className="mobile-quick-btn" onClick={() => onNavigate('order')}><strong>Order</strong><span>Kelola transaksi</span></button>
+          <button className="mobile-quick-btn" onClick={() => onNavigate('convert')}><strong>Convert</strong><span>Kontrol fee & queue</span></button>
           <button className="mobile-quick-btn" onClick={() => onNavigate('stok')}><strong>Stok</strong><span>Cek stok kritis</span></button>
           <button className="mobile-quick-btn" onClick={() => onNavigate('garansi')}><strong>Garansi</strong><span>Proses klaim</span></button>
           <button className="mobile-quick-btn" onClick={() => onNavigate('produk')}><strong>Produk</strong><span>Edit katalog</span></button>
