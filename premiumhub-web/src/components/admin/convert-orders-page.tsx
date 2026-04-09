@@ -1,98 +1,21 @@
 "use client"
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Loader2, RefreshCcw } from 'lucide-react'
 
-type ConvertAsset = 'pulsa' | 'paypal' | 'crypto'
-type ConvertStatus = 'pending' | 'review' | 'approved' | 'processing' | 'success' | 'failed'
+import { getHttpErrorMessage } from '@/lib/httpError'
+import { convertService } from '@/services/convertService'
+import type { ConvertAssetType, ConvertOrderStatus, ConvertOrderSummary } from '@/types/convert'
 
-type ConvertOrder = {
-  id: string
-  user: string
-  contact: string
-  asset: ConvertAsset
-  source: string
-  destination: string
-  amount: number
-  receive: number
-  status: ConvertStatus
-  createdAt: string
+type StatusFilter = 'all' | ConvertOrderStatus
+
+type QueueAction = {
+  toStatus: ConvertOrderStatus
+  label: string
 }
 
-const INITIAL_ORDERS: ConvertOrder[] = [
-  {
-    id: 'CVT-92041',
-    user: 'Budi Santoso',
-    contact: 'budi@gmail.com',
-    asset: 'pulsa',
-    source: 'Telkomsel · 0812****112',
-    destination: 'BCA · 1234567890',
-    amount: 150000,
-    receive: 118450,
-    status: 'pending',
-    createdAt: '08 Apr 2026, 20:11',
-  },
-  {
-    id: 'CVT-92040',
-    user: 'Rina Amelia',
-    contact: 'rina@gmail.com',
-    asset: 'paypal',
-    source: 'paypal@rina.com',
-    destination: 'BCA · 9876543211',
-    amount: 500000,
-    receive: 443000,
-    status: 'review',
-    createdAt: '08 Apr 2026, 20:03',
-  },
-  {
-    id: 'CVT-92039',
-    user: 'Dian Putra',
-    contact: 'dian@gmail.com',
-    asset: 'crypto',
-    source: 'USDT TRC20',
-    destination: 'BRI · 0011223344',
-    amount: 2000000,
-    receive: 1824500,
-    status: 'processing',
-    createdAt: '08 Apr 2026, 19:59',
-  },
-  {
-    id: 'CVT-92038',
-    user: 'Sari Wulan',
-    contact: 'sari@gmail.com',
-    asset: 'pulsa',
-    source: 'XL · 0877****892',
-    destination: 'Mandiri · 7788990011',
-    amount: 100000,
-    receive: 77500,
-    status: 'approved',
-    createdAt: '08 Apr 2026, 19:51',
-  },
-  {
-    id: 'CVT-92037',
-    user: 'Andi Pratama',
-    contact: 'andi@gmail.com',
-    asset: 'crypto',
-    source: 'BTC Network',
-    destination: 'BNI · 4455667788',
-    amount: 3500000,
-    receive: 3221000,
-    status: 'success',
-    createdAt: '08 Apr 2026, 19:36',
-  },
-  {
-    id: 'CVT-92036',
-    user: 'Maya Puspita',
-    contact: 'maya@gmail.com',
-    asset: 'paypal',
-    source: 'maya.paypal@mail.com',
-    destination: 'BCA · 1100223344',
-    amount: 750000,
-    receive: 0,
-    status: 'failed',
-    createdAt: '08 Apr 2026, 19:22',
-  },
-]
+const PAGE_SIZE = 20
 
 function formatRupiah(value: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -102,70 +25,145 @@ function formatRupiah(value: number) {
   }).format(value)
 }
 
-function assetLabel(asset: ConvertAsset) {
+function formatDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}
+
+function assetLabel(asset: ConvertAssetType) {
   if (asset === 'pulsa') return 'Pulsa'
   if (asset === 'paypal') return 'PayPal'
   return 'Crypto'
 }
 
-function statusMeta(status: ConvertStatus) {
-  if (status === 'pending') return { label: 'Pending', className: 's-pending' }
-  if (status === 'review') return { label: 'Review', className: 's-proses' }
-  if (status === 'approved') return { label: 'Approved', className: 's-lunas' }
+function statusMeta(status: ConvertOrderStatus) {
+  if (status === 'pending_transfer') return { label: 'Pending Transfer', className: 's-pending' }
+  if (status === 'waiting_review') return { label: 'Waiting Review', className: 's-proses' }
+  if (status === 'approved') return { label: 'Approved', className: 's-proses' }
   if (status === 'processing') return { label: 'Diproses', className: 's-proses' }
   if (status === 'success') return { label: 'Sukses', className: 's-lunas' }
-  return { label: 'Gagal', className: 's-gagal' }
+  if (status === 'failed') return { label: 'Gagal', className: 's-gagal' }
+  if (status === 'expired') return { label: 'Expired', className: 's-gagal' }
+  return { label: 'Canceled', className: 's-gagal' }
+}
+
+function availableActions(status: ConvertOrderStatus): QueueAction[] {
+  if (status === 'pending_transfer') {
+    return [{ toStatus: 'waiting_review', label: 'Set Review' }]
+  }
+  if (status === 'waiting_review') {
+    return [
+      { toStatus: 'approved', label: 'Approve' },
+      { toStatus: 'failed', label: 'Gagalkan' },
+    ]
+  }
+  if (status === 'approved') {
+    return [
+      { toStatus: 'processing', label: 'Proses' },
+      { toStatus: 'failed', label: 'Gagalkan' },
+    ]
+  }
+  if (status === 'processing') {
+    return [
+      { toStatus: 'success', label: 'Sukseskan' },
+      { toStatus: 'failed', label: 'Gagalkan' },
+    ]
+  }
+  return []
 }
 
 export default function ConvertOrdersPage() {
-  const [orders, setOrders] = useState<ConvertOrder[]>(INITIAL_ORDERS)
+  const [orders, setOrders] = useState<ConvertOrderSummary[]>([])
   const [search, setSearch] = useState('')
-  const [assetFilter, setAssetFilter] = useState<'all' | ConvertAsset>('all')
-  const [statusFilter, setStatusFilter] = useState<'all' | ConvertStatus>('all')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [assetFilter, setAssetFilter] = useState<'all' | ConvertAssetType>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [actingKey, setActingKey] = useState('')
 
-  const filteredOrders = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
 
-    return orders.filter((item) => {
-      if (assetFilter !== 'all' && item.asset !== assetFilter) return false
-      if (statusFilter !== 'all' && item.status !== statusFilter) return false
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+    }, 350)
 
-      if (!keyword) return true
+    return () => window.clearTimeout(timer)
+  }, [search])
 
-      const haystack = [
-        item.id,
-        item.user,
-        item.contact,
-        item.source,
-        item.destination,
-        assetLabel(item.asset),
-      ]
-        .join(' ')
-        .toLowerCase()
+  useEffect(() => {
+    setPage(1)
+  }, [assetFilter, statusFilter, debouncedSearch])
 
-      return haystack.includes(keyword)
-    })
-  }, [orders, search, assetFilter, statusFilter])
+  const loadOrders = useCallback(async (silent = false) => {
+    if (silent) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+    }
 
-  const runAction = (orderID: string, action: 'approve' | 'process') => {
-    setOrders((prev) =>
-      prev.map((item) => {
-        if (item.id !== orderID) return item
+    setError('')
 
-        if (action === 'approve' && (item.status === 'pending' || item.status === 'review')) {
-          return { ...item, status: 'approved' }
-        }
-
-        if (action === 'process' && item.status === 'approved') {
-          return { ...item, status: 'processing' }
-        }
-
-        return item
+    try {
+      const res = await convertService.adminListOrders({
+        page,
+        limit: PAGE_SIZE,
+        asset_type: assetFilter === 'all' ? undefined : assetFilter,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        q: debouncedSearch || undefined,
       })
-    )
 
-    setNotice(action === 'approve' ? `Order ${orderID} di-approve.` : `Order ${orderID} dipindahkan ke proses.`)
+      if (!res.success) {
+        setError(res.message || 'Gagal memuat queue convert')
+        return
+      }
+
+      setOrders(res.data)
+      setTotal(res.meta?.total ?? res.data.length)
+    } catch (err: unknown) {
+      setError(getHttpErrorMessage(err, 'Gagal memuat queue convert'))
+    } finally {
+      if (silent) {
+        setRefreshing(false)
+      } else {
+        setLoading(false)
+      }
+    }
+  }, [assetFilter, debouncedSearch, page, statusFilter])
+
+  useEffect(() => {
+    void loadOrders(false)
+  }, [loadOrders])
+
+  const runAction = async (order: ConvertOrderSummary, action: QueueAction) => {
+    const key = `${order.id}:${action.toStatus}`
+    setActingKey(key)
+    setError('')
+
+    try {
+      const res = await convertService.adminUpdateOrderStatus(order.id, {
+        to_status: action.toStatus,
+        reason: `Admin action: ${action.label}`,
+      })
+
+      if (!res.success) {
+        setError(res.message || 'Gagal update status order convert')
+        return
+      }
+
+      setNotice(`Order ${order.id} berhasil di-update ke status ${action.toStatus}.`)
+      await loadOrders(true)
+    } catch (err: unknown) {
+      setError(getHttpErrorMessage(err, 'Gagal update status order convert'))
+    } finally {
+      setActingKey('')
+    }
   }
 
   return (
@@ -177,6 +175,19 @@ export default function ConvertOrdersPage() {
             className="link-btn"
             style={{ marginLeft: 'auto', color: 'inherit' }}
             onClick={() => setNotice('')}
+          >
+            tutup
+          </button>
+        </div>
+      )}
+
+      {!!error && (
+        <div className="alert-bar" style={{ marginBottom: 12, background: '#FEECEC', borderColor: '#F7C6C6', color: '#B42318' }}>
+          ⚠️ <strong>{error}</strong>
+          <button
+            className="link-btn"
+            style={{ marginLeft: 'auto', color: 'inherit' }}
+            onClick={() => setError('')}
           >
             tutup
           </button>
@@ -214,7 +225,7 @@ export default function ConvertOrdersPage() {
 
             <select
               value={assetFilter}
-              onChange={(event) => setAssetFilter(event.target.value as 'all' | ConvertAsset)}
+              onChange={(event) => setAssetFilter(event.target.value as 'all' | ConvertAssetType)}
               style={{
                 fontFamily: 'inherit',
                 fontSize: 13,
@@ -233,7 +244,7 @@ export default function ConvertOrdersPage() {
 
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as 'all' | ConvertStatus)}
+              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
               style={{
                 fontFamily: 'inherit',
                 fontSize: 13,
@@ -245,16 +256,34 @@ export default function ConvertOrdersPage() {
               }}
             >
               <option value="all">Semua Status</option>
-              <option value="pending">Pending</option>
-              <option value="review">Review</option>
+              <option value="pending_transfer">Pending Transfer</option>
+              <option value="waiting_review">Waiting Review</option>
               <option value="approved">Approved</option>
               <option value="processing">Diproses</option>
               <option value="success">Sukses</option>
               <option value="failed">Gagal</option>
+              <option value="expired">Expired</option>
+              <option value="canceled">Canceled</option>
             </select>
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => void loadOrders(true)}
+              className="topbar-btn"
+              disabled={loading || refreshing}
+            >
+              {refreshing ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Loader2 size={14} className="animate-spin" /> Refreshing
+                </span>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <RefreshCcw size={14} /> Refresh
+                </span>
+              )}
+            </button>
             <Link href="/admin/convert" className="topbar-btn">Overview</Link>
             <Link href="/admin/convert/pricing" className="topbar-btn">Pricing</Link>
             <Link href="/admin/convert/limits" className="topbar-btn">Limits</Link>
@@ -265,7 +294,7 @@ export default function ConvertOrdersPage() {
           <div className="card-header">
             <h2>Queue Order Convert</h2>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Total: <strong style={{ color: 'var(--dark)' }}>{filteredOrders.length}</strong> order
+              Total: <strong style={{ color: 'var(--dark)' }}>{total}</strong> order
             </div>
           </div>
 
@@ -283,55 +312,81 @@ export default function ConvertOrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <Loader2 size={14} className="animate-spin" /> Memuat queue convert...
+                      </span>
+                    </td>
+                  </tr>
+                ) : orders.length === 0 ? (
                   <tr>
                     <td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
                       Tidak ada order untuk filter saat ini.
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order) => {
+                  orders.map((order) => {
                     const status = statusMeta(order.status)
+                    const actions = availableActions(order.status)
 
                     return (
                       <tr key={order.id}>
                         <td>
                           <div className="order-id">{order.id}</div>
-                          <div className="order-email">{order.createdAt}</div>
+                          <div className="order-email">{formatDate(order.created_at)}</div>
                         </td>
                         <td>
-                          <div className="order-buyer">{order.user}</div>
-                          <div className="order-email">{order.contact}</div>
+                          <div className="order-buyer">{order.user_name || 'User'}</div>
+                          <div className="order-email">{order.user_email || order.user_id}</div>
                         </td>
                         <td>
-                          <span className="product-pill">{assetLabel(order.asset)}</span>
-                          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>{order.source}</div>
+                          <span className="product-pill">{assetLabel(order.asset_type)}</span>
+                          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
+                            {order.source_channel} · {order.source_account}
+                          </div>
                         </td>
                         <td>
-                          <div style={{ fontWeight: 700, color: 'var(--dark)' }}>{formatRupiah(order.amount)}</div>
-                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>Terima: {formatRupiah(order.receive)}</div>
+                          <div style={{ fontWeight: 700, color: 'var(--dark)' }}>{formatRupiah(order.source_amount)}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>Terima: {formatRupiah(order.receive_amount)}</div>
                         </td>
-                        <td style={{ maxWidth: 180 }}>
-                          <span style={{ fontSize: 12, color: 'var(--dark)' }}>{order.destination}</span>
+                        <td style={{ maxWidth: 220 }}>
+                          <span style={{ fontSize: 12, color: 'var(--dark)' }}>
+                            {order.destination_bank} · {order.destination_account_number}
+                          </span>
                         </td>
                         <td>
                           <span className={`status-badge ${status.className}`}>{status.label}</span>
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <button className="action-btn">Detail</button>
-
-                            {(order.status === 'pending' || order.status === 'review') && (
-                              <button className="action-btn orange" onClick={() => runAction(order.id, 'approve')}>
-                                Approve
-                              </button>
+                            {order.tracking_token ? (
+                              <Link
+                                className="action-btn"
+                                href={`/product/convert/track/${encodeURIComponent(order.tracking_token)}`}
+                                target="_blank"
+                              >
+                                Detail
+                              </Link>
+                            ) : (
+                              <button className="action-btn" disabled>Detail</button>
                             )}
 
-                            {order.status === 'approved' && (
-                              <button className="action-btn orange" onClick={() => runAction(order.id, 'process')}>
-                                Proses
-                              </button>
-                            )}
+                            {actions.map((action) => {
+                              const key = `${order.id}:${action.toStatus}`
+                              const acting = actingKey === key
+                              return (
+                                <button
+                                  key={key}
+                                  className="action-btn orange"
+                                  onClick={() => void runAction(order, action)}
+                                  disabled={!!actingKey}
+                                >
+                                  {acting ? '...' : action.label}
+                                </button>
+                              )
+                            })}
                           </div>
                         </td>
                       </tr>
@@ -342,6 +397,16 @@ export default function ConvertOrdersPage() {
             </table>
           </div>
         </div>
+
+        {!loading && total > 0 ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Page {page} / {totalPages}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="topbar-btn" disabled={page <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>Prev</button>
+              <button className="topbar-btn" disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>Next</button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="admin-mobile-only">
@@ -350,7 +415,12 @@ export default function ConvertOrdersPage() {
             <div className="mobile-page-title">Queue Convert</div>
             <div className="mobile-page-subtitle">Pantau order per aset</div>
           </div>
-          <Link href="/admin/convert" className="mobile-chip-btn">Overview</Link>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" onClick={() => void loadOrders(true)} className="mobile-chip-btn" disabled={loading || refreshing}>
+              {refreshing ? '...' : 'Refresh'}
+            </button>
+            <Link href="/admin/convert" className="mobile-chip-btn">Overview</Link>
+          </div>
         </div>
 
         <div className="mobile-card" style={{ marginBottom: 8 }}>
@@ -364,80 +434,98 @@ export default function ConvertOrdersPage() {
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
-              <select className="form-select" value={assetFilter} onChange={(event) => setAssetFilter(event.target.value as 'all' | ConvertAsset)}>
+              <select className="form-select" value={assetFilter} onChange={(event) => setAssetFilter(event.target.value as 'all' | ConvertAssetType)}>
                 <option value="all">Semua Aset</option>
                 <option value="pulsa">Pulsa</option>
                 <option value="paypal">PayPal</option>
                 <option value="crypto">Crypto</option>
               </select>
 
-              <select className="form-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | ConvertStatus)}>
+              <select className="form-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
                 <option value="all">Semua Status</option>
-                <option value="pending">Pending</option>
-                <option value="review">Review</option>
+                <option value="pending_transfer">Pending Transfer</option>
+                <option value="waiting_review">Waiting Review</option>
                 <option value="approved">Approved</option>
                 <option value="processing">Diproses</option>
                 <option value="success">Sukses</option>
                 <option value="failed">Gagal</option>
+                <option value="expired">Expired</option>
+                <option value="canceled">Canceled</option>
               </select>
             </div>
           </div>
         </div>
 
         <div className="mobile-card-list">
-          {filteredOrders.length === 0 ? (
+          {loading ? (
+            <article className="mobile-card">
+              <div className="mobile-card-sub" style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                <Loader2 size={14} className="animate-spin" /> Memuat queue convert...
+              </div>
+            </article>
+          ) : orders.length === 0 ? (
             <article className="mobile-card">
               <div className="mobile-card-sub">Tidak ada order untuk filter ini.</div>
             </article>
           ) : (
-            filteredOrders.map((order) => {
+            orders.map((order) => {
               const status = statusMeta(order.status)
+              const actions = availableActions(order.status)
 
               return (
                 <article className="mobile-card" key={order.id}>
                   <div className="mobile-card-head">
                     <div>
-                      <div className="mobile-card-title">{order.id} · {order.user}</div>
-                      <div className="mobile-card-sub">{order.contact}</div>
+                      <div className="mobile-card-title">{order.id} · {order.user_name || 'User'}</div>
+                      <div className="mobile-card-sub">{order.user_email || order.user_id}</div>
                     </div>
                     <span className={`status-badge ${status.className}`}>{status.label}</span>
                   </div>
 
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Aset</span>
-                    <span className="mobile-card-value">{assetLabel(order.asset)}</span>
+                    <span className="mobile-card-value">{assetLabel(order.asset_type)}</span>
                   </div>
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Sumber</span>
-                    <span className="mobile-card-value">{order.source}</span>
+                    <span className="mobile-card-value">{order.source_channel} · {order.source_account}</span>
                   </div>
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Tujuan</span>
-                    <span className="mobile-card-value">{order.destination}</span>
+                    <span className="mobile-card-value">{order.destination_bank} · {order.destination_account_number}</span>
                   </div>
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Nominal</span>
-                    <span className="mobile-card-value">{formatRupiah(order.amount)}</span>
+                    <span className="mobile-card-value">{formatRupiah(order.source_amount)}</span>
                   </div>
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Terima</span>
-                    <span className="mobile-card-value">{formatRupiah(order.receive)}</span>
+                    <span className="mobile-card-value">{formatRupiah(order.receive_amount)}</span>
                   </div>
 
                   <div className="mobile-card-actions">
-                    <button className="action-btn">Detail</button>
-
-                    {(order.status === 'pending' || order.status === 'review') && (
-                      <button className="action-btn orange" onClick={() => runAction(order.id, 'approve')}>
-                        Approve
-                      </button>
+                    {order.tracking_token ? (
+                      <Link className="action-btn" href={`/product/convert/track/${encodeURIComponent(order.tracking_token)}`} target="_blank">
+                        Detail
+                      </Link>
+                    ) : (
+                      <button className="action-btn" disabled>Detail</button>
                     )}
 
-                    {order.status === 'approved' && (
-                      <button className="action-btn orange" onClick={() => runAction(order.id, 'process')}>
-                        Proses
-                      </button>
-                    )}
+                    {actions.map((action) => {
+                      const key = `${order.id}:${action.toStatus}`
+                      const acting = actingKey === key
+                      return (
+                        <button
+                          key={key}
+                          className="action-btn orange"
+                          onClick={() => void runAction(order, action)}
+                          disabled={!!actingKey}
+                        >
+                          {acting ? '...' : action.label}
+                        </button>
+                      )
+                    })}
                   </div>
                 </article>
               )

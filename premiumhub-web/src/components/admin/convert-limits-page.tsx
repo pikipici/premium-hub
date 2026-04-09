@@ -1,65 +1,14 @@
 "use client"
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Loader2, RefreshCcw } from 'lucide-react'
 
-type AssetLimit = {
-  asset: 'pulsa' | 'paypal' | 'crypto'
-  label: string
-  allowGuest: boolean
-  requireLogin: boolean
-  minAmount: number
-  maxAmount: number
-  dailyLimit: number
-  manualReviewThreshold: number
-}
+import { getHttpErrorMessage } from '@/lib/httpError'
+import { convertService } from '@/services/convertService'
+import type { ConvertAssetType, ConvertLimitRule } from '@/types/convert'
 
-type RiskSettings = {
-  velocityPerHour: number
-  maxFailedAttempt: number
-  blockDurationMinutes: number
-  autoHoldHighRisk: boolean
-}
-
-const INITIAL_LIMITS: AssetLimit[] = [
-  {
-    asset: 'pulsa',
-    label: 'Pulsa',
-    allowGuest: true,
-    requireLogin: false,
-    minAmount: 10000,
-    maxAmount: 1000000,
-    dailyLimit: 5000000,
-    manualReviewThreshold: 1000000,
-  },
-  {
-    asset: 'paypal',
-    label: 'PayPal',
-    allowGuest: false,
-    requireLogin: true,
-    minAmount: 50000,
-    maxAmount: 50000000,
-    dailyLimit: 100000000,
-    manualReviewThreshold: 10000000,
-  },
-  {
-    asset: 'crypto',
-    label: 'Crypto',
-    allowGuest: false,
-    requireLogin: true,
-    minAmount: 100000,
-    maxAmount: 100000000,
-    dailyLimit: 300000000,
-    manualReviewThreshold: 15000000,
-  },
-]
-
-const INITIAL_RISK: RiskSettings = {
-  velocityPerHour: 12,
-  maxFailedAttempt: 3,
-  blockDurationMinutes: 30,
-  autoHoldHighRisk: true,
-}
+const ASSET_ORDER: ConvertAssetType[] = ['pulsa', 'paypal', 'crypto']
 
 function formatRupiah(value: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -69,21 +18,75 @@ function formatRupiah(value: number) {
   }).format(value)
 }
 
-export default function ConvertLimitsPage() {
-  const [limits, setLimits] = useState<AssetLimit[]>(INITIAL_LIMITS)
-  const [risk, setRisk] = useState<RiskSettings>(INITIAL_RISK)
-  const [notice, setNotice] = useState('')
+function assetLabel(asset: ConvertAssetType) {
+  if (asset === 'pulsa') return 'Pulsa'
+  if (asset === 'paypal') return 'PayPal'
+  return 'Crypto'
+}
 
-  const updateLimit = <K extends keyof AssetLimit>(index: number, key: K, value: AssetLimit[K]) => {
+function sortRules(rows: ConvertLimitRule[]) {
+  return [...rows].sort((a, b) => ASSET_ORDER.indexOf(a.asset_type) - ASSET_ORDER.indexOf(b.asset_type))
+}
+
+export default function ConvertLimitsPage() {
+  const [limits, setLimits] = useState<ConvertLimitRule[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+
+  const loadLimits = useCallback(async (silent = false) => {
+    if (silent) setRefreshing(true)
+    else setLoading(true)
+
+    setError('')
+
+    try {
+      const res = await convertService.adminGetLimitRules()
+      if (!res.success) {
+        setError(res.message || 'Gagal memuat limit convert')
+        return
+      }
+      setLimits(sortRules(res.data))
+    } catch (err: unknown) {
+      setError(getHttpErrorMessage(err, 'Gagal memuat limit convert'))
+    } finally {
+      if (silent) setRefreshing(false)
+      else setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadLimits(false)
+  }, [loadLimits])
+
+  const hasLimits = useMemo(() => limits.length > 0, [limits.length])
+
+  const updateLimit = <K extends keyof ConvertLimitRule>(index: number, key: K, value: ConvertLimitRule[K]) => {
     setLimits((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)))
   }
 
-  const updateRisk = <K extends keyof RiskSettings>(key: K, value: RiskSettings[K]) => {
-    setRisk((prev) => ({ ...prev, [key]: value }))
-  }
+  const saveLimits = async () => {
+    if (!hasLimits || saving) return
 
-  const saveLimits = () => {
-    setNotice('Konfigurasi limit & akses convert berhasil disimpan.')
+    setSaving(true)
+    setError('')
+
+    try {
+      const res = await convertService.adminUpdateLimitRules(limits)
+      if (!res.success) {
+        setError(res.message || 'Gagal menyimpan limit convert')
+        return
+      }
+
+      setLimits(sortRules(res.data))
+      setNotice('Konfigurasi limit & akses convert berhasil disimpan.')
+    } catch (err: unknown) {
+      setError(getHttpErrorMessage(err, 'Gagal menyimpan limit convert'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -101,11 +104,35 @@ export default function ConvertLimitsPage() {
         </div>
       )}
 
+      {!!error && (
+        <div className="alert-bar" style={{ marginBottom: 12, background: '#FEECEC', borderColor: '#F7C6C6', color: '#B42318' }}>
+          ⚠️ <strong>{error}</strong>
+          <button
+            className="link-btn"
+            style={{ marginLeft: 'auto', color: 'inherit' }}
+            onClick={() => setError('')}
+          >
+            tutup
+          </button>
+        </div>
+      )}
+
       <div className="admin-desktop-only">
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-header">
             <h2>Limits & Access per Aset</h2>
             <div className="card-header-right" style={{ display: 'flex', gap: 8 }}>
+              <button className="topbar-btn" onClick={() => void loadLimits(true)} disabled={loading || refreshing}>
+                {refreshing ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Loader2 size={14} className="animate-spin" /> Refreshing
+                  </span>
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <RefreshCcw size={14} /> Refresh
+                  </span>
+                )}
+              </button>
               <Link href="/admin/convert" className="topbar-btn">Overview</Link>
               <Link href="/admin/convert/orders" className="topbar-btn">Queue</Link>
               <Link href="/admin/convert/pricing" className="topbar-btn">Pricing</Link>
@@ -113,151 +140,134 @@ export default function ConvertLimitsPage() {
           </div>
 
           <div style={{ padding: 16, display: 'grid', gap: 10 }}>
-            {limits.map((item, index) => (
-              <div
-                key={item.asset}
-                style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: 12,
-                  padding: 12,
-                  background: 'var(--white)',
-                }}
-              >
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dark)' }}>{item.label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                    Min {formatRupiah(item.minAmount)} · Max {formatRupiah(item.maxAmount)} · Daily {formatRupiah(item.dailyLimit)}
-                  </div>
-                </div>
-
-                <div className="form-row-2" style={{ marginBottom: 8 }}>
-                  <label className="toggle-wrap">
-                    <span className="toggle">
-                      <input
-                        type="checkbox"
-                        checked={item.allowGuest}
-                        onChange={(event) => updateLimit(index, 'allowGuest', event.target.checked)}
-                      />
-                      <span className="toggle-slider" />
-                    </span>
-                    <span className="toggle-label">Guest boleh transaksi</span>
-                  </label>
-
-                  <label className="toggle-wrap">
-                    <span className="toggle">
-                      <input
-                        type="checkbox"
-                        checked={item.requireLogin}
-                        onChange={(event) => updateLimit(index, 'requireLogin', event.target.checked)}
-                      />
-                      <span className="toggle-slider" />
-                    </span>
-                    <span className="toggle-label">Wajib login</span>
-                  </label>
-                </div>
-
-                <div className="form-row-2">
-                  <div className="form-field">
-                    <label className="form-label">Minimal transaksi</label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      value={item.minAmount}
-                      onChange={(event) => updateLimit(index, 'minAmount', Number(event.target.value) || 0)}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label className="form-label">Maksimal transaksi</label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      value={item.maxAmount}
-                      onChange={(event) => updateLimit(index, 'maxAmount', Number(event.target.value) || 0)}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row-2" style={{ marginTop: 8 }}>
-                  <div className="form-field">
-                    <label className="form-label">Limit harian per user</label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      value={item.dailyLimit}
-                      onChange={(event) => updateLimit(index, 'dailyLimit', Number(event.target.value) || 0)}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label className="form-label">Manual review threshold</label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      value={item.manualReviewThreshold}
-                      onChange={(event) => updateLimit(index, 'manualReviewThreshold', Number(event.target.value) || 0)}
-                    />
-                  </div>
-                </div>
+            {loading ? (
+              <div style={{ fontSize: 13, color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Loader2 size={14} className="animate-spin" /> Memuat limit convert...
               </div>
-            ))}
+            ) : limits.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada limit convert.</div>
+            ) : (
+              limits.map((item, index) => (
+                <div
+                  key={item.asset_type}
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: 12,
+                    padding: 12,
+                    background: 'var(--white)',
+                  }}
+                >
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--dark)' }}>{assetLabel(item.asset_type)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      Min {formatRupiah(item.min_amount)} · Max {formatRupiah(item.max_amount)} · Daily {formatRupiah(item.daily_limit)}
+                    </div>
+                  </div>
+
+                  <div className="form-row-2" style={{ marginBottom: 8 }}>
+                    <label className="toggle-wrap">
+                      <span className="toggle">
+                        <input
+                          type="checkbox"
+                          checked={item.enabled}
+                          onChange={(event) => updateLimit(index, 'enabled', event.target.checked)}
+                        />
+                        <span className="toggle-slider" />
+                      </span>
+                      <span className="toggle-label">Channel aktif</span>
+                    </label>
+
+                    <label className="toggle-wrap">
+                      <span className="toggle">
+                        <input
+                          type="checkbox"
+                          checked={item.allow_guest}
+                          onChange={(event) => updateLimit(index, 'allow_guest', event.target.checked)}
+                        />
+                        <span className="toggle-slider" />
+                      </span>
+                      <span className="toggle-label">Guest boleh transaksi</span>
+                    </label>
+                  </div>
+
+                  <div className="form-row-2" style={{ marginBottom: 8 }}>
+                    <label className="toggle-wrap">
+                      <span className="toggle">
+                        <input
+                          type="checkbox"
+                          checked={item.require_login}
+                          onChange={(event) => updateLimit(index, 'require_login', event.target.checked)}
+                        />
+                        <span className="toggle-slider" />
+                      </span>
+                      <span className="toggle-label">Wajib login</span>
+                    </label>
+                  </div>
+
+                  <div className="form-row-2">
+                    <div className="form-field">
+                      <label className="form-label">Minimal transaksi</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        value={item.min_amount}
+                        onChange={(event) => updateLimit(index, 'min_amount', Number(event.target.value) || 0)}
+                      />
+                    </div>
+
+                    <div className="form-field">
+                      <label className="form-label">Maksimal transaksi</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        value={item.max_amount}
+                        onChange={(event) => updateLimit(index, 'max_amount', Number(event.target.value) || 0)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row-2" style={{ marginTop: 8 }}>
+                    <div className="form-field">
+                      <label className="form-label">Limit harian per user</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        value={item.daily_limit}
+                        onChange={(event) => updateLimit(index, 'daily_limit', Number(event.target.value) || 0)}
+                      />
+                    </div>
+
+                    <div className="form-field">
+                      <label className="form-label">Manual review threshold</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        value={item.manual_review_threshold}
+                        onChange={(event) => updateLimit(index, 'manual_review_threshold', Number(event.target.value) || 0)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-header">
-            <h2>Risk Guardrails (Global)</h2>
+            <h2>Risk Guardrails (Informasi)</h2>
           </div>
 
-          <div style={{ padding: 16 }}>
-            <div className="form-row-3">
-              <div className="form-field">
-                <label className="form-label">Velocity / jam</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={risk.velocityPerHour}
-                  onChange={(event) => updateRisk('velocityPerHour', Number(event.target.value) || 0)}
-                />
-              </div>
-
-              <div className="form-field">
-                <label className="form-label">Max gagal berturut</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={risk.maxFailedAttempt}
-                  onChange={(event) => updateRisk('maxFailedAttempt', Number(event.target.value) || 0)}
-                />
-              </div>
-
-              <div className="form-field">
-                <label className="form-label">Block duration (menit)</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={risk.blockDurationMinutes}
-                  onChange={(event) => updateRisk('blockDurationMinutes', Number(event.target.value) || 0)}
-                />
-              </div>
-            </div>
-
-            <label className="toggle-wrap" style={{ marginTop: 10 }}>
-              <span className="toggle">
-                <input
-                  type="checkbox"
-                  checked={risk.autoHoldHighRisk}
-                  onChange={(event) => updateRisk('autoHoldHighRisk', event.target.checked)}
-                />
-                <span className="toggle-slider" />
-              </span>
-              <span className="toggle-label">Auto hold untuk order high risk</span>
-            </label>
+          <div style={{ padding: 16, fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+            Konfigurasi risk guardrails global (velocity, auto-hold, dan anti abuse lanjutan) dipisah ke phase 4.
+            Di phase 3 ini fokus utama adalah wiring limits & access yang sudah tersedia di backend convert.
           </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="topbar-btn primary" onClick={saveLimits}>Simpan Konfigurasi</button>
+          <button className="topbar-btn primary" onClick={() => void saveLimits()} disabled={!hasLimits || loading || saving}>
+            {saving ? 'Menyimpan...' : 'Simpan Konfigurasi'}
+          </button>
         </div>
       </div>
 
@@ -265,18 +275,31 @@ export default function ConvertLimitsPage() {
         <div className="mobile-page-head">
           <div>
             <div className="mobile-page-title">Limits & Access</div>
-            <div className="mobile-page-subtitle">Rule guest, login, dan threshold risiko</div>
+            <div className="mobile-page-subtitle">Rule guest, login, dan threshold transaksi</div>
           </div>
-          <Link href="/admin/convert" className="mobile-chip-btn">Overview</Link>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="mobile-chip-btn" onClick={() => void loadLimits(true)} disabled={loading || refreshing}>
+              {refreshing ? '...' : 'Refresh'}
+            </button>
+            <Link href="/admin/convert" className="mobile-chip-btn">Overview</Link>
+          </div>
         </div>
+
+        {loading ? (
+          <article className="mobile-card" style={{ marginBottom: 8 }}>
+            <div className="mobile-card-sub" style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+              <Loader2 size={14} className="animate-spin" /> Memuat limit convert...
+            </div>
+          </article>
+        ) : null}
 
         <div className="mobile-card-list">
           {limits.map((item, index) => (
-            <article className="mobile-card" key={item.asset}>
+            <article className="mobile-card" key={item.asset_type}>
               <div className="mobile-card-head">
                 <div>
-                  <div className="mobile-card-title">{item.label}</div>
-                  <div className="mobile-card-sub">Min {formatRupiah(item.minAmount)} · Max {formatRupiah(item.maxAmount)}</div>
+                  <div className="mobile-card-title">{assetLabel(item.asset_type)}</div>
+                  <div className="mobile-card-sub">Min {formatRupiah(item.min_amount)} · Max {formatRupiah(item.max_amount)}</div>
                 </div>
               </div>
 
@@ -284,8 +307,20 @@ export default function ConvertLimitsPage() {
                 <span className="toggle">
                   <input
                     type="checkbox"
-                    checked={item.allowGuest}
-                    onChange={(event) => updateLimit(index, 'allowGuest', event.target.checked)}
+                    checked={item.enabled}
+                    onChange={(event) => updateLimit(index, 'enabled', event.target.checked)}
+                  />
+                  <span className="toggle-slider" />
+                </span>
+                <span className="toggle-label">Channel aktif</span>
+              </label>
+
+              <label className="toggle-wrap" style={{ marginBottom: 8 }}>
+                <span className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={item.allow_guest}
+                    onChange={(event) => updateLimit(index, 'allow_guest', event.target.checked)}
                   />
                   <span className="toggle-slider" />
                 </span>
@@ -296,8 +331,8 @@ export default function ConvertLimitsPage() {
                 <span className="toggle">
                   <input
                     type="checkbox"
-                    checked={item.requireLogin}
-                    onChange={(event) => updateLimit(index, 'requireLogin', event.target.checked)}
+                    checked={item.require_login}
+                    onChange={(event) => updateLimit(index, 'require_login', event.target.checked)}
                   />
                   <span className="toggle-slider" />
                 </span>
@@ -308,29 +343,29 @@ export default function ConvertLimitsPage() {
                 <input
                   className="form-input"
                   type="number"
-                  value={item.minAmount}
-                  onChange={(event) => updateLimit(index, 'minAmount', Number(event.target.value) || 0)}
+                  value={item.min_amount}
+                  onChange={(event) => updateLimit(index, 'min_amount', Number(event.target.value) || 0)}
                   placeholder="Minimal transaksi"
                 />
                 <input
                   className="form-input"
                   type="number"
-                  value={item.maxAmount}
-                  onChange={(event) => updateLimit(index, 'maxAmount', Number(event.target.value) || 0)}
+                  value={item.max_amount}
+                  onChange={(event) => updateLimit(index, 'max_amount', Number(event.target.value) || 0)}
                   placeholder="Maksimal transaksi"
                 />
                 <input
                   className="form-input"
                   type="number"
-                  value={item.dailyLimit}
-                  onChange={(event) => updateLimit(index, 'dailyLimit', Number(event.target.value) || 0)}
+                  value={item.daily_limit}
+                  onChange={(event) => updateLimit(index, 'daily_limit', Number(event.target.value) || 0)}
                   placeholder="Limit harian"
                 />
                 <input
                   className="form-input"
                   type="number"
-                  value={item.manualReviewThreshold}
-                  onChange={(event) => updateLimit(index, 'manualReviewThreshold', Number(event.target.value) || 0)}
+                  value={item.manual_review_threshold}
+                  onChange={(event) => updateLimit(index, 'manual_review_threshold', Number(event.target.value) || 0)}
                   placeholder="Manual review threshold"
                 />
               </div>
@@ -338,50 +373,18 @@ export default function ConvertLimitsPage() {
           ))}
 
           <article className="mobile-card">
-            <div className="mobile-card-title">Risk Guardrails</div>
-            <div className="mobile-card-sub">Konfigurasi global anti abuse</div>
-
-            <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-              <input
-                className="form-input"
-                type="number"
-                value={risk.velocityPerHour}
-                onChange={(event) => updateRisk('velocityPerHour', Number(event.target.value) || 0)}
-                placeholder="Velocity per jam"
-              />
-              <input
-                className="form-input"
-                type="number"
-                value={risk.maxFailedAttempt}
-                onChange={(event) => updateRisk('maxFailedAttempt', Number(event.target.value) || 0)}
-                placeholder="Max gagal berturut"
-              />
-              <input
-                className="form-input"
-                type="number"
-                value={risk.blockDurationMinutes}
-                onChange={(event) => updateRisk('blockDurationMinutes', Number(event.target.value) || 0)}
-                placeholder="Block duration (menit)"
-              />
+            <div className="mobile-card-title">Risk Guardrails (Info)</div>
+            <div className="mobile-card-sub">
+              Pengaturan risk guardrails global dipisah ke phase 4. Phase 3 fokus limit & akses convert yang sudah live.
             </div>
-
-            <label className="toggle-wrap" style={{ marginTop: 8 }}>
-              <span className="toggle">
-                <input
-                  type="checkbox"
-                  checked={risk.autoHoldHighRisk}
-                  onChange={(event) => updateRisk('autoHoldHighRisk', event.target.checked)}
-                />
-                <span className="toggle-slider" />
-              </span>
-              <span className="toggle-label">Auto hold order high risk</span>
-            </label>
           </article>
         </div>
 
         <div className="mobile-card" style={{ marginTop: 8 }}>
           <div className="mobile-card-actions">
-            <button className="action-btn orange" onClick={saveLimits}>Simpan Konfigurasi</button>
+            <button className="action-btn orange" onClick={() => void saveLimits()} disabled={!hasLimits || loading || saving}>
+              {saving ? 'Menyimpan...' : 'Simpan Konfigurasi'}
+            </button>
           </div>
         </div>
       </div>

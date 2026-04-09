@@ -51,7 +51,7 @@ Status:
 
 ---
 
-## Phase 3 — FE Admin Wiring
+## Phase 3 — FE Admin Wiring ✅
 
 Deliverables:
 - Queue admin real (bukan mock).
@@ -60,6 +60,9 @@ Deliverables:
 
 Acceptance:
 - Admin flow end-to-end (review -> approve -> processing -> final) lulus.
+
+Status:
+- Selesai (admin queue/pricing/limits sudah wiring ke backend convert API).
 
 ---
 
