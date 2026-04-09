@@ -5,9 +5,11 @@ import { useParams, useRouter } from 'next/navigation'
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Loader2, RefreshCcw, UploadCloud } from 'lucide-react'
 
+import ConvertTimelineSection from '@/components/convert/ConvertTimelineSection'
+import { getConvertStatusSummary, isFinalConvertStatus } from '@/lib/convertTimeline'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { convertService } from '@/services/convertService'
-import type { ConvertOrderDetail, ConvertOrderStatus } from '@/types/convert'
+import type { ConvertOrderDetail } from '@/types/convert'
 
 function formatRupiah(value: number) {
   return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
@@ -20,32 +22,6 @@ function formatDate(value?: string) {
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
-function statusMeta(status: ConvertOrderStatus | string) {
-  switch (status) {
-    case 'pending_transfer':
-      return { label: 'Menunggu Transfer', className: 'bg-amber-100 text-amber-700 border-amber-200' }
-    case 'waiting_review':
-      return { label: 'Menunggu Review', className: 'bg-yellow-100 text-yellow-700 border-yellow-200' }
-    case 'approved':
-      return { label: 'Approved', className: 'bg-blue-100 text-blue-700 border-blue-200' }
-    case 'processing':
-      return { label: 'Diproses', className: 'bg-sky-100 text-sky-700 border-sky-200' }
-    case 'success':
-      return { label: 'Sukses', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
-    case 'failed':
-      return { label: 'Gagal', className: 'bg-red-100 text-red-700 border-red-200' }
-    case 'expired':
-      return { label: 'Expired', className: 'bg-gray-100 text-gray-700 border-gray-200' }
-    case 'canceled':
-      return { label: 'Dibatalkan', className: 'bg-gray-100 text-gray-700 border-gray-200' }
-    default:
-      return { label: status, className: 'bg-gray-100 text-gray-700 border-gray-200' }
-  }
-}
-
-function isFinalStatus(status: string) {
-  return ['success', 'failed', 'expired', 'canceled'].includes(status)
-}
 
 export default function DashboardConvertOrderDetailPage() {
   const router = useRouter()
@@ -90,8 +66,8 @@ export default function DashboardConvertOrderDetailPage() {
   }, [loadDetail])
 
   const status = detail?.order.status || 'pending_transfer'
-  const statusBadge = statusMeta(status)
-  const canUploadProof = detail ? !isFinalStatus(detail.order.status) : false
+  const statusBadge = getConvertStatusSummary(status)
+  const canUploadProof = detail ? !isFinalConvertStatus(detail.order.status) : false
 
   const submitUploadProof = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -189,7 +165,7 @@ export default function DashboardConvertOrderDetailPage() {
                 <p className="mt-1 text-xs text-[#888]">Dibuat: {formatDate(detail.order.created_at)}</p>
               </div>
 
-              <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${statusBadge.className}`}>
+              <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${statusBadge.badgeClassName}`}>
                 {statusBadge.label}
               </span>
             </div>
@@ -284,27 +260,7 @@ export default function DashboardConvertOrderDetailPage() {
             )}
           </section>
 
-          <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 md:p-6">
-            <h3 className="mb-3 text-sm font-bold text-[#141414]">Timeline Status</h3>
-            {detail.events.length === 0 ? (
-              <p className="text-sm text-[#888]">Belum ada event status.</p>
-            ) : (
-              <div className="space-y-2">
-                {detail.events.map((event) => (
-                  <div key={event.id} className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-semibold text-[#141414]">
-                        {event.from_status ? `${event.from_status} → ` : ''}
-                        {event.to_status}
-                      </p>
-                      <p className="text-xs text-[#888]">{formatDate(event.created_at)}</p>
-                    </div>
-                    {event.reason ? <p className="mt-1 text-xs text-[#666]">Reason: {event.reason}</p> : null}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <ConvertTimelineSection detail={detail} title="Timeline Status" />
 
           <section className="flex flex-wrap gap-2">
             <Link
