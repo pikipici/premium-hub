@@ -211,6 +211,70 @@ func TestConvertAPIUserFlow(t *testing.T) {
 	}
 }
 
+func TestConvertAPIGuestFlow(t *testing.T) {
+	db := openConvertAPITestDB(t)
+	cfg := &config.Config{
+		AppEnv:                     "development",
+		FrontendURL:                "http://localhost:3000",
+		JWTSecret:                  "super-secure-secret-value-32chars++",
+		ConvertExpiryWorkerEnabled: false,
+	}
+	r := Setup(db, cfg)
+
+	createPayload := map[string]any{
+		"asset_type":                 "pulsa",
+		"source_amount":              110000,
+		"source_channel":             "Telkomsel",
+		"source_account":             "081298761234",
+		"destination_bank":           "BCA",
+		"destination_account_number": "1234567890",
+		"destination_account_name":   "Guest Convert",
+		"idempotency_key":            "guest-flow-001",
+	}
+	code, env := doJSONRequest(t, r, http.MethodPost, "/api/v1/convert/guest/orders", "", createPayload)
+	if code != http.StatusCreated || !env.Success {
+		t.Fatalf("create guest order failed: code=%d msg=%s", code, env.Message)
+	}
+
+	var created convertOrderDetailDTO
+	if err := json.Unmarshal(env.Data, &created); err != nil {
+		t.Fatalf("decode guest create data: %v", err)
+	}
+	if created.Order.ID == "" || created.Order.TrackingToken == "" {
+		t.Fatalf("invalid guest create response: %+v", created.Order)
+	}
+	if created.Order.Status != "pending_transfer" {
+		t.Fatalf("unexpected guest initial status: %s", created.Order.Status)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodPost, "/api/v1/convert/track/"+created.Order.TrackingToken+"/proofs", "", map[string]any{
+		"file_url": "https://cdn.example.com/guest-proof.png",
+		"note":     "guest upload proof",
+	})
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("upload guest proof failed: code=%d msg=%s", code, env.Message)
+	}
+
+	var detail convertOrderDetailDTO
+	if err := json.Unmarshal(env.Data, &detail); err != nil {
+		t.Fatalf("decode guest proof response: %v", err)
+	}
+	if detail.Order.Status != "waiting_review" {
+		t.Fatalf("expected waiting_review after guest proof, got %s", detail.Order.Status)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodGet, "/api/v1/convert/track/"+created.Order.TrackingToken, "", nil)
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("track guest order failed: code=%d msg=%s", code, env.Message)
+	}
+	if err := json.Unmarshal(env.Data, &detail); err != nil {
+		t.Fatalf("decode guest track response: %v", err)
+	}
+	if detail.Order.Status != "waiting_review" {
+		t.Fatalf("expected waiting_review in guest track, got %s", detail.Order.Status)
+	}
+}
+
 func TestConvertAPIRateLimitOnCreateOrder(t *testing.T) {
 	db := openConvertAPITestDB(t)
 	cfg := &config.Config{

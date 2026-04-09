@@ -35,6 +35,7 @@ func (h *ConvertHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
+	input.IsGuest = false
 	res, err := h.svc.CreateOrder(c.Request.Context(), userID, input)
 	if err != nil {
 		response.BadRequest(c, err.Error())
@@ -42,6 +43,23 @@ func (h *ConvertHandler) CreateOrder(c *gin.Context) {
 	}
 
 	response.Created(c, "Order convert berhasil dibuat", res)
+}
+
+func (h *ConvertHandler) CreateGuestOrder(c *gin.Context) {
+	var input service.CreateConvertOrderInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	input.IsGuest = true
+	res, err := h.svc.CreateGuestOrder(c.Request.Context(), input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Created(c, "Order convert guest berhasil dibuat", res)
 }
 
 func (h *ConvertHandler) ListOrders(c *gin.Context) {
@@ -97,6 +115,28 @@ func (h *ConvertHandler) TrackOrder(c *gin.Context) {
 	}
 
 	response.Success(c, "OK", res)
+}
+
+func (h *ConvertHandler) UploadProofByToken(c *gin.Context) {
+	token := strings.TrimSpace(c.Param("token"))
+	if token == "" {
+		response.BadRequest(c, "token tracking tidak valid")
+		return
+	}
+
+	input, err := h.parseConvertProofInput(c)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	res, err := h.svc.UploadProofByTrackingToken(c.Request.Context(), token, input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Bukti convert berhasil diunggah", res)
 }
 
 func (h *ConvertHandler) UploadProof(c *gin.Context) {

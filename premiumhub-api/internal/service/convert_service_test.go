@@ -201,6 +201,49 @@ func TestConvertServiceTrackOrderByToken(t *testing.T) {
 	}
 }
 
+func TestConvertServiceCreateGuestOrderAndUploadProofByToken(t *testing.T) {
+	svc, db, _, _ := setupConvertService(t)
+
+	res, err := svc.CreateGuestOrder(context.Background(), CreateConvertOrderInput{
+		AssetType:                "pulsa",
+		SourceAmount:             125_000,
+		SourceChannel:            "Telkomsel",
+		SourceAccount:            "081299991234",
+		DestinationBank:          "BCA",
+		DestinationAccountNumber: "9876543210",
+		DestinationAccountName:   "Guest User",
+		IdempotencyKey:           "guest-service-001",
+	})
+	if err != nil {
+		t.Fatalf("create guest order: %v", err)
+	}
+	if !res.Order.IsGuest {
+		t.Fatalf("expected is_guest=true")
+	}
+	if res.Order.TrackingToken == "" {
+		t.Fatalf("tracking token should not be empty for guest order")
+	}
+
+	var guestBridge model.User
+	if err := db.Where("email = ?", convertGuestBridgeEmail).First(&guestBridge).Error; err != nil {
+		t.Fatalf("guest bridge user should exist: %v", err)
+	}
+
+	updated, err := svc.UploadProofByTrackingToken(context.Background(), res.Order.TrackingToken, UploadConvertProofInput{
+		FileURL: "https://cdn.example.com/guest-proof-service.png",
+		Note:    "guest proof by token",
+	})
+	if err != nil {
+		t.Fatalf("upload proof by token: %v", err)
+	}
+	if updated.Order.Status != convertStatusWaitingReview {
+		t.Fatalf("expected waiting_review, got %s", updated.Order.Status)
+	}
+	if len(updated.Proofs) == 0 {
+		t.Fatalf("expected proofs to be recorded")
+	}
+}
+
 func TestConvertServiceDailyLimitValidation(t *testing.T) {
 	svc, _, member, _ := setupConvertService(t)
 

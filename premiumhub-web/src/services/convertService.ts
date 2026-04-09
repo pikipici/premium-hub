@@ -16,6 +16,11 @@ export const convertService = {
     return res.data
   },
 
+  createGuestOrder: async (payload: CreateConvertOrderPayload) => {
+    const res = await api.post<ApiResponse<ConvertOrderDetail>>('/convert/guest/orders', payload)
+    return res.data
+  },
+
   listOrders: async (params?: ConvertListParams) => {
     const res = await api.get<ApiResponse<ConvertOrderSummary[]>>('/convert/orders', { params })
     return res.data
@@ -37,6 +42,15 @@ export const convertService = {
       : undefined
 
     const res = await api.post<ApiResponse<ConvertOrderDetail>>(`/convert/orders/${orderID}/proofs`, payload, config)
+    return res.data
+  },
+
+  uploadProofByToken: async (token: string, payload: UploadConvertProofPayload | FormData) => {
+    const config = payload instanceof FormData
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : undefined
+
+    const res = await api.post<ApiResponse<ConvertOrderDetail>>(`/convert/track/${encodeURIComponent(token)}/proofs`, payload, config)
     return res.data
   },
 

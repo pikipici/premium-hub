@@ -152,22 +152,31 @@ Response `201`:
 }
 ```
 
-## 4.2 List my orders
+## 4.2 Create guest order convert (tanpa login)
+`POST /api/v1/convert/guest/orders`
+
+Body mengikuti create order biasa, namun server akan force `is_guest=true`.
+
+Catatan:
+- Endpoint ini khusus flow guest checkout.
+- Tetap kena validasi limit/rate-limit dan surcharge guest.
+
+## 4.3 List my orders
 `GET /api/v1/convert/orders?page=1&limit=20&asset_type=pulsa&status=pending_transfer`
 
 Response `200` + `meta` pagination.
 
-## 4.3 Detail my order
+## 4.4 Detail my order
 `GET /api/v1/convert/orders/:id`
 
 Response `200` detail lengkap + timeline events ringkas.
 
-## 4.4 Guest/member tracking by token
+## 4.5 Guest/member tracking by token
 `GET /api/v1/convert/track/:token`
 
 Response `200` status order untuk halaman tracking publik.
 
-## 4.5 Upload proof
+## 4.6 Upload proof by order id (member login)
 `POST /api/v1/convert/orders/:id/proofs`
 
 Body (multipart atau JSON URL):
@@ -180,6 +189,15 @@ Rule:
 - `file_url` harus URL valid `http/https`.
 - Untuk upload file, penyimpanan bisa di-local storage atau R2 sesuai env server.
 - Setelah proof valid masuk, status boleh naik ke `waiting_review` (sesuai policy ops).
+
+## 4.7 Upload proof by tracking token (guest/public)
+`POST /api/v1/convert/track/:token/proofs`
+
+Body sama seperti endpoint upload proof biasa.
+
+Rule tambahan:
+- Token tracking wajib valid dan aktif.
+- Jika order sudah final (`success/failed/expired/canceled`), upload proof ditolak.
 
 ---
 

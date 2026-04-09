@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Loader2, RefreshCcw } from 'lucide-react'
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { Loader2, RefreshCcw, UploadCloud } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
@@ -45,6 +45,10 @@ function statusMeta(status: ConvertOrderStatus | string) {
   }
 }
 
+function isFinalStatus(status: string) {
+  return ['success', 'failed', 'expired', 'canceled'].includes(status)
+}
+
 export default function GuestConvertTrackPage() {
   const params = useParams<{ token: string }>()
   const token = String(params?.token || '')
@@ -53,6 +57,11 @@ export default function GuestConvertTrackPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+
+  const [proofURL, setProofURL] = useState('')
+  const [proofNote, setProofNote] = useState('')
+  const [proofFile, setProofFile] = useState<File | null>(null)
+  const [uploadingProof, setUploadingProof] = useState(false)
 
   const loadTracking = useCallback(async (silent = false) => {
     if (!token) return
@@ -81,7 +90,50 @@ export default function GuestConvertTrackPage() {
     void loadTracking(false)
   }, [loadTracking])
 
+  const submitProof = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!detail || uploadingProof) return
+
+    if (!proofFile && !proofURL.trim()) {
+      setError('Isi URL bukti atau upload file bukti terlebih dahulu.')
+      return
+    }
+
+    setUploadingProof(true)
+    setError('')
+
+    try {
+      const payload = proofFile
+        ? (() => {
+            const formData = new FormData()
+            formData.append('file', proofFile)
+            if (proofNote.trim()) formData.append('note', proofNote.trim())
+            return formData
+          })()
+        : {
+            file_url: proofURL.trim(),
+            note: proofNote.trim() || undefined,
+          }
+
+      const res = await convertService.uploadProofByToken(token, payload)
+      if (!res.success) {
+        setError(res.message || 'Gagal upload bukti transaksi')
+        return
+      }
+
+      setDetail(res.data)
+      setProofURL('')
+      setProofFile(null)
+      setProofNote('')
+    } catch (err: unknown) {
+      setError(getHttpErrorMessage(err, 'Gagal upload bukti transaksi'))
+    } finally {
+      setUploadingProof(false)
+    }
+  }
+
   const statusBadge = useMemo(() => statusMeta(detail?.order.status || 'pending_transfer'), [detail?.order.status])
+  const canUploadProof = detail ? !isFinalStatus(detail.order.status) : false
 
   return (
     <>
@@ -165,6 +217,89 @@ export default function GuestConvertTrackPage() {
               </section>
 
               <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 md:p-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-[#141414]">Bukti Transaksi</h2>
+                  <span className="text-xs text-[#888]">{detail.proofs.length} bukti tercatat</span>
+                </div>
+
+                {canUploadProof ? (
+                  <form onSubmit={submitProof} className="mb-4 space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-[#888]">URL bukti (opsional)</label>
+                      <input
+                        type="url"
+                        value={proofURL}
+                        onChange={(event) => setProofURL(event.target.value)}
+                        placeholder="https://..."
+                        className="w-full rounded-lg border border-[#EBEBEB] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#141414]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-[#888]">Atau upload file bukti</label>
+                      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[#D7D7D3] bg-[#FAFAF8] px-3 py-2.5 text-sm text-[#555]">
+                        <UploadCloud className="h-4 w-4" />
+                        <span className="truncate">{proofFile ? proofFile.name : 'Pilih file (jpg/png/webp/pdf, max 10MB)'}</span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".jpg,.jpeg,.png,.webp,.pdf"
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => setProofFile(event.target.files?.[0] ?? null)}
+                        />
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-[#888]">Catatan (opsional)</label>
+                      <textarea
+                        value={proofNote}
+                        onChange={(event) => setProofNote(event.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-[#EBEBEB] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#141414]"
+                        placeholder="Contoh: transfer via m-banking jam 21:00"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={uploadingProof}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#FF5733] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#e64d2e] disabled:opacity-60"
+                    >
+                      {uploadingProof ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+                      Upload Bukti
+                    </button>
+                  </form>
+                ) : (
+                  <p className="mb-3 rounded-lg border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2 text-sm text-[#666]">
+                    Order sudah final ({statusBadge.label}). Upload bukti ditutup.
+                  </p>
+                )}
+
+                {detail.proofs.length === 0 ? (
+                  <p className="text-sm text-[#888]">Belum ada bukti transaksi yang diunggah.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {detail.proofs.map((proof) => (
+                      <div key={proof.id} className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <a
+                            href={proof.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-semibold text-[#141414] underline underline-offset-2"
+                          >
+                            {proof.file_name || proof.file_url}
+                          </a>
+                          <span className="text-xs text-[#888]">{formatDate(proof.created_at)}</span>
+                        </div>
+                        {proof.note ? <p className="mt-1 text-xs text-[#666]">{proof.note}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 md:p-6">
                 <h2 className="text-sm font-bold text-[#141414]">Timeline</h2>
                 {detail.events.length === 0 ? (
                   <p className="mt-2 text-sm text-[#888]">Belum ada update timeline.</p>
@@ -186,38 +321,12 @@ export default function GuestConvertTrackPage() {
                 )}
               </section>
 
-              <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 md:p-6">
-                <h2 className="text-sm font-bold text-[#141414]">Bukti Transaksi</h2>
-                {detail.proofs.length === 0 ? (
-                  <p className="mt-2 text-sm text-[#888]">Belum ada bukti transaksi yang diunggah.</p>
-                ) : (
-                  <div className="mt-3 space-y-2">
-                    {detail.proofs.map((proof) => (
-                      <div key={proof.id} className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <a
-                            href={proof.file_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-semibold text-[#141414] underline underline-offset-2"
-                          >
-                            {proof.file_name || proof.file_url}
-                          </a>
-                          <span className="text-xs text-[#888]">{formatDate(proof.created_at)}</span>
-                        </div>
-                        {proof.note ? <p className="mt-1 text-xs text-[#666]">{proof.note}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
               <section className="flex flex-wrap gap-2">
                 <Link
                   href="/login"
                   className="inline-flex items-center justify-center rounded-lg bg-[#141414] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#2a2a2a]"
                 >
-                  Login untuk upload bukti / pantau lebih mudah
+                  Login untuk akses dashboard
                 </Link>
                 <Link
                   href="/product/convert"

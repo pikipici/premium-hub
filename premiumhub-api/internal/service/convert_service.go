@@ -12,6 +12,7 @@ import (
 
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
+	hashpkg "premiumhub-api/pkg/hash"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -37,6 +38,11 @@ const (
 const (
 	defaultConvertPPNRate = 0.11
 	defaultConvertExpiry  = 60 * time.Minute
+)
+
+const (
+	convertGuestBridgeEmail = "guest-convert@system.local"
+	convertGuestBridgeName  = "Guest Convert"
 )
 
 var supportedConvertAssets = map[string]struct{}{
@@ -227,8 +233,6 @@ type ConvertExpireResult struct {
 }
 
 func (s *ConvertService) CreateOrder(ctx context.Context, userID uuid.UUID, input CreateConvertOrderInput) (*ConvertOrderDetailResponse, error) {
-	_ = ctx
-
 	if err := s.ensureDefaultRules(); err != nil {
 		return nil, errors.New("gagal menyiapkan rule convert")
 	}
@@ -236,6 +240,27 @@ func (s *ConvertService) CreateOrder(ctx context.Context, userID uuid.UUID, inpu
 	if _, err := s.ensureActiveUser(userID); err != nil {
 		return nil, err
 	}
+
+	actorID := userID
+	return s.createOrderWithOwner(ctx, userID, input, "user", &actorID, true)
+}
+
+func (s *ConvertService) CreateGuestOrder(ctx context.Context, input CreateConvertOrderInput) (*ConvertOrderDetailResponse, error) {
+	if err := s.ensureDefaultRules(); err != nil {
+		return nil, errors.New("gagal menyiapkan rule convert")
+	}
+
+	guestUser, err := s.ensureGuestBridgeUser()
+	if err != nil {
+		return nil, err
+	}
+
+	input.IsGuest = true
+	return s.createOrderWithOwner(ctx, guestUser.ID, input, "guest", nil, false)
+}
+
+func (s *ConvertService) createOrderWithOwner(ctx context.Context, ownerUserID uuid.UUID, input CreateConvertOrderInput, actorType string, actorID *uuid.UUID, includeUser bool) (*ConvertOrderDetailResponse, error) {
+	_ = ctx
 
 	assetType := normalizeConvertAsset(input.AssetType)
 	if !isSupportedConvertAsset(assetType) {
@@ -250,10 +275,16 @@ func (s *ConvertService) CreateOrder(ctx context.Context, userID uuid.UUID, inpu
 	}
 
 	idempotencyKey := normalizeConvertIdempotencyKey(input.IdempotencyKey)
+	if input.IsGuest {
+		idempotencyKey = buildGuestIdempotencyKey(idempotencyKey, input)
+	}
 	if idempotencyKey != "" {
-		existing, err := s.convertRepo.FindOrderByIdempotencyKey(userID, idempotencyKey)
+		existing, err := s.convertRepo.FindOrderByIdempotencyKey(ownerUserID, idempotencyKey)
 		if err == nil {
-			return s.GetOrderByUser(userID, existing.ID)
+			if includeUser {
+				return s.GetOrderByUser(ownerUserID, existing.ID)
+			}
+			return s.getOrderByPublic(existing.ID)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("gagal cek idempotency order convert")
@@ -280,18 +311,17 @@ func (s *ConvertService) CreateOrder(ctx context.Context, userID uuid.UUID, inpu
 	if input.IsGuest && !limitRule.AllowGuest {
 		return nil, errors.New("asset convert ini tidak mengizinkan guest")
 	}
-	if limitRule.RequireLogin && input.IsGuest {
-		return nil, errors.New("asset convert ini wajib login")
-	}
 
 	now := time.Now()
-	startDay, endDay := convertDayRange(now, "Asia/Jakarta")
-	todayUsedAmount, err := s.convertRepo.SumUserDailySourceAmount(userID, assetType, startDay, endDay, convertDailyLimitStatuses)
-	if err != nil {
-		return nil, errors.New("gagal menghitung limit harian convert")
-	}
-	if limitRule.DailyLimit > 0 && todayUsedAmount+input.SourceAmount > limitRule.DailyLimit {
-		return nil, errors.New("nominal convert melebihi limit harian")
+	if !input.IsGuest {
+		startDay, endDay := convertDayRange(now, "Asia/Jakarta")
+		todayUsedAmount, err := s.convertRepo.SumUserDailySourceAmount(ownerUserID, assetType, startDay, endDay, convertDailyLimitStatuses)
+		if err != nil {
+			return nil, errors.New("gagal menghitung limit harian convert")
+		}
+		if limitRule.DailyLimit > 0 && todayUsedAmount+input.SourceAmount > limitRule.DailyLimit {
+			return nil, errors.New("nominal convert melebihi limit harian")
+		}
 	}
 
 	pricingRule, err := s.convertRepo.FindPricingRuleByAsset(assetType)
@@ -312,7 +342,7 @@ func (s *ConvertService) CreateOrder(ctx context.Context, userID uuid.UUID, inpu
 
 	expiresAt := now.Add(defaultConvertExpiry)
 	order := &model.ConvertOrder{
-		UserID:                   userID,
+		UserID:                   ownerUserID,
 		AssetType:                assetType,
 		Status:                   convertStatusPendingTransfer,
 		IsGuest:                  input.IsGuest,
@@ -354,8 +384,8 @@ func (s *ConvertService) CreateOrder(ctx context.Context, userID uuid.UUID, inpu
 			FromStatus: "",
 			ToStatus:   convertStatusPendingTransfer,
 			Reason:     "order dibuat",
-			ActorType:  "user",
-			ActorID:    &userID,
+			ActorType:  actorType,
+			ActorID:    actorID,
 			CreatedAt:  now,
 		}
 		if err := s.convertRepo.CreateEventTx(tx, event); err != nil {
@@ -368,7 +398,12 @@ func (s *ConvertService) CreateOrder(ctx context.Context, userID uuid.UUID, inpu
 		return nil, errors.New("gagal membuat order convert")
 	}
 
-	res, err := s.GetOrderByUser(userID, order.ID)
+	var res *ConvertOrderDetailResponse
+	if includeUser {
+		res, err = s.GetOrderByUser(ownerUserID, order.ID)
+	} else {
+		res, err = s.getOrderByPublic(order.ID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -425,6 +460,18 @@ func (s *ConvertService) GetOrderByUser(userID, orderID uuid.UUID) (*ConvertOrde
 	}
 
 	return s.buildConvertOrderDetail(row, true)
+}
+
+func (s *ConvertService) getOrderByPublic(orderID uuid.UUID) (*ConvertOrderDetailResponse, error) {
+	row, err := s.convertRepo.FindOrderByID(orderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("order convert tidak ditemukan")
+		}
+		return nil, errors.New("gagal memuat order convert")
+	}
+
+	return s.buildConvertOrderDetail(row, false)
 }
 
 func (s *ConvertService) TrackOrderByToken(token string) (*ConvertOrderDetailResponse, error) {
@@ -547,6 +594,101 @@ func (s *ConvertService) UploadProof(ctx context.Context, userID, orderID uuid.U
 	}
 
 	return s.GetOrderByUser(userID, orderID)
+}
+
+func (s *ConvertService) UploadProofByTrackingToken(ctx context.Context, token string, input UploadConvertProofInput) (*ConvertOrderDetailResponse, error) {
+	_ = ctx
+
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil, errors.New("token tracking tidak valid")
+	}
+
+	track, err := s.convertRepo.FindTrackingToken(token)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("order convert tidak ditemukan")
+		}
+		return nil, errors.New("gagal melacak order convert")
+	}
+	if track.ExpiresAt != nil && track.ExpiresAt.Before(time.Now()) {
+		return nil, errors.New("token tracking sudah kedaluwarsa")
+	}
+
+	fileURL := strings.TrimSpace(input.FileURL)
+	if fileURL == "" {
+		return nil, errors.New("bukti transaksi tidak valid")
+	}
+
+	note := strings.TrimSpace(input.Note)
+	if len(note) > 500 {
+		return nil, errors.New("catatan bukti terlalu panjang")
+	}
+
+	now := time.Now()
+	err = s.convertRepo.Transaction(func(tx *gorm.DB) error {
+		row, err := s.convertRepo.LockOrderByIDTx(tx, track.OrderID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("order convert tidak ditemukan")
+			}
+			return err
+		}
+		if isFinalConvertStatus(row.Status) {
+			return errors.New("order convert sudah final")
+		}
+
+		proof := &model.ConvertProof{
+			OrderID:        row.ID,
+			FileURL:        fileURL,
+			FileName:       strings.TrimSpace(input.FileName),
+			MimeType:       strings.TrimSpace(input.MimeType),
+			FileSize:       input.FileSize,
+			Note:           note,
+			UploadedByType: "guest",
+			UploadedByID:   nil,
+			CreatedAt:      now,
+		}
+		if err := s.convertRepo.CreateProofTx(tx, proof); err != nil {
+			return err
+		}
+
+		fromStatus := normalizeConvertStatus(row.Status)
+		toStatus := fromStatus
+		reason := "bukti transaksi diunggah via tracking"
+
+		if row.Status == convertStatusPendingTransfer {
+			toStatus = convertStatusWaitingReview
+			row.Status = toStatus
+			if err := s.convertRepo.SaveOrderTx(tx, row); err != nil {
+				return err
+			}
+		} else {
+			reason = "bukti tambahan diunggah via tracking"
+		}
+
+		event := &model.ConvertOrderEvent{
+			OrderID:    row.ID,
+			FromStatus: fromStatus,
+			ToStatus:   toStatus,
+			Reason:     reason,
+			ActorType:  "guest",
+			CreatedAt:  now,
+		}
+		if err := s.convertRepo.CreateEventTx(tx, event); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		if err.Error() == "order convert tidak ditemukan" || err.Error() == "order convert sudah final" || err.Error() == "catatan bukti terlalu panjang" || err.Error() == "token tracking sudah kedaluwarsa" {
+			return nil, err
+		}
+		return nil, errors.New("gagal mengunggah bukti convert")
+	}
+
+	return s.TrackOrderByToken(token)
 }
 
 func (s *ConvertService) AdminListOrders(page, limit int, filter ConvertListFilterInput) (*ConvertOrderListResponse, error) {
@@ -904,6 +1046,48 @@ func (s *ConvertService) ensureActiveUser(userID uuid.UUID) (*model.User, error)
 	return user, nil
 }
 
+func (s *ConvertService) ensureGuestBridgeUser() (*model.User, error) {
+	user, err := s.userRepo.FindByEmail(convertGuestBridgeEmail)
+	if err == nil {
+		if !user.IsActive {
+			user.IsActive = true
+			if saveErr := s.userRepo.Update(user); saveErr != nil {
+				return nil, errors.New("gagal update user guest convert")
+			}
+		}
+		return user, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("gagal cek user guest convert")
+	}
+
+	password, hashErr := hashpkg.Password(uuid.NewString())
+	if hashErr != nil {
+		return nil, errors.New("gagal menyiapkan user guest convert")
+	}
+
+	create := &model.User{
+		Name:     convertGuestBridgeName,
+		Email:    convertGuestBridgeEmail,
+		Password: password,
+		Role:     "user",
+		IsActive: true,
+	}
+	if createErr := s.userRepo.Create(create); createErr != nil {
+		if !isUniqueConstraintError(createErr) {
+			return nil, errors.New("gagal membuat user guest convert")
+		}
+
+		reload, reloadErr := s.userRepo.FindByEmail(convertGuestBridgeEmail)
+		if reloadErr != nil {
+			return nil, errors.New("gagal memuat user guest convert")
+		}
+		return reload, nil
+	}
+
+	return create, nil
+}
+
 func (s *ConvertService) ensureDefaultRules() error {
 	pricingDefaults := defaultConvertPricingRules()
 	for _, base := range pricingDefaults {
@@ -1134,6 +1318,43 @@ func normalizeConvertIdempotencyKey(v string) string {
 		key = key[:80]
 	}
 	return key
+}
+
+func buildGuestIdempotencyKey(base string, input CreateConvertOrderInput) string {
+	base = normalizeConvertIdempotencyKey(base)
+	if base == "" {
+		return ""
+	}
+
+	srcTail := tailAlnum(input.SourceAccount, 4)
+	dstTail := tailAlnum(input.DestinationAccountNumber, 4)
+	asset := normalizeConvertAsset(input.AssetType)
+	composed := fmt.Sprintf("g:%s:%s:%s:%s", asset, base, srcTail, dstTail)
+	return normalizeConvertIdempotencyKey(composed)
+}
+
+func tailAlnum(v string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	trimmed := strings.TrimSpace(v)
+	if trimmed == "" {
+		return "none"
+	}
+
+	filtered := make([]rune, 0, len(trimmed))
+	for _, ch := range trimmed {
+		if (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+			filtered = append(filtered, ch)
+		}
+	}
+	if len(filtered) == 0 {
+		return "none"
+	}
+	if len(filtered) <= n {
+		return strings.ToLower(string(filtered))
+	}
+	return strings.ToLower(string(filtered[len(filtered)-n:]))
 }
 
 func normalizePPNRate(v float64) float64 {

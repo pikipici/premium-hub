@@ -90,6 +90,16 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request tracking convert. Coba lagi sebentar."),
 		convertHandler.TrackOrder,
 	)
+	api.POST(
+		"/convert/guest/orders",
+		middleware.NewIPRateLimiter(cfg.ConvertCreateRateLimitMax, cfg.ConvertCreateRateLimitWindow, "Terlalu banyak request buat order convert guest. Coba lagi sebentar."),
+		convertHandler.CreateGuestOrder,
+	)
+	api.POST(
+		"/convert/track/:token/proofs",
+		middleware.NewIPRateLimiter(cfg.ConvertProofRateLimitMax, cfg.ConvertProofRateLimitWindow, "Terlalu banyak upload bukti convert. Coba lagi sebentar."),
+		convertHandler.UploadProofByToken,
+	)
 
 	// Protected routes
 	protected := api.Group("")

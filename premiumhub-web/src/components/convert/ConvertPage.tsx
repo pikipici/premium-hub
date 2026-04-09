@@ -302,7 +302,7 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
   const proceedAfterConfirm = async (mode: 'member' | 'guest') => {
     if (!agree || isSubmittingOrder) return
 
-    if (!isMember) {
+    if (mode === 'member' && !isMember) {
       router.push(`/login?next=${encodeURIComponent(pathname || ASSET_ROUTES[assetType])}`)
       return
     }
@@ -327,7 +327,7 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
     const idempotencyKey = `cvt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
     try {
-      const response = await convertService.createOrder({
+      const payload = {
         asset_type: assetType,
         source_amount: quote.normalizedAmount,
         source_channel: sourceChannel,
@@ -337,7 +337,11 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
         destination_account_name: bankAccountName.trim(),
         is_guest: mode === 'guest',
         idempotency_key: idempotencyKey,
-      })
+      }
+
+      const response = mode === 'guest'
+        ? await convertService.createGuestOrder(payload)
+        : await convertService.createOrder(payload)
 
       const order = response.data?.order
       if (!order?.id) {
@@ -380,9 +384,9 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
             </div>
           ) : (
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              ⚡ Lu bisa simulasi quote tanpa login. Untuk create order real di phase ini tetap wajib login.{' '}
+              ⚡ Mode tamu aktif. Ada biaya tambahan <strong>{formatRupiah(GUEST_SURCHARGE)}</strong>.{' '}
               <Link href="/login" className="font-bold text-[#FF5733] underline underline-offset-2">
-                Login sekarang
+                Login biar biaya ini hilang
               </Link>
               .
             </div>
@@ -806,14 +810,19 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
                 </button>
               ) : canProceedAsGuest ? (
                 <div className="space-y-2">
-                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    Untuk keamanan rollout phase ini, order convert real sementara hanya bisa dibuat setelah login.
-                  </p>
+                  <button
+                    type="button"
+                    disabled={!agree || isSubmittingOrder}
+                    onClick={() => proceedAfterConfirm('guest')}
+                    className="w-full rounded-full bg-[#141414] px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSubmittingOrder ? 'Membuat order guest...' : `Lanjut sebagai tamu (+${formatRupiah(GUEST_SURCHARGE)})`}
+                  </button>
                   <Link
                     href={`/login?next=${encodeURIComponent(pathname || ASSET_ROUTES[assetType])}`}
                     className="inline-flex w-full items-center justify-center rounded-full border border-[#FF5733] bg-white px-4 py-3 text-sm font-extrabold text-[#FF5733]"
                   >
-                    Login untuk lanjut transaksi
+                    Login dulu biar lebih hemat
                   </Link>
                 </div>
               ) : (

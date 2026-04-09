@@ -100,6 +100,8 @@ Implementasi convert sudah dipisah total dari modul lain (route + tabel + servic
 
 ### User routes
 - `GET /api/v1/convert/track/:token` (public tracking)
+- `POST /api/v1/convert/guest/orders` (public guest checkout)
+- `POST /api/v1/convert/track/:token/proofs` (public guest proof upload)
 - `POST /api/v1/convert/orders`
 - `GET /api/v1/convert/orders`
 - `GET /api/v1/convert/orders/:id`
