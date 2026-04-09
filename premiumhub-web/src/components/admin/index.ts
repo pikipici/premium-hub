@@ -1,6 +1,7 @@
 import AdminStyles from './admin-styles'
 import AdminSidebar from './admin-sidebar'
 import AdminTopbar from './admin-topbar'
+import AdminMobileDrawer from './admin-mobile-drawer'
 import DashboardPage from './dashboard-page'
 import ProdukPage from './produk-page'
 import EditProdukPage from './edit-produk-page'
@@ -18,6 +19,7 @@ export {
   AdminStyles,
   AdminSidebar,
   AdminTopbar,
+  AdminMobileDrawer,
   DashboardPage,
   ProdukPage,
   EditProdukPage,

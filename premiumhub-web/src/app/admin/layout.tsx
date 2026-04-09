@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import AdminStyles from '@/components/admin/admin-styles'
 import AdminSidebar from '@/components/admin/admin-sidebar'
 import AdminTopbar from '@/components/admin/admin-topbar'
-import AdminMobileBottomNav from '@/components/admin/admin-mobile-bottom-nav'
+import AdminMobileDrawer from '@/components/admin/admin-mobile-drawer'
 
 type PageMeta = {
   title: string
@@ -53,6 +53,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { isAuthenticated, user, hasHydrated } = useAuthStore()
   const router = useRouter()
   const pathname = usePathname()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const openMobileMenu = useCallback(() => {
+    setMobileMenuOpen(true)
+  }, [])
+
+  const closeMobileMenu = useCallback(() => {
+    setMobileMenuOpen(false)
+  }, [])
 
   useEffect(() => {
     if (!hasHydrated) return
@@ -79,11 +88,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <AdminSidebar />
 
         <div className="admin-main">
-          <AdminTopbar title={page.title} sub={page.sub} />
+          <AdminTopbar title={page.title} sub={page.sub} onOpenMobileMenu={openMobileMenu} />
           {children}
-          <AdminMobileBottomNav />
         </div>
       </div>
+
+      <AdminMobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu} />
     </>
   )
 }

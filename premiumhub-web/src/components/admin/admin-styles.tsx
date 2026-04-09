@@ -46,8 +46,23 @@ export default function AdminStyles() {
 
       /* TOPBAR */
       .topbar { height: 60px; background: var(--white); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; position: sticky; top: 0; z-index: 90; }
+      .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+      .topbar-title-wrap { min-width: 0; }
       .topbar-left h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
       .topbar-left p { font-size: 12px; color: var(--muted); margin-top: 1px; }
+      .mobile-menu-btn {
+        display: none;
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--white);
+        color: var(--dark);
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .mobile-menu-btn:hover { border-color: var(--dark); }
       .topbar-right { display: flex; align-items: center; gap: 12px; }
       .topbar-btn { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; font-weight: 500; padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--white); color: var(--dark); cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 6px; text-decoration: none; }
       .topbar-btn:hover { border-color: var(--dark); }
@@ -61,6 +76,128 @@ export default function AdminStyles() {
       .admin-desktop-only { display: block; }
       .admin-mobile-only { display: none; }
       .admin-mobile-bottom-nav { display: none; }
+
+      .admin-mobile-drawer-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 108;
+        background: rgba(20,20,20,.45);
+        opacity: 0;
+        pointer-events: none;
+        border: 0;
+        transition: opacity .18s ease;
+      }
+      .admin-mobile-drawer-backdrop.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .admin-mobile-drawer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(86vw, 320px);
+        background: var(--dark);
+        color: #fff;
+        z-index: 109;
+        border-right: 1px solid rgba(255,255,255,.08);
+        display: flex;
+        flex-direction: column;
+        transform: translateX(-102%);
+        transition: transform .2s ease;
+        box-shadow: 14px 0 28px rgba(0,0,0,.25);
+      }
+      .admin-mobile-drawer.open { transform: translateX(0); }
+      .admin-mobile-drawer-head {
+        padding: 14px 12px;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .admin-mobile-drawer-logo {
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: -.3px;
+      }
+      .admin-mobile-drawer-logo span { color: var(--orange); }
+      .admin-mobile-drawer-sub {
+        margin-top: 2px;
+        font-size: 10px;
+        color: rgba(255,255,255,.45);
+        text-transform: uppercase;
+        letter-spacing: .9px;
+      }
+      .admin-mobile-drawer-close {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,.16);
+        background: transparent;
+        color: rgba(255,255,255,.82);
+        cursor: pointer;
+      }
+      .admin-mobile-drawer-scroll {
+        overflow: auto;
+        padding: 10px 10px 12px;
+        display: grid;
+        gap: 10px;
+      }
+      .admin-mobile-drawer-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: rgba(255,255,255,.32);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        margin: 0 6px 4px;
+      }
+      .admin-mobile-drawer-items {
+        display: grid;
+        gap: 4px;
+      }
+      .admin-mobile-drawer-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 36px;
+        border-radius: 10px;
+        padding: 8px 10px;
+        color: rgba(255,255,255,.7);
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .admin-mobile-drawer-item.active {
+        background: rgba(255,255,255,.12);
+        color: #fff;
+      }
+      .admin-mobile-drawer-icon {
+        width: 18px;
+        text-align: center;
+        opacity: .85;
+        flex-shrink: 0;
+      }
+      .admin-mobile-drawer-actions {
+        margin-top: auto;
+        border-top: 1px solid rgba(255,255,255,.08);
+        padding: 10px;
+        display: grid;
+        gap: 6px;
+      }
+      .admin-mobile-drawer-action {
+        border: 1px solid rgba(255,255,255,.18);
+        border-radius: 9px;
+        padding: 8px 10px;
+        text-decoration: none;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .admin-mobile-drawer-action:hover {
+        background: rgba(255,255,255,.08);
+      }
 
       .mobile-page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
       .mobile-page-title { font-size: 13px; font-weight: 700; color: var(--dark); }
@@ -354,7 +491,7 @@ export default function AdminStyles() {
         .sidebar { display: none; }
         .admin-main {
           margin-left: 0;
-          padding-bottom: calc(72px + env(safe-area-inset-bottom));
+          padding-bottom: max(10px, env(safe-area-inset-bottom));
         }
 
         .admin-desktop-only { display: none !important; }
@@ -368,51 +505,11 @@ export default function AdminStyles() {
           gap: 8px;
           backdrop-filter: saturate(140%) blur(8px);
         }
+        .topbar-left { gap: 8px; }
         .topbar-left h1 { font-size: 14px; line-height: 1.2; }
         .topbar-left p { display: none; }
         .topbar-right { display: none; }
-
-        .admin-mobile-bottom-nav {
-          display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: 2px;
-          position: fixed;
-          left: 8px;
-          right: 8px;
-          bottom: calc(8px + env(safe-area-inset-bottom));
-          z-index: 95;
-          background: rgba(20, 20, 20, 0.96);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 16px;
-          padding: 6px;
-          box-shadow: 0 12px 28px rgba(20,20,20,.25);
-        }
-        .admin-mobile-bottom-nav-item {
-          text-decoration: none;
-          color: rgba(255,255,255,.72);
-          border-radius: 10px;
-          padding: 6px 2px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 2px;
-          min-height: 46px;
-        }
-        .admin-mobile-bottom-nav-item.active {
-          background: rgba(255,255,255,.12);
-          color: #fff;
-        }
-        .admin-mobile-bottom-nav-icon {
-          font-size: 14px;
-          line-height: 1;
-        }
-        .admin-mobile-bottom-nav-label {
-          font-size: 10px;
-          line-height: 1;
-          font-weight: 600;
-          letter-spacing: .2px;
-        }
+        .mobile-menu-btn { display: inline-flex; align-items: center; justify-content: center; }
 
         .page { padding: 10px; }
 
@@ -532,19 +629,9 @@ export default function AdminStyles() {
         .topbar-left h1 { font-size: 13px; }
         .page { padding: 8px; }
 
-        .admin-mobile-bottom-nav {
-          left: 6px;
-          right: 6px;
-          padding: 5px;
-          border-radius: 14px;
-        }
-        .admin-mobile-bottom-nav-item { min-height: 44px; }
-        .admin-mobile-bottom-nav-icon { font-size: 13px; }
-        .admin-mobile-bottom-nav-label { font-size: 9px; }
-
         .mobile-fab {
           right: 10px;
-          bottom: calc(72px + env(safe-area-inset-bottom));
+          bottom: calc(12px + env(safe-area-inset-bottom));
           font-size: 11px;
           padding: 9px 12px;
         }
