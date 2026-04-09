@@ -351,6 +351,11 @@ function normalizeOrderStatus(status?: string): string {
   return normalized || 'PENDING'
 }
 
+function isOpenOrderStatus(status?: string): boolean {
+  const normalized = normalizeOrderStatus(status)
+  return normalized === 'PENDING' || normalized === 'RECEIVED'
+}
+
 function orderStatusMeta(status?: string) {
   const normalized = normalizeOrderStatus(status)
   switch (normalized) {
@@ -486,6 +491,7 @@ export default function NomorVirtualPage() {
   const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>('all')
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
   const [smsStateByOrder, setSmsStateByOrder] = useState<Record<number, SMSState>>({})
+  const [liveOrderId, setLiveOrderId] = useState<number | null>(null)
 
   const selectedCountryKey = selectedCountry?.key || ''
   const selectedProductKey = selectedProduct?.key || ''
@@ -535,6 +541,21 @@ export default function NomorVirtualPage() {
       return haystack.includes(query)
     })
   }, [orderSearch, orderStatusFilter, orders])
+
+  const liveOrder = useMemo(() => {
+    if (liveOrderId !== null) {
+      return orders.find((order) => order.provider_order_id === liveOrderId) || null
+    }
+
+    return orders.find((order) => isOpenOrderStatus(order.provider_status)) || null
+  }, [liveOrderId, orders])
+
+  const liveOrderStatus = normalizeOrderStatus(liveOrder?.provider_status)
+  const liveOrderMeta = orderStatusMeta(liveOrder?.provider_status)
+  const liveSMSState = liveOrder ? smsStateByOrder[liveOrder.provider_order_id] : undefined
+  const liveCanFinish = liveOrderStatus === 'PENDING' || liveOrderStatus === 'RECEIVED'
+  const liveCanCancel = liveOrderStatus === 'PENDING' || liveOrderStatus === 'RECEIVED'
+  const liveCanBan = liveOrderStatus === 'PENDING' || liveOrderStatus === 'RECEIVED'
 
   const refreshWalletBalance = useCallback(async () => {
     setWalletLoading(true)
@@ -638,7 +659,17 @@ export default function NomorVirtualPage() {
   useEffect(() => {
     void loadCountries()
     void refreshWalletBalance()
-  }, [loadCountries, refreshWalletBalance])
+    void loadOrders(1)
+  }, [loadCountries, loadOrders, refreshWalletBalance])
+
+  useEffect(() => {
+    if (liveOrderId !== null) return
+
+    const openOrder = orders.find((order) => isOpenOrderStatus(order.provider_status))
+    if (!openOrder) return
+
+    setLiveOrderId(openOrder.provider_order_id)
+  }, [liveOrderId, orders])
 
   useEffect(() => {
     if (!selectedCountryKey) {
@@ -707,7 +738,8 @@ export default function NomorVirtualPage() {
         }))
       }
 
-      setMainTab('orders')
+      setLiveOrderId(updatedOrder.provider_order_id)
+      setMainTab('catalog')
       setOrdersPage(1)
       await Promise.all([loadOrders(1), refreshWalletBalance()])
     },
@@ -932,7 +964,7 @@ export default function NomorVirtualPage() {
             mainTab === 'orders' ? 'bg-[#141414] text-white' : 'text-[#666] hover:bg-[#F7F7F5]'
           }`}
         >
-          Order Saya
+          Riwayat Order
           <span
             className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
               mainTab === 'orders' ? 'bg-white/20 text-white' : 'bg-[#F7F7F5] text-[#666]'
@@ -1231,6 +1263,149 @@ export default function NomorVirtualPage() {
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
+                <header className="border-b border-[#EBEBEB] px-4 py-3">
+                  <h2 className="text-sm font-bold">Terima OTP Realtime</h2>
+                  <p className="text-xs text-[#888] mt-0.5">Nunggu OTP tetap di tab Beli Nomor. Riwayat ada di tab Riwayat Order.</p>
+                </header>
+
+                <div className="p-4 space-y-3">
+                  {!liveOrder ? (
+                    <div className="rounded-xl border border-dashed border-[#D8D8D5] bg-[#FAFAF8] px-3 py-3 text-xs text-[#666]">
+                      Belum ada order aktif. Pilih negara, layanan, operator, lalu klik beli untuk mulai terima OTP di sini.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3 text-sm space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[#888] text-xs">Provider Order</span>
+                          <span className="font-semibold text-[#141414]">#{liveOrder.provider_order_id}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[#888] text-xs">Nomor</span>
+                          <span className="font-semibold text-[#141414] text-right break-all">{liveOrder.phone || '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[#888] text-xs">Layanan</span>
+                          <span className="font-semibold text-[#141414] text-right">{toTitleCase(liveOrder.product || 'unknown')}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 border-t border-[#EBEBEB] pt-2">
+                          <span className="text-[#888] text-xs">Status</span>
+                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${liveOrderMeta.className}`}>
+                            {liveOrderMeta.label}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#888] leading-relaxed">
+                          Auto-cancel + refund berjalan maksimal 15 menit kalau belum ada SMS masuk.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => runOrderAction(liveOrder, 'check')}
+                          disabled={Boolean(actionLoading[`check:${liveOrder.provider_order_id}`])}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#EBEBEB] px-2.5 py-1.5 text-xs font-semibold text-[#555] hover:bg-[#F7F7F5] disabled:opacity-60"
+                        >
+                          {actionLoading[`check:${liveOrder.provider_order_id}`] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
+                          Check
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void toggleSMSInbox(liveOrder)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#EBEBEB] px-2.5 py-1.5 text-xs font-semibold text-[#555] hover:bg-[#F7F7F5]"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          {liveSMSState?.open ? 'Tutup SMS' : 'Buka SMS'}
+                        </button>
+
+                        {liveCanFinish ? (
+                          <button
+                            type="button"
+                            onClick={() => runOrderAction(liveOrder, 'finish')}
+                            disabled={Boolean(actionLoading[`finish:${liveOrder.provider_order_id}`])}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                          >
+                            {actionLoading[`finish:${liveOrder.provider_order_id}`] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            Finish
+                          </button>
+                        ) : null}
+
+                        {liveCanCancel ? (
+                          <button
+                            type="button"
+                            onClick={() => runOrderAction(liveOrder, 'cancel')}
+                            disabled={Boolean(actionLoading[`cancel:${liveOrder.provider_order_id}`])}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                          >
+                            {actionLoading[`cancel:${liveOrder.provider_order_id}`] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                            Cancel
+                          </button>
+                        ) : null}
+
+                        {liveCanBan ? (
+                          <button
+                            type="button"
+                            onClick={() => runOrderAction(liveOrder, 'ban')}
+                            disabled={Boolean(actionLoading[`ban:${liveOrder.provider_order_id}`])}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-60"
+                          >
+                            {actionLoading[`ban:${liveOrder.provider_order_id}`] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldBan className="w-3.5 h-3.5" />}
+                            Ban
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {liveSMSState?.open ? (
+                        <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-3">
+                          {liveSMSState.loading ? (
+                            <div className="text-xs text-[#666] inline-flex items-center gap-2">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memuat SMS inbox...
+                            </div>
+                          ) : liveSMSState.error ? (
+                            <div className="text-xs text-red-600 inline-flex items-center gap-1.5">
+                              <CircleAlert className="w-3.5 h-3.5" /> {liveSMSState.error}
+                            </div>
+                          ) : (liveSMSState.items || []).length === 0 ? (
+                            <div className="text-xs text-[#777]">Belum ada SMS masuk. Klik Check secara berkala.</div>
+                          ) : (
+                            <div className="space-y-2">
+                              {(liveSMSState.items || []).map((sms, index) => (
+                                <div key={`${sms.id ?? index}`} className="rounded-xl border border-[#EBEBEB] bg-white px-3 py-2.5 text-xs">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                                    <span className="font-semibold text-[#555]">{sms.sender || 'Sender tidak diketahui'}</span>
+                                    <span className="text-[#888]">{sms.date || sms.created_at || '-'}</span>
+                                  </div>
+
+                                  {sms.code ? (
+                                    <div className="font-black tracking-widest text-sm text-[#141414] mb-1">{sms.code}</div>
+                                  ) : null}
+
+                                  <p className="text-[#666] break-words">{sms.text || '-'}</p>
+
+                                  {sms.code ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => void copyCode(sms.code)}
+                                      className="mt-2 rounded-lg border border-[#EBEBEB] px-2 py-1 text-[11px] font-semibold text-[#555] hover:bg-[#F7F7F5]"
+                                    >
+                                      Salin kode {sms.code}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-[#888]">Klik Check untuk sinkron status terbaru dari provider.</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div className="rounded-2xl border border-[#EBEBEB] bg-white p-3 text-xs text-[#666]">
                 <p className="font-semibold text-[#141414] mb-1">Wallet</p>
                 <p>
@@ -1276,6 +1451,11 @@ export default function NomorVirtualPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-xs text-[#666]">
+            Realtime OTP sekarang ada di tab <span className="font-bold text-[#141414]">Beli Nomor</span> (section Terima OTP Realtime).
+            Tab ini fokus buat riwayat dan audit order.
           </div>
 
           {ordersLoading ? (
