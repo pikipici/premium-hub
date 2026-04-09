@@ -30,6 +30,7 @@ import type {
 type MainTab = 'catalog' | 'orders'
 type OrderStatusFilter = 'all' | 'PENDING' | 'RECEIVED' | 'FINISHED' | 'CANCELED'
 type OrderAction = 'check' | 'finish' | 'cancel' | 'ban'
+type AdvancedAction = Exclude<OrderAction, 'check'>
 
 interface CountryOption {
   key: string
@@ -470,6 +471,31 @@ function isInsufficientBalance(message: string): boolean {
   return message.toLowerCase().includes('saldo wallet tidak cukup')
 }
 
+function advancedActionMeta(action: AdvancedAction) {
+  if (action === 'finish') {
+    return {
+      title: 'Konfirmasi Finish Order',
+      description: 'Gunakan saat OTP sudah dipakai dan order ini dianggap selesai.',
+      confirmLabel: 'Ya, Finish Order',
+      confirmClass: 'bg-emerald-500 hover:bg-emerald-600 text-white',
+    }
+  }
+  if (action === 'cancel') {
+    return {
+      title: 'Konfirmasi Cancel Order',
+      description: 'Gunakan hanya kalau order benar-benar tidak dilanjutkan.',
+      confirmLabel: 'Ya, Cancel Order',
+      confirmClass: 'bg-red-500 hover:bg-red-600 text-white',
+    }
+  }
+  return {
+    title: 'Konfirmasi Ban Order',
+    description: 'Ban dipakai untuk nomor bermasalah. Pastikan ini bukan false alarm.',
+    confirmLabel: 'Ya, Ban Order',
+    confirmClass: 'bg-amber-500 hover:bg-amber-600 text-white',
+  }
+}
+
 export default function NomorVirtualPage() {
   const { walletBalance, setWalletBalance } = useAuthStore()
 
@@ -510,6 +536,7 @@ export default function NomorVirtualPage() {
   const [smsStateByOrder, setSmsStateByOrder] = useState<Record<number, SMSState>>({})
   const [liveOrderId, setLiveOrderId] = useState<number | null>(null)
   const [nowTs, setNowTs] = useState(() => Date.now())
+  const [advancedActionModal, setAdvancedActionModal] = useState<{ action: AdvancedAction; providerOrderID: number } | null>(null)
 
   const selectedCountryKey = selectedCountry?.key || ''
   const selectedProductKey = selectedProduct?.key || ''
@@ -598,6 +625,26 @@ export default function NomorVirtualPage() {
   const livePrimaryCode = (livePrimarySMS?.code || '').trim()
   const liveSLAExpired = liveRemainingMs !== null && liveRemainingMs <= 0
   const liveIsOpenStatus = isOpenOrderStatus(liveOrderStatus)
+
+  const advancedModalOrder = useMemo(() => {
+    if (!advancedActionModal) return null
+
+    const fromOrders = orders.find((order) => order.provider_order_id === advancedActionModal.providerOrderID)
+    if (fromOrders) return fromOrders
+
+    if (liveOrder?.provider_order_id === advancedActionModal.providerOrderID) {
+      return liveOrder
+    }
+
+    return null
+  }, [advancedActionModal, liveOrder, orders])
+
+  const advancedModalMeta = advancedActionModal ? advancedActionMeta(advancedActionModal.action) : null
+  const advancedModalActionKey =
+    advancedActionModal && advancedModalOrder
+      ? `${advancedActionModal.action}:${advancedModalOrder.provider_order_id}`
+      : ''
+  const advancedModalLoading = advancedModalActionKey ? Boolean(actionLoading[advancedModalActionKey]) : false
 
   const refreshWalletBalance = useCallback(async () => {
     setWalletLoading(true)
@@ -836,7 +883,7 @@ export default function NomorVirtualPage() {
     order: FiveSimOrder,
     action: OrderAction,
     options?: { silentSuccess?: boolean }
-  ) => {
+  ): Promise<boolean> => {
     const actionKey = `${action}:${order.provider_order_id}`
     setActionLoading((prev) => ({ ...prev, [actionKey]: true }))
     if (!options?.silentSuccess) {
@@ -856,7 +903,7 @@ export default function NomorVirtualPage() {
 
       if (!response.success) {
         setBannerError(response.message || 'Gagal memproses aksi order')
-        return
+        return false
       }
 
       if (!options?.silentSuccess) {
@@ -883,27 +930,40 @@ export default function NomorVirtualPage() {
       if (action !== 'check') {
         void refreshWalletBalance()
       }
+
+      return true
     } catch (error: unknown) {
       setBannerError(resolveErrorMessage(error, 'Gagal memproses aksi order'))
+      return false
     } finally {
       setActionLoading((prev) => ({ ...prev, [actionKey]: false }))
     }
   }, [refreshWalletBalance])
 
-  const confirmAdvancedAction = async (order: FiveSimOrder, action: Exclude<OrderAction, 'check'>) => {
-    const actionLabel =
-      action === 'finish'
-        ? 'Finish order ini? OTP akan dianggap selesai dipakai.'
-        : action === 'cancel'
-          ? 'Cancel order ini? Gunakan kalau order memang tidak akan dilanjut.'
-          : 'Ban order ini? Gunakan hanya kalau nomor benar-benar bermasalah.'
+  const openAdvancedActionModal = (order: FiveSimOrder, action: AdvancedAction) => {
+    setAdvancedActionModal({
+      action,
+      providerOrderID: order.provider_order_id,
+    })
+  }
 
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm(actionLabel)
-      if (!confirmed) return
+  const closeAdvancedActionModal = () => {
+    if (advancedModalLoading) return
+    setAdvancedActionModal(null)
+  }
+
+  const confirmAdvancedAction = async () => {
+    if (!advancedActionModal) return
+    if (!advancedModalOrder) {
+      setBannerError('Order tidak ditemukan. Coba refresh list order dulu.')
+      setAdvancedActionModal(null)
+      return
     }
 
-    await runOrderAction(order, action)
+    const success = await runOrderAction(advancedModalOrder, advancedActionModal.action)
+    if (success) {
+      setAdvancedActionModal(null)
+    }
   }
 
   const toggleSMSInbox = async (order: FiveSimOrder) => {
@@ -1491,7 +1551,7 @@ export default function NomorVirtualPage() {
                             {liveCanFinish ? (
                               <button
                                 type="button"
-                                onClick={() => void confirmAdvancedAction(liveOrder, 'finish')}
+                                onClick={() => openAdvancedActionModal(liveOrder, 'finish')}
                                 disabled={Boolean(actionLoading[`finish:${liveOrder.provider_order_id}`])}
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
                               >
@@ -1503,7 +1563,7 @@ export default function NomorVirtualPage() {
                             {liveCanCancel ? (
                               <button
                                 type="button"
-                                onClick={() => void confirmAdvancedAction(liveOrder, 'cancel')}
+                                onClick={() => openAdvancedActionModal(liveOrder, 'cancel')}
                                 disabled={Boolean(actionLoading[`cancel:${liveOrder.provider_order_id}`])}
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
                               >
@@ -1515,7 +1575,7 @@ export default function NomorVirtualPage() {
                             {liveCanBan ? (
                               <button
                                 type="button"
-                                onClick={() => void confirmAdvancedAction(liveOrder, 'ban')}
+                                onClick={() => openAdvancedActionModal(liveOrder, 'ban')}
                                 disabled={Boolean(actionLoading[`ban:${liveOrder.provider_order_id}`])}
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-60"
                               >
@@ -1812,6 +1872,86 @@ export default function NomorVirtualPage() {
           </div>
         </div>
       )}
+
+      {advancedActionModal ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6">
+          <button
+            type="button"
+            aria-label="Tutup modal aksi lanjutan"
+            onClick={closeAdvancedActionModal}
+            className="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
+          />
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Konfirmasi aksi lanjutan order"
+            className="relative z-[81] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#EBEBEB] bg-white p-5 shadow-2xl sm:p-6"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-base font-extrabold text-[#141414]">
+                {advancedModalMeta?.title || 'Konfirmasi Aksi Order'}
+              </h3>
+              <button
+                type="button"
+                onClick={closeAdvancedActionModal}
+                disabled={advancedModalLoading}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#EBEBEB] text-sm font-bold text-[#666] hover:border-[#141414] hover:text-[#141414] disabled:opacity-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-4 text-sm space-y-1.5">
+              <div className="flex items-center justify-between gap-2 text-xs text-[#666]">
+                <span>Order</span>
+                <span className="font-semibold text-[#141414]">#{advancedActionModal.providerOrderID}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 text-xs text-[#666]">
+                <span>Layanan</span>
+                <span className="font-semibold text-[#141414] text-right">
+                  {advancedModalOrder ? toTitleCase(advancedModalOrder.product || 'unknown') : '-'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2 text-xs text-[#666]">
+                <span>Nomor</span>
+                <span className="font-semibold text-[#141414] text-right break-all">
+                  {advancedModalOrder?.phone || '-'}
+                </span>
+              </div>
+            </div>
+
+            <p className="mt-4 text-xs leading-relaxed text-[#777]">
+              {advancedModalMeta?.description || 'Pastikan aksi ini sesuai kebutuhan order.'}
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={closeAdvancedActionModal}
+                disabled={advancedModalLoading}
+                className="w-full rounded-full border border-[#EBEBEB] bg-white px-4 py-3 text-sm font-bold text-[#555] hover:bg-[#F7F7F5] disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmAdvancedAction()}
+                disabled={advancedModalLoading}
+                className={`w-full rounded-full px-4 py-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60 ${advancedModalMeta?.confirmClass || 'bg-[#141414] text-white'}`}
+              >
+                {advancedModalLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Memproses...
+                  </span>
+                ) : (
+                  advancedModalMeta?.confirmLabel || 'Konfirmasi Aksi'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
