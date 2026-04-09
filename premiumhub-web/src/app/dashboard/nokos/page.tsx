@@ -874,8 +874,8 @@ export default function NomorVirtualPage() {
         <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-wider font-semibold text-white/40 mb-2">Nomor Virtual OTP</p>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-1">Terima SMS & OTP Instan</h1>
-            <p className="text-sm text-white/60">Flow sudah siap buat wiring full ke backend 5sim.</p>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-1">Beli Nomor Virtual & Terima OTP Instan</h1>
+            <p className="text-sm text-white/60">Pilih negara, layanan, dan operator. Nomor aktif dalam hitungan detik, potongan saldo transparan dari wallet.</p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full md:w-auto">
