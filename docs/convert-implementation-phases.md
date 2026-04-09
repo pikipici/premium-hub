@@ -20,7 +20,7 @@ Acceptance:
 
 ---
 
-## Phase 1 — Backend Core (Persist + API)
+## Phase 1 — Backend Core (Persist + API) ✅
 
 Deliverables:
 - Migration tabel `convert_*`.
@@ -31,9 +31,12 @@ Acceptance:
 - API test lifecycle order lulus.
 - Tidak ada perubahan behavior pada route non-convert.
 
+Status:
+- Selesai (commit: `94b0153`).
+
 ---
 
-## Phase 2 — FE User Wiring
+## Phase 2 — FE User Wiring ✅
 
 Deliverables:
 - Form convert create order ke API real.
@@ -42,6 +45,9 @@ Deliverables:
 
 Acceptance:
 - User flow end-to-end (create -> track -> waiting_review) lulus.
+
+Status:
+- Selesai (frontend sudah wiring ke API real untuk create/list/detail/track/upload-proof).
 
 ---
 

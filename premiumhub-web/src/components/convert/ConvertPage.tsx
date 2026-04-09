@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
+import { getHttpErrorMessage } from '@/lib/httpError'
+import { convertService } from '@/services/convertService'
 import { useAuthStore } from '@/store/authStore'
 
 export type ConvertAssetType = 'pulsa' | 'paypal' | 'crypto'
@@ -153,6 +155,7 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
   const [agree, setAgree] = useState(false)
   const [attemptedReview, setAttemptedReview] = useState(false)
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const selectedAsset = ASSETS[assetType]
   const selectedBank = BANKS.find((item) => item.key === bank) ?? BANKS[0]
@@ -250,6 +253,7 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
     setShowConfirm(false)
     setAgree(false)
     setIsSubmittingOrder(false)
+    setSubmitError('')
   }
 
   const switchAssetType = (nextType: ConvertAssetType) => {
@@ -267,6 +271,7 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
     if (validationError) return
     setAgree(false)
     setIsSubmittingOrder(false)
+    setSubmitError('')
     setShowConfirm(true)
   }
 
@@ -294,42 +299,65 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
 
   const canProceedAsGuest = !guestBlocked
 
-  const proceedAfterConfirm = (mode: 'member' | 'guest') => {
+  const proceedAfterConfirm = async (mode: 'member' | 'guest') => {
     if (!agree || isSubmittingOrder) return
 
-    setIsSubmittingOrder(true)
-
-    const now = Date.now()
-    const orderId = `CVT-${String(now).slice(-8)}`
-    const trackingToken = `${assetType}-${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`
-
-    const params = new URLSearchParams()
-    params.set('asset', assetType)
-    params.set('amount', String(quote.normalizedAmount))
-    params.set('receive', String(quote.totalReceived))
-    params.set('bank', selectedBank.label)
-    params.set('eta', selectedAsset.eta)
-
-    if (assetType === 'pulsa') {
-      params.set('channel', pulsaProvider)
-      params.set('source', pulsaSenderPhone || '-')
-    } else if (assetType === 'paypal') {
-      params.set('channel', paypalFlowType)
-      params.set('source', paypalEmail || '-')
-    } else {
-      params.set('channel', `${cryptoAsset}-${cryptoNetwork}`)
-      params.set('source', cryptoWalletAddress || '-')
+    if (!isMember) {
+      router.push(`/login?next=${encodeURIComponent(pathname || ASSET_ROUTES[assetType])}`)
+      return
     }
 
-    window.setTimeout(() => {
-      if (mode === 'member') {
-        router.push(`/dashboard/convert/orders/${orderId}?${params.toString()}`)
+    setIsSubmittingOrder(true)
+    setSubmitError('')
+
+    const sourceChannel =
+      assetType === 'pulsa'
+        ? pulsaProvider
+        : assetType === 'paypal'
+          ? paypalFlowType
+          : `${cryptoAsset}-${cryptoNetwork}`
+
+    const sourceAccount =
+      assetType === 'pulsa'
+        ? pulsaSenderPhone.trim()
+        : assetType === 'paypal'
+          ? paypalEmail.trim()
+          : cryptoWalletAddress.trim()
+
+    const idempotencyKey = `cvt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+    try {
+      const response = await convertService.createOrder({
+        asset_type: assetType,
+        source_amount: quote.normalizedAmount,
+        source_channel: sourceChannel,
+        source_account: sourceAccount,
+        destination_bank: selectedBank.label,
+        destination_account_number: bankAccountNumber.trim(),
+        destination_account_name: bankAccountName.trim(),
+        is_guest: mode === 'guest',
+        idempotency_key: idempotencyKey,
+      })
+
+      const order = response.data?.order
+      if (!order?.id) {
+        setSubmitError('Response order convert tidak valid. Coba lagi.')
         return
       }
 
-      params.set('orderId', orderId)
-      router.push(`/product/convert/track/${trackingToken}?${params.toString()}`)
-    }, 500)
+      closeReview()
+
+      if (mode === 'guest' && order.tracking_token) {
+        router.push(`/product/convert/track/${encodeURIComponent(order.tracking_token)}`)
+        return
+      }
+
+      router.push(`/dashboard/convert/orders/${order.id}`)
+    } catch (error: unknown) {
+      setSubmitError(getHttpErrorMessage(error, 'Gagal membuat order convert. Coba lagi.'))
+    } finally {
+      setIsSubmittingOrder(false)
+    }
   }
 
   return (
@@ -352,9 +380,9 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
             </div>
           ) : (
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              ⚡ Mode tamu aktif. Ada biaya tambahan <strong>{formatRupiah(GUEST_SURCHARGE)}</strong>.{' '}
+              ⚡ Lu bisa simulasi quote tanpa login. Untuk create order real di phase ini tetap wajib login.{' '}
               <Link href="/login" className="font-bold text-[#FF5733] underline underline-offset-2">
-                Login biar biaya ini hilang
+                Login sekarang
               </Link>
               .
             </div>
@@ -761,6 +789,12 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
             </label>
 
             <div className="mt-4">
+              {submitError ? (
+                <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  {submitError}
+                </p>
+              ) : null}
+
               {isMember ? (
                 <button
                   type="button"
@@ -768,28 +802,23 @@ export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: Co
                   onClick={() => proceedAfterConfirm('member')}
                   className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isSubmittingOrder ? 'Menyiapkan order...' : 'Konfirmasi & Buat Order'}
+                  {isSubmittingOrder ? 'Membuat order convert...' : 'Konfirmasi & Buat Order'}
                 </button>
               ) : canProceedAsGuest ? (
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    disabled={!agree || isSubmittingOrder}
-                    onClick={() => proceedAfterConfirm('guest')}
-                    className="w-full rounded-full bg-[#141414] px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isSubmittingOrder ? 'Menyiapkan order tamu...' : `Lanjut sebagai tamu (+${formatRupiah(GUEST_SURCHARGE)})`}
-                  </button>
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Untuk keamanan rollout phase ini, order convert real sementara hanya bisa dibuat setelah login.
+                  </p>
                   <Link
-                    href="/login"
+                    href={`/login?next=${encodeURIComponent(pathname || ASSET_ROUTES[assetType])}`}
                     className="inline-flex w-full items-center justify-center rounded-full border border-[#FF5733] bg-white px-4 py-3 text-sm font-extrabold text-[#FF5733]"
                   >
-                    Login dulu biar lebih hemat
+                    Login untuk lanjut transaksi
                   </Link>
                 </div>
               ) : (
                 <Link
-                  href="/login"
+                  href={`/login?next=${encodeURIComponent(pathname || ASSET_ROUTES[assetType])}`}
                   className="inline-flex w-full items-center justify-center rounded-full bg-[#141414] px-4 py-3 text-sm font-extrabold text-white"
                 >
                   Login untuk lanjut transaksi
