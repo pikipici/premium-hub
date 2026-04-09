@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"premiumhub-api/config"
 	"premiumhub-api/internal/model"
@@ -32,15 +33,20 @@ type fakeFiveSimClient struct {
 	reuseErr          error
 	checkResp         *FiveSimOrderPayload
 	checkErr          error
+	checkRespByID     map[int64]*FiveSimOrderPayload
+	checkErrByID      map[int64]error
 	finishResp        *FiveSimOrderPayload
 	finishErr         error
 	cancelResp        *FiveSimOrderPayload
 	cancelErr         error
+	cancelRespByID    map[int64]*FiveSimOrderPayload
+	cancelErrByID     map[int64]error
 	banResp           *FiveSimOrderPayload
 	banErr            error
 
-	checkHits  int
-	cancelHits int
+	checkHits   int
+	cancelHits  int
+	checkHitsBy map[int64]int
 }
 
 func (f *fakeFiveSimClient) GetProfile(_ context.Context) (map[string]any, error) {
@@ -101,8 +107,23 @@ func (f *fakeFiveSimClient) ReuseNumber(_ context.Context, _, _ string) (*FiveSi
 	return f.reuseResp, nil
 }
 
-func (f *fakeFiveSimClient) CheckOrder(_ context.Context, _ int64) (*FiveSimOrderPayload, error) {
+func (f *fakeFiveSimClient) CheckOrder(_ context.Context, providerOrderID int64) (*FiveSimOrderPayload, error) {
 	f.checkHits++
+	if f.checkHitsBy == nil {
+		f.checkHitsBy = map[int64]int{}
+	}
+	f.checkHitsBy[providerOrderID] = f.checkHitsBy[providerOrderID] + 1
+
+	if f.checkErrByID != nil {
+		if err, ok := f.checkErrByID[providerOrderID]; ok && err != nil {
+			return nil, err
+		}
+	}
+	if f.checkRespByID != nil {
+		if res, ok := f.checkRespByID[providerOrderID]; ok && res != nil {
+			return res, nil
+		}
+	}
 	if f.checkErr != nil {
 		return nil, f.checkErr
 	}
@@ -122,8 +143,18 @@ func (f *fakeFiveSimClient) FinishOrder(_ context.Context, _ int64) (*FiveSimOrd
 	return f.finishResp, nil
 }
 
-func (f *fakeFiveSimClient) CancelOrder(_ context.Context, _ int64) (*FiveSimOrderPayload, error) {
+func (f *fakeFiveSimClient) CancelOrder(_ context.Context, providerOrderID int64) (*FiveSimOrderPayload, error) {
 	f.cancelHits++
+	if f.cancelErrByID != nil {
+		if err, ok := f.cancelErrByID[providerOrderID]; ok && err != nil {
+			return nil, err
+		}
+	}
+	if f.cancelRespByID != nil {
+		if res, ok := f.cancelRespByID[providerOrderID]; ok && res != nil {
+			return res, nil
+		}
+	}
 	if f.cancelErr != nil {
 		return nil, f.cancelErr
 	}
@@ -472,5 +503,253 @@ func TestFiveSimServiceBuyActivationInsufficientWalletCancelFailureEscalates(t *
 	}
 	if fake.cancelHits != 1 {
 		t.Fatalf("expected cancel provider hit once, got %d", fake.cancelHits)
+	}
+}
+
+func TestFiveSimServiceCheckOrderPersistsStatusAndSnapshot(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+
+	seed := model.FiveSimOrder{
+		ID:              uuid.New(),
+		UserID:          activeUser.ID,
+		ProviderOrderID: 551100,
+		OrderType:       "activation",
+		ProviderStatus:  "PENDING",
+		CreatedAt:       time.Now().Add(-2 * time.Minute),
+		UpdatedAt:       time.Now().Add(-2 * time.Minute),
+	}
+	if err := db.Create(&seed).Error; err != nil {
+		t.Fatalf("seed order: %v", err)
+	}
+
+	fake.checkRespByID = map[int64]*FiveSimOrderPayload{
+		551100: {
+			ID:       551100,
+			Status:   "RECEIVED",
+			Phone:    "+628123123123",
+			Country:  "indonesia",
+			Operator: "any",
+			Product:  "telegram",
+			Price:    0.22,
+			SMS: []FiveSimSMS{{
+				Code: "12345",
+				Text: "kode otp 12345",
+			}},
+		},
+	}
+
+	localOrder, _, err := svc.CheckOrder(context.Background(), activeUser.ID, 551100)
+	if err != nil {
+		t.Fatalf("check order: %v", err)
+	}
+	if localOrder.ProviderStatus != "RECEIVED" {
+		t.Fatalf("expected returned status RECEIVED, got %s", localOrder.ProviderStatus)
+	}
+
+	var dbRow model.FiveSimOrder
+	if err := db.First(&dbRow, "provider_order_id = ?", 551100).Error; err != nil {
+		t.Fatalf("load db row: %v", err)
+	}
+	if dbRow.ProviderStatus != "RECEIVED" {
+		t.Fatalf("expected persisted status RECEIVED, got %s", dbRow.ProviderStatus)
+	}
+	if dbRow.LastSyncedAt == nil {
+		t.Fatalf("expected last_synced_at to be set")
+	}
+	if !strings.Contains(dbRow.RawPayload, "12345") {
+		t.Fatalf("expected raw payload to include sms snapshot")
+	}
+}
+
+func TestFiveSimServiceAutoRefundOnFailedStatusWithoutSMS(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	seedFiveSimOrderWithCharge(t, db, activeUser.ID, 662211, "PENDING", 1_000, time.Now().Add(-3*time.Minute))
+
+	fake.checkRespByID = map[int64]*FiveSimOrderPayload{
+		662211: {
+			ID:       662211,
+			Status:   "TIMEOUT",
+			Phone:    "+628880001111",
+			Country:  "indonesia",
+			Operator: "any",
+			Product:  "telegram",
+			Price:    0.5,
+			SMS:      []FiveSimSMS{},
+		},
+	}
+
+	if _, _, err := svc.CheckOrder(context.Background(), activeUser.ID, 662211); err != nil {
+		t.Fatalf("check order timeout: %v", err)
+	}
+
+	var userAfterFirst model.User
+	if err := db.First(&userAfterFirst, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user first: %v", err)
+	}
+	if userAfterFirst.WalletBalance != 50_000 {
+		t.Fatalf("wallet should be refunded to 50000, got %d", userAfterFirst.WalletBalance)
+	}
+
+	if _, _, err := svc.CheckOrder(context.Background(), activeUser.ID, 662211); err != nil {
+		t.Fatalf("check order timeout second pass: %v", err)
+	}
+
+	var refundCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", "fivesim_order:662211:refund").Count(&refundCount).Error; err != nil {
+		t.Fatalf("count refund ledger: %v", err)
+	}
+	if refundCount != 1 {
+		t.Fatalf("expected exactly 1 refund ledger row, got %d", refundCount)
+	}
+}
+
+func TestFiveSimServiceNoRefundWhenSMSAlreadyExists(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	seedFiveSimOrderWithCharge(t, db, activeUser.ID, 773322, "PENDING", 1_000, time.Now().Add(-3*time.Minute))
+
+	fake.checkRespByID = map[int64]*FiveSimOrderPayload{
+		773322: {
+			ID:       773322,
+			Status:   "CANCELED",
+			Phone:    "+628880001222",
+			Country:  "indonesia",
+			Operator: "any",
+			Product:  "telegram",
+			Price:    0.5,
+			SMS: []FiveSimSMS{{
+				Code: "99887",
+				Text: "kode otp 99887",
+			}},
+		},
+	}
+
+	if _, _, err := svc.CheckOrder(context.Background(), activeUser.ID, 773322); err != nil {
+		t.Fatalf("check order canceled with sms: %v", err)
+	}
+
+	var userAfter model.User
+	if err := db.First(&userAfter, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user: %v", err)
+	}
+	if userAfter.WalletBalance != 49_000 {
+		t.Fatalf("wallet should stay deducted when sms exists, got %d", userAfter.WalletBalance)
+	}
+
+	var refundCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", "fivesim_order:773322:refund").Count(&refundCount).Error; err != nil {
+		t.Fatalf("count refund ledger: %v", err)
+	}
+	if refundCount != 0 {
+		t.Fatalf("expected no refund ledger, got %d", refundCount)
+	}
+}
+
+func TestFiveSimServiceReconcileOpenOrdersAutoCancelAndRefund(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	seedFiveSimOrderWithCharge(t, db, activeUser.ID, 884433, "PENDING", 1_000, time.Now().Add(-20*time.Minute))
+
+	fake.checkRespByID = map[int64]*FiveSimOrderPayload{
+		884433: {
+			ID:       884433,
+			Status:   "PENDING",
+			Phone:    "+628880004433",
+			Country:  "indonesia",
+			Operator: "any",
+			Product:  "telegram",
+			Price:    0.4,
+			SMS:      []FiveSimSMS{},
+		},
+	}
+	fake.cancelRespByID = map[int64]*FiveSimOrderPayload{
+		884433: {
+			ID:       884433,
+			Status:   "CANCELED",
+			Phone:    "+628880004433",
+			Country:  "indonesia",
+			Operator: "any",
+			Product:  "telegram",
+			Price:    0.4,
+			SMS:      []FiveSimSMS{},
+		},
+	}
+
+	res, err := svc.ReconcileOpenOrders(context.Background(), FiveSimReconcileInput{
+		Limit:      50,
+		MinSyncAge: time.Second,
+		MaxWaiting: 15 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("reconcile open orders: %v", err)
+	}
+	if res.Checked != 1 || res.Synced != 1 || res.AutoCanceled != 1 || res.Refunded != 1 || res.Failed != 0 {
+		t.Fatalf("unexpected reconcile result: %+v", res)
+	}
+	if fake.cancelHits != 1 {
+		t.Fatalf("expected auto cancel to be called once, got %d", fake.cancelHits)
+	}
+
+	var row model.FiveSimOrder
+	if err := db.First(&row, "provider_order_id = ?", 884433).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if row.ProviderStatus != "CANCELED" {
+		t.Fatalf("expected final provider status CANCELED, got %s", row.ProviderStatus)
+	}
+
+	var userAfter model.User
+	if err := db.First(&userAfter, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user after reconcile: %v", err)
+	}
+	if userAfter.WalletBalance != 50_000 {
+		t.Fatalf("wallet should be refunded to 50000, got %d", userAfter.WalletBalance)
+	}
+}
+
+func seedFiveSimOrderWithCharge(t *testing.T, db *gorm.DB, userID uuid.UUID, providerOrderID int64, status string, amount int64, createdAt time.Time) {
+	t.Helper()
+
+	var user model.User
+	if err := db.First(&user, "id = ?", userID).Error; err != nil {
+		t.Fatalf("load user seed: %v", err)
+	}
+
+	before := user.WalletBalance
+	after := before - amount
+	user.WalletBalance = after
+	if err := db.Save(&user).Error; err != nil {
+		t.Fatalf("save user seed wallet: %v", err)
+	}
+
+	order := model.FiveSimOrder{
+		ID:              uuid.New(),
+		UserID:          userID,
+		ProviderOrderID: providerOrderID,
+		OrderType:       "activation",
+		Phone:           "+628123000000",
+		Country:         "indonesia",
+		Operator:        "any",
+		Product:         "telegram",
+		ProviderPrice:   0.5,
+		ProviderStatus:  status,
+		CreatedAt:       createdAt,
+		UpdatedAt:       createdAt,
+	}
+	if err := db.Create(&order).Error; err != nil {
+		t.Fatalf("create seed order: %v", err)
+	}
+
+	ledger := model.WalletLedger{
+		ID:            uuid.New(),
+		UserID:        userID,
+		Type:          "debit",
+		Category:      "5sim_purchase",
+		Amount:        amount,
+		BalanceBefore: before,
+		BalanceAfter:  after,
+		Reference:     fmt.Sprintf("fivesim_order:%d:charge", providerOrderID),
+		Description:   "seed charge ledger",
+	}
+	if err := db.Create(&ledger).Error; err != nil {
+		t.Fatalf("create seed ledger: %v", err)
 	}
 }

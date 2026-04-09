@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"premiumhub-api/internal/model"
 
 	"github.com/google/uuid"
@@ -43,4 +45,22 @@ func (r *FiveSimOrderRepo) ListByUser(userID uuid.UUID, page, limit int) ([]mode
 	q.Count(&total)
 	err := q.Offset((page - 1) * limit).Limit(limit).Order("created_at DESC").Find(&rows).Error
 	return rows, total, err
+}
+
+func (r *FiveSimOrderRepo) ListOpenForReconcile(statuses []string, syncedBefore time.Time, limit int) ([]model.FiveSimOrder, error) {
+	var rows []model.FiveSimOrder
+
+	q := r.db.Model(&model.FiveSimOrder{})
+	if len(statuses) > 0 {
+		q = q.Where("provider_status IN ?", statuses)
+	}
+	if !syncedBefore.IsZero() {
+		q = q.Where("last_synced_at IS NULL OR last_synced_at <= ?", syncedBefore)
+	}
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+
+	err := q.Order("created_at ASC").Find(&rows).Error
+	return rows, err
 }

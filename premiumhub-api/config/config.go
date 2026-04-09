@@ -16,6 +16,9 @@ type Config struct {
 	NeticonBaseURL, NeticonAPIKey, NeticonUserID, NeticonHTTPTimeoutSec  string
 	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                 string
 	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                  string
+	FiveSimReconcileWorkerInterval, FiveSimReconcileWorkerBatchLimit     string
+	FiveSimReconcileSyncMinAge, FiveSimOrderMaxWaitingDuration           string
+	FiveSimReconcileWorkerEnabled                                        bool
 	WalletTopupExpiryMinutes                                             string
 	SMTPHost, SMTPPort, SMTPUser, SMTPPass, FrontendURL                  string
 	CookieDomain, CookieSameSite                                         string
@@ -64,6 +67,11 @@ func Load() *Config {
 		FiveSimHTTPTimeoutSec:             e("FIVESIM_HTTP_TIMEOUT_SEC", "15"),
 		FiveSimWalletPriceMultiplier:      e("FIVESIM_WALLET_PRICE_MULTIPLIER", "1"),
 		FiveSimWalletMinDebit:             e("FIVESIM_WALLET_MIN_DEBIT", "1"),
+		FiveSimReconcileWorkerEnabled:     eb("FIVESIM_RECONCILE_WORKER_ENABLED", true),
+		FiveSimReconcileWorkerInterval:    e("FIVESIM_RECONCILE_WORKER_INTERVAL", "1m"),
+		FiveSimReconcileWorkerBatchLimit:  e("FIVESIM_RECONCILE_WORKER_BATCH_LIMIT", "200"),
+		FiveSimReconcileSyncMinAge:        e("FIVESIM_RECONCILE_SYNC_MIN_AGE", "45s"),
+		FiveSimOrderMaxWaitingDuration:    e("FIVESIM_ORDER_MAX_WAITING_DURATION", "15m"),
 		WalletTopupExpiryMinutes:          e("WALLET_TOPUP_EXPIRY_MINUTES", "15"),
 		SMTPHost:                          e("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:                          e("SMTP_PORT", "587"),

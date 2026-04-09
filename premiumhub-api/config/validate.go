@@ -132,6 +132,29 @@ func (c *Config) Validate() error {
 			problems = append(problems, "FIVESIM_WALLET_MIN_DEBIT harus angka > 0 dan <= 1000000000")
 		}
 	}
+	if v := strings.TrimSpace(c.FiveSimReconcileWorkerInterval); v != "" {
+		if _, err := time.ParseDuration(v); err != nil {
+			problems = append(problems, "FIVESIM_RECONCILE_WORKER_INTERVAL harus format duration valid (contoh: 1m, 30s)")
+		}
+	}
+	if v := strings.TrimSpace(c.FiveSimReconcileWorkerBatchLimit); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 10_000 {
+			problems = append(problems, "FIVESIM_RECONCILE_WORKER_BATCH_LIMIT harus angka 1-10000")
+		}
+	}
+	if v := strings.TrimSpace(c.FiveSimReconcileSyncMinAge); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			problems = append(problems, "FIVESIM_RECONCILE_SYNC_MIN_AGE harus format duration valid dan > 0")
+		}
+	}
+	if v := strings.TrimSpace(c.FiveSimOrderMaxWaitingDuration); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			problems = append(problems, "FIVESIM_ORDER_MAX_WAITING_DURATION harus format duration valid dan > 0")
+		}
+	}
 
 	if appEnv == "production" {
 		if strings.TrimSpace(c.NeticonAPIKey) == "" {

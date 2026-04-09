@@ -21,6 +21,26 @@ import (
 
 var errFiveSimWalletInsufficient = errors.New("saldo wallet tidak cukup untuk beli nomor 5sim")
 
+const (
+	fiveSimStatusPending  = "PENDING"
+	fiveSimStatusReceived = "RECEIVED"
+	fiveSimStatusCanceled = "CANCELED"
+	fiveSimStatusTimeout  = "TIMEOUT"
+	fiveSimStatusFinished = "FINISHED"
+	fiveSimStatusBanned   = "BANNED"
+)
+
+var fiveSimOpenStatuses = map[string]struct{}{
+	fiveSimStatusPending:  {},
+	fiveSimStatusReceived: {},
+}
+
+var fiveSimRefundEligibleStatuses = map[string]struct{}{
+	fiveSimStatusCanceled: {},
+	fiveSimStatusTimeout:  {},
+	fiveSimStatusBanned:   {},
+}
+
 type FiveSimService struct {
 	cfg        *config.Config
 	userRepo   *repository.UserRepo
@@ -71,6 +91,20 @@ type FiveSimCatalogPricesResponse struct {
 	Product  string                   `json:"product"`
 	Currency string                   `json:"currency"`
 	Prices   []FiveSimCatalogPriceRow `json:"prices"`
+}
+
+type FiveSimReconcileInput struct {
+	Limit      int
+	MinSyncAge time.Duration
+	MaxWaiting time.Duration
+}
+
+type FiveSimReconcileResult struct {
+	Checked      int `json:"checked"`
+	Synced       int `json:"synced"`
+	AutoCanceled int `json:"auto_canceled"`
+	Refunded     int `json:"refunded"`
+	Failed       int `json:"failed"`
 }
 
 func NewFiveSimService(
@@ -746,6 +780,84 @@ func (s *FiveSimService) ListLocalOrders(userID uuid.UUID, page, limit int) ([]m
 	return rows, total, nil
 }
 
+func (s *FiveSimService) ReconcileOpenOrders(ctx context.Context, input FiveSimReconcileInput) (*FiveSimReconcileResult, error) {
+	if input.Limit <= 0 {
+		input.Limit = 200
+	}
+	if input.Limit > 1000 {
+		input.Limit = 1000
+	}
+	if input.MinSyncAge <= 0 {
+		input.MinSyncAge = 45 * time.Second
+	}
+	if input.MaxWaiting <= 0 {
+		input.MaxWaiting = 15 * time.Minute
+	}
+
+	syncedBefore := time.Now().Add(-input.MinSyncAge)
+	rows, err := s.orderRepo.ListOpenForReconcile([]string{fiveSimStatusPending, fiveSimStatusReceived}, syncedBefore, input.Limit)
+	if err != nil {
+		return nil, errors.New("gagal memuat antrian order 5sim")
+	}
+
+	result := &FiveSimReconcileResult{}
+	for i := range rows {
+		if err := ctx.Err(); err != nil {
+			break
+		}
+
+		row := &rows[i]
+		result.Checked++
+
+		providerOrder, err := s.client.CheckOrder(ctx, row.ProviderOrderID)
+		if err != nil {
+			result.Failed++
+			s.touchOrderSyncedAt(row)
+			continue
+		}
+
+		if err := s.applySnapshot(row, providerOrder, row.OrderType, "worker-check"); err != nil {
+			result.Failed++
+			continue
+		}
+
+		if s.shouldAutoCancelByWaitingWindow(row, providerOrder, input.MaxWaiting) {
+			cancelledOrder, cancelErr := s.client.CancelOrder(ctx, row.ProviderOrderID)
+			if cancelErr == nil {
+				providerOrder = cancelledOrder
+				result.AutoCanceled++
+				if err := s.applySnapshot(row, providerOrder, row.OrderType, "worker-cancel"); err != nil {
+					result.Failed++
+					continue
+				}
+			} else if latest, checkErr := s.client.CheckOrder(ctx, row.ProviderOrderID); checkErr == nil {
+				providerOrder = latest
+				if err := s.applySnapshot(row, providerOrder, row.OrderType, "worker-check-after-cancel"); err != nil {
+					result.Failed++
+					continue
+				}
+			}
+		}
+
+		if err := s.orderRepo.Update(row); err != nil {
+			result.Failed++
+			continue
+		}
+		result.Synced++
+
+		refunded, settleErr := s.settleWalletAfterSync(row, providerOrder, "auto-reconcile")
+		if settleErr != nil {
+			result.Failed++
+			continue
+		}
+		if refunded {
+			result.Refunded++
+		}
+	}
+
+	return result, nil
+}
+
 func (s *FiveSimService) GetProviderProfile(ctx context.Context) (map[string]any, error) {
 	res, err := s.client.GetProfile(ctx)
 	if err != nil {
@@ -807,6 +919,13 @@ func (s *FiveSimService) runOrderAction(
 
 	if err := s.applySnapshot(localOrder, providerOrder, "", action); err != nil {
 		return nil, nil, err
+	}
+	if err := s.orderRepo.Update(localOrder); err != nil {
+		return nil, nil, errors.New("gagal update order 5sim")
+	}
+
+	if _, err := s.settleWalletAfterSync(localOrder, providerOrder, "manual-"+action); err != nil {
+		return nil, nil, fmt.Errorf("status order 5sim berhasil diupdate, tapi settlement wallet gagal: %w", err)
 	}
 
 	return localOrder, providerOrder, nil
@@ -879,7 +998,7 @@ func (s *FiveSimService) applySnapshot(row *model.FiveSimOrder, providerOrder *F
 		row.ProviderPrice = providerOrder.Price
 	}
 
-	status := strings.ToUpper(strings.TrimSpace(providerOrder.Status))
+	status := normalizeFiveSimOrderStatus(providerOrder.Status)
 	if status != "" {
 		row.ProviderStatus = status
 	}
@@ -893,6 +1012,204 @@ func (s *FiveSimService) applySnapshot(row *model.FiveSimOrder, providerOrder *F
 	row.LastSyncedAt = &now
 
 	return nil
+}
+
+func (s *FiveSimService) shouldAutoCancelByWaitingWindow(row *model.FiveSimOrder, providerOrder *FiveSimOrderPayload, maxWaiting time.Duration) bool {
+	if row == nil {
+		return false
+	}
+	if maxWaiting <= 0 {
+		maxWaiting = 15 * time.Minute
+	}
+
+	status := normalizeFiveSimOrderStatus(row.ProviderStatus)
+	if providerOrder != nil {
+		if providerStatus := normalizeFiveSimOrderStatus(providerOrder.Status); providerStatus != "" {
+			status = providerStatus
+		}
+	}
+	if !isFiveSimOpenStatus(status) {
+		return false
+	}
+	if s.orderHasAnySMS(row, providerOrder) {
+		return false
+	}
+
+	return time.Since(row.CreatedAt) >= maxWaiting
+}
+
+func (s *FiveSimService) settleWalletAfterSync(row *model.FiveSimOrder, providerOrder *FiveSimOrderPayload, reason string) (bool, error) {
+	if row == nil {
+		return false, nil
+	}
+
+	status := normalizeFiveSimOrderStatus(row.ProviderStatus)
+	if providerOrder != nil {
+		if providerStatus := normalizeFiveSimOrderStatus(providerOrder.Status); providerStatus != "" {
+			status = providerStatus
+		}
+	}
+	if !isFiveSimRefundEligibleStatus(status) {
+		return false, nil
+	}
+	if s.orderHasAnySMS(row, providerOrder) {
+		return false, nil
+	}
+
+	return s.refundWalletForOrder(row, status, reason)
+}
+
+func (s *FiveSimService) refundWalletForOrder(row *model.FiveSimOrder, status, reason string) (bool, error) {
+	if row == nil || row.ProviderOrderID <= 0 {
+		return false, nil
+	}
+	if s.walletRepo == nil {
+		return false, errors.New("konfigurasi wallet belum siap")
+	}
+
+	chargeRef := fmt.Sprintf("fivesim_order:%d:charge", row.ProviderOrderID)
+	refundRef := fmt.Sprintf("fivesim_order:%d:refund", row.ProviderOrderID)
+
+	description := fmt.Sprintf(
+		"Refund otomatis 5sim provider_order_id=%d status=%s reason=%s",
+		row.ProviderOrderID,
+		normalizeFiveSimOrderStatus(status),
+		strings.TrimSpace(reason),
+	)
+
+	refunded := false
+	err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, refundRef); err == nil {
+			return nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("gagal cek ledger refund 5sim")
+		}
+
+		chargeLedger, err := s.walletRepo.FindLedgerByReferenceTx(tx, chargeRef)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return errors.New("gagal cek ledger charge 5sim")
+		}
+
+		amount := chargeLedger.Amount
+		if amount <= 0 {
+			return errors.New("nominal refund 5sim tidak valid")
+		}
+
+		user, err := s.walletRepo.LockUserByIDTx(tx, row.UserID)
+		if err != nil {
+			return errors.New("user tidak ditemukan")
+		}
+
+		before := user.WalletBalance
+		after := before + amount
+		user.WalletBalance = after
+		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+			return errors.New("gagal update saldo wallet untuk refund 5sim")
+		}
+
+		ledger := &model.WalletLedger{
+			ID:            uuid.New(),
+			UserID:        user.ID,
+			Type:          "credit",
+			Category:      "5sim_refund",
+			Amount:        amount,
+			BalanceBefore: before,
+			BalanceAfter:  after,
+			Reference:     refundRef,
+			Description:   description,
+		}
+		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
+			return errors.New("gagal menulis ledger refund 5sim")
+		}
+
+		refunded = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return refunded, nil
+}
+
+func (s *FiveSimService) orderHasAnySMS(row *model.FiveSimOrder, providerOrder *FiveSimOrderPayload) bool {
+	if providerOrder != nil && hasFiveSimSMS(providerOrder.SMS) {
+		return true
+	}
+	if row == nil {
+		return false
+	}
+	return rawFiveSimPayloadHasSMS(row.RawPayload)
+}
+
+func (s *FiveSimService) touchOrderSyncedAt(row *model.FiveSimOrder) {
+	if row == nil {
+		return
+	}
+	now := time.Now()
+	row.LastSyncedAt = &now
+	_ = s.orderRepo.Update(row)
+}
+
+func normalizeFiveSimOrderStatus(status string) string {
+	return strings.ToUpper(strings.TrimSpace(status))
+}
+
+func isFiveSimOpenStatus(status string) bool {
+	_, ok := fiveSimOpenStatuses[normalizeFiveSimOrderStatus(status)]
+	return ok
+}
+
+func isFiveSimRefundEligibleStatus(status string) bool {
+	_, ok := fiveSimRefundEligibleStatuses[normalizeFiveSimOrderStatus(status)]
+	return ok
+}
+
+func hasFiveSimSMS(smsList []FiveSimSMS) bool {
+	if len(smsList) == 0 {
+		return false
+	}
+	for _, sms := range smsList {
+		if strings.TrimSpace(sms.Code) != "" {
+			return true
+		}
+		if strings.TrimSpace(sms.Text) != "" {
+			return true
+		}
+		if strings.TrimSpace(sms.Sender) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func rawFiveSimPayloadHasSMS(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return false
+	}
+
+	var payload FiveSimOrderPayload
+	if err := json.Unmarshal([]byte(trimmed), &payload); err == nil {
+		return hasFiveSimSMS(payload.SMS)
+	}
+
+	var generic map[string]any
+	if err := json.Unmarshal([]byte(trimmed), &generic); err != nil {
+		return false
+	}
+	rawSMS, ok := generic["sms"]
+	if !ok {
+		return false
+	}
+	items, ok := rawSMS.([]any)
+	if !ok {
+		return false
+	}
+	return len(items) > 0
 }
 
 func (s *FiveSimService) ensureUserActive(userID uuid.UUID) error {
