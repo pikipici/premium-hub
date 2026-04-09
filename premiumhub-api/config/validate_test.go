@@ -128,19 +128,68 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject malformed convert safety config", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                            "development",
+			JWTSecret:                         "super-secure-secret-value-32chars++",
+			CookieSameSite:                    "lax",
+			AuthRateLimitMax:                  "20",
+			AuthRateLimitWindow:               "1m",
+			ConvertCreateRateLimitMax:         "0",
+			ConvertCreateRateLimitWindow:      "wrong",
+			ConvertProofRateLimitMax:          "-1",
+			ConvertProofRateLimitWindow:       "2m",
+			ConvertTrackRateLimitMax:          "10",
+			ConvertTrackRateLimitWindow:       "oops",
+			ConvertAdminStatusRateLimitMax:    "abc",
+			ConvertAdminStatusRateLimitWindow: "1m",
+			ConvertExpiryWorkerInterval:       "bad-duration",
+			ConvertExpiryWorkerBatchLimit:     "20000",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected convert safety validation errors")
+		}
+
+		msg := err.Error()
+		for _, expected := range []string{
+			"CONVERT_CREATE_RATE_LIMIT_MAX",
+			"CONVERT_CREATE_RATE_LIMIT_WINDOW",
+			"CONVERT_PROOF_RATE_LIMIT_MAX",
+			"CONVERT_TRACK_RATE_LIMIT_WINDOW",
+			"CONVERT_ADMIN_STATUS_RATE_LIMIT_MAX",
+			"CONVERT_EXPIRY_WORKER_INTERVAL",
+			"CONVERT_EXPIRY_WORKER_BATCH_LIMIT",
+		} {
+			if !strings.Contains(msg, expected) {
+				t.Fatalf("expected error to contain %q, got: %s", expected, msg)
+			}
+		}
+	})
+
 	t.Run("production passes when complete", func(t *testing.T) {
 		cfg := &Config{
-			AppEnv:                "Production",
-			JWTSecret:             "super-secure-secret-value-32chars++",
-			NeticonAPIKey:         "NP_xxx",
-			NeticonUserID:         "MERCHANT_01",
-			NeticonBaseURL:        "https://qris.neticonpay.my.id/qris.php",
-			FiveSimAPIKey:         "FS_xxx",
-			FiveSimHTTPTimeoutSec: "15",
-			CookieSameSite:        "strict",
-			CookieSecure:          true,
-			AuthRateLimitMax:      "25",
-			AuthRateLimitWindow:   "2m",
+			AppEnv:                            "Production",
+			JWTSecret:                         "super-secure-secret-value-32chars++",
+			NeticonAPIKey:                     "NP_xxx",
+			NeticonUserID:                     "MERCHANT_01",
+			NeticonBaseURL:                    "https://qris.neticonpay.my.id/qris.php",
+			FiveSimAPIKey:                     "FS_xxx",
+			FiveSimHTTPTimeoutSec:             "15",
+			CookieSameSite:                    "strict",
+			CookieSecure:                      true,
+			AuthRateLimitMax:                  "25",
+			AuthRateLimitWindow:               "2m",
+			ConvertTrackRateLimitMax:          "120",
+			ConvertTrackRateLimitWindow:       "1m",
+			ConvertCreateRateLimitMax:         "12",
+			ConvertCreateRateLimitWindow:      "1m",
+			ConvertProofRateLimitMax:          "20",
+			ConvertProofRateLimitWindow:       "5m",
+			ConvertAdminStatusRateLimitMax:    "120",
+			ConvertAdminStatusRateLimitWindow: "1m",
+			ConvertExpiryWorkerInterval:       "1m",
+			ConvertExpiryWorkerBatchLimit:     "200",
 		}
 		if err := cfg.Validate(); err != nil {
 			t.Fatalf("expected valid production config, got: %v", err)

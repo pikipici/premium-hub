@@ -81,7 +81,7 @@ Status:
 
 ---
 
-## Phase 5 — QA & Go-Live
+## Phase 5 — QA & Go-Live ✅
 
 Deliverables:
 - Unit/integration/E2E untuk scope convert.
@@ -89,3 +89,6 @@ Deliverables:
 
 Acceptance:
 - Rollout tanpa incident di modul non-convert.
+
+Status:
+- Selesai baseline QA/go-live: test matrix, API integration smoke tests, dan dokumen UAT+canary+observability.

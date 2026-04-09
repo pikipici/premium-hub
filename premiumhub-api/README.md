@@ -130,3 +130,6 @@ Implementasi convert sudah dipisah total dari modul lain (route + tabel + servic
 
 Detail kontrak & lifecycle lihat:
 - `docs/api/convert-contract.md`
+
+QA + go-live checklist phase 5:
+- `../docs/convert-phase5-qa-go-live.md`
