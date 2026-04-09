@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
@@ -245,5 +246,73 @@ func TestConvertServiceDailyLimitValidation(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "limit harian") {
 		t.Fatalf("expected daily limit error, got: %v", err)
+	}
+}
+
+func TestConvertServiceUploadProofRejectedWhenOrderFinal(t *testing.T) {
+	svc, _, member, admin := setupConvertService(t)
+
+	order := createBaselineConvertOrder(t, svc, member.ID, "idem-final-proof")
+	orderID := uuid.MustParse(order.Order.ID)
+
+	if _, err := svc.UploadProof(context.Background(), member.ID, orderID, UploadConvertProofInput{FileURL: "https://example.com/proof-1.png"}); err != nil {
+		t.Fatalf("upload proof first: %v", err)
+	}
+	if _, err := svc.AdminUpdateOrderStatus(context.Background(), admin.ID, orderID, AdminUpdateConvertStatusInput{ToStatus: convertStatusApproved, Reason: "ok"}); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+	if _, err := svc.AdminUpdateOrderStatus(context.Background(), admin.ID, orderID, AdminUpdateConvertStatusInput{ToStatus: convertStatusProcessing, Reason: "proses"}); err != nil {
+		t.Fatalf("processing: %v", err)
+	}
+	if _, err := svc.AdminUpdateOrderStatus(context.Background(), admin.ID, orderID, AdminUpdateConvertStatusInput{ToStatus: convertStatusSuccess, Reason: "done"}); err != nil {
+		t.Fatalf("success: %v", err)
+	}
+
+	_, err := svc.UploadProof(context.Background(), member.ID, orderID, UploadConvertProofInput{FileURL: "https://example.com/proof-2.png"})
+	if err == nil || !strings.Contains(err.Error(), "sudah final") {
+		t.Fatalf("expected order final upload error, got: %v", err)
+	}
+}
+
+func TestConvertServiceExpirePendingOrders(t *testing.T) {
+	svc, db, member, _ := setupConvertService(t)
+
+	order := createBaselineConvertOrder(t, svc, member.ID, "idem-expire-1")
+	orderID := uuid.MustParse(order.Order.ID)
+
+	past := time.Now().Add(-2 * time.Hour)
+	if err := db.Model(&model.ConvertOrder{}).Where("id = ?", orderID).Update("expires_at", past).Error; err != nil {
+		t.Fatalf("set expired at: %v", err)
+	}
+
+	result, err := svc.ExpirePendingOrders(context.Background(), 100)
+	if err != nil {
+		t.Fatalf("expire pending orders: %v", err)
+	}
+	if result.Expired != 1 {
+		t.Fatalf("expected 1 expired order, got %d (checked=%d)", result.Expired, result.Checked)
+	}
+
+	detail, err := svc.GetOrderByUser(member.ID, orderID)
+	if err != nil {
+		t.Fatalf("get order by user: %v", err)
+	}
+	if detail.Order.Status != convertStatusExpired {
+		t.Fatalf("expected expired status, got %s", detail.Order.Status)
+	}
+
+	hasExpiredEvent := false
+	for _, event := range detail.Events {
+		if event.ToStatus == convertStatusExpired {
+			hasExpiredEvent = true
+			break
+		}
+	}
+	if !hasExpiredEvent {
+		t.Fatalf("expected expired event in timeline")
+	}
+
+	if _, err := svc.TrackOrderByToken(order.Order.TrackingToken); err == nil {
+		t.Fatalf("tracking token should be inactive after scheduler expiration")
 	}
 }

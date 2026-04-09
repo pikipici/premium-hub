@@ -66,7 +66,7 @@ Status:
 
 ---
 
-## Phase 4 — Ops Safety
+## Phase 4 — Ops Safety ✅
 
 Deliverables:
 - Rate limiting endpoint sensitif.
@@ -75,6 +75,9 @@ Deliverables:
 
 Acceptance:
 - Skenario abuse minimal tertangani.
+
+Status:
+- Selesai (rate-limit endpoint sensitif, validasi bukti diperketat, dan worker auto-expire pending order aktif).
 
 ---
 

@@ -202,16 +202,34 @@ Rule:
 - Wajib valid transition.
 - Wajib simpan actor admin + reason di event log.
 
-## 5.3 Get pricing rules
+## 5.3 Expire pending orders (ops safety)
+`POST /api/v1/admin/convert/orders/expire-pending?limit=200`
+
+Tujuan:
+- Menjalankan proses expire pending order secara manual (ops/recovery), selain worker scheduler otomatis.
+
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "Expire pending convert selesai",
+  "data": {
+    "checked": 17,
+    "expired": 5
+  }
+}
+```
+
+## 5.4 Get pricing rules
 `GET /api/v1/admin/convert/pricing`
 
-## 5.4 Update pricing rules
+## 5.5 Update pricing rules
 `PUT /api/v1/admin/convert/pricing`
 
-## 5.5 Get limits/access rules
+## 5.6 Get limits/access rules
 `GET /api/v1/admin/convert/limits`
 
-## 5.6 Update limits/access rules
+## 5.7 Update limits/access rules
 `PUT /api/v1/admin/convert/limits`
 
 ---
@@ -281,3 +299,4 @@ Contoh message minimum:
 ## 10) Changelog
 
 - `2026-04-09`: Initial freeze contract v1 (manual convert, isolated namespace).
+- `2026-04-09`: Phase 4 ops safety update (`expire-pending` admin endpoint + stronger safety guard notes).

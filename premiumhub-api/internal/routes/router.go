@@ -47,6 +47,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
+	service.StartConvertExpiryWorker(cfg, convertSvc)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc, cfg)
@@ -77,7 +78,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	products.GET("/:slug/prices", productHandler.GetPrices)
 
 	api.POST("/payment/webhook", paymentHandler.Webhook)
-	api.GET("/convert/track/:token", convertHandler.TrackOrder)
+	api.GET(
+		"/convert/track/:token",
+		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request tracking convert. Coba lagi sebentar."),
+		convertHandler.TrackOrder,
+	)
 
 	// Protected routes
 	protected := api.Group("")
@@ -107,10 +112,18 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/wallet/topups/:id", walletHandler.GetTopup)
 	protected.POST("/wallet/topups/:id/check", walletHandler.CheckTopup)
 
-	protected.POST("/convert/orders", convertHandler.CreateOrder)
+	protected.POST(
+		"/convert/orders",
+		middleware.NewUserRateLimiter(cfg.ConvertCreateRateLimitMax, cfg.ConvertCreateRateLimitWindow, "Terlalu banyak request buat order convert. Coba lagi sebentar."),
+		convertHandler.CreateOrder,
+	)
 	protected.GET("/convert/orders", convertHandler.ListOrders)
 	protected.GET("/convert/orders/:id", convertHandler.GetOrder)
-	protected.POST("/convert/orders/:id/proofs", convertHandler.UploadProof)
+	protected.POST(
+		"/convert/orders/:id/proofs",
+		middleware.NewUserRateLimiter(cfg.ConvertProofRateLimitMax, cfg.ConvertProofRateLimitWindow, "Terlalu banyak upload bukti convert. Coba lagi sebentar."),
+		convertHandler.UploadProof,
+	)
 
 	protected.GET("/5sim/catalog/countries", fiveSimHandler.GetCountries)
 	protected.GET("/5sim/catalog/products", fiveSimHandler.GetProducts)
@@ -163,7 +176,12 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/wallet/topups/reconcile", walletHandler.ReconcilePending)
 
 	admin.GET("/convert/orders", convertHandler.AdminListOrders)
-	admin.PATCH("/convert/orders/:id/status", convertHandler.AdminUpdateOrderStatus)
+	admin.PATCH(
+		"/convert/orders/:id/status",
+		middleware.NewUserRateLimiter(cfg.ConvertAdminStatusRateLimitMax, cfg.ConvertAdminStatusRateLimitWindow, "Terlalu banyak update status convert. Coba lagi sebentar."),
+		convertHandler.AdminUpdateOrderStatus,
+	)
+	admin.POST("/convert/orders/expire-pending", convertHandler.AdminExpirePending)
 	admin.GET("/convert/pricing", convertHandler.AdminGetPricingRules)
 	admin.PUT("/convert/pricing", convertHandler.AdminUpdatePricingRules)
 	admin.GET("/convert/limits", convertHandler.AdminGetLimitRules)

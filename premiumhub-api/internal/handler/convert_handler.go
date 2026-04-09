@@ -5,6 +5,7 @@ import (
 	"math"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -168,6 +169,24 @@ func (h *ConvertHandler) AdminUpdateOrderStatus(c *gin.Context) {
 	response.Success(c, "Status order convert diperbarui", res)
 }
 
+func (h *ConvertHandler) AdminExpirePending(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
+	if limit <= 0 {
+		limit = 200
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	res, err := h.svc.ExpirePendingOrders(c.Request.Context(), limit)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Expire pending convert selesai", res)
+}
+
 func (h *ConvertHandler) AdminGetPricingRules(c *gin.Context) {
 	res, err := h.svc.GetPricingRules()
 	if err != nil {
@@ -249,6 +268,15 @@ func parseConvertProofInput(c *gin.Context) (service.UploadConvertProofInput, er
 	if input.FileURL == "" {
 		return service.UploadConvertProofInput{}, fmt.Errorf("bukti transaksi tidak valid")
 	}
+	validatedURL, err := normalizeExternalProofURL(input.FileURL)
+	if err != nil {
+		return service.UploadConvertProofInput{}, err
+	}
+	input.FileURL = validatedURL
+	input.Note = strings.TrimSpace(input.Note)
+	if len(input.Note) > 500 {
+		return service.UploadConvertProofInput{}, fmt.Errorf("catatan bukti terlalu panjang")
+	}
 
 	return input, nil
 }
@@ -256,13 +284,20 @@ func parseConvertProofInput(c *gin.Context) (service.UploadConvertProofInput, er
 func parseConvertProofMultipart(c *gin.Context) (service.UploadConvertProofInput, error) {
 	fileURL := strings.TrimSpace(c.PostForm("file_url"))
 	note := strings.TrimSpace(c.PostForm("note"))
+	if len(note) > 500 {
+		return service.UploadConvertProofInput{}, fmt.Errorf("catatan bukti terlalu panjang")
+	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
 		if fileURL == "" {
 			return service.UploadConvertProofInput{}, fmt.Errorf("bukti transaksi tidak valid")
 		}
-		return service.UploadConvertProofInput{FileURL: fileURL, Note: note}, nil
+		validatedURL, err := normalizeExternalProofURL(fileURL)
+		if err != nil {
+			return service.UploadConvertProofInput{}, err
+		}
+		return service.UploadConvertProofInput{FileURL: validatedURL, Note: note}, nil
 	}
 
 	savedURL, mimeType, fileSize, fileName, err := saveConvertProofFile(c, file)
@@ -317,6 +352,30 @@ func saveConvertProofFile(c *gin.Context, file *multipart.FileHeader) (string, s
 	}
 
 	return fullPath, mimeType, file.Size, file.Filename, nil
+}
+
+func normalizeExternalProofURL(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", fmt.Errorf("bukti transaksi tidak valid")
+	}
+	if len(value) > 2048 {
+		return "", fmt.Errorf("url bukti transaksi terlalu panjang")
+	}
+
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return "", fmt.Errorf("url bukti transaksi tidak valid")
+	}
+	scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+	if scheme != "http" && scheme != "https" {
+		return "", fmt.Errorf("url bukti transaksi harus http/https")
+	}
+	if strings.TrimSpace(parsed.Host) == "" {
+		return "", fmt.Errorf("url bukti transaksi tidak valid")
+	}
+
+	return value, nil
 }
 
 func isAllowedConvertProofMime(mime string) bool {

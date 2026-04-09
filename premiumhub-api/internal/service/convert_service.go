@@ -221,6 +221,11 @@ type ConvertOrderListResponse struct {
 	Total  int64                         `json:"total"`
 }
 
+type ConvertExpireResult struct {
+	Checked int `json:"checked"`
+	Expired int `json:"expired"`
+}
+
 func (s *ConvertService) CreateOrder(ctx context.Context, userID uuid.UUID, input CreateConvertOrderInput) (*ConvertOrderDetailResponse, error) {
 	_ = ctx
 
@@ -469,6 +474,11 @@ func (s *ConvertService) UploadProof(ctx context.Context, userID, orderID uuid.U
 		return nil, errors.New("bukti transaksi tidak valid")
 	}
 
+	note := strings.TrimSpace(input.Note)
+	if len(note) > 500 {
+		return nil, errors.New("catatan bukti terlalu panjang")
+	}
+
 	now := time.Now()
 	err := s.convertRepo.Transaction(func(tx *gorm.DB) error {
 		row, err := s.convertRepo.LockOrderByIDTx(tx, orderID)
@@ -481,6 +491,9 @@ func (s *ConvertService) UploadProof(ctx context.Context, userID, orderID uuid.U
 		if row.UserID != userID {
 			return errors.New("order convert bukan milik user")
 		}
+		if isFinalConvertStatus(row.Status) {
+			return errors.New("order convert sudah final")
+		}
 
 		proof := &model.ConvertProof{
 			OrderID:        row.ID,
@@ -488,7 +501,7 @@ func (s *ConvertService) UploadProof(ctx context.Context, userID, orderID uuid.U
 			FileName:       strings.TrimSpace(input.FileName),
 			MimeType:       strings.TrimSpace(input.MimeType),
 			FileSize:       input.FileSize,
-			Note:           strings.TrimSpace(input.Note),
+			Note:           note,
 			UploadedByType: "user",
 			UploadedByID:   &userID,
 			CreatedAt:      now,
@@ -497,31 +510,37 @@ func (s *ConvertService) UploadProof(ctx context.Context, userID, orderID uuid.U
 			return err
 		}
 
+		fromStatus := normalizeConvertStatus(row.Status)
+		toStatus := fromStatus
+		reason := "bukti transaksi diunggah"
+
 		if row.Status == convertStatusPendingTransfer {
-			fromStatus := row.Status
-			row.Status = convertStatusWaitingReview
+			toStatus = convertStatusWaitingReview
+			row.Status = toStatus
 			if err := s.convertRepo.SaveOrderTx(tx, row); err != nil {
 				return err
 			}
+		} else {
+			reason = "bukti tambahan diunggah"
+		}
 
-			event := &model.ConvertOrderEvent{
-				OrderID:    row.ID,
-				FromStatus: fromStatus,
-				ToStatus:   convertStatusWaitingReview,
-				Reason:     "bukti transaksi diunggah",
-				ActorType:  "user",
-				ActorID:    &userID,
-				CreatedAt:  now,
-			}
-			if err := s.convertRepo.CreateEventTx(tx, event); err != nil {
-				return err
-			}
+		event := &model.ConvertOrderEvent{
+			OrderID:    row.ID,
+			FromStatus: fromStatus,
+			ToStatus:   toStatus,
+			Reason:     reason,
+			ActorType:  "user",
+			ActorID:    &userID,
+			CreatedAt:  now,
+		}
+		if err := s.convertRepo.CreateEventTx(tx, event); err != nil {
+			return err
 		}
 
 		return nil
 	})
 	if err != nil {
-		if err.Error() == "order convert tidak ditemukan" || err.Error() == "order convert bukan milik user" {
+		if err.Error() == "order convert tidak ditemukan" || err.Error() == "order convert bukan milik user" || err.Error() == "order convert sudah final" || err.Error() == "catatan bukti terlalu panjang" {
 			return nil, err
 		}
 		return nil, errors.New("gagal mengunggah bukti convert")
@@ -622,6 +641,77 @@ func (s *ConvertService) AdminUpdateOrderStatus(ctx context.Context, adminID, or
 	}
 
 	return s.buildConvertOrderDetail(row, true)
+}
+
+func (s *ConvertService) ExpirePendingOrders(ctx context.Context, limit int) (*ConvertExpireResult, error) {
+	_ = ctx
+
+	if limit <= 0 {
+		limit = 200
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	now := time.Now()
+	rows, err := s.convertRepo.ListExpiredOrders([]string{convertStatusPendingTransfer, convertStatusWaitingReview}, now, limit)
+	if err != nil {
+		return nil, errors.New("gagal memuat kandidat expire convert")
+	}
+
+	result := &ConvertExpireResult{Checked: len(rows), Expired: 0}
+	for _, candidate := range rows {
+		didExpire := false
+		err := s.convertRepo.Transaction(func(tx *gorm.DB) error {
+			row, err := s.convertRepo.LockOrderByIDTx(tx, candidate.ID)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil
+				}
+				return err
+			}
+
+			fromStatus := normalizeConvertStatus(row.Status)
+			if fromStatus != convertStatusPendingTransfer && fromStatus != convertStatusWaitingReview {
+				return nil
+			}
+			if row.ExpiresAt == nil || row.ExpiresAt.After(now) {
+				return nil
+			}
+
+			row.Status = convertStatusExpired
+			if err := s.convertRepo.SaveOrderTx(tx, row); err != nil {
+				return err
+			}
+
+			if err := s.convertRepo.DeactivateTrackingTokenByOrderIDTx(tx, row.ID); err != nil {
+				return err
+			}
+
+			event := &model.ConvertOrderEvent{
+				OrderID:    row.ID,
+				FromStatus: fromStatus,
+				ToStatus:   convertStatusExpired,
+				Reason:     "expired otomatis oleh scheduler",
+				ActorType:  "system",
+				CreatedAt:  now,
+			}
+			if err := s.convertRepo.CreateEventTx(tx, event); err != nil {
+				return err
+			}
+
+			didExpire = true
+			return nil
+		})
+		if err != nil {
+			return nil, errors.New("gagal mengeksekusi expire pending convert")
+		}
+		if didExpire {
+			result.Expired++
+		}
+	}
+
+	return result, nil
 }
 
 func (s *ConvertService) GetPricingRules() ([]ConvertPricingRuleInput, error) {
@@ -1076,6 +1166,14 @@ func isKnownConvertStatus(status string) bool {
 		return true
 	}
 	return false
+}
+
+func isFinalConvertStatus(status string) bool {
+	normalized := normalizeConvertStatus(status)
+	return normalized == convertStatusSuccess ||
+		normalized == convertStatusFailed ||
+		normalized == convertStatusExpired ||
+		normalized == convertStatusCanceled
 }
 
 func isValidConvertTransition(fromStatus, toStatus string) bool {

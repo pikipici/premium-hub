@@ -64,6 +64,9 @@ func TestSetupProductionDisablesSimulateRoute(t *testing.T) {
 	if !hasRoute(routes, "GET", "/api/v1/admin/5sim/profile") {
 		t.Fatalf("admin 5sim profile route should exist")
 	}
+	if !hasRoute(routes, "POST", "/api/v1/admin/convert/orders/expire-pending") {
+		t.Fatalf("admin convert expire pending route should exist")
+	}
 }
 
 func TestSetupNonProductionEnablesSimulateRoute(t *testing.T) {

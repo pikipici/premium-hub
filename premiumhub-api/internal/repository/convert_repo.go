@@ -111,6 +111,23 @@ func (r *ConvertRepo) SaveOrder(row *model.ConvertOrder) error {
 	return r.db.Save(row).Error
 }
 
+func (r *ConvertRepo) ListExpiredOrders(statuses []string, now time.Time, limit int) ([]model.ConvertOrder, error) {
+	var rows []model.ConvertOrder
+
+	q := r.db.Model(&model.ConvertOrder{}).
+		Where("expires_at IS NOT NULL AND expires_at <= ?", now).
+		Order("expires_at ASC")
+	if len(statuses) > 0 {
+		q = q.Where("status IN ?", statuses)
+	}
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+
+	err := q.Find(&rows).Error
+	return rows, err
+}
+
 func (r *ConvertRepo) LockOrderByIDTx(tx *gorm.DB, orderID uuid.UUID) (*model.ConvertOrder, error) {
 	var row model.ConvertOrder
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", orderID).First(&row).Error
@@ -143,6 +160,12 @@ func (r *ConvertRepo) ListProofsByOrder(orderID uuid.UUID) ([]model.ConvertProof
 
 func (r *ConvertRepo) CreateTrackingTokenTx(tx *gorm.DB, row *model.ConvertTrackingToken) error {
 	return tx.Create(row).Error
+}
+
+func (r *ConvertRepo) DeactivateTrackingTokenByOrderIDTx(tx *gorm.DB, orderID uuid.UUID) error {
+	return tx.Model(&model.ConvertTrackingToken{}).
+		Where("order_id = ? AND is_active = ?", orderID, true).
+		Update("is_active", false).Error
 }
 
 func (r *ConvertRepo) FindTrackingToken(token string) (*model.ConvertTrackingToken, error) {

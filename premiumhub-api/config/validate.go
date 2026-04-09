@@ -43,6 +43,38 @@ func (c *Config) Validate() error {
 			problems = append(problems, "AUTH_RATE_LIMIT_WINDOW harus format duration valid (contoh: 1m, 30s)")
 		}
 	}
+
+	validateRate := func(maxRaw, winRaw, maxField, winField string) {
+		if v := strings.TrimSpace(maxRaw); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n <= 0 {
+				problems = append(problems, maxField+" harus angka > 0")
+			}
+		}
+		if v := strings.TrimSpace(winRaw); v != "" {
+			if _, err := time.ParseDuration(v); err != nil {
+				problems = append(problems, winField+" harus format duration valid (contoh: 1m, 30s)")
+			}
+		}
+	}
+
+	validateRate(c.ConvertTrackRateLimitMax, c.ConvertTrackRateLimitWindow, "CONVERT_TRACK_RATE_LIMIT_MAX", "CONVERT_TRACK_RATE_LIMIT_WINDOW")
+	validateRate(c.ConvertCreateRateLimitMax, c.ConvertCreateRateLimitWindow, "CONVERT_CREATE_RATE_LIMIT_MAX", "CONVERT_CREATE_RATE_LIMIT_WINDOW")
+	validateRate(c.ConvertProofRateLimitMax, c.ConvertProofRateLimitWindow, "CONVERT_PROOF_RATE_LIMIT_MAX", "CONVERT_PROOF_RATE_LIMIT_WINDOW")
+	validateRate(c.ConvertAdminStatusRateLimitMax, c.ConvertAdminStatusRateLimitWindow, "CONVERT_ADMIN_STATUS_RATE_LIMIT_MAX", "CONVERT_ADMIN_STATUS_RATE_LIMIT_WINDOW")
+
+	if v := strings.TrimSpace(c.ConvertExpiryWorkerInterval); v != "" {
+		if _, err := time.ParseDuration(v); err != nil {
+			problems = append(problems, "CONVERT_EXPIRY_WORKER_INTERVAL harus format duration valid (contoh: 1m, 30s)")
+		}
+	}
+	if v := strings.TrimSpace(c.ConvertExpiryWorkerBatchLimit); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 10_000 {
+			problems = append(problems, "CONVERT_EXPIRY_WORKER_BATCH_LIMIT harus angka 1-10000")
+		}
+	}
+
 	if v := strings.TrimSpace(c.FiveSimHTTPTimeoutSec); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 || n > 120 {

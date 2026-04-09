@@ -94,7 +94,7 @@ FIVESIM_WALLET_MIN_DEBIT=1
 
 ---
 
-## Convert API (Phase 1 baseline)
+## Convert API (Phase 4 baseline)
 
 Implementasi convert sudah dipisah total dari modul lain (route + tabel + service):
 
@@ -108,10 +108,25 @@ Implementasi convert sudah dipisah total dari modul lain (route + tabel + servic
 ### Admin routes
 - `GET /api/v1/admin/convert/orders`
 - `PATCH /api/v1/admin/convert/orders/:id/status`
+- `POST /api/v1/admin/convert/orders/expire-pending`
 - `GET /api/v1/admin/convert/pricing`
 - `PUT /api/v1/admin/convert/pricing`
 - `GET /api/v1/admin/convert/limits`
 - `PUT /api/v1/admin/convert/limits`
+
+### Safety guards (Phase 4)
+- In-memory rate limit endpoint sensitif:
+  - `CONVERT_TRACK_RATE_LIMIT_MAX` / `CONVERT_TRACK_RATE_LIMIT_WINDOW`
+  - `CONVERT_CREATE_RATE_LIMIT_MAX` / `CONVERT_CREATE_RATE_LIMIT_WINDOW`
+  - `CONVERT_PROOF_RATE_LIMIT_MAX` / `CONVERT_PROOF_RATE_LIMIT_WINDOW`
+  - `CONVERT_ADMIN_STATUS_RATE_LIMIT_MAX` / `CONVERT_ADMIN_STATUS_RATE_LIMIT_WINDOW`
+- Upload bukti divalidasi ketat:
+  - file upload: whitelist MIME + max 10MB
+  - URL bukti: wajib `http/https` valid
+- Auto-expire pending order via worker:
+  - `CONVERT_EXPIRY_WORKER_ENABLED=true|false`
+  - `CONVERT_EXPIRY_WORKER_INTERVAL=1m`
+  - `CONVERT_EXPIRY_WORKER_BATCH_LIMIT=200`
 
 Detail kontrak & lifecycle lihat:
 - `docs/api/convert-contract.md`
