@@ -6,7 +6,7 @@ import { Loader2, RefreshCcw } from 'lucide-react'
 
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { convertService } from '@/services/convertService'
-import type { ConvertAssetType, ConvertOrderStatus, ConvertOrderSummary } from '@/types/convert'
+import type { ConvertAssetType, ConvertOrderDetail, ConvertOrderStatus, ConvertOrderSummary } from '@/types/convert'
 
 type StatusFilter = 'all' | ConvertOrderStatus
 
@@ -25,7 +25,8 @@ function formatRupiah(value: number) {
   }).format(value)
 }
 
-function formatDate(value: string) {
+function formatDate(value?: string) {
+  if (!value) return '-'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
@@ -73,6 +74,13 @@ function availableActions(status: ConvertOrderStatus): QueueAction[] {
   return []
 }
 
+function proofQuickHint(status: ConvertOrderStatus) {
+  if (status === 'pending_transfer') return 'Biasanya bukti belum masuk.'
+  if (status === 'waiting_review') return 'Buka bukti untuk validasi cepat.'
+  if (status === 'approved' || status === 'processing') return 'Cek bukti sebelum finalisasi.'
+  return 'Lihat bukti yang tersimpan.'
+}
+
 export default function ConvertOrdersPage() {
   const [orders, setOrders] = useState<ConvertOrderSummary[]>([])
   const [search, setSearch] = useState('')
@@ -86,6 +94,11 @@ export default function ConvertOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [actingKey, setActingKey] = useState('')
+
+  const [proofDrawerOpen, setProofDrawerOpen] = useState(false)
+  const [proofDrawerLoading, setProofDrawerLoading] = useState(false)
+  const [proofDrawerError, setProofDrawerError] = useState('')
+  const [selectedDetail, setSelectedDetail] = useState<ConvertOrderDetail | null>(null)
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
 
@@ -141,6 +154,32 @@ export default function ConvertOrdersPage() {
     void loadOrders(false)
   }, [loadOrders])
 
+  const openProofDrawer = async (orderID: string) => {
+    setProofDrawerOpen(true)
+    setProofDrawerLoading(true)
+    setProofDrawerError('')
+
+    try {
+      const res = await convertService.adminGetOrderByID(orderID)
+      if (!res.success) {
+        setProofDrawerError(res.message || 'Gagal memuat detail bukti transfer')
+        return
+      }
+      setSelectedDetail(res.data)
+    } catch (err: unknown) {
+      setProofDrawerError(getHttpErrorMessage(err, 'Gagal memuat detail bukti transfer'))
+    } finally {
+      setProofDrawerLoading(false)
+    }
+  }
+
+  const closeProofDrawer = () => {
+    setProofDrawerOpen(false)
+    setProofDrawerLoading(false)
+    setProofDrawerError('')
+    setSelectedDetail(null)
+  }
+
   const runAction = async (order: ConvertOrderSummary, action: QueueAction) => {
     const key = `${order.id}:${action.toStatus}`
     setActingKey(key)
@@ -155,6 +194,10 @@ export default function ConvertOrdersPage() {
       if (!res.success) {
         setError(res.message || 'Gagal update status order convert')
         return
+      }
+
+      if (selectedDetail?.order.id === order.id) {
+        setSelectedDetail(res.data)
       }
 
       setNotice(`Order ${order.id} berhasil di-update ke status ${action.toStatus}.`)
@@ -307,6 +350,7 @@ export default function ConvertOrdersPage() {
                   <th>Aset</th>
                   <th>Nominal</th>
                   <th>Tujuan</th>
+                  <th>Bukti</th>
                   <th>Status</th>
                   <th>Aksi</th>
                 </tr>
@@ -314,7 +358,7 @@ export default function ConvertOrdersPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                         <Loader2 size={14} className="animate-spin" /> Memuat queue convert...
                       </span>
@@ -322,7 +366,7 @@ export default function ConvertOrdersPage() {
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 24 }}>
                       Tidak ada order untuk filter saat ini.
                     </td>
                   </tr>
@@ -355,6 +399,16 @@ export default function ConvertOrdersPage() {
                           <span style={{ fontSize: 12, color: 'var(--dark)' }}>
                             {order.destination_bank} · {order.destination_account_number}
                           </span>
+                        </td>
+                        <td style={{ minWidth: 170 }}>
+                          <button
+                            className="action-btn"
+                            onClick={() => void openProofDrawer(order.id)}
+                            disabled={proofDrawerLoading && selectedDetail?.order.id === order.id}
+                          >
+                            Lihat Bukti
+                          </button>
+                          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>{proofQuickHint(order.status)}</div>
                         </td>
                         <td>
                           <span className={`status-badge ${status.className}`}>{status.label}</span>
@@ -502,6 +556,11 @@ export default function ConvertOrdersPage() {
                     <span className="mobile-card-label">Terima</span>
                     <span className="mobile-card-value">{formatRupiah(order.receive_amount)}</span>
                   </div>
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Bukti</span>
+                    <button className="action-btn" onClick={() => void openProofDrawer(order.id)}>Lihat Bukti</button>
+                  </div>
+                  <div className="mobile-card-sub" style={{ marginTop: 4 }}>{proofQuickHint(order.status)}</div>
 
                   <div className="mobile-card-actions">
                     {order.tracking_token ? (
@@ -533,6 +592,113 @@ export default function ConvertOrdersPage() {
           )}
         </div>
       </div>
+
+      {proofDrawerOpen ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 60,
+            background: 'rgba(20, 20, 20, 0.45)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 16,
+          }}
+          onClick={closeProofDrawer}
+        >
+          <div
+            style={{
+              width: 'min(860px, 100%)',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              background: '#fff',
+              borderRadius: 12,
+              border: '1px solid #EBEBEB',
+              padding: 16,
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#141414' }}>Detail Bukti Transfer</h3>
+                <div style={{ marginTop: 4, fontSize: 12, color: '#777' }}>
+                  {selectedDetail ? `Order ${selectedDetail.order.id}` : 'Memuat detail order...'}
+                </div>
+              </div>
+              <button className="topbar-btn" onClick={closeProofDrawer}>Tutup</button>
+            </div>
+
+            {proofDrawerLoading ? (
+              <div style={{ fontSize: 13, color: '#666', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Loader2 size={14} className="animate-spin" /> Memuat bukti transfer...
+              </div>
+            ) : proofDrawerError ? (
+              <div className="alert-bar" style={{ background: '#FEECEC', borderColor: '#F7C6C6', color: '#B42318' }}>
+                ⚠️ <strong>{proofDrawerError}</strong>
+              </div>
+            ) : selectedDetail ? (
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div style={{ border: '1px solid #EBEBEB', borderRadius: 10, padding: 12, background: '#FAFAF8' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, fontSize: 12 }}>
+                    <div>
+                      <div style={{ color: '#888' }}>Status</div>
+                      <div style={{ fontWeight: 700, color: '#141414' }}>{statusMeta(selectedDetail.order.status).label}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#888' }}>Aset</div>
+                      <div style={{ fontWeight: 700, color: '#141414' }}>{assetLabel(selectedDetail.order.asset_type)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#888' }}>Sumber</div>
+                      <div style={{ fontWeight: 700, color: '#141414' }}>{selectedDetail.order.source_channel} · {selectedDetail.order.source_account}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#888' }}>Tujuan</div>
+                      <div style={{ fontWeight: 700, color: '#141414' }}>{selectedDetail.order.destination_bank} · {selectedDetail.order.destination_account_number}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#141414' }}>Bukti yang di-submit user</h4>
+                    <span style={{ fontSize: 12, color: '#777' }}>{selectedDetail.proofs.length} bukti</span>
+                  </div>
+
+                  {selectedDetail.proofs.length === 0 ? (
+                    <div style={{ border: '1px solid #F7C6C6', borderRadius: 10, background: '#FFF4F4', color: '#B42318', fontSize: 12, padding: 10 }}>
+                      Belum ada bukti transfer yang diunggah user.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {selectedDetail.proofs.map((proof) => (
+                        <div key={proof.id} style={{ border: '1px solid #EBEBEB', borderRadius: 10, background: '#FAFAF8', padding: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                            <a
+                              href={proof.file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ fontSize: 13, fontWeight: 700, color: '#141414', textDecoration: 'underline' }}
+                            >
+                              {proof.file_name || proof.file_url}
+                            </a>
+                            <span style={{ fontSize: 11, color: '#777' }}>{formatDate(proof.created_at)}</span>
+                          </div>
+                          <div style={{ marginTop: 4, fontSize: 11, color: '#666' }}>
+                            Upload via: <strong>{proof.uploaded_by_type}</strong>
+                            {proof.note ? ` · Note: ${proof.note}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -109,6 +109,7 @@ Implementasi convert sudah dipisah total dari modul lain (route + tabel + servic
 
 ### Admin routes
 - `GET /api/v1/admin/convert/orders`
+- `GET /api/v1/admin/convert/orders/:id`
 - `PATCH /api/v1/admin/convert/orders/:id/status`
 - `POST /api/v1/admin/convert/orders/expire-pending`
 - `GET /api/v1/admin/convert/pricing`

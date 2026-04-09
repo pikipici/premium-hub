@@ -194,6 +194,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/wallet/topups/reconcile", walletHandler.ReconcilePending)
 
 	admin.GET("/convert/orders", convertHandler.AdminListOrders)
+	admin.GET("/convert/orders/:id", convertHandler.AdminGetOrder)
 	admin.PATCH(
 		"/convert/orders/:id/status",
 		middleware.NewUserRateLimiter(cfg.ConvertAdminStatusRateLimitMax, cfg.ConvertAdminStatusRateLimitWindow, "Terlalu banyak update status convert. Coba lagi sebentar."),

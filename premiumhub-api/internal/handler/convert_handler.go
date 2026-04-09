@@ -183,6 +183,22 @@ func (h *ConvertHandler) AdminListOrders(c *gin.Context) {
 	})
 }
 
+func (h *ConvertHandler) AdminGetOrder(c *gin.Context) {
+	orderID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "order_id tidak valid")
+		return
+	}
+
+	res, err := h.svc.AdminGetOrderByID(orderID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "OK", res)
+}
+
 func (h *ConvertHandler) AdminUpdateOrderStatus(c *gin.Context) {
 	adminID := c.MustGet("user_id").(uuid.UUID)
 	orderID, err := uuid.Parse(c.Param("id"))

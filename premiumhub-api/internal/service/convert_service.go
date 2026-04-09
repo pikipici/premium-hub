@@ -720,6 +720,18 @@ func (s *ConvertService) AdminListOrders(page, limit int, filter ConvertListFilt
 	return &ConvertOrderListResponse{Orders: items, Total: total}, nil
 }
 
+func (s *ConvertService) AdminGetOrderByID(orderID uuid.UUID) (*ConvertOrderDetailResponse, error) {
+	row, err := s.convertRepo.FindOrderByID(orderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("order convert tidak ditemukan")
+		}
+		return nil, errors.New("gagal memuat detail order convert")
+	}
+
+	return s.buildConvertOrderDetail(row, true)
+}
+
 func (s *ConvertService) AdminUpdateOrderStatus(ctx context.Context, adminID, orderID uuid.UUID, input AdminUpdateConvertStatusInput) (*ConvertOrderDetailResponse, error) {
 	_ = ctx
 

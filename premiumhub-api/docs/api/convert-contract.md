@@ -206,7 +206,13 @@ Rule tambahan:
 ## 5.1 List queue
 `GET /api/v1/admin/convert/orders?page=1&limit=20&status=waiting_review&asset_type=paypal&q=...`
 
-## 5.2 Update status/order action
+## 5.2 Detail order (include proofs + events)
+`GET /api/v1/admin/convert/orders/:id`
+
+Tujuan:
+- Admin bisa review detail order, termasuk semua bukti transfer yang sudah diunggah user.
+
+## 5.3 Update status/order action
 `PATCH /api/v1/admin/convert/orders/:id/status`
 
 Body:
@@ -222,7 +228,7 @@ Rule:
 - Wajib valid transition.
 - Wajib simpan actor admin + reason di event log.
 
-## 5.3 Expire pending orders (ops safety)
+## 5.4 Expire pending orders (ops safety)
 `POST /api/v1/admin/convert/orders/expire-pending?limit=200`
 
 Tujuan:
@@ -240,16 +246,16 @@ Response `200`:
 }
 ```
 
-## 5.4 Get pricing rules
+## 5.5 Get pricing rules
 `GET /api/v1/admin/convert/pricing`
 
-## 5.5 Update pricing rules
+## 5.6 Update pricing rules
 `PUT /api/v1/admin/convert/pricing`
 
-## 5.6 Get limits/access rules
+## 5.7 Get limits/access rules
 `GET /api/v1/admin/convert/limits`
 
-## 5.7 Update limits/access rules
+## 5.8 Update limits/access rules
 `PUT /api/v1/admin/convert/limits`
 
 ---

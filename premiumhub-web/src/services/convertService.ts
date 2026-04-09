@@ -59,6 +59,11 @@ export const convertService = {
     return res.data
   },
 
+  adminGetOrderByID: async (orderID: string) => {
+    const res = await api.get<ApiResponse<ConvertOrderDetail>>(`/admin/convert/orders/${orderID}`)
+    return res.data
+  },
+
   adminUpdateOrderStatus: async (orderID: string, payload: { to_status: string; reason?: string; internal_note?: string }) => {
     const res = await api.patch<ApiResponse<ConvertOrderDetail>>(`/admin/convert/orders/${orderID}/status`, payload)
     return res.data

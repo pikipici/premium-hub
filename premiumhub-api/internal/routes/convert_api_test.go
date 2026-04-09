@@ -36,8 +36,14 @@ type convertOrderDTO struct {
 	Status        string `json:"status"`
 }
 
+type convertProofDTO struct {
+	ID      string `json:"id"`
+	FileURL string `json:"file_url"`
+}
+
 type convertOrderDetailDTO struct {
-	Order convertOrderDTO `json:"order"`
+	Order  convertOrderDTO   `json:"order"`
+	Proofs []convertProofDTO `json:"proofs"`
 }
 
 type expireResultDTO struct {
@@ -310,6 +316,69 @@ func TestConvertAPIRateLimitOnCreateOrder(t *testing.T) {
 	code, env = doJSONRequest(t, r, http.MethodPost, "/api/v1/convert/orders", token, payload)
 	if code != http.StatusTooManyRequests || env.Success {
 		t.Fatalf("second create should be rate-limited, got code=%d success=%v msg=%s", code, env.Success, env.Message)
+	}
+}
+
+func TestConvertAPIAdminGetOrderDetail(t *testing.T) {
+	db := openConvertAPITestDB(t)
+	cfg := &config.Config{
+		AppEnv:                     "development",
+		FrontendURL:                "http://localhost:3000",
+		JWTSecret:                  "super-secure-secret-value-32chars++",
+		ConvertExpiryWorkerEnabled: false,
+	}
+	r := Setup(db, cfg)
+
+	user := seedConvertAPIUser(t, db, "user", "convert-user-admin-detail@example.com")
+	admin := seedConvertAPIUser(t, db, "admin", "convert-admin-detail@example.com")
+	userToken := mustToken(t, user, cfg.JWTSecret)
+	adminToken := mustToken(t, admin, cfg.JWTSecret)
+
+	createPayload := map[string]any{
+		"asset_type":                 "pulsa",
+		"source_amount":              120000,
+		"source_channel":             "Telkomsel",
+		"source_account":             "081234567890",
+		"destination_bank":           "BCA",
+		"destination_account_number": "1234567890",
+		"destination_account_name":   "Budi Santoso",
+		"idempotency_key":            "api-admin-detail-001",
+	}
+	code, env := doJSONRequest(t, r, http.MethodPost, "/api/v1/convert/orders", userToken, createPayload)
+	if code != http.StatusCreated || !env.Success {
+		t.Fatalf("create order failed: code=%d msg=%s", code, env.Message)
+	}
+
+	var created convertOrderDetailDTO
+	if err := json.Unmarshal(env.Data, &created); err != nil {
+		t.Fatalf("decode create data: %v", err)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodPost, "/api/v1/convert/orders/"+created.Order.ID+"/proofs", userToken, map[string]any{
+		"file_url": "https://cdn.example.com/proof/order-001.png",
+		"note":     "bukti transfer",
+	})
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("upload proof failed: code=%d msg=%s", code, env.Message)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodGet, "/api/v1/admin/convert/orders/"+created.Order.ID, adminToken, nil)
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("admin get order detail failed: code=%d msg=%s", code, env.Message)
+	}
+
+	var detail convertOrderDetailDTO
+	if err := json.Unmarshal(env.Data, &detail); err != nil {
+		t.Fatalf("decode admin detail: %v", err)
+	}
+	if detail.Order.ID != created.Order.ID {
+		t.Fatalf("unexpected order id: got=%s want=%s", detail.Order.ID, created.Order.ID)
+	}
+	if len(detail.Proofs) == 0 {
+		t.Fatalf("expected proofs in admin detail")
+	}
+	if detail.Proofs[0].FileURL == "" {
+		t.Fatalf("expected proof file_url in admin detail")
 	}
 }
 
