@@ -1438,7 +1438,7 @@ export default function NomorVirtualPage() {
                         ) : (
                           <div className="rounded-xl border border-dashed border-[#D8D8D5] bg-[#FAFAF8] px-3 py-3 text-xs text-[#666]">
                             {liveIsOpenStatus
-                              ? 'Belum ada SMS OTP. Sistem auto-check status berkala, lu juga bisa klik Check kapan aja.'
+                              ? 'Belum ada SMS OTP. Sistem auto-check status berkala, kamu juga bisa klik Check kapan aja.'
                               : 'Belum ada SMS OTP tercatat untuk order ini.'}
                           </div>
                         )}
