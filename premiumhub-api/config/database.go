@@ -30,6 +30,12 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.WalletTopup{},
 		&model.WalletLedger{},
 		&model.FiveSimOrder{},
+		&model.ConvertOrder{},
+		&model.ConvertOrderEvent{},
+		&model.ConvertProof{},
+		&model.ConvertPricingRule{},
+		&model.ConvertLimitRule{},
+		&model.ConvertTrackingToken{},
 	)
 	log.Println("DB connected & migrated")
 	return db

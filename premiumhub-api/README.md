@@ -91,3 +91,27 @@ FIVESIM_WALLET_MIN_DEBIT=1
 - `FIVESIM_API_KEY` backend-only, jangan expose ke frontend/client.
 - Kalau API key pernah terkirim ke channel publik/grup/chat, **anggap bocor dan rotate segera**.
 - Setelah ubah env, restart service API agar config baru kebaca.
+
+---
+
+## Convert API (Phase 1 baseline)
+
+Implementasi convert sudah dipisah total dari modul lain (route + tabel + service):
+
+### User routes
+- `GET /api/v1/convert/track/:token` (public tracking)
+- `POST /api/v1/convert/orders`
+- `GET /api/v1/convert/orders`
+- `GET /api/v1/convert/orders/:id`
+- `POST /api/v1/convert/orders/:id/proofs`
+
+### Admin routes
+- `GET /api/v1/admin/convert/orders`
+- `PATCH /api/v1/admin/convert/orders/:id/status`
+- `GET /api/v1/admin/convert/pricing`
+- `PUT /api/v1/admin/convert/pricing`
+- `GET /api/v1/admin/convert/limits`
+- `PUT /api/v1/admin/convert/limits`
+
+Detail kontrak & lifecycle lihat:
+- `docs/api/convert-contract.md`

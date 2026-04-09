@@ -34,6 +34,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	notifRepo := repository.NewNotificationRepo(db)
 	walletRepo := repository.NewWalletRepo(db)
 	fiveSimOrderRepo := repository.NewFiveSimOrderRepo(db)
+	convertRepo := repository.NewConvertRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg)
@@ -45,6 +46,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	paymentSvc := service.NewPaymentService(orderRepo, orderSvc)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
+	convertSvc := service.NewConvertService(userRepo, convertRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc, cfg)
@@ -53,6 +55,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
 	walletHandler := handler.NewWalletHandler(walletSvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
+	convertHandler := handler.NewConvertHandler(convertSvc)
 	claimHandler := handler.NewClaimHandler(claimSvc)
 	stockHandler := handler.NewStockHandler(stockSvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
@@ -74,6 +77,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	products.GET("/:slug/prices", productHandler.GetPrices)
 
 	api.POST("/payment/webhook", paymentHandler.Webhook)
+	api.GET("/convert/track/:token", convertHandler.TrackOrder)
 
 	// Protected routes
 	protected := api.Group("")
@@ -102,6 +106,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/wallet/topups", walletHandler.ListTopups)
 	protected.GET("/wallet/topups/:id", walletHandler.GetTopup)
 	protected.POST("/wallet/topups/:id/check", walletHandler.CheckTopup)
+
+	protected.POST("/convert/orders", convertHandler.CreateOrder)
+	protected.GET("/convert/orders", convertHandler.ListOrders)
+	protected.GET("/convert/orders/:id", convertHandler.GetOrder)
+	protected.POST("/convert/orders/:id/proofs", convertHandler.UploadProof)
 
 	protected.GET("/5sim/catalog/countries", fiveSimHandler.GetCountries)
 	protected.GET("/5sim/catalog/products", fiveSimHandler.GetProducts)
@@ -152,6 +161,13 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.PUT("/users/:id/block", adminHandler.BlockUser)
 	admin.POST("/wallet/topups/:id/recheck", walletHandler.AdminRecheckTopup)
 	admin.POST("/wallet/topups/reconcile", walletHandler.ReconcilePending)
+
+	admin.GET("/convert/orders", convertHandler.AdminListOrders)
+	admin.PATCH("/convert/orders/:id/status", convertHandler.AdminUpdateOrderStatus)
+	admin.GET("/convert/pricing", convertHandler.AdminGetPricingRules)
+	admin.PUT("/convert/pricing", convertHandler.AdminUpdatePricingRules)
+	admin.GET("/convert/limits", convertHandler.AdminGetLimitRules)
+	admin.PUT("/convert/limits", convertHandler.AdminUpdateLimitRules)
 
 	return r
 }
