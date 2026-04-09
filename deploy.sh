@@ -115,6 +115,7 @@ BACKEND_DIR="${PROJECT_ROOT}/premiumhub-api"
 
 # Build behavior toggles
 RUN_GO_MOD_TIDY="${RUN_GO_MOD_TIDY:-0}"   # default: jangan mutate deps saat deploy
+FORCE_GO_MOD_DOWNLOAD="${FORCE_GO_MOD_DOWNLOAD:-0}" # paksa go mod download saat BE build
 NPM_FLAGS="${NPM_FLAGS:---include=dev --no-audit --no-fund}"
 
 # Git update behavior (deterministic by default)
@@ -234,6 +235,84 @@ is_worktree_dirty() {
   [[ -n "$(git ls-files --others --exclude-standard)" ]]
 }
 
+read_env_value() {
+  local key="$1"
+  local env_file="$2"
+
+  awk -v k="${key}" '
+    {
+      raw = $0
+      if (raw ~ "^[[:space:]]*#") next
+      sub(/^[[:space:]]+/, "", raw)
+      sub(/^export[[:space:]]+/, "", raw)
+      if (index(raw, k"=") != 1) next
+
+      line = raw
+      sub(/^[^=]*=/, "", line)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      if ((substr(line,1,1)=="\"" && substr(line,length(line),1)=="\"") || (substr(line,1,1)=="\047" && substr(line,length(line),1)=="\047")) {
+        line = substr(line, 2, length(line)-2)
+      }
+      print line
+      exit
+    }
+  ' "${env_file}"
+}
+
+validate_convert_r2_env() {
+  local env_file="${BACKEND_DIR}/.env"
+  if [[ ! -f "${env_file}" ]]; then
+    log_warn "Backend .env tidak ditemukan (${env_file}). Skip precheck R2 config."
+    return 0
+  fi
+
+  local mode
+  mode="$(read_env_value "CONVERT_PROOF_STORAGE_MODE" "${env_file}" | tr '[:upper:]' '[:lower:]' | xargs)"
+  [[ -z "${mode}" ]] && mode="local"
+
+  if [[ "${mode}" != "r2" ]]; then
+    log_info "Convert proof storage mode=${mode} (R2 precheck skipped)"
+    return 0
+  fi
+
+  local required_keys=(
+    "CONVERT_PROOF_R2_ENDPOINT"
+    "CONVERT_PROOF_R2_BUCKET"
+    "CONVERT_PROOF_R2_ACCESS_KEY_ID"
+    "CONVERT_PROOF_R2_SECRET_ACCESS_KEY"
+  )
+
+  local missing=()
+  local key value
+  for key in "${required_keys[@]}"; do
+    value="$(read_env_value "${key}" "${env_file}" | xargs || true)"
+    if [[ -z "${value}" ]]; then
+      missing+=("${key}")
+    fi
+  done
+
+  if (( ${#missing[@]} > 0 )); then
+    log_err "CONVERT_PROOF_STORAGE_MODE=r2 tapi env wajib belum lengkap: ${missing[*]}"
+    return 1
+  fi
+
+  local endpoint public_base
+  endpoint="$(read_env_value "CONVERT_PROOF_R2_ENDPOINT" "${env_file}" | xargs)"
+  public_base="$(read_env_value "CONVERT_PROOF_R2_PUBLIC_BASE_URL" "${env_file}" | xargs || true)"
+
+  if [[ ! "${endpoint}" =~ ^https?:// ]]; then
+    log_err "CONVERT_PROOF_R2_ENDPOINT harus diawali http:// atau https://"
+    return 1
+  fi
+
+  if [[ -n "${public_base}" && ! "${public_base}" =~ ^https?:// ]]; then
+    log_err "CONVERT_PROOF_R2_PUBLIC_BASE_URL harus diawali http:// atau https://"
+    return 1
+  fi
+
+  log_ok "Convert proof storage precheck: mode=r2 dan env mandatory terisi"
+}
+
 # ---------- Precheck ----------
 step_start "PRECHECK"
 command -v git >/dev/null
@@ -243,6 +322,7 @@ command -v curl >/dev/null
 command -v systemctl >/dev/null
 command -v awk >/dev/null
 command -v sort >/dev/null
+command -v xargs >/dev/null
 
 [[ -d "${PROJECT_ROOT}/.git" ]] || { log_err "Runtime root bukan git repository: ${PROJECT_ROOT}"; exit 1; }
 [[ -d "${FRONTEND_DIR}" ]] || { log_err "Frontend dir tidak ditemukan: ${FRONTEND_DIR}"; exit 1; }
@@ -259,6 +339,8 @@ if [[ -f "${BACKEND_DIR}/go.mod" ]]; then
     log_info "go.mod directive: ${GO_DIRECTIVE}"
   fi
 fi
+
+validate_convert_r2_env
 
 step_done "PRECHECK"
 
@@ -447,8 +529,29 @@ if [[ "${SHOULD_BUILD_FE}" == "1" ]]; then
   fi
 fi
 
+NEEDS_GO_MOD_DOWNLOAD=0
+GO_MOD_DOWNLOAD_REASON="skip (deps unchanged)"
+if [[ "${SHOULD_BUILD_BE}" == "1" ]]; then
+  if [[ "${FORCE_GO_MOD_DOWNLOAD}" == "1" ]]; then
+    NEEDS_GO_MOD_DOWNLOAD=1
+    GO_MOD_DOWNLOAD_REASON="FORCE_GO_MOD_DOWNLOAD=1"
+  elif [[ "${BASELINE_VALID}" != "1" ]]; then
+    NEEDS_GO_MOD_DOWNLOAD=1
+    GO_MOD_DOWNLOAD_REASON="baseline missing/invalid"
+  elif has_changed_exact "premiumhub-api/go.mod"; then
+    NEEDS_GO_MOD_DOWNLOAD=1
+    GO_MOD_DOWNLOAD_REASON="go.mod changed"
+  elif has_changed_exact "premiumhub-api/go.sum"; then
+    NEEDS_GO_MOD_DOWNLOAD=1
+    GO_MOD_DOWNLOAD_REASON="go.sum changed"
+  else
+    NEEDS_GO_MOD_DOWNLOAD=0
+    GO_MOD_DOWNLOAD_REASON="go module files unchanged"
+  fi
+fi
+
 log_info "Plan reason: ${PLAN_REASON}"
-log_info "Build plan: FE=${SHOULD_BUILD_FE}, BE=${SHOULD_BUILD_BE}, npm_ci=${NEEDS_NPM_CI} (${NPM_CI_REASON})"
+log_info "Build plan: FE=${SHOULD_BUILD_FE}, BE=${SHOULD_BUILD_BE}, npm_ci=${NEEDS_NPM_CI} (${NPM_CI_REASON}), go_mod_download=${NEEDS_GO_MOD_DOWNLOAD} (${GO_MOD_DOWNLOAD_REASON})"
 
 if is_worktree_dirty; then
   log_warn "Working tree masih dirty/untracked. Untuk baseline paling stabil, commit dulu perubahan."
@@ -485,6 +588,12 @@ if [[ "${SHOULD_BUILD_BE}" == "1" ]]; then
     log_info "RUN_GO_MOD_TIDY=1 -> running go mod tidy..."
     go mod tidy
   else
+    if [[ "${NEEDS_GO_MOD_DOWNLOAD}" == "1" ]]; then
+      log_info "Running go mod download (${GO_MOD_DOWNLOAD_REASON})..."
+      go mod download
+    else
+      log_info "Skipping go mod download (${GO_MOD_DOWNLOAD_REASON})"
+    fi
     log_info "Skipping go mod tidy (set RUN_GO_MOD_TIDY=1 jika diperlukan)"
   fi
 
