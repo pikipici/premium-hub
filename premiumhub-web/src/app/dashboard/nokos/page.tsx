@@ -1107,7 +1107,7 @@ export default function NomorVirtualPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 items-start">
             <section className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
               <header className="border-b border-[#EBEBEB] px-4 py-3">
                 <h2 className="text-sm font-bold">Pilih Negara</h2>
