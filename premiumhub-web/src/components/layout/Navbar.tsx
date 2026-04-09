@@ -97,7 +97,7 @@ export default function Navbar() {
                 <Link href="/dashboard" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Dashboard</Link>
                 <Link href="/dashboard/wallet" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Wallet</Link>
                 <Link href="/dashboard/convert/orders" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Convert</Link>
-                <Link href="/dashboard/nomor-virtual" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Nomor Virtual</Link>
+                <Link href="/dashboard/nokos" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Nomor Virtual</Link>
                 {user?.role === 'admin' && <Link href="/admin" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Admin Panel</Link>}
                 <button onClick={handleLogout} className="block text-sm font-medium text-red-500 py-2" disabled={logouting}>Logout</button>
               </>

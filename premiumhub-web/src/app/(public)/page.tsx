@@ -25,7 +25,7 @@ export default function HomePage() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/nokos"
+              href="/product/nokos"
               className="inline-flex items-center justify-center gap-2 rounded-full bg-[#FF5733] px-7 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(255,87,51,0.28)] transition hover:-translate-y-0.5 hover:bg-[#D94420]"
             >
               Masuk ke Nokos <ArrowRight className="h-4 w-4" />
