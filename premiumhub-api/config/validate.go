@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -75,6 +76,44 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	proofStorageMode := strings.ToLower(strings.TrimSpace(c.ConvertProofStorageMode))
+	if proofStorageMode == "" {
+		proofStorageMode = "local"
+	}
+	if proofStorageMode != "local" && proofStorageMode != "r2" {
+		problems = append(problems, "CONVERT_PROOF_STORAGE_MODE harus salah satu: local|r2")
+	}
+
+	if v := strings.TrimSpace(c.ConvertProofMaxFileMB); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 100 {
+			problems = append(problems, "CONVERT_PROOF_MAX_FILE_MB harus angka 1-100")
+		}
+	}
+
+	if proofStorageMode == "r2" {
+		if strings.TrimSpace(c.ConvertProofR2Endpoint) == "" {
+			problems = append(problems, "CONVERT_PROOF_R2_ENDPOINT wajib diisi saat CONVERT_PROOF_STORAGE_MODE=r2")
+		} else if err := validateHTTPURL(c.ConvertProofR2Endpoint); err != nil {
+			problems = append(problems, "CONVERT_PROOF_R2_ENDPOINT tidak valid: "+err.Error())
+		}
+		if strings.TrimSpace(c.ConvertProofR2Bucket) == "" {
+			problems = append(problems, "CONVERT_PROOF_R2_BUCKET wajib diisi saat CONVERT_PROOF_STORAGE_MODE=r2")
+		}
+		if strings.TrimSpace(c.ConvertProofR2AccessKeyID) == "" {
+			problems = append(problems, "CONVERT_PROOF_R2_ACCESS_KEY_ID wajib diisi saat CONVERT_PROOF_STORAGE_MODE=r2")
+		}
+		if strings.TrimSpace(c.ConvertProofR2SecretAccessKey) == "" {
+			problems = append(problems, "CONVERT_PROOF_R2_SECRET_ACCESS_KEY wajib diisi saat CONVERT_PROOF_STORAGE_MODE=r2")
+		}
+	}
+
+	if v := strings.TrimSpace(c.ConvertProofR2PublicBaseURL); v != "" {
+		if err := validateHTTPURL(v); err != nil {
+			problems = append(problems, "CONVERT_PROOF_R2_PUBLIC_BASE_URL tidak valid: "+err.Error())
+		}
+	}
+
 	if v := strings.TrimSpace(c.FiveSimHTTPTimeoutSec); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 || n > 120 {
@@ -114,4 +153,19 @@ func (c *Config) Validate() error {
 	}
 
 	return errors.New(strings.Join(problems, "; "))
+}
+
+func validateHTTPURL(raw string) error {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return errors.New("format URL tidak valid")
+	}
+	scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+	if scheme != "http" && scheme != "https" {
+		return errors.New("scheme harus http/https")
+	}
+	if strings.TrimSpace(parsed.Host) == "" {
+		return errors.New("host wajib diisi")
+	}
+	return nil
 }

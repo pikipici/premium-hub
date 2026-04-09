@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	"premiumhub-api/internal/middleware"
 	"premiumhub-api/internal/repository"
 	"premiumhub-api/internal/service"
+	"premiumhub-api/internal/storage"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -49,6 +51,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 
+	convertProofStorage, err := storage.NewConvertProofStorage(cfg)
+	if err != nil {
+		panic(fmt.Errorf("gagal inisialisasi convert proof storage: %w", err))
+	}
+
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc, cfg)
 	productHandler := handler.NewProductHandler(productSvc)
@@ -56,7 +63,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
 	walletHandler := handler.NewWalletHandler(walletSvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
-	convertHandler := handler.NewConvertHandler(convertSvc)
+	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage)
 	claimHandler := handler.NewClaimHandler(claimSvc)
 	stockHandler := handler.NewStockHandler(stockSvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)

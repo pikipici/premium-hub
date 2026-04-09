@@ -177,6 +177,8 @@ Body (multipart atau JSON URL):
 
 Rule:
 - Minimal salah satu dari `file` atau `file_url`.
+- `file_url` harus URL valid `http/https`.
+- Untuk upload file, penyimpanan bisa di-local storage atau R2 sesuai env server.
 - Setelah proof valid masuk, status boleh naik ke `waiting_review` (sesuai policy ops).
 
 ---

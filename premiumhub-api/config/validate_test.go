@@ -167,6 +167,41 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject malformed convert proof r2 config", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                        "development",
+			JWTSecret:                     "super-secure-secret-value-32chars++",
+			CookieSameSite:                "lax",
+			AuthRateLimitMax:              "20",
+			AuthRateLimitWindow:           "1m",
+			ConvertProofStorageMode:       "r2",
+			ConvertProofMaxFileMB:         "0",
+			ConvertProofR2Endpoint:        "ftp://invalid-endpoint",
+			ConvertProofR2Bucket:          "",
+			ConvertProofR2AccessKeyID:     "",
+			ConvertProofR2SecretAccessKey: "",
+			ConvertProofR2PublicBaseURL:   "not-a-url",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected invalid R2 proof storage config")
+		}
+
+		msg := err.Error()
+		for _, expected := range []string{
+			"CONVERT_PROOF_MAX_FILE_MB",
+			"CONVERT_PROOF_R2_ENDPOINT",
+			"CONVERT_PROOF_R2_BUCKET",
+			"CONVERT_PROOF_R2_ACCESS_KEY_ID",
+			"CONVERT_PROOF_R2_SECRET_ACCESS_KEY",
+			"CONVERT_PROOF_R2_PUBLIC_BASE_URL",
+		} {
+			if !strings.Contains(msg, expected) {
+				t.Fatalf("expected error to contain %q, got: %s", expected, msg)
+			}
+		}
+	})
+
 	t.Run("production passes when complete", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:                            "Production",

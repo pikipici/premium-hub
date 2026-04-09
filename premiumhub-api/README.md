@@ -94,7 +94,7 @@ FIVESIM_WALLET_MIN_DEBIT=1
 
 ---
 
-## Convert API (Phase 4 baseline)
+## Convert API (Phase 5 baseline)
 
 Implementasi convert sudah dipisah total dari modul lain (route + tabel + service):
 
@@ -123,6 +123,9 @@ Implementasi convert sudah dipisah total dari modul lain (route + tabel + servic
 - Upload bukti divalidasi ketat:
   - file upload: whitelist MIME + max 10MB
   - URL bukti: wajib `http/https` valid
+- Storage bukti convert mendukung 2 mode:
+  - `CONVERT_PROOF_STORAGE_MODE=local` → simpan ke disk lokal (`CONVERT_PROOF_LOCAL_DIR`)
+  - `CONVERT_PROOF_STORAGE_MODE=r2` → upload ke Cloudflare R2 (`CONVERT_PROOF_R2_*`)
 - Auto-expire pending order via worker:
   - `CONVERT_EXPIRY_WORKER_ENABLED=true|false`
   - `CONVERT_EXPIRY_WORKER_INTERVAL=1m`

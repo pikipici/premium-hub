@@ -9,25 +9,29 @@ import (
 )
 
 type Config struct {
-	AppPort, AppEnv                                                     string
-	DBHost, DBPort, DBUser, DBPassword, DBName                          string
-	JWTSecret, JWTExpiry                                                string
-	MidtransServerKey, MidtransClientKey, MidtransEnv                   string
-	NeticonBaseURL, NeticonAPIKey, NeticonUserID, NeticonHTTPTimeoutSec string
-	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                string
-	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                 string
-	WalletTopupExpiryMinutes                                            string
-	SMTPHost, SMTPPort, SMTPUser, SMTPPass, FrontendURL                 string
-	CookieDomain, CookieSameSite                                        string
-	CookieSecure                                                        bool
-	GoogleClientID                                                      string
-	AuthRateLimitMax, AuthRateLimitWindow                               string
-	ConvertTrackRateLimitMax, ConvertTrackRateLimitWindow               string
-	ConvertCreateRateLimitMax, ConvertCreateRateLimitWindow             string
-	ConvertProofRateLimitMax, ConvertProofRateLimitWindow               string
-	ConvertAdminStatusRateLimitMax, ConvertAdminStatusRateLimitWindow   string
-	ConvertExpiryWorkerEnabled                                          bool
-	ConvertExpiryWorkerInterval, ConvertExpiryWorkerBatchLimit          string
+	AppPort, AppEnv                                                      string
+	DBHost, DBPort, DBUser, DBPassword, DBName                           string
+	JWTSecret, JWTExpiry                                                 string
+	MidtransServerKey, MidtransClientKey, MidtransEnv                    string
+	NeticonBaseURL, NeticonAPIKey, NeticonUserID, NeticonHTTPTimeoutSec  string
+	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                 string
+	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                  string
+	WalletTopupExpiryMinutes                                             string
+	SMTPHost, SMTPPort, SMTPUser, SMTPPass, FrontendURL                  string
+	CookieDomain, CookieSameSite                                         string
+	CookieSecure                                                         bool
+	GoogleClientID                                                       string
+	AuthRateLimitMax, AuthRateLimitWindow                                string
+	ConvertTrackRateLimitMax, ConvertTrackRateLimitWindow                string
+	ConvertCreateRateLimitMax, ConvertCreateRateLimitWindow              string
+	ConvertProofRateLimitMax, ConvertProofRateLimitWindow                string
+	ConvertAdminStatusRateLimitMax, ConvertAdminStatusRateLimitWindow    string
+	ConvertExpiryWorkerEnabled                                           bool
+	ConvertExpiryWorkerInterval, ConvertExpiryWorkerBatchLimit           string
+	ConvertProofStorageMode, ConvertProofLocalDir, ConvertProofMaxFileMB string
+	ConvertProofR2Endpoint, ConvertProofR2Bucket, ConvertProofR2Region   string
+	ConvertProofR2AccessKeyID, ConvertProofR2SecretAccessKey             string
+	ConvertProofR2PublicBaseURL, ConvertProofR2Prefix                    string
 }
 
 func Load() *Config {
@@ -83,6 +87,16 @@ func Load() *Config {
 		ConvertExpiryWorkerEnabled:        eb("CONVERT_EXPIRY_WORKER_ENABLED", true),
 		ConvertExpiryWorkerInterval:       e("CONVERT_EXPIRY_WORKER_INTERVAL", "1m"),
 		ConvertExpiryWorkerBatchLimit:     e("CONVERT_EXPIRY_WORKER_BATCH_LIMIT", "200"),
+		ConvertProofStorageMode:           e("CONVERT_PROOF_STORAGE_MODE", "local"),
+		ConvertProofLocalDir:              e("CONVERT_PROOF_LOCAL_DIR", "runtime/convert-proofs"),
+		ConvertProofMaxFileMB:             e("CONVERT_PROOF_MAX_FILE_MB", "10"),
+		ConvertProofR2Endpoint:            e("CONVERT_PROOF_R2_ENDPOINT", ""),
+		ConvertProofR2Bucket:              e("CONVERT_PROOF_R2_BUCKET", ""),
+		ConvertProofR2Region:              e("CONVERT_PROOF_R2_REGION", "auto"),
+		ConvertProofR2AccessKeyID:         e("CONVERT_PROOF_R2_ACCESS_KEY_ID", ""),
+		ConvertProofR2SecretAccessKey:     e("CONVERT_PROOF_R2_SECRET_ACCESS_KEY", ""),
+		ConvertProofR2PublicBaseURL:       e("CONVERT_PROOF_R2_PUBLIC_BASE_URL", ""),
+		ConvertProofR2Prefix:              e("CONVERT_PROOF_R2_PREFIX", "convert-proofs"),
 	}
 }
 

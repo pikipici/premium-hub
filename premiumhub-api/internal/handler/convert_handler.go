@@ -3,31 +3,28 @@ package handler
 import (
 	"fmt"
 	"math"
-	"mime/multipart"
-	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"premiumhub-api/internal/service"
+	"premiumhub-api/internal/storage"
 	"premiumhub-api/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-const maxConvertProofFileSize int64 = 10 * 1024 * 1024
-
 type ConvertHandler struct {
-	svc *service.ConvertService
+	svc          *service.ConvertService
+	proofStorage *storage.ConvertProofStorage
 }
 
-func NewConvertHandler(svc *service.ConvertService) *ConvertHandler {
-	return &ConvertHandler{svc: svc}
+func NewConvertHandler(svc *service.ConvertService, proofStorage *storage.ConvertProofStorage) *ConvertHandler {
+	if proofStorage == nil {
+		panic("convert proof storage is required")
+	}
+	return &ConvertHandler{svc: svc, proofStorage: proofStorage}
 }
 
 func (h *ConvertHandler) CreateOrder(c *gin.Context) {
@@ -110,7 +107,7 @@ func (h *ConvertHandler) UploadProof(c *gin.Context) {
 		return
 	}
 
-	input, err := parseConvertProofInput(c)
+	input, err := h.parseConvertProofInput(c)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -254,10 +251,10 @@ func parseConvertPagination(c *gin.Context, defaultLimit, maxLimit int) (int, in
 	return page, limit
 }
 
-func parseConvertProofInput(c *gin.Context) (service.UploadConvertProofInput, error) {
+func (h *ConvertHandler) parseConvertProofInput(c *gin.Context) (service.UploadConvertProofInput, error) {
 	contentType := c.ContentType()
 	if strings.HasPrefix(contentType, "multipart/form-data") {
-		return parseConvertProofMultipart(c)
+		return h.parseConvertProofMultipart(c)
 	}
 
 	var input service.UploadConvertProofInput
@@ -281,7 +278,7 @@ func parseConvertProofInput(c *gin.Context) (service.UploadConvertProofInput, er
 	return input, nil
 }
 
-func parseConvertProofMultipart(c *gin.Context) (service.UploadConvertProofInput, error) {
+func (h *ConvertHandler) parseConvertProofMultipart(c *gin.Context) (service.UploadConvertProofInput, error) {
 	fileURL := strings.TrimSpace(c.PostForm("file_url"))
 	note := strings.TrimSpace(c.PostForm("note"))
 	if len(note) > 500 {
@@ -300,7 +297,7 @@ func parseConvertProofMultipart(c *gin.Context) (service.UploadConvertProofInput
 		return service.UploadConvertProofInput{FileURL: validatedURL, Note: note}, nil
 	}
 
-	savedURL, mimeType, fileSize, fileName, err := saveConvertProofFile(c, file)
+	savedURL, mimeType, fileSize, fileName, err := h.proofStorage.StoreMultipartFile(c.Request.Context(), file)
 	if err != nil {
 		return service.UploadConvertProofInput{}, err
 	}
@@ -312,46 +309,6 @@ func parseConvertProofMultipart(c *gin.Context) (service.UploadConvertProofInput
 		FileSize: fileSize,
 		Note:     note,
 	}, nil
-}
-
-func saveConvertProofFile(c *gin.Context, file *multipart.FileHeader) (string, string, int64, string, error) {
-	if file == nil {
-		return "", "", 0, "", fmt.Errorf("file bukti tidak ditemukan")
-	}
-	if file.Size <= 0 || file.Size > maxConvertProofFileSize {
-		return "", "", 0, "", fmt.Errorf("ukuran file bukti tidak valid")
-	}
-
-	opened, err := file.Open()
-	if err != nil {
-		return "", "", 0, "", fmt.Errorf("gagal membaca file bukti")
-	}
-	defer opened.Close()
-
-	header := make([]byte, 512)
-	n, _ := opened.Read(header)
-	mimeType := http.DetectContentType(header[:n])
-	if !isAllowedConvertProofMime(mimeType) {
-		return "", "", 0, "", fmt.Errorf("tipe file bukti tidak didukung")
-	}
-
-	safeName := sanitizeConvertProofName(file.Filename)
-	if safeName == "" {
-		safeName = "proof"
-	}
-
-	dir := filepath.Join("runtime", "convert-proofs", time.Now().Format("20060102"))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", "", 0, "", fmt.Errorf("gagal menyiapkan storage bukti")
-	}
-
-	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
-	fullPath := filepath.Join(dir, storedName)
-	if err := c.SaveUploadedFile(file, fullPath); err != nil {
-		return "", "", 0, "", fmt.Errorf("gagal menyimpan file bukti")
-	}
-
-	return fullPath, mimeType, file.Size, file.Filename, nil
 }
 
 func normalizeExternalProofURL(raw string) (string, error) {
@@ -376,27 +333,4 @@ func normalizeExternalProofURL(raw string) (string, error) {
 	}
 
 	return value, nil
-}
-
-func isAllowedConvertProofMime(mime string) bool {
-	allowed := map[string]bool{
-		"image/jpeg":      true,
-		"image/png":       true,
-		"image/webp":      true,
-		"application/pdf": true,
-	}
-	return allowed[strings.ToLower(strings.TrimSpace(mime))]
-}
-
-var convertProofFilenameSanitizer = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
-
-func sanitizeConvertProofName(name string) string {
-	name = strings.TrimSpace(name)
-	name = strings.ReplaceAll(name, string(filepath.Separator), "_")
-	name = convertProofFilenameSanitizer.ReplaceAllString(name, "_")
-	name = strings.Trim(name, "._-")
-	if len(name) > 120 {
-		name = name[len(name)-120:]
-	}
-	return name
 }
