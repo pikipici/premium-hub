@@ -199,6 +199,16 @@ Rule tambahan:
 - Token tracking wajib valid dan aktif.
 - Jika order sudah final (`success/failed/expired/canceled`), upload proof ditolak.
 
+## 4.8 View proof via proxy (public)
+`GET /api/v1/convert/proofs/:proofId/view`
+
+Tujuan:
+- Proxy viewer untuk bukti yang disimpan di R2 agar halaman admin/user tidak tergantung akses cert langsung ke domain R2.
+
+Rule:
+- Hanya URL proof dari host R2 publik yang dikonfigurasi server yang bisa diproxy.
+- Kalau proof berasal dari URL eksternal non-R2, fallback tetap lewat link asli.
+
 ---
 
 ## 5) Admin API Contract

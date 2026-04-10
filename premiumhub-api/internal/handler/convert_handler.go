@@ -2,11 +2,16 @@ package handler
 
 import (
 	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
+	"time"
 
+	"premiumhub-api/config"
 	"premiumhub-api/internal/service"
 	"premiumhub-api/internal/storage"
 	"premiumhub-api/pkg/response"
@@ -16,15 +21,32 @@ import (
 )
 
 type ConvertHandler struct {
-	svc          *service.ConvertService
-	proofStorage *storage.ConvertProofStorage
+	svc                   *service.ConvertService
+	proofStorage          *storage.ConvertProofStorage
+	proofProxyAllowedHost string
+	proofProxyHTTPClient  *http.Client
 }
 
-func NewConvertHandler(svc *service.ConvertService, proofStorage *storage.ConvertProofStorage) *ConvertHandler {
+func NewConvertHandler(svc *service.ConvertService, proofStorage *storage.ConvertProofStorage, cfg *config.Config) *ConvertHandler {
 	if proofStorage == nil {
 		panic("convert proof storage is required")
 	}
-	return &ConvertHandler{svc: svc, proofStorage: proofStorage}
+
+	allowedHost := ""
+	if cfg != nil {
+		if parsed, err := url.Parse(strings.TrimSpace(cfg.ConvertProofR2PublicBaseURL)); err == nil {
+			allowedHost = strings.ToLower(strings.TrimSpace(parsed.Host))
+		}
+	}
+
+	return &ConvertHandler{
+		svc:                   svc,
+		proofStorage:          proofStorage,
+		proofProxyAllowedHost: allowedHost,
+		proofProxyHTTPClient: &http.Client{
+			Timeout: 20 * time.Second,
+		},
+	}
 }
 
 func (h *ConvertHandler) CreateOrder(c *gin.Context) {
@@ -115,6 +137,81 @@ func (h *ConvertHandler) TrackOrder(c *gin.Context) {
 	}
 
 	response.Success(c, "OK", res)
+}
+
+func (h *ConvertHandler) ViewProof(c *gin.Context) {
+	proofID, err := uuid.Parse(c.Param("proofId"))
+	if err != nil {
+		response.BadRequest(c, "proof_id tidak valid")
+		return
+	}
+
+	proof, err := h.svc.GetProofByID(proofID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	proofURL := strings.TrimSpace(proof.FileURL)
+	if proofURL == "" {
+		response.BadRequest(c, "url bukti tidak valid")
+		return
+	}
+	parsedURL, err := url.Parse(proofURL)
+	if err != nil || strings.TrimSpace(parsedURL.Host) == "" {
+		response.BadRequest(c, "url bukti tidak valid")
+		return
+	}
+
+	if !h.isProofProxyAllowed(parsedURL) {
+		response.BadRequest(c, "bukti ini harus dibuka lewat link asli")
+		return
+	}
+
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, proofURL, nil)
+	if err != nil {
+		response.Error(c, http.StatusBadGateway, "gagal memproses request bukti")
+		return
+	}
+
+	httpClient := h.proofProxyHTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 20 * time.Second}
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		response.Error(c, http.StatusBadGateway, "gagal mengambil file bukti")
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		response.Error(c, http.StatusBadGateway, "bukti tidak bisa diakses saat ini")
+		return
+	}
+
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	filename := strings.TrimSpace(proof.FileName)
+	if filename == "" {
+		filename = path.Base(strings.TrimSpace(parsedURL.Path))
+	}
+	if filename == "" || filename == "." || filename == "/" {
+		filename = "proof"
+	}
+
+	c.Header("Content-Type", contentType)
+	if contentLength := strings.TrimSpace(resp.Header.Get("Content-Length")); contentLength != "" {
+		c.Header("Content-Length", contentLength)
+	}
+	c.Header("Cache-Control", "private, max-age=60")
+	c.Header("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", sanitizeContentDispositionFilename(filename)))
+	c.Status(http.StatusOK)
+	_, _ = io.Copy(c.Writer, resp.Body)
 }
 
 func (h *ConvertHandler) UploadProofByToken(c *gin.Context) {
@@ -389,4 +486,32 @@ func normalizeExternalProofURL(raw string) (string, error) {
 	}
 
 	return value, nil
+}
+
+func (h *ConvertHandler) isProofProxyAllowed(parsedURL *url.URL) bool {
+	if parsedURL == nil {
+		return false
+	}
+	scheme := strings.ToLower(strings.TrimSpace(parsedURL.Scheme))
+	if scheme != "http" && scheme != "https" {
+		return false
+	}
+	if h.proofProxyAllowedHost == "" {
+		return false
+	}
+
+	host := strings.ToLower(strings.TrimSpace(parsedURL.Host))
+	return host == h.proofProxyAllowedHost
+}
+
+func sanitizeContentDispositionFilename(raw string) string {
+	name := strings.TrimSpace(raw)
+	name = strings.ReplaceAll(name, "\n", "_")
+	name = strings.ReplaceAll(name, "\r", "_")
+	name = strings.ReplaceAll(name, "\"", "_")
+	name = strings.ReplaceAll(name, ";", "_")
+	if name == "" {
+		name = "proof"
+	}
+	return name
 }

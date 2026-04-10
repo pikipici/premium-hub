@@ -64,7 +64,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
 	walletHandler := handler.NewWalletHandler(walletSvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
-	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage)
+	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage, cfg)
 	claimHandler := handler.NewClaimHandler(claimSvc)
 	stockHandler := handler.NewStockHandler(stockSvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
@@ -90,6 +90,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		"/convert/track/:token",
 		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request tracking convert. Coba lagi sebentar."),
 		convertHandler.TrackOrder,
+	)
+	api.GET(
+		"/convert/proofs/:proofId/view",
+		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request bukti convert. Coba lagi sebentar."),
+		convertHandler.ViewProof,
 	)
 	api.POST(
 		"/convert/guest/orders",

@@ -100,6 +100,7 @@ Implementasi convert sudah dipisah total dari modul lain (route + tabel + servic
 
 ### User routes
 - `GET /api/v1/convert/track/:token` (public tracking)
+- `GET /api/v1/convert/proofs/:proofId/view` (public proxy viewer untuk bukti R2)
 - `POST /api/v1/convert/guest/orders` (public guest checkout)
 - `POST /api/v1/convert/track/:token/proofs` (public guest proof upload)
 - `POST /api/v1/convert/orders`

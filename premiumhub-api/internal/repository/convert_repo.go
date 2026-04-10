@@ -158,6 +158,12 @@ func (r *ConvertRepo) ListProofsByOrder(orderID uuid.UUID) ([]model.ConvertProof
 	return rows, err
 }
 
+func (r *ConvertRepo) FindProofByID(proofID uuid.UUID) (*model.ConvertProof, error) {
+	var row model.ConvertProof
+	err := r.db.Where("id = ?", proofID).First(&row).Error
+	return &row, err
+}
+
 func (r *ConvertRepo) CreateTrackingTokenTx(tx *gorm.DB, row *model.ConvertTrackingToken) error {
 	return tx.Create(row).Error
 }

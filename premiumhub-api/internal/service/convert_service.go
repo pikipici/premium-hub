@@ -732,6 +732,17 @@ func (s *ConvertService) AdminGetOrderByID(orderID uuid.UUID) (*ConvertOrderDeta
 	return s.buildConvertOrderDetail(row, true)
 }
 
+func (s *ConvertService) GetProofByID(proofID uuid.UUID) (*model.ConvertProof, error) {
+	row, err := s.convertRepo.FindProofByID(proofID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("bukti convert tidak ditemukan")
+		}
+		return nil, errors.New("gagal memuat bukti convert")
+	}
+	return row, nil
+}
+
 func (s *ConvertService) AdminUpdateOrderStatus(ctx context.Context, adminID, orderID uuid.UUID, input AdminUpdateConvertStatusInput) (*ConvertOrderDetailResponse, error) {
 	_ = ctx
 

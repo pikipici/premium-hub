@@ -281,6 +281,91 @@ func TestConvertAPIGuestFlow(t *testing.T) {
 	}
 }
 
+func TestConvertAPIProofViewProxy(t *testing.T) {
+	db := openConvertAPITestDB(t)
+
+	upstreamPayload := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0x00, 0x00, 0x00, 0x00}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/proof.png" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(upstreamPayload)
+	}))
+	defer upstream.Close()
+
+	cfg := &config.Config{
+		AppEnv:                      "development",
+		FrontendURL:                 "http://localhost:3000",
+		JWTSecret:                   "super-secure-secret-value-32chars++",
+		ConvertExpiryWorkerEnabled:  false,
+		ConvertProofR2PublicBaseURL: upstream.URL,
+	}
+	r := Setup(db, cfg)
+
+	user := seedConvertAPIUser(t, db, "user", "convert-user-proof-proxy@example.com")
+	token := mustToken(t, user, cfg.JWTSecret)
+
+	createPayload := map[string]any{
+		"asset_type":                 "pulsa",
+		"source_amount":              130000,
+		"source_channel":             "Telkomsel",
+		"source_account":             "081234567890",
+		"destination_bank":           "BCA",
+		"destination_account_number": "1234567890",
+		"destination_account_name":   "Proxy Tester",
+		"idempotency_key":            "api-proof-proxy-001",
+	}
+	code, env := doJSONRequest(t, r, http.MethodPost, "/api/v1/convert/orders", token, createPayload)
+	if code != http.StatusCreated || !env.Success {
+		t.Fatalf("create order failed: code=%d msg=%s", code, env.Message)
+	}
+
+	var created convertOrderDetailDTO
+	if err := json.Unmarshal(env.Data, &created); err != nil {
+		t.Fatalf("decode create data: %v", err)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodPost, "/api/v1/convert/orders/"+created.Order.ID+"/proofs", token, map[string]any{
+		"file_url": "https://cdn.example.com/proxy-proof.png",
+		"note":     "proxy proof",
+	})
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("upload proof failed: code=%d msg=%s", code, env.Message)
+	}
+
+	var detail convertOrderDetailDTO
+	if err := json.Unmarshal(env.Data, &detail); err != nil {
+		t.Fatalf("decode detail after proof: %v", err)
+	}
+	if len(detail.Proofs) == 0 {
+		t.Fatalf("expected proof after upload")
+	}
+
+	proofID, err := uuid.Parse(detail.Proofs[0].ID)
+	if err != nil {
+		t.Fatalf("parse proof id: %v", err)
+	}
+	if err := db.Model(&model.ConvertProof{}).Where("id = ?", proofID).Update("file_url", upstream.URL+"/proof.png").Error; err != nil {
+		t.Fatalf("update proof file url: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/convert/proofs/"+proofID.String()+"/view", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("proxy view should be 200, got %d body=%s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Content-Type"); got != "image/png" {
+		t.Fatalf("unexpected content-type: %s", got)
+	}
+	if !bytes.Equal(w.Body.Bytes(), upstreamPayload) {
+		t.Fatalf("proxy payload mismatch")
+	}
+}
+
 func TestConvertAPIRateLimitOnCreateOrder(t *testing.T) {
 	db := openConvertAPITestDB(t)
 	cfg := &config.Config{

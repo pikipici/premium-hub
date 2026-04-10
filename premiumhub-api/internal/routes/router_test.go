@@ -76,6 +76,9 @@ func TestSetupProductionDisablesSimulateRoute(t *testing.T) {
 	if !hasRoute(routes, "POST", "/api/v1/convert/track/:token/proofs") {
 		t.Fatalf("guest convert upload proof by token route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/convert/proofs/:proofId/view") {
+		t.Fatalf("convert proof proxy route should exist")
+	}
 }
 
 func TestSetupNonProductionEnablesSimulateRoute(t *testing.T) {

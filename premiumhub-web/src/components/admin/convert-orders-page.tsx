@@ -6,7 +6,7 @@ import { Loader2, RefreshCcw } from 'lucide-react'
 
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { convertService } from '@/services/convertService'
-import type { ConvertAssetType, ConvertOrderDetail, ConvertOrderStatus, ConvertOrderSummary } from '@/types/convert'
+import type { ConvertAssetType, ConvertOrderDetail, ConvertOrderStatus, ConvertOrderSummary, ConvertProof } from '@/types/convert'
 
 type StatusFilter = 'all' | ConvertOrderStatus
 
@@ -79,6 +79,25 @@ function proofQuickHint(status: ConvertOrderStatus) {
   if (status === 'waiting_review') return 'Buka bukti untuk validasi cepat.'
   if (status === 'approved' || status === 'processing') return 'Cek bukti sebelum finalisasi.'
   return 'Lihat bukti yang tersimpan.'
+}
+
+function shouldUseProofProxy(fileURL: string) {
+  const value = String(fileURL || '').trim()
+  if (!value) return false
+
+  try {
+    const parsed = new URL(value)
+    return parsed.hostname.endsWith('.r2.dev')
+  } catch {
+    return false
+  }
+}
+
+function resolveProofHref(proof: ConvertProof) {
+  if (shouldUseProofProxy(proof.file_url)) {
+    return `/api/v1/convert/proofs/${encodeURIComponent(proof.id)}/view`
+  }
+  return proof.file_url
 }
 
 export default function ConvertOrdersPage() {
@@ -676,9 +695,10 @@ export default function ConvertOrdersPage() {
                         <div key={proof.id} style={{ border: '1px solid #EBEBEB', borderRadius: 10, background: '#FAFAF8', padding: 10 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                             <a
-                              href={proof.file_url}
+                              href={resolveProofHref(proof)}
                               target="_blank"
                               rel="noreferrer"
+                              title={proof.file_url}
                               style={{ fontSize: 13, fontWeight: 700, color: '#141414', textDecoration: 'underline' }}
                             >
                               {proof.file_name || proof.file_url}

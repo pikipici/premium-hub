@@ -11,7 +11,7 @@ import Navbar from '@/components/layout/Navbar'
 import { getConvertStatusSummary, isFinalConvertStatus } from '@/lib/convertTimeline'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { convertService } from '@/services/convertService'
-import type { ConvertOrderDetail } from '@/types/convert'
+import type { ConvertOrderDetail, ConvertProof } from '@/types/convert'
 
 function formatRupiah(value: number) {
   return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
@@ -24,6 +24,24 @@ function formatDate(value?: string) {
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
+function shouldUseProofProxy(fileURL: string) {
+  const value = String(fileURL || '').trim()
+  if (!value) return false
+
+  try {
+    const parsed = new URL(value)
+    return parsed.hostname.endsWith('.r2.dev')
+  } catch {
+    return false
+  }
+}
+
+function resolveProofHref(proof: ConvertProof) {
+  if (shouldUseProofProxy(proof.file_url)) {
+    return `/api/v1/convert/proofs/${encodeURIComponent(proof.id)}/view`
+  }
+  return proof.file_url
+}
 
 export default function GuestConvertTrackPage() {
   const params = useParams<{ token: string }>()
@@ -259,9 +277,10 @@ export default function GuestConvertTrackPage() {
                       <div key={proof.id} className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-sm">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <a
-                            href={proof.file_url}
+                            href={resolveProofHref(proof)}
                             target="_blank"
                             rel="noreferrer"
+                            title={proof.file_url}
                             className="font-semibold text-[#141414] underline underline-offset-2"
                           >
                             {proof.file_name || proof.file_url}
