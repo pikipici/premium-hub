@@ -2,13 +2,11 @@ package service
 
 import (
 	"context"
-	cryptoRand "crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -26,33 +24,16 @@ type WalletService struct {
 	userRepo   *repository.UserRepo
 	walletRepo *repository.WalletRepo
 	notifRepo  *repository.NotificationRepo
-	neticon    NeticonClient
 	pakasir    PakasirClient
 }
-
-var walletRandReader io.Reader = cryptoRand.Reader
 
 func NewWalletService(
 	cfg *config.Config,
 	userRepo *repository.UserRepo,
 	walletRepo *repository.WalletRepo,
 	notifRepo *repository.NotificationRepo,
-	neticon NeticonClient,
-) *WalletService {
-	return NewWalletServiceWithGateway(cfg, userRepo, walletRepo, notifRepo, neticon, nil)
-}
-
-func NewWalletServiceWithGateway(
-	cfg *config.Config,
-	userRepo *repository.UserRepo,
-	walletRepo *repository.WalletRepo,
-	notifRepo *repository.NotificationRepo,
-	neticon NeticonClient,
 	pakasir PakasirClient,
 ) *WalletService {
-	if neticon == nil {
-		neticon = NewNeticonClient(cfg)
-	}
 	if pakasir == nil {
 		pakasir = NewPakasirClient(cfg)
 	}
@@ -62,7 +43,6 @@ func NewWalletServiceWithGateway(
 		userRepo:   userRepo,
 		walletRepo: walletRepo,
 		notifRepo:  notifRepo,
-		neticon:    neticon,
 		pakasir:    pakasir,
 	}
 }
@@ -80,11 +60,10 @@ type CreateTopupInput struct {
 type WalletTopupResponse struct {
 	ID              string     `json:"id"`
 	Provider        string     `json:"provider"`
-	ProviderTrxID   string     `json:"provider_trx_id"`
+	GatewayRef      string     `json:"gateway_ref"`
 	PaymentMethod   string     `json:"payment_method"`
 	PaymentNumber   string     `json:"payment_number"`
 	RequestedAmount int64      `json:"requested_amount"`
-	UniqueCode      int        `json:"unique_code"`
 	PayableAmount   int64      `json:"payable_amount"`
 	Status          string     `json:"status"`
 	ProviderStatus  string     `json:"provider_status"`
@@ -156,6 +135,9 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 	if _, err := s.ensureActiveUser(userID); err != nil {
 		return nil, err
 	}
+	if !s.pakasirConfigured() {
+		return nil, errors.New("gateway payment belum dikonfigurasi")
+	}
 
 	amount := input.Amount
 	if amount < 1000 {
@@ -176,100 +158,51 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 		return nil, errors.New("gagal cek idempotency")
 	}
 
-	expiresAt := time.Now().Add(s.topupExpiryDuration())
-
-	if s.pakasirConfigured() {
-		paymentMethod := NormalizePakasirPaymentMethod(input.PaymentMethod)
-		if paymentMethod == "" {
-			paymentMethod = "qris"
-		}
-		providerOrderID := buildPakasirTopupReference(userID, idempotencyKey)
-
-		rawReq, _ := json.Marshal(map[string]interface{}{
-			"action":           "transactioncreate",
-			"provider":         "pakasir",
-			"order_id":         providerOrderID,
-			"requested_amount": amount,
-			"payment_method":   paymentMethod,
-		})
-
-		created, rawResp, err := s.pakasir.CreateTransaction(ctx, paymentMethod, providerOrderID, amount)
-		if err != nil {
-			return nil, fmt.Errorf("gagal membuat invoice topup: %w", err)
-		}
-
-		payableAmount := created.TotalPayment
-		if payableAmount <= 0 {
-			payableAmount = amount
-		}
-		expiresAt = created.ExpiredAt
-
-		topup := &model.WalletTopup{
-			ID:              uuid.New(),
-			UserID:          userID,
-			Provider:        "pakasir",
-			ProviderTrxID:   created.OrderID,
-			PaymentMethod:   created.PaymentMethod,
-			PaymentNumber:   created.PaymentNumber,
-			IdempotencyKey:  idempotencyKey,
-			RequestedAmount: amount,
-			UniqueCode:      0,
-			PayableAmount:   payableAmount,
-			Status:          "pending",
-			ProviderStatus:  "pending",
-			RawRequest:      string(rawReq),
-			RawResponse:     string(rawResp),
-			ExpiresAt:       expiresAt,
-		}
-		if topup.PaymentMethod == "" {
-			topup.PaymentMethod = paymentMethod
-		}
-
-		if err := s.walletRepo.CreateTopup(topup); err != nil {
-			if existing, findErr := s.walletRepo.FindTopupByIdempotencyKey(userID, idempotencyKey); findErr == nil {
-				return toTopupResponse(existing), nil
-			}
-			return nil, errors.New("gagal menyimpan topup")
-		}
-
-		return toTopupResponse(topup), nil
+	paymentMethod := NormalizePakasirPaymentMethod(input.PaymentMethod)
+	if paymentMethod == "" {
+		paymentMethod = "qris"
 	}
+	providerOrderID := buildPakasirTopupReference(userID, idempotencyKey)
 
-	uniqueCode, err := generateUniqueCode()
-	if err != nil {
-		return nil, errors.New("gagal membuat kode unik")
-	}
-	payableAmount := amount + int64(uniqueCode)
-
-	rawReq, _ := json.Marshal(map[string]interface{}{
-		"action":           "request_deposit",
-		"requested_amount": amount,
-		"unique_code":      uniqueCode,
-		"payable_amount":   payableAmount,
+	rawReq, _ := json.Marshal(map[string]any{
+		"action":         "transactioncreate",
+		"provider":       "pakasir",
+		"order_id":       providerOrderID,
+		"amount":         amount,
+		"payment_method": paymentMethod,
 	})
 
-	netRes, netRaw, err := s.neticon.RequestDeposit(ctx, payableAmount)
+	created, rawResp, err := s.pakasir.CreateTransaction(ctx, paymentMethod, providerOrderID, amount)
 	if err != nil {
 		return nil, fmt.Errorf("gagal membuat invoice topup: %w", err)
+	}
+
+	payableAmount := created.TotalPayment
+	if payableAmount <= 0 {
+		payableAmount = amount
 	}
 
 	topup := &model.WalletTopup{
 		ID:              uuid.New(),
 		UserID:          userID,
-		Provider:        "neticon",
-		ProviderTrxID:   netRes.TrxID,
-		PaymentMethod:   "qris",
-		PaymentNumber:   "",
+		Provider:        "pakasir",
+		GatewayRef:      created.OrderID,
+		PaymentMethod:   created.PaymentMethod,
+		PaymentNumber:   created.PaymentNumber,
 		IdempotencyKey:  idempotencyKey,
 		RequestedAmount: amount,
-		UniqueCode:      uniqueCode,
-		PayableAmount:   netRes.Amount,
+		UniqueCode:      0,
+		PayableAmount:   payableAmount,
 		Status:          "pending",
 		ProviderStatus:  "pending",
 		RawRequest:      string(rawReq),
-		RawResponse:     string(netRaw),
-		ExpiresAt:       expiresAt,
+		RawResponse:     string(rawResp),
+		ExpiresAt:       created.ExpiredAt,
 	}
+	if topup.PaymentMethod == "" {
+		topup.PaymentMethod = paymentMethod
+	}
+
 	if err := s.walletRepo.CreateTopup(topup); err != nil {
 		if existing, findErr := s.walletRepo.FindTopupByIdempotencyKey(userID, idempotencyKey); findErr == nil {
 			return toTopupResponse(existing), nil
@@ -464,7 +397,7 @@ func (s *WalletService) HandlePakasirWebhook(ctx context.Context, input WalletPa
 		return nil
 	}
 
-	topup, err := s.walletRepo.FindTopupByProviderTrxID("pakasir", orderID)
+	topup, err := s.walletRepo.FindTopupByGatewayRef("pakasir", orderID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
@@ -483,44 +416,27 @@ func (s *WalletService) syncTopupStatus(ctx context.Context, topup *model.Wallet
 	if topup.Status == "success" || topup.Status == "failed" || topup.Status == "expired" {
 		return nil
 	}
-
-	if strings.EqualFold(topup.Provider, "pakasir") || (topup.Provider == "" && s.pakasirConfigured()) {
-		if !s.pakasirConfigured() {
-			return errors.New("pakasir belum dikonfigurasi")
-		}
-		amount := topup.RequestedAmount
-		if amount <= 0 {
-			amount = topup.PayableAmount
-		}
-		detail, raw, err := s.pakasir.TransactionDetail(ctx, topup.ProviderTrxID, amount)
-		if err != nil {
-			return fmt.Errorf("gagal cek status topup: %w", err)
-		}
-
-		mapped := mapProviderStatus(detail.Status)
-		switch mapped {
-		case "success":
-			return s.settleSuccess(topup.ID, detail.Status, raw)
-		case "failed", "expired":
-			return s.markFinalStatus(topup.ID, mapped, detail.Status, raw)
-		default:
-			return s.touchPending(topup.ID, detail.Status, raw)
-		}
+	if !s.pakasirConfigured() {
+		return errors.New("pakasir belum dikonfigurasi")
 	}
 
-	statusRes, raw, err := s.neticon.CheckStatus(ctx, topup.ProviderTrxID)
+	amount := topup.RequestedAmount
+	if amount <= 0 {
+		amount = topup.PayableAmount
+	}
+	detail, raw, err := s.pakasir.TransactionDetail(ctx, topup.GatewayRef, amount)
 	if err != nil {
 		return fmt.Errorf("gagal cek status topup: %w", err)
 	}
 
-	mapped := mapProviderStatus(statusRes.Status)
+	mapped := mapProviderStatus(detail.Status)
 	switch mapped {
 	case "success":
-		return s.settleSuccess(topup.ID, statusRes.Status, raw)
+		return s.settleSuccess(topup.ID, detail.Status, raw)
 	case "failed", "expired":
-		return s.markFinalStatus(topup.ID, mapped, statusRes.Status, raw)
+		return s.markFinalStatus(topup.ID, mapped, detail.Status, raw)
 	default:
-		return s.touchPending(topup.ID, statusRes.Status, raw)
+		return s.touchPending(topup.ID, detail.Status, raw)
 	}
 }
 
@@ -562,14 +478,14 @@ func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, 
 			return err
 		}
 
-		creditAmount := topup.PayableAmount
-		if strings.EqualFold(topup.Provider, "pakasir") && topup.RequestedAmount > 0 {
-			creditAmount = topup.RequestedAmount
-		}
-
 		user, err := s.walletRepo.LockUserByIDTx(tx, topup.UserID)
 		if err != nil {
 			return errors.New("user tidak ditemukan")
+		}
+
+		creditAmount := topup.RequestedAmount
+		if creditAmount <= 0 {
+			creditAmount = topup.PayableAmount
 		}
 
 		before := user.WalletBalance
@@ -577,11 +493,6 @@ func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, 
 		user.WalletBalance = after
 		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
 			return errors.New("gagal update saldo wallet")
-		}
-
-		description := fmt.Sprintf("Topup wallet via Neticon (%s)", topup.ProviderTrxID)
-		if strings.EqualFold(topup.Provider, "pakasir") {
-			description = fmt.Sprintf("Topup wallet via Pakasir (%s)", topup.ProviderTrxID)
 		}
 
 		ledger := &model.WalletLedger{
@@ -594,7 +505,7 @@ func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, 
 			BalanceBefore: before,
 			BalanceAfter:  after,
 			Reference:     reference,
-			Description:   description,
+			Description:   fmt.Sprintf("Topup wallet via Pakasir (%s)", topup.GatewayRef),
 		}
 		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
 			return errors.New("gagal menulis ledger wallet")
@@ -689,15 +600,6 @@ func normalizeIdempotencyKey(key string) string {
 	return key
 }
 
-func generateUniqueCode() (int, error) {
-	var b [2]byte
-	if _, err := io.ReadFull(walletRandReader, b[:]); err != nil {
-		return 0, err
-	}
-	raw := int(b[0])<<8 | int(b[1])
-	return 100 + (raw % 900), nil
-}
-
 func mapProviderStatus(status string) string {
 	s := strings.ToLower(strings.TrimSpace(status))
 	s = strings.ToLower(NormalizePakasirStatus(s))
@@ -720,11 +622,10 @@ func toTopupResponse(topup *model.WalletTopup) *WalletTopupResponse {
 	return &WalletTopupResponse{
 		ID:              topup.ID.String(),
 		Provider:        topup.Provider,
-		ProviderTrxID:   topup.ProviderTrxID,
+		GatewayRef:      topup.GatewayRef,
 		PaymentMethod:   topup.PaymentMethod,
 		PaymentNumber:   topup.PaymentNumber,
 		RequestedAmount: topup.RequestedAmount,
-		UniqueCode:      topup.UniqueCode,
 		PayableAmount:   topup.PayableAmount,
 		Status:          topup.Status,
 		ProviderStatus:  topup.ProviderStatus,

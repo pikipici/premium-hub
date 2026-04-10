@@ -18,7 +18,7 @@ export interface WalletBalance {
 export interface WalletTopup {
   id: string
   provider?: string
-  provider_trx_id?: string
+  gateway_ref?: string
 
   requested_amount?: number
   unique_code?: number
@@ -28,8 +28,7 @@ export interface WalletTopup {
   bonus?: number
   total_credit?: number
   payment_method?: string
-  snap_token?: string
-  midtrans_order_id?: string
+  payment_number?: string
 
   status: WalletTopupStatus
   provider_status?: string

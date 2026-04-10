@@ -28,7 +28,7 @@ func hasRoute(routes []gin.RouteInfo, method, path string) bool {
 	return false
 }
 
-func TestSetupProductionDisablesSimulateRoute(t *testing.T) {
+func TestSetupProductionRoutes(t *testing.T) {
 	db := openTestDB(t)
 	cfg := &config.Config{
 		AppEnv:      "production",
@@ -38,10 +38,6 @@ func TestSetupProductionDisablesSimulateRoute(t *testing.T) {
 
 	r := Setup(db, cfg)
 	routes := r.Routes()
-
-	if hasRoute(routes, "POST", "/api/v1/payment/simulate/:orderId") {
-		t.Fatalf("simulate route should be disabled in production")
-	}
 
 	if !hasRoute(routes, "GET", "/healthz") {
 		t.Fatalf("health route should exist")
@@ -87,7 +83,7 @@ func TestSetupProductionDisablesSimulateRoute(t *testing.T) {
 	}
 }
 
-func TestSetupNonProductionEnablesSimulateRoute(t *testing.T) {
+func TestSetupDevelopmentPaymentRoutes(t *testing.T) {
 	db := openTestDB(t)
 	cfg := &config.Config{
 		AppEnv:      "development",
@@ -98,7 +94,10 @@ func TestSetupNonProductionEnablesSimulateRoute(t *testing.T) {
 	r := Setup(db, cfg)
 	routes := r.Routes()
 
-	if !hasRoute(routes, "POST", "/api/v1/payment/simulate/:orderId") {
-		t.Fatalf("simulate route should exist in non-production")
+	if !hasRoute(routes, "POST", "/api/v1/payment/create") {
+		t.Fatalf("payment create route should exist")
+	}
+	if !hasRoute(routes, "POST", "/api/v1/payment/webhook") {
+		t.Fatalf("payment webhook route should exist")
 	}
 }

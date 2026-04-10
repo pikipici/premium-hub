@@ -1,9 +1,8 @@
-# Wallet Topup API Contract (Wiring Freeze)
+# Wallet Topup API Contract (Pakasir)
 
-Tanggal freeze: 2026-04-05 (UTC)
+Tanggal update: 2026-04-10 (UTC)
 
-Dokumen ini jadi kontrak backend untuk integrasi UI wallet topup.
-Perubahan breaking setelah ini harus lewat versioning endpoint.
+Dokumen ini jadi kontrak backend untuk integrasi wallet topup berbasis **Pakasir**.
 
 ## Auth
 
@@ -22,20 +21,6 @@ Semua endpoint wallet butuh auth user (`Bearer token` atau cookie `access_token`
 
 `GET /api/v1/wallet/balance`
 
-Response `200`:
-
-```json
-{
-  "success": true,
-  "message": "OK",
-  "data": {
-    "balance": 125000
-  }
-}
-```
-
----
-
 ### 2) Buat invoice topup (idempotent)
 
 `POST /api/v1/wallet/topups`
@@ -48,13 +33,19 @@ Body:
 ```json
 {
   "amount": 50000,
-  "idempotency_key": "topup-20260405-001"
+  "payment_method": "qris",
+  "idempotency_key": "topup-20260410-001"
 }
 ```
 
 Aturan:
 - minimal `amount` = `1000`
 - jika `idempotency_key` sama untuk user yang sama, backend mengembalikan invoice lama (tidak buat invoice baru)
+- `payment_method` yang didukung backend saat ini:
+  - `qris`
+  - `bri_va`
+  - `bni_va`
+  - `permata_va`
 
 Response `201`:
 
@@ -64,15 +55,16 @@ Response `201`:
   "message": "Invoice topup dibuat",
   "data": {
     "id": "uuid",
-    "provider": "neticon",
-    "provider_trx_id": "H2H1710001234",
+    "provider": "pakasir",
+    "gateway_ref": "WLT-ABC123...",
+    "payment_method": "qris",
+    "payment_number": "000201...",
     "requested_amount": 50000,
-    "unique_code": 321,
-    "payable_amount": 50321,
+    "payable_amount": 53000,
     "status": "pending",
     "provider_status": "pending",
-    "idempotency_key": "topup-20260405-001",
-    "expires_at": "2026-04-05T00:20:00Z",
+    "idempotency_key": "topup-20260410-001",
+    "expires_at": "2026-04-10T16:20:00Z",
     "is_overdue": false,
     "last_checked_at": null,
     "settled_at": null,
@@ -82,59 +74,67 @@ Response `201`:
 }
 ```
 
----
+> Catatan: saldo wallet yang dikredit saat sukses = `requested_amount` (bukan `payable_amount`).
 
 ### 3) List topup
 
 `GET /api/v1/wallet/topups?page=1&limit=20`
 
-Response `200` + `meta` pagination.
-
----
-
 ### 4) Detail topup
 
 `GET /api/v1/wallet/topups/:id`
-
-Response `200`:
-- struktur `data` sama seperti create topup.
-
----
 
 ### 5) Sinkron status topup ke provider
 
 `POST /api/v1/wallet/topups/:id/check`
 
 Fungsi:
-- backend cek status terbaru ke Neticon
+- backend cek status terbaru ke Pakasir (`transactiondetail`)
 - jika `success`, saldo wallet dikredit **sekali saja** (idempotent settlement)
-
-Response `200`:
-- struktur `data` sama seperti detail topup.
-
----
 
 ### 6) Riwayat ledger wallet
 
 `GET /api/v1/wallet/ledger?page=1&limit=20`
 
-Response `200` + `meta` pagination.
-
-Data item:
+Contoh item ledger topup:
 
 ```json
 {
   "id": "uuid",
   "type": "credit",
   "category": "topup",
-  "amount": 50321,
+  "amount": 50000,
   "balance_before": 10000,
-  "balance_after": 60321,
+  "balance_after": 60000,
   "reference": "wallet_topup:<topup_id>",
-  "description": "Topup wallet via Neticon (H2H1710001234)",
+  "description": "Topup wallet via Pakasir (WLT-ABC123...)",
   "created_at": "..."
 }
 ```
+
+## Endpoint Webhook Provider
+
+### Webhook topup Pakasir
+
+`POST /api/v1/wallet/topups/webhook/pakasir`
+
+Body expected (provider):
+
+```json
+{
+  "order_id": "WLT-ABC123...",
+  "project": "premiumhub",
+  "status": "COMPLETED",
+  "amount": 50000,
+  "payment_method": "qris",
+  "completed_at": "2026-04-10T16:05:00Z"
+}
+```
+
+Behavior:
+- webhook divalidasi project + status
+- backend tetap verify ulang via `transactiondetail`
+- settlement tetap idempotent
 
 ## Endpoint Admin
 
@@ -166,9 +166,3 @@ Contoh message penting:
 - `topup tidak ditemukan`
 - `akun diblokir`
 - `gagal cek status topup: ...`
-
-## Catatan Implementasi
-
-- Settlement topup dilakukan dalam DB transaction + row lock (anti double-credit).
-- Ledger wallet memakai `reference` unik, jadi credit tidak bisa masuk dua kali untuk topup yang sama.
-- `is_overdue=true` artinya sudah lewat `expires_at` tapi status internal masih `pending`.

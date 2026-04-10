@@ -36,9 +36,9 @@ func (r *WalletRepo) FindTopupByID(topupID uuid.UUID) (*model.WalletTopup, error
 	return &topup, err
 }
 
-func (r *WalletRepo) FindTopupByProviderTrxID(provider, providerTrxID string) (*model.WalletTopup, error) {
+func (r *WalletRepo) FindTopupByGatewayRef(provider, gatewayRef string) (*model.WalletTopup, error) {
 	var topup model.WalletTopup
-	err := r.db.Where("provider = ? AND provider_trx_id = ?", provider, providerTrxID).First(&topup).Error
+	err := r.db.Where("provider = ? AND gateway_ref = ?", provider, gatewayRef).First(&topup).Error
 	return &topup, err
 }
 

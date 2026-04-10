@@ -18,14 +18,13 @@ func InitDB(cfg *Config) *gorm.DB {
 	if err != nil {
 		log.Fatal("DB connect:", err)
 	}
-	db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.User{},
 		&model.Product{},
 		&model.ProductPrice{},
 		&model.Stock{},
 		&model.Order{},
 		&model.Claim{},
-		&model.Payment{},
 		&model.Notification{},
 		&model.WalletTopup{},
 		&model.WalletLedger{},
@@ -36,7 +35,14 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.ConvertPricingRule{},
 		&model.ConvertLimitRule{},
 		&model.ConvertTrackingToken{},
-	)
+	); err != nil {
+		log.Fatal("DB migrate:", err)
+	}
+
+	if err := applyPaymentSchemaCleanup(db); err != nil {
+		log.Fatal("DB payment migration:", err)
+	}
+
 	log.Println("DB connected & migrated")
 	return db
 }

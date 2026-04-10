@@ -69,8 +69,8 @@ func (r *OrderRepo) TotalRevenue() (int64, error) {
 	return total, err
 }
 
-func (r *OrderRepo) FindByMidtransID(midtransID string) (*model.Order, error) {
+func (r *OrderRepo) FindByGatewayOrderID(gatewayOrderID string) (*model.Order, error) {
 	var o model.Order
-	err := r.db.Where("midtrans_id = ?", midtransID).First(&o).Error
+	err := r.db.Where("gateway_order_id = ?", gatewayOrderID).First(&o).Error
 	return &o, err
 }

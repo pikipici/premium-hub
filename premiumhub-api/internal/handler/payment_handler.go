@@ -63,17 +63,3 @@ func (h *PaymentHandler) GetStatus(c *gin.Context) {
 		"total_price":    order.TotalPrice,
 	})
 }
-
-// SimulatePayment - DEV only endpoint to simulate successful payment
-func (h *PaymentHandler) SimulatePayment(c *gin.Context) {
-	orderID, err := uuid.Parse(c.Param("orderId"))
-	if err != nil {
-		response.BadRequest(c, "ID tidak valid")
-		return
-	}
-	if err := h.paymentSvc.SimulatePayment(orderID); err != nil {
-		response.BadRequest(c, err.Error())
-		return
-	}
-	response.Success(c, "Pembayaran disimulasikan berhasil", nil)
-}

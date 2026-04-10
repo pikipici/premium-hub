@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -37,7 +38,6 @@ func setupCoreDB(t *testing.T) *gorm.DB {
 		&model.Stock{},
 		&model.Order{},
 		&model.Claim{},
-		&model.Payment{},
 		&model.Notification{},
 		&model.WalletTopup{},
 		&model.WalletLedger{},
@@ -712,6 +712,78 @@ func TestOrderService_AllBranches(t *testing.T) {
 	}
 }
 
+type fakePakasirOrderClient struct {
+	createHits    int
+	detailHits    int
+	statusByID    map[string]string
+	amountByID    map[string]int64
+	methodByID    map[string]string
+	createErr     error
+	detailErrByID map[string]error
+}
+
+func newFakePakasirOrderClient() *fakePakasirOrderClient {
+	return &fakePakasirOrderClient{
+		statusByID:    map[string]string{},
+		amountByID:    map[string]int64{},
+		methodByID:    map[string]string{},
+		detailErrByID: map[string]error{},
+	}
+}
+
+func (f *fakePakasirOrderClient) CreateTransaction(_ context.Context, method, orderID string, amount int64) (*PakasirCreateResult, []byte, error) {
+	if f.createErr != nil {
+		return nil, nil, f.createErr
+	}
+	f.createHits++
+	if method == "" {
+		method = "qris"
+	}
+	if _, ok := f.statusByID[orderID]; !ok {
+		f.statusByID[orderID] = "PENDING"
+	}
+	f.amountByID[orderID] = amount
+	f.methodByID[orderID] = method
+	return &PakasirCreateResult{
+		OrderID:       orderID,
+		PaymentMethod: method,
+		PaymentNumber: "000201...",
+		Amount:        amount,
+		TotalPayment:  amount + 3000,
+		ExpiredAt:     time.Now().UTC().Add(15 * time.Minute),
+	}, []byte(`{"ok":true}`), nil
+}
+
+func (f *fakePakasirOrderClient) TransactionDetail(_ context.Context, orderID string, amount int64) (*PakasirDetailResult, []byte, error) {
+	f.detailHits++
+	if err := f.detailErrByID[orderID]; err != nil {
+		return nil, nil, err
+	}
+	status := f.statusByID[orderID]
+	if status == "" {
+		status = "PENDING"
+	}
+	if overridden, ok := f.amountByID[orderID]; ok && overridden > 0 {
+		amount = overridden
+	} else if amount <= 0 {
+		amount = f.amountByID[orderID]
+	}
+	method := f.methodByID[orderID]
+	if method == "" {
+		method = "qris"
+	}
+	return &PakasirDetailResult{
+		OrderID:       orderID,
+		Amount:        amount,
+		Status:        NormalizePakasirStatus(status),
+		PaymentMethod: method,
+	}, []byte(`{"ok":true}`), nil
+}
+
+func (f *fakePakasirOrderClient) TransactionCancel(_ context.Context, _ string, _ int64) ([]byte, error) {
+	return []byte(`{"ok":true}`), nil
+}
+
 func TestPaymentService_AllBranches(t *testing.T) {
 	db := setupCoreDB(t)
 	user := seedUser(t, db, "payment-user@example.com", true)
@@ -723,9 +795,15 @@ func TestPaymentService_AllBranches(t *testing.T) {
 	productRepo := repository.NewProductRepo(db)
 	notifRepo := repository.NewNotificationRepo(db)
 	orderSvc := NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
-	svc := NewPaymentService(orderRepo, orderSvc)
+
+	fake := newFakePakasirOrderClient()
+	cfg := &config.Config{
+		PakasirProject: "premiumhub",
+		PakasirAPIKey:  "PK_test",
+	}
+	svc := NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, fake)
 	if svc == nil {
-		t.Fatalf("NewPaymentService should return instance")
+		t.Fatalf("NewPaymentServiceWithGateway should return instance")
 	}
 
 	if _, err := svc.CreateTransaction(user.ID, CreatePaymentInput{OrderID: "invalid"}); err == nil || !strings.Contains(err.Error(), "order tidak ditemukan") {
@@ -742,25 +820,37 @@ func TestPaymentService_AllBranches(t *testing.T) {
 		t.Fatalf("expected processed order error, got: %v", err)
 	}
 
-	createdTx, err := svc.CreateTransaction(user.ID, CreatePaymentInput{OrderID: pendingOrder.ID.String()})
+	createdTx, err := svc.CreateTransaction(user.ID, CreatePaymentInput{OrderID: pendingOrder.ID.String(), PaymentMethod: "qris"})
 	if err != nil {
 		t.Fatalf("create transaction: %v", err)
 	}
-	if createdTx.SnapToken == "" || createdTx.MidtransID == "" {
-		t.Fatalf("snap token/midtrans id should be generated")
+	if createdTx.PaymentNumber == "" || createdTx.GatewayOrderID == "" {
+		t.Fatalf("payment_number/gateway_order_id should be generated")
 	}
 
-	if err := svc.HandleWebhook(WebhookInput{OrderID: "missing", TransactionStatus: "capture", PaymentType: "qris"}); err == nil || !strings.Contains(err.Error(), "order tidak ditemukan") {
+	pendingUpdated, err := orderRepo.FindByID(pendingOrder.ID)
+	if err != nil {
+		t.Fatalf("find pending updated: %v", err)
+	}
+	if pendingUpdated.GatewayOrderID == "" || pendingUpdated.PaymentPayload == "" {
+		t.Fatalf("gateway order data should be persisted")
+	}
+
+	if err := svc.HandleWebhook(WebhookInput{OrderID: "missing", Project: "premiumhub", Status: "COMPLETED"}); err == nil || !strings.Contains(err.Error(), "order tidak ditemukan") {
 		t.Fatalf("expected webhook order not found, got: %v", err)
 	}
 
 	captureOrder := seedOrder(t, db, user.ID, price.ID, "pending", price.Price)
-	captureOrder.MidtransID = "MID-CAP-1"
+	captureOrder.GatewayOrderID = "ORD-CAP-1"
 	if err := orderRepo.Update(captureOrder); err != nil {
 		t.Fatalf("update capture order: %v", err)
 	}
+	fake.statusByID["ORD-CAP-1"] = "COMPLETED"
+	fake.amountByID["ORD-CAP-1"] = captureOrder.TotalPrice
+	fake.methodByID["ORD-CAP-1"] = "qris"
+
 	seedStock(t, db, product.ID, "shared", "available")
-	if err := svc.HandleWebhook(WebhookInput{OrderID: "MID-CAP-1", TransactionStatus: "capture", PaymentType: "qris"}); err != nil {
+	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-CAP-1", Project: "premiumhub", Status: "COMPLETED", PaymentMethod: "qris"}); err != nil {
 		t.Fatalf("webhook capture: %v", err)
 	}
 
@@ -773,57 +863,50 @@ func TestPaymentService_AllBranches(t *testing.T) {
 	}
 
 	captureNoStock := seedOrder(t, db, user.ID, price.ID, "pending", price.Price)
-	captureNoStock.MidtransID = "MID-CAP-2"
+	captureNoStock.GatewayOrderID = "ORD-CAP-2"
 	if err := orderRepo.Update(captureNoStock); err != nil {
 		t.Fatalf("update capture no stock order: %v", err)
 	}
-	if err := svc.HandleWebhook(WebhookInput{OrderID: "MID-CAP-2", TransactionStatus: "settlement", PaymentType: "qris"}); err == nil || !strings.Contains(err.Error(), "stok tidak tersedia") {
+	fake.statusByID["ORD-CAP-2"] = "COMPLETED"
+	fake.amountByID["ORD-CAP-2"] = captureNoStock.TotalPrice
+	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-CAP-2", Project: "premiumhub", Status: "COMPLETED"}); err == nil || !strings.Contains(err.Error(), "stok tidak tersedia") {
 		t.Fatalf("expected settlement confirm error, got: %v", err)
 	}
 
-	denyOrder := seedOrder(t, db, user.ID, price.ID, "pending", price.Price)
-	denyOrder.MidtransID = "MID-DENY"
-	if err := orderRepo.Update(denyOrder); err != nil {
-		t.Fatalf("update deny order: %v", err)
+	amountMismatch := seedOrder(t, db, user.ID, price.ID, "pending", price.Price)
+	amountMismatch.GatewayOrderID = "ORD-MIS-1"
+	if err := orderRepo.Update(amountMismatch); err != nil {
+		t.Fatalf("update amount mismatch order: %v", err)
 	}
-	if err := svc.HandleWebhook(WebhookInput{OrderID: "MID-DENY", TransactionStatus: "deny", PaymentType: "qris"}); err != nil {
-		t.Fatalf("webhook deny failed: %v", err)
-	}
-	denyUpdated, _ := orderRepo.FindByID(denyOrder.ID)
-	if denyUpdated.PaymentStatus != "failed" || denyUpdated.OrderStatus != "failed" {
-		t.Fatalf("deny webhook should mark order failed")
+	fake.statusByID["ORD-MIS-1"] = "COMPLETED"
+	fake.amountByID["ORD-MIS-1"] = amountMismatch.TotalPrice + 123
+	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-MIS-1", Project: "premiumhub", Status: "COMPLETED"}); err == nil || !strings.Contains(err.Error(), "nominal pembayaran tidak cocok") {
+		t.Fatalf("expected amount mismatch error, got: %v", err)
 	}
 
-	noopOrder := seedOrder(t, db, user.ID, price.ID, "pending", price.Price)
-	noopOrder.MidtransID = "MID-NOOP"
-	if err := orderRepo.Update(noopOrder); err != nil {
-		t.Fatalf("update noop order: %v", err)
+	projectMismatch := seedOrder(t, db, user.ID, price.ID, "pending", price.Price)
+	projectMismatch.GatewayOrderID = "ORD-PROJ-1"
+	if err := orderRepo.Update(projectMismatch); err != nil {
+		t.Fatalf("update project mismatch order: %v", err)
 	}
-	if err := svc.HandleWebhook(WebhookInput{OrderID: "MID-NOOP", TransactionStatus: "pending", PaymentType: "qris"}); err != nil {
-		t.Fatalf("webhook pending should be noop: %v", err)
+	fake.statusByID["ORD-PROJ-1"] = "COMPLETED"
+	fake.amountByID["ORD-PROJ-1"] = projectMismatch.TotalPrice
+	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-PROJ-1", Project: "other-project", Status: "COMPLETED"}); err != nil {
+		t.Fatalf("project mismatch should be ignored, got: %v", err)
+	}
+	projectMismatchUpdated, _ := orderRepo.FindByID(projectMismatch.ID)
+	if projectMismatchUpdated.PaymentStatus != "pending" {
+		t.Fatalf("project mismatch should not update order")
 	}
 
 	if _, err := svc.GetStatus(uuid.New(), user.ID); err == nil || !strings.Contains(err.Error(), "order tidak ditemukan") {
 		t.Fatalf("expected get status not found, got: %v", err)
 	}
-	if _, err := svc.GetStatus(noopOrder.ID, other.ID); err == nil || !strings.Contains(err.Error(), "akses ditolak") {
+	if _, err := svc.GetStatus(projectMismatch.ID, other.ID); err == nil || !strings.Contains(err.Error(), "akses ditolak") {
 		t.Fatalf("expected get status access denied, got: %v", err)
 	}
-	if _, err := svc.GetStatus(noopOrder.ID, user.ID); err != nil {
+	if _, err := svc.GetStatus(projectMismatch.ID, user.ID); err != nil {
 		t.Fatalf("get status success expected: %v", err)
-	}
-
-	if err := svc.SimulatePayment(uuid.New()); err == nil || !strings.Contains(err.Error(), "order tidak ditemukan") {
-		t.Fatalf("expected simulate order not found, got: %v", err)
-	}
-	if err := svc.SimulatePayment(processed.ID); err == nil || !strings.Contains(err.Error(), "order sudah diproses") {
-		t.Fatalf("expected simulate processed order error, got: %v", err)
-	}
-
-	simOrder := seedOrder(t, db, user.ID, price.ID, "pending", price.Price)
-	seedStock(t, db, product.ID, "shared", "available")
-	if err := svc.SimulatePayment(simOrder.ID); err != nil {
-		t.Fatalf("simulate payment success expected: %v", err)
 	}
 }
 

@@ -12,8 +12,6 @@ type Config struct {
 	AppPort, AppEnv                                                      string
 	DBHost, DBPort, DBUser, DBPassword, DBName                           string
 	JWTSecret, JWTExpiry                                                 string
-	MidtransServerKey, MidtransClientKey, MidtransEnv                    string
-	NeticonBaseURL, NeticonAPIKey, NeticonUserID, NeticonHTTPTimeoutSec  string
 	PakasirBaseURL, PakasirProject, PakasirAPIKey, PakasirHTTPTimeoutSec string
 	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                 string
 	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                  string
@@ -58,13 +56,6 @@ func Load() *Config {
 		DBName:                            e("DB_NAME", "premiumhub"),
 		JWTSecret:                         e("JWT_SECRET", "changeme-secret-32chars-minimum!!"),
 		JWTExpiry:                         e("JWT_EXPIRY", "24h"),
-		MidtransServerKey:                 e("MIDTRANS_SERVER_KEY", ""),
-		MidtransClientKey:                 e("MIDTRANS_CLIENT_KEY", ""),
-		MidtransEnv:                       e("MIDTRANS_ENV", "sandbox"),
-		NeticonBaseURL:                    e("NETICON_BASE_URL", "https://qris.neticonpay.my.id/qris.php"),
-		NeticonAPIKey:                     e("NETICON_API_KEY", ""),
-		NeticonUserID:                     e("NETICON_USER_ID", ""),
-		NeticonHTTPTimeoutSec:             e("NETICON_HTTP_TIMEOUT_SEC", "10"),
 		PakasirBaseURL:                    e("PAKASIR_BASE_URL", "https://app.pakasir.com"),
 		PakasirProject:                    e("PAKASIR_PROJECT", ""),
 		PakasirAPIKey:                     e("PAKASIR_API_KEY", ""),

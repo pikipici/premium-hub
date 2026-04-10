@@ -176,7 +176,7 @@ function WalletTopupStatusContent() {
           <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <div className="text-[11px] uppercase tracking-wide text-white/45 mb-2">Invoice</div>
-              <div className="text-sm font-bold break-all">{topup.provider_trx_id ?? topup.midtrans_order_id ?? topup.id}</div>
+              <div className="text-sm font-bold break-all">{topup.gateway_ref ?? topup.id}</div>
 
               <div className="mt-5 text-[11px] uppercase tracking-wide text-white/45">Nominal Transfer</div>
               <div className="text-3xl font-extrabold tracking-tight mt-1">{formatRupiah(transferAmount)}</div>
@@ -219,8 +219,8 @@ function WalletTopupStatusContent() {
               <div className="font-bold capitalize">{topup.provider_status || topup.status}</div>
             </div>
             <div className="rounded-xl bg-[#F7F7F5] p-3">
-              <div className="text-xs text-[#888] mb-1">Kode Unik</div>
-              <div className="font-bold">{topup.unique_code ?? '-'}</div>
+              <div className="text-xs text-[#888] mb-1">Payment Number</div>
+              <div className="font-bold break-all">{topup.payment_number || '-'}</div>
             </div>
           </div>
 

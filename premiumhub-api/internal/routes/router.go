@@ -3,7 +3,6 @@ package routes
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"premiumhub-api/config"
 	"premiumhub-api/internal/handler"
@@ -125,9 +124,6 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	protected.POST("/payment/create", paymentHandler.Create)
 	protected.GET("/payment/status/:orderId", paymentHandler.GetStatus)
-	if strings.ToLower(cfg.AppEnv) != "production" {
-		protected.POST("/payment/simulate/:orderId", paymentHandler.SimulatePayment) // DEV only
-	}
 
 	protected.GET("/wallet/balance", walletHandler.Balance)
 	protected.GET("/wallet/ledger", walletHandler.ListLedger)

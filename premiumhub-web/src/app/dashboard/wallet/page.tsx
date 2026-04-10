@@ -16,12 +16,10 @@ const NETFLIX_PRICE = 25000
 const QUICK_AMOUNTS = [25000, 50000, 100000, 200000]
 
 const PAYMENT_METHODS = [
-  { name: 'QRIS', icon: '⬛', fee: 'Gratis' },
-  { name: 'Transfer BCA', icon: '🏦', fee: 'Gratis' },
-  { name: 'GoPay', icon: '💚', fee: 'Gratis' },
-  { name: 'OVO', icon: '💜', fee: 'Gratis' },
-  { name: 'Dana', icon: '💙', fee: 'Gratis' },
-  { name: 'ShopeePay', icon: '🧡', fee: 'Gratis' },
+  { key: 'qris', name: 'QRIS', icon: '⬛', fee: 'Dari provider' },
+  { key: 'bri_va', name: 'BRI VA', icon: '🏦', fee: 'Dari provider' },
+  { key: 'bni_va', name: 'BNI VA', icon: '🏦', fee: 'Dari provider' },
+  { key: 'permata_va', name: 'Permata VA', icon: '🏦', fee: 'Dari provider' },
 ] as const
 
 type TxFilter = 'all' | 'topup' | 'purchase' | 'refund'
@@ -91,7 +89,7 @@ export default function WalletPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const [amount, setAmount] = useState<number>(QUICK_AMOUNTS[1])
-  const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHODS)[number]['name']>('QRIS')
+  const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHODS)[number]['key']>('qris')
   const [txFilter, setTxFilter] = useState<TxFilter>('all')
   const [error, setError] = useState('')
 
@@ -101,6 +99,11 @@ export default function WalletPage() {
   }, [amount])
 
   const estimatedBalance = useMemo(() => balance + selectedAmount, [balance, selectedAmount])
+
+  const selectedPaymentMethodLabel = useMemo(
+    () => PAYMENT_METHODS.find((method) => method.key === paymentMethod)?.name || paymentMethod,
+    [paymentMethod]
+  )
 
   const affordabilityCount = useMemo(() => Math.floor(balance / NETFLIX_PRICE), [balance])
 
@@ -172,6 +175,7 @@ export default function WalletPage() {
       const res = await walletService.createTopup({
         amount: selectedAmount,
         idempotencyKey: createIdempotencyKey(),
+        paymentMethod,
       })
 
       if (!res.success) {
@@ -305,12 +309,12 @@ export default function WalletPage() {
               <div className="text-[11px] font-bold uppercase tracking-wide text-[#888] mb-2">Metode Pembayaran</div>
               <div className="grid grid-cols-3 gap-2">
                 {PAYMENT_METHODS.map((method) => {
-                  const selected = paymentMethod === method.name
+                  const selected = paymentMethod === method.key
                   return (
                     <button
-                      key={method.name}
+                      key={method.key}
                       type="button"
-                      onClick={() => setPaymentMethod(method.name)}
+                      onClick={() => setPaymentMethod(method.key)}
                       className={`relative rounded-xl border px-1.5 py-2.5 transition-colors ${
                         selected
                           ? 'border-[#141414] bg-[#FAFAF8]'
@@ -336,7 +340,7 @@ export default function WalletPage() {
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[#888]">Metode bayar</span>
-                <span className="font-semibold">{paymentMethod}</span>
+                <span className="font-semibold">{selectedPaymentMethodLabel}</span>
               </div>
               <div className="pt-2 border-t border-[#EBEBEB] flex items-center justify-between">
                 <span className="text-sm font-bold">Saldo setelah top up</span>
@@ -464,7 +468,7 @@ export default function WalletPage() {
                       {formatRupiah(topup.payable_amount ?? topup.total_credit ?? topup.amount ?? topup.requested_amount ?? 0)}
                     </div>
                     <div className="text-xs text-[#888] mt-1">
-                      {formatDate(topup.created_at)} • {topup.provider_trx_id ?? topup.midtrans_order_id ?? topup.id}
+                      {formatDate(topup.created_at)} • {topup.gateway_ref ?? topup.id}
                     </div>
                   </div>
 

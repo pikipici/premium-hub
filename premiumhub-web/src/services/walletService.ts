@@ -5,6 +5,7 @@ import type { Wallet, WalletBalance, WalletLedger, WalletListParams, WalletTopup
 interface CreateTopupPayload {
   amount: number
   idempotencyKey?: string
+  paymentMethod?: string
 }
 
 export const walletService = {
@@ -23,10 +24,10 @@ export const walletService = {
     }
   },
 
-  createTopup: async ({ amount, idempotencyKey }: CreateTopupPayload) => {
+  createTopup: async ({ amount, idempotencyKey, paymentMethod }: CreateTopupPayload) => {
     const res = await api.post<ApiResponse<WalletTopup>>(
       '/wallet/topups',
-      { amount, idempotency_key: idempotencyKey },
+      { amount, idempotency_key: idempotencyKey, payment_method: paymentMethod },
       {
         headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
       }

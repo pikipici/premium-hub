@@ -55,10 +55,6 @@ type PaymentResponse struct {
 	Amount         int64      `json:"amount"`
 	TotalPayment   int64      `json:"total_payment,omitempty"`
 	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
-
-	// Legacy aliases (temporary for backward compatibility)
-	SnapToken  string `json:"snap_token,omitempty"`
-	MidtransID string `json:"midtrans_id,omitempty"`
 }
 
 func (s *PaymentService) pakasirConfigured() bool {
@@ -69,6 +65,10 @@ func (s *PaymentService) pakasirConfigured() bool {
 }
 
 func (s *PaymentService) CreateTransaction(userID uuid.UUID, input CreatePaymentInput) (*PaymentResponse, error) {
+	if !s.pakasirConfigured() {
+		return nil, fmt.Errorf("gateway payment belum dikonfigurasi")
+	}
+
 	orderID, err := uuid.Parse(strings.TrimSpace(input.OrderID))
 	if err != nil {
 		return nil, fmt.Errorf("order tidak ditemukan")
@@ -85,71 +85,45 @@ func (s *PaymentService) CreateTransaction(userID uuid.UUID, input CreatePayment
 		return nil, fmt.Errorf("order sudah diproses")
 	}
 
-	if s.pakasirConfigured() {
-		method := NormalizePakasirPaymentMethod(input.PaymentMethod)
-		if method == "" {
-			method = "qris"
-		}
-
-		providerOrderID := buildPakasirOrderReference("ORD", order.ID.String())
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-
-		created, _, err := s.pakasir.CreateTransaction(ctx, method, providerOrderID, order.TotalPrice)
-		if err != nil {
-			return nil, fmt.Errorf("gagal membuat invoice pakasir: %w", err)
-		}
-
-		order.MidtransID = created.OrderID
-		order.SnapToken = created.PaymentNumber
-		order.PaymentMethod = created.PaymentMethod
-		if order.PaymentMethod == "" {
-			order.PaymentMethod = method
-		}
-		if err := s.orderRepo.Update(order); err != nil {
-			return nil, err
-		}
-
-		expiresAt := created.ExpiredAt
-		return &PaymentResponse{
-			OrderID:        order.ID.String(),
-			Provider:       "pakasir",
-			PaymentMethod:  order.PaymentMethod,
-			PaymentNumber:  created.PaymentNumber,
-			GatewayOrderID: created.OrderID,
-			Amount:         order.TotalPrice,
-			TotalPayment:   created.TotalPayment,
-			ExpiresAt:      &expiresAt,
-			SnapToken:      created.PaymentNumber,
-			MidtransID:     created.OrderID,
-		}, nil
+	method := NormalizePakasirPaymentMethod(input.PaymentMethod)
+	if method == "" {
+		method = "qris"
 	}
 
-	// Legacy fallback (non-pakasir mode)
-	midtransID := fmt.Sprintf("PH-%s-%d", order.ID.String()[:8], time.Now().Unix())
-	snapToken := fmt.Sprintf("mock-snap-%s", order.ID.String()[:12])
+	providerOrderID := buildPakasirOrderReference("ORD", order.ID.String())
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 
-	order.MidtransID = midtransID
-	order.SnapToken = snapToken
-	s.orderRepo.Update(order)
+	created, _, err := s.pakasir.CreateTransaction(ctx, method, providerOrderID, order.TotalPrice)
+	if err != nil {
+		return nil, fmt.Errorf("gagal membuat invoice pakasir: %w", err)
+	}
 
+	order.GatewayOrderID = created.OrderID
+	order.PaymentPayload = created.PaymentNumber
+	order.PaymentMethod = created.PaymentMethod
+	if order.PaymentMethod == "" {
+		order.PaymentMethod = method
+	}
+	if err := s.orderRepo.Update(order); err != nil {
+		return nil, err
+	}
+
+	expiresAt := created.ExpiredAt
 	return &PaymentResponse{
-		OrderID:       order.ID.String(),
-		Provider:      "legacy",
-		PaymentMethod: "qris",
-		PaymentNumber: snapToken,
-		Amount:        order.TotalPrice,
-		SnapToken:     snapToken,
-		MidtransID:    midtransID,
+		OrderID:        order.ID.String(),
+		Provider:       "pakasir",
+		PaymentMethod:  order.PaymentMethod,
+		PaymentNumber:  created.PaymentNumber,
+		GatewayOrderID: created.OrderID,
+		Amount:         order.TotalPrice,
+		TotalPayment:   created.TotalPayment,
+		ExpiresAt:      &expiresAt,
 	}, nil
 }
 
 type WebhookInput struct {
-	OrderID           string `json:"order_id"`
-	TransactionStatus string `json:"transaction_status"`
-	PaymentType       string `json:"payment_type"`
-
-	// Pakasir fields
+	OrderID       string `json:"order_id"`
 	Project       string `json:"project"`
 	Status        string `json:"status"`
 	PaymentMethod string `json:"payment_method"`
@@ -158,26 +132,10 @@ type WebhookInput struct {
 }
 
 func (s *PaymentService) HandleWebhook(input WebhookInput) error {
-	if s.pakasirConfigured() {
-		return s.handlePakasirWebhook(input)
+	if !s.pakasirConfigured() {
+		return fmt.Errorf("gateway payment belum dikonfigurasi")
 	}
-
-	order, err := s.orderRepo.FindByMidtransID(input.OrderID)
-	if err != nil {
-		return fmt.Errorf("order tidak ditemukan")
-	}
-
-	switch input.TransactionStatus {
-	case "capture", "settlement":
-		order.PaymentMethod = input.PaymentType
-		s.orderRepo.Update(order)
-		return s.orderSvc.ConfirmPayment(order.ID)
-	case "deny", "cancel", "expire":
-		order.PaymentStatus = "failed"
-		order.OrderStatus = "failed"
-		return s.orderRepo.Update(order)
-	}
-	return nil
+	return s.handlePakasirWebhook(input)
 }
 
 func (s *PaymentService) handlePakasirWebhook(input WebhookInput) error {
@@ -192,12 +150,12 @@ func (s *PaymentService) handlePakasirWebhook(input WebhookInput) error {
 		}
 	}
 
-	status := NormalizePakasirStatus(firstNonEmpty(strings.TrimSpace(input.Status), strings.TrimSpace(input.TransactionStatus)))
+	status := NormalizePakasirStatus(strings.TrimSpace(input.Status))
 	if !IsPakasirPaidStatus(status) {
 		return nil
 	}
 
-	order, err := s.orderRepo.FindByMidtransID(orderID)
+	order, err := s.orderRepo.FindByGatewayOrderID(orderID)
 	if err != nil {
 		return fmt.Errorf("order tidak ditemukan")
 	}
@@ -217,7 +175,7 @@ func (s *PaymentService) handlePakasirWebhook(input WebhookInput) error {
 
 	method := verified.PaymentMethod
 	if method == "" {
-		method = NormalizePakasirPaymentMethod(firstNonEmpty(input.PaymentMethod, input.PaymentType))
+		method = NormalizePakasirPaymentMethod(input.PaymentMethod)
 	}
 	if method == "" {
 		method = "qris"
@@ -241,24 +199,6 @@ func (s *PaymentService) GetStatus(orderID, userID uuid.UUID) (*model.Order, err
 	return order, nil
 }
 
-// SimulatePayment - for development/testing only, simulates successful payment
-func (s *PaymentService) SimulatePayment(orderID uuid.UUID) error {
-	if s.pakasirConfigured() {
-		return fmt.Errorf("simulate payment dinonaktifkan saat pakasir aktif")
-	}
-
-	order, err := s.orderRepo.FindByID(orderID)
-	if err != nil {
-		return fmt.Errorf("order tidak ditemukan")
-	}
-	if order.PaymentStatus != "pending" {
-		return fmt.Errorf("order sudah diproses")
-	}
-	order.PaymentMethod = "simulated"
-	s.orderRepo.Update(order)
-	return s.orderSvc.ConfirmPayment(order.ID)
-}
-
 func buildPakasirOrderReference(prefix, source string) string {
 	sanitized := strings.ToUpper(strings.TrimSpace(source))
 	sanitized = strings.ReplaceAll(sanitized, "-", "")
@@ -272,14 +212,4 @@ func buildPakasirOrderReference(prefix, source string) string {
 		return strings.ToUpper(prefix)
 	}
 	return strings.ToUpper(prefix) + "-" + sanitized
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, v := range values {
-		v = strings.TrimSpace(v)
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }

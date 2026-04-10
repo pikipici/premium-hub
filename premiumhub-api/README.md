@@ -25,6 +25,7 @@ Server akan auto-migrate tabel saat start.
 - `GOOGLE_CLIENT_ID` wajib jika mau aktifkan Google login/signup
 - `COOKIE_SAMESITE=none` mewajibkan `COOKIE_SECURE=true`
 - `AUTH_RATE_LIMIT_MAX` + `AUTH_RATE_LIMIT_WINDOW` mengatur throttle endpoint auth
+- `PAKASIR_BASE_URL`, `PAKASIR_PROJECT`, `PAKASIR_API_KEY` wajib untuk flow payment order/wallet
 
 ---
 

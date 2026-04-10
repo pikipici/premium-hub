@@ -49,8 +49,8 @@ export interface Order {
   payment_status: 'pending' | 'paid' | 'failed' | 'expired'
   order_status: 'pending' | 'active' | 'completed' | 'failed'
   stock?: OrderStock
-  midtrans_id?: string
-  snap_token?: string
+  gateway_order_id?: string
+  payment_payload?: string
   paid_at: string | null
   expires_at?: string | null
   created_at: string
