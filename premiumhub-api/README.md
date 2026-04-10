@@ -130,6 +130,7 @@ Implementasi convert sudah dipisah total dari modul lain (route + tabel + servic
 - Storage bukti convert mendukung 2 mode:
   - `CONVERT_PROOF_STORAGE_MODE=local` → simpan ke disk lokal (`CONVERT_PROOF_LOCAL_DIR`)
   - `CONVERT_PROOF_STORAGE_MODE=r2` → upload ke Cloudflare R2 (`CONVERT_PROOF_R2_*`)
+  - `CONVERT_PROOF_R2_UPLOAD_TIMEOUT` → timeout upload ke R2 (default `45s`)
 - Auto-expire pending order via worker:
   - `CONVERT_EXPIRY_WORKER_ENABLED=true|false`
   - `CONVERT_EXPIRY_WORKER_INTERVAL=1m`

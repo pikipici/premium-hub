@@ -10,6 +10,8 @@ import type {
   UploadConvertProofPayload,
 } from '@/types/convert'
 
+const PROOF_UPLOAD_TIMEOUT_MS = 65_000
+
 export const convertService = {
   createOrder: async (payload: CreateConvertOrderPayload) => {
     const res = await api.post<ApiResponse<ConvertOrderDetail>>('/convert/orders', payload)
@@ -38,8 +40,8 @@ export const convertService = {
 
   uploadProof: async (orderID: string, payload: UploadConvertProofPayload | FormData) => {
     const config = payload instanceof FormData
-      ? { headers: { 'Content-Type': 'multipart/form-data' } }
-      : undefined
+      ? { timeout: PROOF_UPLOAD_TIMEOUT_MS, headers: { 'Content-Type': 'multipart/form-data' } }
+      : { timeout: PROOF_UPLOAD_TIMEOUT_MS }
 
     const res = await api.post<ApiResponse<ConvertOrderDetail>>(`/convert/orders/${orderID}/proofs`, payload, config)
     return res.data
@@ -47,8 +49,8 @@ export const convertService = {
 
   uploadProofByToken: async (token: string, payload: UploadConvertProofPayload | FormData) => {
     const config = payload instanceof FormData
-      ? { headers: { 'Content-Type': 'multipart/form-data' } }
-      : undefined
+      ? { timeout: PROOF_UPLOAD_TIMEOUT_MS, headers: { 'Content-Type': 'multipart/form-data' } }
+      : { timeout: PROOF_UPLOAD_TIMEOUT_MS }
 
     const res = await api.post<ApiResponse<ConvertOrderDetail>>(`/convert/track/${encodeURIComponent(token)}/proofs`, payload, config)
     return res.data

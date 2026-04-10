@@ -35,6 +35,7 @@ type Config struct {
 	ConvertProofR2Endpoint, ConvertProofR2Bucket, ConvertProofR2Region   string
 	ConvertProofR2AccessKeyID, ConvertProofR2SecretAccessKey             string
 	ConvertProofR2PublicBaseURL, ConvertProofR2Prefix                    string
+	ConvertProofR2UploadTimeout                                          string
 }
 
 func Load() *Config {
@@ -105,6 +106,7 @@ func Load() *Config {
 		ConvertProofR2SecretAccessKey:     e("CONVERT_PROOF_R2_SECRET_ACCESS_KEY", ""),
 		ConvertProofR2PublicBaseURL:       e("CONVERT_PROOF_R2_PUBLIC_BASE_URL", ""),
 		ConvertProofR2Prefix:              e("CONVERT_PROOF_R2_PREFIX", "convert-proofs"),
+		ConvertProofR2UploadTimeout:       e("CONVERT_PROOF_R2_UPLOAD_TIMEOUT", "45s"),
 	}
 }
 

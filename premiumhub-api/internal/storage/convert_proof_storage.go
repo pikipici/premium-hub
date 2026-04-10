@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -34,10 +35,11 @@ type ConvertProofStorage struct {
 
 	localDir string
 
-	r2Client     *s3.Client
-	r2Bucket     string
-	r2Prefix     string
-	r2PublicBase string
+	r2Client        *s3.Client
+	r2Bucket        string
+	r2Prefix        string
+	r2PublicBase    string
+	r2UploadTimeout time.Duration
 }
 
 func NewConvertProofStorage(cfg *config.Config) (*ConvertProofStorage, error) {
@@ -59,10 +61,11 @@ func NewConvertProofStorage(cfg *config.Config) (*ConvertProofStorage, error) {
 	}
 
 	s := &ConvertProofStorage{
-		mode:      mode,
-		maxSizeMB: int64(maxFileMB),
-		maxSize:   int64(maxFileMB) * 1024 * 1024,
-		localDir:  strings.TrimSpace(cfg.ConvertProofLocalDir),
+		mode:            mode,
+		maxSizeMB:       int64(maxFileMB),
+		maxSize:         int64(maxFileMB) * 1024 * 1024,
+		localDir:        strings.TrimSpace(cfg.ConvertProofLocalDir),
+		r2UploadTimeout: parseDurationPositive(cfg.ConvertProofR2UploadTimeout, 45*time.Second),
 	}
 	if s.localDir == "" {
 		s.localDir = filepath.Join("runtime", "convert-proofs")
@@ -213,8 +216,15 @@ func (s *ConvertProofStorage) storeR2(ctx context.Context, reader io.Reader, saf
 		return "", fmt.Errorf("client R2 belum terinisialisasi")
 	}
 
+	uploadCtx := ctx
+	cancel := func() {}
+	if s.r2UploadTimeout > 0 {
+		uploadCtx, cancel = context.WithTimeout(ctx, s.r2UploadTimeout)
+	}
+	defer cancel()
+
 	objectKey := buildR2ObjectKey(s.r2Prefix, safeName)
-	_, err := s.r2Client.PutObject(ctx, &s3.PutObjectInput{
+	_, err := s.r2Client.PutObject(uploadCtx, &s3.PutObjectInput{
 		Bucket:        aws.String(s.r2Bucket),
 		Key:           aws.String(objectKey),
 		Body:          reader,
@@ -222,6 +232,9 @@ func (s *ConvertProofStorage) storeR2(ctx context.Context, reader io.Reader, saf
 		ContentLength: aws.Int64(size),
 	})
 	if err != nil {
+		if isR2UploadTimeoutError(err) {
+			return "", fmt.Errorf("upload bukti timeout, coba ulang")
+		}
 		return "", fmt.Errorf("gagal upload bukti ke R2")
 	}
 
@@ -253,6 +266,31 @@ func parsePositiveInt(raw string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+func parseDurationPositive(raw string, fallback time.Duration) time.Duration {
+	d, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err != nil || d <= 0 {
+		return fallback
+	}
+	return d
+}
+
+func isR2UploadTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "deadline exceeded") ||
+		strings.Contains(msg, "request canceled") ||
+		strings.Contains(msg, "timeout") {
+		return true
+	}
+	return false
 }
 
 func isAllowedConvertProofMime(mime string) bool {

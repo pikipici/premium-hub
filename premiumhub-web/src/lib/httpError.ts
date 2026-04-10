@@ -6,5 +6,14 @@ interface ApiErrorPayload {
 
 export function getHttpErrorMessage(error: unknown, fallback: string): string {
   const axiosErr = error as AxiosError<ApiErrorPayload>
-  return axiosErr.response?.data?.message || fallback
+
+  const apiMessage = axiosErr.response?.data?.message
+  if (apiMessage) return apiMessage
+
+  const rawMessage = String(axiosErr.message || '')
+  if (axiosErr.code === 'ECONNABORTED' || /timeout/i.test(rawMessage)) {
+    return 'Request timeout. Coba ulang beberapa saat lagi.'
+  }
+
+  return fallback
 }

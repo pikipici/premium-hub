@@ -114,6 +114,13 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if v := strings.TrimSpace(c.ConvertProofR2UploadTimeout); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 || d > 10*time.Minute {
+			problems = append(problems, "CONVERT_PROOF_R2_UPLOAD_TIMEOUT harus duration valid > 0 dan <= 10m")
+		}
+	}
+
 	if v := strings.TrimSpace(c.FiveSimHTTPTimeoutSec); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 || n > 120 {

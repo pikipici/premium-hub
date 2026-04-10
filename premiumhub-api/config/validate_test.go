@@ -181,6 +181,7 @@ func TestConfigValidate(t *testing.T) {
 			ConvertProofR2AccessKeyID:     "",
 			ConvertProofR2SecretAccessKey: "",
 			ConvertProofR2PublicBaseURL:   "not-a-url",
+			ConvertProofR2UploadTimeout:   "0",
 		}
 		err := cfg.Validate()
 		if err == nil {
@@ -195,6 +196,7 @@ func TestConfigValidate(t *testing.T) {
 			"CONVERT_PROOF_R2_ACCESS_KEY_ID",
 			"CONVERT_PROOF_R2_SECRET_ACCESS_KEY",
 			"CONVERT_PROOF_R2_PUBLIC_BASE_URL",
+			"CONVERT_PROOF_R2_UPLOAD_TIMEOUT",
 		} {
 			if !strings.Contains(msg, expected) {
 				t.Fatalf("expected error to contain %q, got: %s", expected, msg)
