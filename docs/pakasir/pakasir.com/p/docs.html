@@ -1,0 +1,364 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="shortcut icon" href="https://img.depo.web.id/xzics5iq/eciazkgiq.webp">
+  
+  <title>Docs (Panduan Integrasi) | Pakasir</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootswatch/5.3.3/cosmo/bootstrap.min.css">
+  <style>
+    [v-cloak] {
+      display: none
+    }
+    @media(min-width:768px) {
+      .container {
+        max-width: 720px;
+      }
+    }
+.article h2 {
+  border-bottom: 1px solid #dee2e6!important;
+  margin-bottom: 1rem;
+  padding-bottom: 5px;
+  margin-top: 1.5rem;
+  font-size: 1.75rem;
+  color: unset;
+}
+.article h3, .article h4, .article h5 {
+  margin-top: 1.5rem;
+  font-size: 1.25rem;
+  color: unset;
+}
+.article img {
+  max-width: 100%;
+}
+.article blockquote, .article pre {
+  background-color: var(--bs-light);
+  border: 1px solid var(--bs-border-color);
+  padding: .5rem;
+  border-radius: .5rem;
+}
+.article blockquote p:last-child {
+  margin-bottom: 0;
+}
+[v-cloak] {
+  display: none;
+}
+.wa-float {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #25D366;
+  color: white;
+  border-radius: 30px;
+  padding: 10px 15px;
+  text-decoration: none;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  z-index: 1000;
+  transition: background-color 0.3s ease;
+}
+.wa-float:hover {
+  background-color: #1DA851;
+}
+.wa-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+}
+[v-cloak] {
+  display: none
+}
+main {
+  padding-top: 60px
+}
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-sm navbar-dark shadow-sm border-bottom fixed-top" style="background: #e46455">
+    <div class="container px-3">
+      <a class="navbar-brand" href="https://pakasir.com/">
+        <b>Pakasir</b>
+      </a>
+      <ul class="navbar-nav ms-auto" style="flex-direction: row;">
+        <li class="nav-item">
+          <a class="nav-link active px-1 px-sm-2" href="https://pakasir.com/p/pricing">Biaya</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active px-1 px-sm-2" href="docs.html">Panduan</a>
+        </li>
+      </ul>
+      <div class="ms-2">
+        <a class="btn btn-light btn-sm mt-1" href="https://app.pakasir.com">Daftar/Login</a>
+      </div>
+    </div>
+  </nav>
+  <main class="container px-3 mt-3" id="main"><div class="">
+  <div class="mb-5">
+    <h1 class="">Docs (Panduan Integrasi)</h1>
+    <p class="text-muted">Diperbarui 03 Mar 2026</p>
+  </div>
+<div class="article">
+  <h2>A. Persiapan</h2>
+<p>Pertama Anda bisa lakukan dengan mendaftar/login. Setelah itu mulailah dengan membuat Proyek.</p>
+<h3>A.1. Proyek</h3>
+<p>Proyek adalah identitas dari aplikasi/website Anda. Jadi, dengan satu akun Pakasir, Anda dapat mengintegrasikan untuk banyak website/aplikasi. Yaitu dengan membuat proyek untuk masing-masing website/aplikasi.</p>
+<p>Yang perlu dicatat disini adalah <code>Slug</code> dan <code>Api Key</code> dari proyek Anda. Kedua hal ini nantinya akan Anda butuhkan untuk melakukan integrasi.</p>
+<h2>B. Integrasi Via URL</h2>
+<p>Untuk mengarahkan pelanggan Anda ke halaman pembayaran, cukup gunakan URL berikut:</p>
+<pre><code>https://app.pakasir.com/pay/{slug}/{amount}?order_id={order_id}
+</code></pre>
+<ul>
+<li><code>slug</code> diambil dari proyek yang Anda miliki</li>
+<li><code>amount</code> merupakan nominal transaksi tanpa titik dan spasi. contoh: <code>100000</code> atau <code>25000</code></li>
+<li><code>order_id</code> adalah ID dari transaksi atau invoice di sistem Anda. contoh: <code>INV20240910-123456</code> atau <code>1298</code></li>
+</ul>
+<p>Berikut adalah contoh penggunaan yang benar:</p>
+<pre><code>https://app.pakasir.com/pay/depodomain/22000?order_id=240910HDE7C9
+</code></pre>
+<h3>B.1. Opsi: Custom Redirect</h3>
+<p>Akan muncul tombol <code>[Kembali ke halaman merchant]</code> setelah user berhasil melakukan pembayaran. Dan defaultnya akan diarahkan ke halaman sebelumnya.</p>
+<p>Untuk mengarahkan user ke halaman khusus, tambahkan <code>redirect=https://websitekamu.com/tujuan</code> pada URL.</p>
+<pre><code>https://app.pakasir.com/pay/depodomain/22000?order_id=240910HDE7C9&amp;redirect=https://app.depodomain.com/invoices
+</code></pre>
+<h3>B.2. Opsi: Hanya QRIS</h3>
+<p>Untuk mengaktifkan hanya QRIS, sehingga pengunjung langsung melihat QR code dan tidak bisa mengubah ke metode pembayaran lain.</p>
+<p>Tambahkan <code>qris_only=1</code> pada URL.</p>
+<pre><code>https://app.pakasir.com/pay/depodomain/22000?order_id=240910HDE7C9&amp;qris_only=1
+</code></pre>
+<h3>B.3. Opsi: Paypal</h3>
+<p>Jika Anda ingin langsung mengarahkan customer ke halaman pembayaran via Paypal, maka cukup ganti url <code>/pay/</code> dengan <code>/paypal/</code>.</p>
+<p>Contoh:</p>
+<pre><code>https://app.pakasir.com/paypal/depodomain/22000?order_id=240910HDE7C9
+</code></pre>
+<h2>C. Integrasi Via API</h2>
+<p>Disini Anda membutuhkan <code>API Key</code> yang terdapat di halaman detail Proyek.</p>
+<h3>C.1. Penjelasan</h3>
+<p>Integrasi via API, artinya kami akan mengirimkan detail berikut:</p>
+<ol>
+<li>QR string atau nomor Virtual Account</li>
+<li>Total Pembayaran</li>
+<li>Waktu kadaluarsa (Expired)</li>
+</ol>
+<p>Untuk menampilkan Kode QR atau Nomor Virtual Account dan Nominal kepada pengguna, menjadi tanggung jawab Anda. Anda bisa menggunakan library yang mengubah QR string menjadi gambar.</p>
+<h3>C.2. API: Transaction create</h3>
+<ul>
+<li>Method: <code>POST</code></li>
+<li>URL: <code>https://app.pakasir.com/api/transactioncreate/{method}</code></li>
+<li>Body (JSON):</li>
+</ul>
+<pre><code class="language-json">{
+    &quot;project&quot;: &quot;depodomain&quot;,
+    &quot;order_id&quot;: &quot;INV123123&quot;,
+    &quot;amount&quot;: 99000,
+    &quot;api_key&quot;: &quot;xxx123&quot;
+}
+</code></pre>
+<p>Contoh penggunaannya dengan CURL:</p>
+<pre><code class="language-bash">curl -L 'https://app.pakasir.com/api/transactioncreate/qris' \
+-H 'Content-Type: application/json' \
+-d '{
+    &quot;project&quot;: &quot;depodomain&quot;,
+    &quot;order_id&quot;: &quot;INV123123&quot;,
+    &quot;amount&quot;: 99000,
+    &quot;api_key&quot;: &quot;xxx123&quot;
+}'
+</code></pre>
+<p>Untuk responsenya kurang lebih seperti berikut:</p>
+<pre><code>{
+    &quot;payment&quot;: {
+        &quot;project&quot;: &quot;depodomain&quot;,
+        &quot;order_id&quot;: &quot;INV123123&quot;,
+        &quot;amount&quot;: 99000,
+        &quot;fee&quot;: 1003,
+        &quot;total_payment&quot;: 100003,
+        &quot;payment_method&quot;: &quot;qris&quot;,
+        &quot;payment_number&quot;: &quot;00020101021226610016ID.CO.SHOPEE.WWW01189360091800216005230208216005230303UME51440014ID.CO.QRIS.WWW0215ID10243228429300303UME5204792953033605409100003.005802ID5907Pakasir6012KAB. KEBUMEN61055439262230519SP25RZRATEQI2HQ65Q46304A079&quot;,
+        &quot;expired_at&quot;: &quot;2025-09-19T01:18:49.678622564Z&quot;
+    }
+}
+</code></pre>
+<h3>C.3. Pilihan Payment Method</h3>
+<ul>
+<li>cimb_niaga_va</li>
+<li>bni_va</li>
+<li>qris</li>
+<li>sampoerna_va</li>
+<li>bnc_va</li>
+<li>maybank_va</li>
+<li>permata_va</li>
+<li>atm_bersama_va</li>
+<li>artha_graha_va</li>
+<li>bri_va</li>
+<li>paypal</li>
+</ul>
+<h3>C.4. API: Payment simulation</h3>
+<p>Jika proyek Anda masih di mode Sandbox, Anda dapat lakukan simulasi pembayaran untuk mengetes webhook.</p>
+<ul>
+<li>Method: <code>POST</code></li>
+<li>URL: <code>https://app.pakasir.com/api/paymentsimulation</code></li>
+<li>Body (JSON):</li>
+</ul>
+<pre><code class="language-json">{
+    &quot;project&quot;: &quot;depodomain&quot;,
+    &quot;order_id&quot;: &quot;INV123123&quot;,
+    &quot;amount&quot;: 99000,
+    &quot;api_key&quot;: &quot;xxx123&quot;
+}
+</code></pre>
+<p>Contoh penggunaannya dengan CURL:</p>
+<pre><code class="language-bash">curl -L 'https://app.pakasir.com/api/paymentsimulation' \
+-H 'Content-Type: application/json' \
+-d '{
+    &quot;project&quot;: &quot;depodomain&quot;,
+    &quot;order_id&quot;: &quot;INV123123&quot;,
+    &quot;amount&quot;: 99000,
+    &quot;api_key&quot;: &quot;xxx123&quot;
+}'
+</code></pre>
+<h3>C.5. API: Transaction Cancel</h3>
+<p>Anda dapat membatalkan transaksi jika memang dibutuhkan. Silakan gunakan API berikut untuk melakukannya:</p>
+<ul>
+<li>Method: <code>POST</code></li>
+<li>URL: <code>https://app.pakasir.com/api/transactioncancel</code></li>
+<li>Body (JSON):</li>
+</ul>
+<pre><code class="language-json">{
+    &quot;project&quot;: &quot;depodomain&quot;,
+    &quot;order_id&quot;: &quot;INV123123&quot;,
+    &quot;amount&quot;: 99000,
+    &quot;api_key&quot;: &quot;xxx123&quot;
+}
+</code></pre>
+<p>Contoh penggunaannya dengan CURL:</p>
+<pre><code class="language-bash">curl -L 'https://app.pakasir.com/api/transactioncancel' \
+-H 'Content-Type: application/json' \
+-d '{
+    &quot;project&quot;: &quot;depodomain&quot;,
+    &quot;order_id&quot;: &quot;INV123123&quot;,
+    &quot;amount&quot;: 99000,
+    &quot;api_key&quot;: &quot;xxx123&quot;
+}'
+</code></pre>
+<h2>D. Webhook</h2>
+<p>Ketika pelanggan berhasil melakukan pembayaran dan dana masuk ke sistem kami, maka kami akan memberitahukan sistem Anda melalui webhook.</p>
+<p>Kami akan mengirimkan http <code>POST</code> dengan struktur body sebagai berikut:</p>
+<pre><code>{
+  &quot;amount&quot;: 22000,
+  &quot;order_id&quot;: &quot;240910HDE7C9&quot;,
+  &quot;project&quot;: &quot;depodomain&quot;,
+  &quot;status&quot;: &quot;completed&quot;,
+  &quot;payment_method&quot;: &quot;qris&quot;,
+  &quot;completed_at&quot;: &quot;2024-09-10T08:07:02.819+07:00&quot;
+}
+</code></pre>
+<p>Untuk menerima webhook tersebut, silakan isi Webhook URL pada proyek Anda (yaitu melalui form Edit Proyek).</p>
+<p><strong>Penting:</strong> Saat menerima webhook pastikan amount dan order_id sesuai dengan transaksi di sistem Anda. Kami sarankan untuk tetap menggunakan API dibawah ini untuk pengecekan status yang lebih valid.</p>
+<h2>E. Transaction Detail API</h2>
+<p>Untuk mengetahui status sebuah transaksi Anda bisa lakukan melalui API ini. Disini Anda membutuhkan <code>API Key</code> yang terdapat di halaman detail Proyek.</p>
+<p>Berikut ini adalah API yang bisa Anda panggil:</p>
+<pre><code>GET https://app.pakasir.com/api/transactiondetail?project={slug}&amp;amount={amount}&amp;order_id={order_id}&amp;api_key={api_key}
+</code></pre>
+<p>Contoh penggunaan yang benar dengan CURL:</p>
+<pre><code>curl https://app.pakasir.com/api/transactiondetail?project=depodomain&amp;amount=22000&amp;order_id=240910HDE7C9&amp;api_key=JHGejwhe237dkhjeukyw8e33
+</code></pre>
+<p>Untuk response yang akan Anda dapatkan kurang lebih seperti berikut:</p>
+<pre><code>{
+  &quot;transaction&quot;: {
+    &quot;amount&quot;: 22000,
+    &quot;order_id&quot;: &quot;240910HDE7C9&quot;,
+    &quot;project&quot;: &quot;depodomain&quot;,
+    &quot;status&quot;: &quot;completed&quot;,
+    &quot;payment_method&quot;: &quot;qris&quot;,
+    &quot;completed_at&quot;: &quot;2024-09-10T08:07:02.819+07:00&quot;
+  }
+}
+</code></pre>
+<h2>F. Wordpress Plugin</h2>
+<h3>1. WooComerce</h3>
+<p>Silakan cari &quot;Pakasir&quot; atau langsung menuju halaman plugin <a href="https://wordpress.org/plugins/pakasir-for-woocommerce/">Pakasir for WooCommerce</a>.</p>
+<h3>2. EDD</h3>
+<p>Silakan download file zip <a href="https://github.com/gx1org/pakasir-for-edd/raw/refs/heads/main/pakasir-for-edd.zip">disini</a>, lalu upload ke halaman plugin. Panduan: <a href="https://github.com/gx1org/pakasir-for-edd">Pakasir for EDD</a></p>
+<h3>3. FluentCart</h3>
+<p>Silakan download file zip <a href="https://github.com/gx1org/pakasir-for-fluentcart/raw/refs/heads/main/pakasir-for-fluentcart.zip">disini</a>, lalu upload ke halaman plugin. Panduan:<br />
+<a href="https://github.com/gx1org/pakasir-for-fluentcart">Pakasir for FluentCart</a></p>
+<h2>G. Node.js Package</h2>
+<p>Untuk pengguna node.js, kalian dapat menggunakan pakasir-sdk berikut:</p>
+<p><a href="https://github.com/zeative/pakasir-sdk">https://github.com/zeative/pakasir-sdk</a></p>
+<h2>H. Metode Pembayaran Paypal</h2>
+<p>Untuk pembayaran dengan metode Paypal sebenarnya cukup sederhana. Kami memiliki kurs tetap yaitu: Rp 15.000 per USD.</p>
+<p>Karena sistem pakasir pakai rupiah, maka pengguna perlu mengirimkan amount dalam rupiah. meskipun di aplikasi/website pengguna menggunakan USD.</p>
+<p>Contoh:</p>
+<p>Produk A dijual seharga $5. Maka pengguna perlu membuat transaksi di pakasir (via API atau URL), dengan amount Rp 75.000.</p>
+<h3>Fee Paypal</h3>
+<p>Untuk fee paypal terdiri dari 2 hal berikut:</p>
+<ol>
+<li>Fee dari Pakasir: Rp 3.000 ($0.20)</li>
+<li>Fee dari Paypal: 4.4% + $0.30 (bisa cek <a href="https://www.paypal.com/id/business/paypal-business-fees">disini</a>)</li>
+</ol>
+<p>Jadi, untuk contoh produk seharga $5, total amount yang harus pembeli bayar adalah $5 + $0.75 = $5.75</p>
+
+</div>
+<script>
+ fetch('/api/posts/docs/views', {
+   method: 'POST'
+ })
+ document.querySelectorAll('table').forEach(v => {
+   v.classList.add('table')
+   v.classList.add('border')
+ })
+</script></main>
+  <footer class="small text-muted bg-light border-top" style="">
+    <div class="container py-4 pb-3">
+      <div class="row g-4">
+        <div class="col-md-6">
+          <h3 class="mb-3">Pakasir</h3>
+          <p>
+            Pakasir adalah layanan link pembayaran yang membantu merchant menerima pembayaran lewat Qris dan Virtual Account.
+            Dana disimpan dan diproses oleh Payment Gateway resmi berizin Bank Indonesia.
+            Pakasir berada dibawah naungan <a href="https://gx1.org/?ref=pakasir" class="text-muted" target="_blank">PT. Geksa</a>
+          </p>
+        </div>
+        <div class="col-md-3">
+          <h5 class="mb-3">Referensi</h5>
+          <ul class="ps-3">
+            <li class="mb-2">
+              <a class="text-muted" href="https://www.webkus.com" target="_blank">
+                Jual Produk Digital Tanpa Biaya
+              </a>
+            </li>
+            <li class="mb-2">
+              <a class="text-muted" href="https://depodomain.com" target="_blank">
+                Perpanjang Domain Murah
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div class="col-md-3">
+          <h5 class="mb-3">Informasi</h5>
+          <ul class="ps-3">
+            <li class="mb-2">
+              <a class="text-muted" href="https://pakasir.com/p/privacy">Privacy Policy</a>
+            </li>
+            <li class="mb-2">
+              <a class="text-muted" href="https://pakasir.com/p/tos">Term of Service</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <hr>
+      Pakasir &copy; 2024
+    </div>
+  </footer>
+  <a href="https://s.id/geksa-community" target="_blank" class="wa-float">
+    <img src="https://img.icons8.com/color/48/000000/whatsapp--v1.png" alt="WA" class="wa-icon">
+    Join Grup
+  </a>
+  <script defer src="https://umami.gx1.org/script.js" data-website-id="f71e63b8-d251-4b0b-b339-e113c1e67d00"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
