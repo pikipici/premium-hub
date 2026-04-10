@@ -18,6 +18,7 @@ type Config struct {
 	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                  string
 	FiveSimReconcileWorkerInterval, FiveSimReconcileWorkerBatchLimit     string
 	FiveSimReconcileSyncMinAge, FiveSimOrderMaxWaitingDuration           string
+	FiveSimResolveNotFoundThreshold, FiveSimResolveNotFoundMinAge        string
 	FiveSimReconcileWorkerEnabled                                        bool
 	WalletTopupExpiryMinutes                                             string
 	SMTPHost, SMTPPort, SMTPUser, SMTPPass, FrontendURL                  string
@@ -73,6 +74,8 @@ func Load() *Config {
 		FiveSimReconcileWorkerBatchLimit:  e("FIVESIM_RECONCILE_WORKER_BATCH_LIMIT", "200"),
 		FiveSimReconcileSyncMinAge:        e("FIVESIM_RECONCILE_SYNC_MIN_AGE", "45s"),
 		FiveSimOrderMaxWaitingDuration:    e("FIVESIM_ORDER_MAX_WAITING_DURATION", "15m"),
+		FiveSimResolveNotFoundThreshold:   e("FIVESIM_RESOLVE_NOT_FOUND_THRESHOLD", "3"),
+		FiveSimResolveNotFoundMinAge:      e("FIVESIM_RESOLVE_NOT_FOUND_MIN_AGE", "3m"),
 		WalletTopupExpiryMinutes:          e("WALLET_TOPUP_EXPIRY_MINUTES", "15"),
 		SMTPHost:                          e("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:                          e("SMTP_PORT", "587"),

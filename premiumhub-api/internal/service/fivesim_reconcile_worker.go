@@ -43,15 +43,16 @@ func StartFiveSimReconcileWorker(cfg *config.Config, svc *FiveSimService) {
 			if res == nil {
 				continue
 			}
-			if res.Checked == 0 && res.Synced == 0 && res.AutoCanceled == 0 && res.Refunded == 0 && res.Failed == 0 {
+			if res.Checked == 0 && res.Synced == 0 && res.AutoCanceled == 0 && res.SyntheticResolved == 0 && res.Refunded == 0 && res.Failed == 0 {
 				continue
 			}
 
 			log.Printf(
-				"[fivesim-reconcile-worker] run done checked=%d synced=%d auto_canceled=%d refunded=%d failed=%d",
+				"[fivesim-reconcile-worker] run done checked=%d synced=%d auto_canceled=%d synthetic_resolved=%d refunded=%d failed=%d",
 				res.Checked,
 				res.Synced,
 				res.AutoCanceled,
+				res.SyntheticResolved,
 				res.Refunded,
 				res.Failed,
 			)

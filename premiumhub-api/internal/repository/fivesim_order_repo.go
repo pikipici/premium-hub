@@ -54,6 +54,8 @@ func (r *FiveSimOrderRepo) ListOpenForReconcile(statuses []string, syncedBefore 
 	if len(statuses) > 0 {
 		q = q.Where("provider_status IN ?", statuses)
 	}
+	q = q.Where("resolved_at IS NULL")
+	q = q.Where("next_sync_at IS NULL OR next_sync_at <= ?", time.Now())
 	if !syncedBefore.IsZero() {
 		q = q.Where("last_synced_at IS NULL OR last_synced_at <= ?", syncedBefore)
 	}

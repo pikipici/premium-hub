@@ -705,6 +705,102 @@ func TestFiveSimServiceReconcileOpenOrdersAutoCancelAndRefund(t *testing.T) {
 	}
 }
 
+func TestFiveSimServiceReconcileOpenOrdersResolveNotFoundAfterThreshold(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	svc.cfg.FiveSimResolveNotFoundThreshold = "1"
+	svc.cfg.FiveSimResolveNotFoundMinAge = "1s"
+	seedFiveSimOrderWithCharge(t, db, activeUser.ID, 995511, "PENDING", 1_000, time.Now().Add(-20*time.Minute))
+
+	fake.checkErrByID = map[int64]error{
+		995511: &FiveSimAPIError{StatusCode: 404, Message: "order not found", Retryable: false},
+	}
+
+	res, err := svc.ReconcileOpenOrders(context.Background(), FiveSimReconcileInput{
+		Limit:      50,
+		MinSyncAge: time.Second,
+		MaxWaiting: 15 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("reconcile open orders: %v", err)
+	}
+	if res.Checked != 1 || res.Synced != 1 || res.SyntheticResolved != 1 || res.Refunded != 1 || res.Failed != 0 {
+		t.Fatalf("unexpected reconcile result: %+v", res)
+	}
+
+	var row model.FiveSimOrder
+	if err := db.First(&row, "provider_order_id = ?", 995511).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if row.ProviderStatus != "TIMEOUT" {
+		t.Fatalf("expected synthetic status TIMEOUT, got %s", row.ProviderStatus)
+	}
+	if row.ResolutionSource != fiveSimResolutionSourceSynthetic {
+		t.Fatalf("expected synthetic resolution source, got %s", row.ResolutionSource)
+	}
+	if row.ResolvedAt == nil {
+		t.Fatalf("expected resolved_at to be set")
+	}
+
+	var userAfter model.User
+	if err := db.First(&userAfter, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user after reconcile: %v", err)
+	}
+	if userAfter.WalletBalance != 50_000 {
+		t.Fatalf("wallet should be refunded to 50000, got %d", userAfter.WalletBalance)
+	}
+}
+
+func TestFiveSimServiceReconcileOpenOrdersNotFoundBelowThresholdKeepsOpen(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	svc.cfg.FiveSimResolveNotFoundThreshold = "3"
+	svc.cfg.FiveSimResolveNotFoundMinAge = "1s"
+	seedFiveSimOrderWithCharge(t, db, activeUser.ID, 995512, "PENDING", 1_000, time.Now().Add(-20*time.Minute))
+
+	fake.checkErrByID = map[int64]error{
+		995512: &FiveSimAPIError{StatusCode: 404, Message: "order not found", Retryable: false},
+	}
+
+	res, err := svc.ReconcileOpenOrders(context.Background(), FiveSimReconcileInput{
+		Limit:      50,
+		MinSyncAge: time.Second,
+		MaxWaiting: 15 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("reconcile open orders: %v", err)
+	}
+	if res.Checked != 1 || res.Synced != 0 || res.SyntheticResolved != 0 || res.Refunded != 0 || res.Failed != 1 {
+		t.Fatalf("unexpected reconcile result: %+v", res)
+	}
+
+	var row model.FiveSimOrder
+	if err := db.First(&row, "provider_order_id = ?", 995512).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if row.ProviderStatus != "PENDING" {
+		t.Fatalf("expected order to stay PENDING, got %s", row.ProviderStatus)
+	}
+	if row.SyncFailCount != 1 {
+		t.Fatalf("expected sync_fail_count=1, got %d", row.SyncFailCount)
+	}
+	if row.LastSyncErrorCode != fiveSimSyncErrOrderNotFound {
+		t.Fatalf("expected error code ORDER_NOT_FOUND, got %s", row.LastSyncErrorCode)
+	}
+	if row.NextSyncAt == nil {
+		t.Fatalf("expected next_sync_at to be set")
+	}
+	if row.ResolvedAt != nil {
+		t.Fatalf("expected unresolved order")
+	}
+
+	var userAfter model.User
+	if err := db.First(&userAfter, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user after reconcile: %v", err)
+	}
+	if userAfter.WalletBalance != 49_000 {
+		t.Fatalf("wallet should remain deducted, got %d", userAfter.WalletBalance)
+	}
+}
+
 func seedFiveSimOrderWithCharge(t *testing.T, db *gorm.DB, userID uuid.UUID, providerOrderID int64, status string, amount int64, createdAt time.Time) {
 	t.Helper()
 

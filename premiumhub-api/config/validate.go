@@ -162,6 +162,18 @@ func (c *Config) Validate() error {
 			problems = append(problems, "FIVESIM_ORDER_MAX_WAITING_DURATION harus format duration valid dan > 0")
 		}
 	}
+	if v := strings.TrimSpace(c.FiveSimResolveNotFoundThreshold); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 100 {
+			problems = append(problems, "FIVESIM_RESOLVE_NOT_FOUND_THRESHOLD harus angka 1-100")
+		}
+	}
+	if v := strings.TrimSpace(c.FiveSimResolveNotFoundMinAge); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			problems = append(problems, "FIVESIM_RESOLVE_NOT_FOUND_MIN_AGE harus format duration valid dan > 0")
+		}
+	}
 
 	if appEnv == "production" {
 		if strings.TrimSpace(c.NeticonAPIKey) == "" {

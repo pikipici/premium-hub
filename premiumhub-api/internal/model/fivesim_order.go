@@ -20,8 +20,15 @@ type FiveSimOrder struct {
 	ProviderPrice  float64 `gorm:"not null;default:0" json:"provider_price"`
 	ProviderStatus string  `gorm:"size:32;index" json:"provider_status"`
 
-	RawPayload   string     `gorm:"type:text" json:"raw_payload,omitempty"`
-	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
+	SyncFailCount     int        `gorm:"not null;default:0" json:"sync_fail_count"`
+	LastSyncErrorCode string     `gorm:"size:64" json:"last_sync_error_code,omitempty"`
+	LastSyncErrorMsg  string     `gorm:"size:255" json:"last_sync_error_message,omitempty"`
+	ResolutionSource  string     `gorm:"size:32;index" json:"resolution_source,omitempty"`
+	ResolutionReason  string     `gorm:"size:120" json:"resolution_reason,omitempty"`
+	RawPayload        string     `gorm:"type:text" json:"raw_payload,omitempty"`
+	LastSyncedAt      *time.Time `json:"last_synced_at,omitempty"`
+	NextSyncAt        *time.Time `json:"next_sync_at,omitempty"`
+	ResolvedAt        *time.Time `json:"resolved_at,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

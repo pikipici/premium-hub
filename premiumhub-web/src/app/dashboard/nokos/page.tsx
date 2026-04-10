@@ -28,7 +28,7 @@ import type {
 } from '@/types/fiveSim'
 
 type MainTab = 'catalog' | 'orders'
-type OrderStatusFilter = 'all' | 'PENDING' | 'RECEIVED' | 'FINISHED' | 'CANCELED'
+type OrderStatusFilter = 'all' | 'PENDING' | 'RECEIVED' | 'FINISHED' | 'CANCELED' | 'TIMEOUT'
 type OrderAction = 'check' | 'finish' | 'cancel' | 'ban'
 
 interface CountryOption {
@@ -69,6 +69,7 @@ const ORDER_STATUS_FILTERS: { key: OrderStatusFilter; label: string }[] = [
   { key: 'RECEIVED', label: 'Diterima' },
   { key: 'FINISHED', label: 'Selesai' },
   { key: 'CANCELED', label: 'Batal' },
+  { key: 'TIMEOUT', label: 'Timeout' },
 ]
 
 const FALLBACK_WALLET_MULTIPLIER = (() => {
@@ -360,6 +361,11 @@ function isOpenOrderStatus(status?: string): boolean {
 function orderStatusMeta(status?: string) {
   const normalized = normalizeOrderStatus(status)
   switch (normalized) {
+    case 'PENDING':
+      return {
+        label: 'Pending',
+        className: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      }
     case 'RECEIVED':
       return {
         label: 'Diterima',
@@ -375,6 +381,11 @@ function orderStatusMeta(status?: string) {
         label: 'Dibatalkan',
         className: 'bg-gray-100 text-gray-700 border-gray-200',
       }
+    case 'TIMEOUT':
+      return {
+        label: 'Timeout',
+        className: 'bg-rose-100 text-rose-700 border-rose-200',
+      }
     case 'BANNED':
       return {
         label: 'Ban',
@@ -382,8 +393,8 @@ function orderStatusMeta(status?: string) {
       }
     default:
       return {
-        label: 'Pending',
-        className: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+        label: normalized || 'Pending',
+        className: 'bg-slate-100 text-slate-700 border-slate-200',
       }
   }
 }

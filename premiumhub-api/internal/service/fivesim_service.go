@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,6 +29,17 @@ const (
 	fiveSimStatusTimeout  = "TIMEOUT"
 	fiveSimStatusFinished = "FINISHED"
 	fiveSimStatusBanned   = "BANNED"
+
+	fiveSimResolutionSourceProvider  = "provider"
+	fiveSimResolutionSourceSynthetic = "synthetic"
+
+	fiveSimSyncErrNone          = "NONE"
+	fiveSimSyncErrOrderNotFound = "ORDER_NOT_FOUND"
+	fiveSimSyncErrOrderExpired  = "ORDER_EXPIRED"
+	fiveSimSyncErrAuth          = "AUTH"
+	fiveSimSyncErrRateLimit     = "RATE_LIMIT"
+	fiveSimSyncErrProvider      = "PROVIDER_ERROR"
+	fiveSimSyncErrUnknown       = "UNKNOWN"
 )
 
 var fiveSimOpenStatuses = map[string]struct{}{
@@ -100,11 +112,19 @@ type FiveSimReconcileInput struct {
 }
 
 type FiveSimReconcileResult struct {
-	Checked      int `json:"checked"`
-	Synced       int `json:"synced"`
-	AutoCanceled int `json:"auto_canceled"`
-	Refunded     int `json:"refunded"`
-	Failed       int `json:"failed"`
+	Checked           int `json:"checked"`
+	Synced            int `json:"synced"`
+	AutoCanceled      int `json:"auto_canceled"`
+	SyntheticResolved int `json:"synthetic_resolved"`
+	Refunded          int `json:"refunded"`
+	Failed            int `json:"failed"`
+}
+
+type fiveSimSyncErrorInfo struct {
+	Code          string
+	Message       string
+	Retryable     bool
+	ResolveAsGone bool
 }
 
 func NewFiveSimService(
@@ -794,6 +814,9 @@ func (s *FiveSimService) ReconcileOpenOrders(ctx context.Context, input FiveSimR
 		input.MaxWaiting = 15 * time.Minute
 	}
 
+	notFoundThreshold := s.parseResolveNotFoundThreshold(3)
+	notFoundMinAge := s.parseResolveNotFoundMinAge(3 * time.Minute)
+
 	syncedBefore := time.Now().Add(-input.MinSyncAge)
 	rows, err := s.orderRepo.ListOpenForReconcile([]string{fiveSimStatusPending, fiveSimStatusReceived}, syncedBefore, input.Limit)
 	if err != nil {
@@ -811,8 +834,34 @@ func (s *FiveSimService) ReconcileOpenOrders(ctx context.Context, input FiveSimR
 
 		providerOrder, err := s.client.CheckOrder(ctx, row.ProviderOrderID)
 		if err != nil {
+			errInfo := classifyFiveSimSyncError(err)
+			s.markSyncFailed(row, errInfo, input.MinSyncAge)
+
+			if s.shouldResolveSyntheticOnMissingProviderOrder(row, errInfo, notFoundThreshold, notFoundMinAge) {
+				s.resolveSyntheticTerminal(row, errInfo)
+				if updateErr := s.orderRepo.Update(row); updateErr != nil {
+					result.Failed++
+					continue
+				}
+				result.Synced++
+				result.SyntheticResolved++
+
+				refunded, settleErr := s.settleWalletAfterSync(row, nil, "auto-reconcile-missing-order")
+				if settleErr != nil {
+					result.Failed++
+					continue
+				}
+				if refunded {
+					result.Refunded++
+				}
+				continue
+			}
+
+			if updateErr := s.orderRepo.Update(row); updateErr != nil {
+				result.Failed++
+				continue
+			}
 			result.Failed++
-			s.touchOrderSyncedAt(row)
 			continue
 		}
 
@@ -836,6 +885,9 @@ func (s *FiveSimService) ReconcileOpenOrders(ctx context.Context, input FiveSimR
 					result.Failed++
 					continue
 				}
+			} else {
+				errInfo := classifyFiveSimSyncError(cancelErr)
+				s.markSyncFailed(row, errInfo, input.MinSyncAge)
 			}
 		}
 
@@ -914,6 +966,20 @@ func (s *FiveSimService) runOrderAction(
 
 	providerOrder, err := providerFn(ctx, providerOrderID)
 	if err != nil {
+		if action == "check" {
+			errInfo := classifyFiveSimSyncError(err)
+			s.markSyncFailed(localOrder, errInfo, 30*time.Second)
+			if s.shouldResolveSyntheticOnMissingProviderOrder(localOrder, errInfo, s.parseResolveNotFoundThreshold(3), s.parseResolveNotFoundMinAge(3*time.Minute)) {
+				s.resolveSyntheticTerminal(localOrder, errInfo)
+				if updateErr := s.orderRepo.Update(localOrder); updateErr == nil {
+					if _, settleErr := s.settleWalletAfterSync(localOrder, nil, "manual-check-missing-order"); settleErr == nil {
+						return localOrder, nil, nil
+					}
+				}
+			} else {
+				_ = s.orderRepo.Update(localOrder)
+			}
+		}
 		return nil, nil, s.normalizeProviderErr(err)
 	}
 
@@ -1010,8 +1076,229 @@ func (s *FiveSimService) applySnapshot(row *model.FiveSimOrder, providerOrder *F
 	row.RawPayload = string(raw)
 	now := time.Now()
 	row.LastSyncedAt = &now
+	row.NextSyncAt = nil
+	row.SyncFailCount = 0
+	row.LastSyncErrorCode = ""
+	row.LastSyncErrorMsg = ""
+
+	if isFiveSimOpenStatus(status) {
+		row.ResolvedAt = nil
+		row.ResolutionSource = ""
+		row.ResolutionReason = ""
+	} else {
+		row.ResolvedAt = &now
+		row.ResolutionSource = fiveSimResolutionSourceProvider
+		row.ResolutionReason = fmt.Sprintf("provider_%s", strings.ToLower(status))
+	}
 
 	return nil
+}
+
+func (s *FiveSimService) parseResolveNotFoundThreshold(fallback int) int {
+	if fallback <= 0 {
+		fallback = 3
+	}
+	if s == nil || s.cfg == nil {
+		return fallback
+	}
+	raw := strings.TrimSpace(s.cfg.FiveSimResolveNotFoundThreshold)
+	if raw == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return fallback
+	}
+	if n > 100 {
+		return 100
+	}
+	return n
+}
+
+func (s *FiveSimService) parseResolveNotFoundMinAge(fallback time.Duration) time.Duration {
+	if fallback <= 0 {
+		fallback = 3 * time.Minute
+	}
+	if s == nil || s.cfg == nil {
+		return fallback
+	}
+	raw := strings.TrimSpace(s.cfg.FiveSimResolveNotFoundMinAge)
+	if raw == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return fallback
+	}
+	return d
+}
+
+func classifyFiveSimSyncError(err error) fiveSimSyncErrorInfo {
+	info := fiveSimSyncErrorInfo{
+		Code:      fiveSimSyncErrUnknown,
+		Message:   normalizeFiveSimSyncMessage("request 5sim gagal"),
+		Retryable: true,
+	}
+	if err == nil {
+		info.Code = fiveSimSyncErrNone
+		info.Message = ""
+		info.Retryable = false
+		return info
+	}
+
+	var apiErr *FiveSimAPIError
+	if errors.As(err, &apiErr) {
+		msg := normalizeFiveSimSyncMessage(apiErr.Message)
+		if msg == "" {
+			msg = normalizeFiveSimSyncMessage(err.Error())
+		}
+		info.Message = msg
+		info.Retryable = apiErr.Retryable
+
+		lowerMsg := strings.ToLower(msg)
+		switch {
+		case apiErr.StatusCode == http.StatusUnauthorized || apiErr.StatusCode == http.StatusForbidden:
+			info.Code = fiveSimSyncErrAuth
+			info.Retryable = false
+		case apiErr.StatusCode == http.StatusTooManyRequests:
+			info.Code = fiveSimSyncErrRateLimit
+			info.Retryable = true
+		case apiErr.StatusCode == http.StatusNotFound || strings.Contains(lowerMsg, "order not found"):
+			info.Code = fiveSimSyncErrOrderNotFound
+			info.ResolveAsGone = true
+			info.Retryable = false
+		case apiErr.StatusCode == http.StatusBadRequest && strings.Contains(lowerMsg, "order expired"):
+			info.Code = fiveSimSyncErrOrderExpired
+			info.ResolveAsGone = true
+			info.Retryable = false
+		case apiErr.StatusCode >= 500:
+			info.Code = fiveSimSyncErrProvider
+			info.Retryable = true
+		default:
+			info.Code = fiveSimSyncErrUnknown
+		}
+		return info
+	}
+
+	msg := normalizeFiveSimSyncMessage(err.Error())
+	if msg != "" {
+		info.Message = msg
+	}
+	if strings.Contains(strings.ToLower(info.Message), "order not found") {
+		info.Code = fiveSimSyncErrOrderNotFound
+		info.ResolveAsGone = true
+		info.Retryable = false
+	}
+	return info
+}
+
+func normalizeFiveSimSyncMessage(raw string) string {
+	msg := strings.TrimSpace(raw)
+	if msg == "" {
+		return ""
+	}
+	if len(msg) > 255 {
+		msg = msg[:255]
+	}
+	return msg
+}
+
+func (s *FiveSimService) markSyncFailed(row *model.FiveSimOrder, info fiveSimSyncErrorInfo, minSyncAge time.Duration) {
+	if row == nil {
+		return
+	}
+	now := time.Now()
+	row.SyncFailCount = row.SyncFailCount + 1
+	row.LastSyncErrorCode = strings.TrimSpace(info.Code)
+	row.LastSyncErrorMsg = normalizeFiveSimSyncMessage(info.Message)
+	row.LastSyncedAt = &now
+	row.NextSyncAt = nil
+
+	nextDelay := nextFiveSimSyncDelay(row.SyncFailCount, minSyncAge, info)
+	if nextDelay > 0 {
+		nextAt := now.Add(nextDelay)
+		row.NextSyncAt = &nextAt
+	}
+}
+
+func nextFiveSimSyncDelay(failCount int, minSyncAge time.Duration, info fiveSimSyncErrorInfo) time.Duration {
+	base := minSyncAge
+	if base <= 0 {
+		base = 45 * time.Second
+	}
+
+	switch info.Code {
+	case fiveSimSyncErrAuth:
+		return maxFiveSimDuration(base, 10*time.Minute)
+	case fiveSimSyncErrOrderNotFound, fiveSimSyncErrOrderExpired:
+		return maxFiveSimDuration(base, 1*time.Minute)
+	case fiveSimSyncErrRateLimit:
+		return maxFiveSimDuration(base, 90*time.Second)
+	}
+
+	switch {
+	case failCount >= 10:
+		return maxFiveSimDuration(base, 15*time.Minute)
+	case failCount >= 6:
+		return maxFiveSimDuration(base, 5*time.Minute)
+	case failCount >= 3:
+		return maxFiveSimDuration(base, 90*time.Second)
+	default:
+		return base
+	}
+}
+
+func maxFiveSimDuration(a, b time.Duration) time.Duration {
+	if a >= b {
+		return a
+	}
+	return b
+}
+
+func (s *FiveSimService) shouldResolveSyntheticOnMissingProviderOrder(row *model.FiveSimOrder, info fiveSimSyncErrorInfo, threshold int, minAge time.Duration) bool {
+	if row == nil || !info.ResolveAsGone {
+		return false
+	}
+	if !isFiveSimOpenStatus(row.ProviderStatus) {
+		return false
+	}
+	if threshold <= 0 {
+		threshold = 3
+	}
+	if minAge <= 0 {
+		minAge = 3 * time.Minute
+	}
+	if row.SyncFailCount < threshold {
+		return false
+	}
+	return time.Since(row.CreatedAt) >= minAge
+}
+
+func (s *FiveSimService) resolveSyntheticTerminal(row *model.FiveSimOrder, info fiveSimSyncErrorInfo) {
+	if row == nil {
+		return
+	}
+
+	now := time.Now()
+	targetStatus := fiveSimStatusTimeout
+	reason := "provider_missing_order"
+	if info.Code == fiveSimSyncErrOrderExpired {
+		reason = "provider_order_expired"
+	}
+	if s.orderHasAnySMS(row, nil) {
+		targetStatus = fiveSimStatusFinished
+		reason = reason + "_with_sms"
+	}
+
+	row.ProviderStatus = targetStatus
+	row.ResolutionSource = fiveSimResolutionSourceSynthetic
+	row.ResolutionReason = reason
+	row.ResolvedAt = &now
+	row.LastSyncedAt = &now
+	row.NextSyncAt = nil
+	row.LastSyncErrorCode = strings.TrimSpace(info.Code)
+	row.LastSyncErrorMsg = normalizeFiveSimSyncMessage(info.Message)
+	row.SyncFailCount = 0
 }
 
 func (s *FiveSimService) shouldAutoCancelByWaitingWindow(row *model.FiveSimOrder, providerOrder *FiveSimOrderPayload, maxWaiting time.Duration) bool {
