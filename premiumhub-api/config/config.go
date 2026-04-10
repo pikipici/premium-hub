@@ -14,6 +14,7 @@ type Config struct {
 	JWTSecret, JWTExpiry                                                 string
 	MidtransServerKey, MidtransClientKey, MidtransEnv                    string
 	NeticonBaseURL, NeticonAPIKey, NeticonUserID, NeticonHTTPTimeoutSec  string
+	PakasirBaseURL, PakasirProject, PakasirAPIKey, PakasirHTTPTimeoutSec string
 	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                 string
 	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                  string
 	FiveSimReconcileWorkerInterval, FiveSimReconcileWorkerBatchLimit     string
@@ -64,6 +65,10 @@ func Load() *Config {
 		NeticonAPIKey:                     e("NETICON_API_KEY", ""),
 		NeticonUserID:                     e("NETICON_USER_ID", ""),
 		NeticonHTTPTimeoutSec:             e("NETICON_HTTP_TIMEOUT_SEC", "10"),
+		PakasirBaseURL:                    e("PAKASIR_BASE_URL", "https://app.pakasir.com"),
+		PakasirProject:                    e("PAKASIR_PROJECT", ""),
+		PakasirAPIKey:                     e("PAKASIR_API_KEY", ""),
+		PakasirHTTPTimeoutSec:             e("PAKASIR_HTTP_TIMEOUT_SEC", "12"),
 		FiveSimBaseURL:                    e("FIVESIM_BASE_URL", "https://5sim.net/v1"),
 		FiveSimAPIKey:                     e("FIVESIM_API_KEY", ""),
 		FiveSimHTTPTimeoutSec:             e("FIVESIM_HTTP_TIMEOUT_SEC", "15"),

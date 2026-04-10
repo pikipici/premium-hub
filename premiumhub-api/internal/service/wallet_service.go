@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	cryptoRand "crypto/rand"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +27,7 @@ type WalletService struct {
 	walletRepo *repository.WalletRepo
 	notifRepo  *repository.NotificationRepo
 	neticon    NeticonClient
+	pakasir    PakasirClient
 }
 
 var walletRandReader io.Reader = cryptoRand.Reader
@@ -36,15 +39,31 @@ func NewWalletService(
 	notifRepo *repository.NotificationRepo,
 	neticon NeticonClient,
 ) *WalletService {
+	return NewWalletServiceWithGateway(cfg, userRepo, walletRepo, notifRepo, neticon, nil)
+}
+
+func NewWalletServiceWithGateway(
+	cfg *config.Config,
+	userRepo *repository.UserRepo,
+	walletRepo *repository.WalletRepo,
+	notifRepo *repository.NotificationRepo,
+	neticon NeticonClient,
+	pakasir PakasirClient,
+) *WalletService {
 	if neticon == nil {
 		neticon = NewNeticonClient(cfg)
 	}
+	if pakasir == nil {
+		pakasir = NewPakasirClient(cfg)
+	}
+
 	return &WalletService{
 		cfg:        cfg,
 		userRepo:   userRepo,
 		walletRepo: walletRepo,
 		notifRepo:  notifRepo,
 		neticon:    neticon,
+		pakasir:    pakasir,
 	}
 }
 
@@ -55,12 +74,15 @@ type WalletBalanceResponse struct {
 type CreateTopupInput struct {
 	Amount         int64  `json:"amount" binding:"required"`
 	IdempotencyKey string `json:"idempotency_key"`
+	PaymentMethod  string `json:"payment_method"`
 }
 
 type WalletTopupResponse struct {
 	ID              string     `json:"id"`
 	Provider        string     `json:"provider"`
 	ProviderTrxID   string     `json:"provider_trx_id"`
+	PaymentMethod   string     `json:"payment_method"`
+	PaymentNumber   string     `json:"payment_number"`
 	RequestedAmount int64      `json:"requested_amount"`
 	UniqueCode      int        `json:"unique_code"`
 	PayableAmount   int64      `json:"payable_amount"`
@@ -106,12 +128,28 @@ type WalletReconcileResult struct {
 	Errors  []string `json:"errors,omitempty"`
 }
 
+type WalletPakasirWebhookInput struct {
+	Amount        int64  `json:"amount"`
+	OrderID       string `json:"order_id"`
+	Project       string `json:"project"`
+	Status        string `json:"status"`
+	PaymentMethod string `json:"payment_method"`
+	CompletedAt   string `json:"completed_at"`
+}
+
 func (s *WalletService) GetBalance(userID uuid.UUID) (*WalletBalanceResponse, error) {
 	user, err := s.ensureActiveUser(userID)
 	if err != nil {
 		return nil, err
 	}
 	return &WalletBalanceResponse{Balance: user.WalletBalance}, nil
+}
+
+func (s *WalletService) pakasirConfigured() bool {
+	if s == nil || s.cfg == nil || s.pakasir == nil {
+		return false
+	}
+	return strings.TrimSpace(s.cfg.PakasirProject) != "" && strings.TrimSpace(s.cfg.PakasirAPIKey) != ""
 }
 
 func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input CreateTopupInput) (*WalletTopupResponse, error) {
@@ -138,12 +176,70 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 		return nil, errors.New("gagal cek idempotency")
 	}
 
+	expiresAt := time.Now().Add(s.topupExpiryDuration())
+
+	if s.pakasirConfigured() {
+		paymentMethod := NormalizePakasirPaymentMethod(input.PaymentMethod)
+		if paymentMethod == "" {
+			paymentMethod = "qris"
+		}
+		providerOrderID := buildPakasirTopupReference(userID, idempotencyKey)
+
+		rawReq, _ := json.Marshal(map[string]interface{}{
+			"action":           "transactioncreate",
+			"provider":         "pakasir",
+			"order_id":         providerOrderID,
+			"requested_amount": amount,
+			"payment_method":   paymentMethod,
+		})
+
+		created, rawResp, err := s.pakasir.CreateTransaction(ctx, paymentMethod, providerOrderID, amount)
+		if err != nil {
+			return nil, fmt.Errorf("gagal membuat invoice topup: %w", err)
+		}
+
+		payableAmount := created.TotalPayment
+		if payableAmount <= 0 {
+			payableAmount = amount
+		}
+		expiresAt = created.ExpiredAt
+
+		topup := &model.WalletTopup{
+			ID:              uuid.New(),
+			UserID:          userID,
+			Provider:        "pakasir",
+			ProviderTrxID:   created.OrderID,
+			PaymentMethod:   created.PaymentMethod,
+			PaymentNumber:   created.PaymentNumber,
+			IdempotencyKey:  idempotencyKey,
+			RequestedAmount: amount,
+			UniqueCode:      0,
+			PayableAmount:   payableAmount,
+			Status:          "pending",
+			ProviderStatus:  "pending",
+			RawRequest:      string(rawReq),
+			RawResponse:     string(rawResp),
+			ExpiresAt:       expiresAt,
+		}
+		if topup.PaymentMethod == "" {
+			topup.PaymentMethod = paymentMethod
+		}
+
+		if err := s.walletRepo.CreateTopup(topup); err != nil {
+			if existing, findErr := s.walletRepo.FindTopupByIdempotencyKey(userID, idempotencyKey); findErr == nil {
+				return toTopupResponse(existing), nil
+			}
+			return nil, errors.New("gagal menyimpan topup")
+		}
+
+		return toTopupResponse(topup), nil
+	}
+
 	uniqueCode, err := generateUniqueCode()
 	if err != nil {
 		return nil, errors.New("gagal membuat kode unik")
 	}
 	payableAmount := amount + int64(uniqueCode)
-	expiresAt := time.Now().Add(s.topupExpiryDuration())
 
 	rawReq, _ := json.Marshal(map[string]interface{}{
 		"action":           "request_deposit",
@@ -162,6 +258,8 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 		UserID:          userID,
 		Provider:        "neticon",
 		ProviderTrxID:   netRes.TrxID,
+		PaymentMethod:   "qris",
+		PaymentNumber:   "",
 		IdempotencyKey:  idempotencyKey,
 		RequestedAmount: amount,
 		UniqueCode:      uniqueCode,
@@ -346,9 +444,68 @@ func (s *WalletService) ReconcilePending(ctx context.Context, limit int) (*Walle
 	return result, nil
 }
 
+func (s *WalletService) HandlePakasirWebhook(ctx context.Context, input WalletPakasirWebhookInput) error {
+	if !s.pakasirConfigured() {
+		return errors.New("pakasir belum dikonfigurasi")
+	}
+
+	orderID := strings.TrimSpace(input.OrderID)
+	if orderID == "" {
+		return errors.New("order_id wajib diisi")
+	}
+
+	if cfgProject := strings.TrimSpace(s.cfg.PakasirProject); cfgProject != "" {
+		if project := strings.TrimSpace(input.Project); project != "" && !strings.EqualFold(project, cfgProject) {
+			return nil
+		}
+	}
+
+	if !IsPakasirPaidStatus(input.Status) {
+		return nil
+	}
+
+	topup, err := s.walletRepo.FindTopupByProviderTrxID("pakasir", orderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return errors.New("gagal memuat topup")
+	}
+
+	if input.Amount > 0 && topup.RequestedAmount > 0 && input.Amount != topup.RequestedAmount {
+		return fmt.Errorf("nominal webhook tidak cocok")
+	}
+
+	return s.syncTopupStatus(ctx, topup)
+}
+
 func (s *WalletService) syncTopupStatus(ctx context.Context, topup *model.WalletTopup) error {
 	if topup.Status == "success" || topup.Status == "failed" || topup.Status == "expired" {
 		return nil
+	}
+
+	if strings.EqualFold(topup.Provider, "pakasir") || (topup.Provider == "" && s.pakasirConfigured()) {
+		if !s.pakasirConfigured() {
+			return errors.New("pakasir belum dikonfigurasi")
+		}
+		amount := topup.RequestedAmount
+		if amount <= 0 {
+			amount = topup.PayableAmount
+		}
+		detail, raw, err := s.pakasir.TransactionDetail(ctx, topup.ProviderTrxID, amount)
+		if err != nil {
+			return fmt.Errorf("gagal cek status topup: %w", err)
+		}
+
+		mapped := mapProviderStatus(detail.Status)
+		switch mapped {
+		case "success":
+			return s.settleSuccess(topup.ID, detail.Status, raw)
+		case "failed", "expired":
+			return s.markFinalStatus(topup.ID, mapped, detail.Status, raw)
+		default:
+			return s.touchPending(topup.ID, detail.Status, raw)
+		}
 	}
 
 	statusRes, raw, err := s.neticon.CheckStatus(ctx, topup.ProviderTrxID)
@@ -405,16 +562,26 @@ func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, 
 			return err
 		}
 
+		creditAmount := topup.PayableAmount
+		if strings.EqualFold(topup.Provider, "pakasir") && topup.RequestedAmount > 0 {
+			creditAmount = topup.RequestedAmount
+		}
+
 		user, err := s.walletRepo.LockUserByIDTx(tx, topup.UserID)
 		if err != nil {
 			return errors.New("user tidak ditemukan")
 		}
 
 		before := user.WalletBalance
-		after := before + topup.PayableAmount
+		after := before + creditAmount
 		user.WalletBalance = after
 		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
 			return errors.New("gagal update saldo wallet")
+		}
+
+		description := fmt.Sprintf("Topup wallet via Neticon (%s)", topup.ProviderTrxID)
+		if strings.EqualFold(topup.Provider, "pakasir") {
+			description = fmt.Sprintf("Topup wallet via Pakasir (%s)", topup.ProviderTrxID)
 		}
 
 		ledger := &model.WalletLedger{
@@ -423,11 +590,11 @@ func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, 
 			TopupID:       &topup.ID,
 			Type:          "credit",
 			Category:      "topup",
-			Amount:        topup.PayableAmount,
+			Amount:        creditAmount,
 			BalanceBefore: before,
 			BalanceAfter:  after,
 			Reference:     reference,
-			Description:   fmt.Sprintf("Topup wallet via Neticon (%s)", topup.ProviderTrxID),
+			Description:   description,
 		}
 		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
 			return errors.New("gagal menulis ledger wallet")
@@ -440,7 +607,7 @@ func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, 
 		}
 
 		userID = user.ID
-		creditedAmount = topup.PayableAmount
+		creditedAmount = creditAmount
 		return nil
 	})
 	if err != nil {
@@ -533,10 +700,11 @@ func generateUniqueCode() (int, error) {
 
 func mapProviderStatus(status string) string {
 	s := strings.ToLower(strings.TrimSpace(status))
+	s = strings.ToLower(NormalizePakasirStatus(s))
 	switch s {
-	case "success", "settlement", "capture", "paid":
+	case "success", "settlement", "capture", "paid", "completed":
 		return "success"
-	case "deny", "cancel", "failed", "failure":
+	case "deny", "cancel", "canceled", "cancelled", "failed", "failure":
 		return "failed"
 	case "expire", "expired":
 		return "expired"
@@ -553,6 +721,8 @@ func toTopupResponse(topup *model.WalletTopup) *WalletTopupResponse {
 		ID:              topup.ID.String(),
 		Provider:        topup.Provider,
 		ProviderTrxID:   topup.ProviderTrxID,
+		PaymentMethod:   topup.PaymentMethod,
+		PaymentNumber:   topup.PaymentNumber,
 		RequestedAmount: topup.RequestedAmount,
 		UniqueCode:      topup.UniqueCode,
 		PayableAmount:   topup.PayableAmount,
@@ -577,4 +747,14 @@ func (s *WalletService) topupExpiryDuration() time.Duration {
 		minutes = 120
 	}
 	return time.Duration(minutes) * time.Minute
+}
+
+func buildPakasirTopupReference(userID uuid.UUID, idempotencyKey string) string {
+	raw := userID.String() + ":" + strings.TrimSpace(idempotencyKey)
+	hash := sha1.Sum([]byte(raw))
+	token := strings.ToUpper(hex.EncodeToString(hash[:]))
+	if len(token) > 24 {
+		token = token[:24]
+	}
+	return "WLT-" + token
 }

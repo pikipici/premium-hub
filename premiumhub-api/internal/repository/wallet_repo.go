@@ -36,6 +36,12 @@ func (r *WalletRepo) FindTopupByID(topupID uuid.UUID) (*model.WalletTopup, error
 	return &topup, err
 }
 
+func (r *WalletRepo) FindTopupByProviderTrxID(provider, providerTrxID string) (*model.WalletTopup, error) {
+	var topup model.WalletTopup
+	err := r.db.Where("provider = ? AND provider_trx_id = ?", provider, providerTrxID).First(&topup).Error
+	return &topup, err
+}
+
 func (r *WalletRepo) FindTopupByIdempotencyKey(userID uuid.UUID, key string) (*model.WalletTopup, error) {
 	var topup model.WalletTopup
 	err := r.db.Where("user_id = ? AND idempotency_key = ?", userID, key).

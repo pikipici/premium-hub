@@ -6,7 +6,7 @@ import (
 )
 
 func TestConfigValidate(t *testing.T) {
-	t.Run("development allows missing neticon creds", func(t *testing.T) {
+	t.Run("development allows missing pakasir creds", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:              "development",
 			JWTSecret:           "super-secure-secret-value-32chars++",
@@ -105,7 +105,7 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
-	t.Run("production requires neticon fields", func(t *testing.T) {
+	t.Run("production requires pakasir fields", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:    "production",
 			JWTSecret: "super-secure-secret-value-32chars++",
@@ -117,9 +117,9 @@ func TestConfigValidate(t *testing.T) {
 
 		msg := err.Error()
 		for _, expected := range []string{
-			"NETICON_API_KEY",
-			"NETICON_USER_ID",
-			"NETICON_BASE_URL",
+			"PAKASIR_PROJECT",
+			"PAKASIR_API_KEY",
+			"PAKASIR_BASE_URL",
 			"FIVESIM_API_KEY",
 		} {
 			if !strings.Contains(msg, expected) {
@@ -208,9 +208,10 @@ func TestConfigValidate(t *testing.T) {
 		cfg := &Config{
 			AppEnv:                            "Production",
 			JWTSecret:                         "super-secure-secret-value-32chars++",
-			NeticonAPIKey:                     "NP_xxx",
-			NeticonUserID:                     "MERCHANT_01",
-			NeticonBaseURL:                    "https://qris.neticonpay.my.id/qris.php",
+			PakasirProject:                    "premiumhub",
+			PakasirAPIKey:                     "PK_xxx",
+			PakasirBaseURL:                    "https://app.pakasir.com",
+			PakasirHTTPTimeoutSec:             "12",
 			FiveSimAPIKey:                     "FS_xxx",
 			FiveSimHTTPTimeoutSec:             "15",
 			CookieSameSite:                    "strict",

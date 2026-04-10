@@ -45,6 +45,18 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if v := strings.TrimSpace(c.PakasirHTTPTimeoutSec); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 120 {
+			problems = append(problems, "PAKASIR_HTTP_TIMEOUT_SEC harus angka 1-120")
+		}
+	}
+	if v := strings.TrimSpace(c.PakasirBaseURL); v != "" {
+		if err := validateHTTPURL(v); err != nil {
+			problems = append(problems, "PAKASIR_BASE_URL tidak valid: "+err.Error())
+		}
+	}
+
 	validateRate := func(maxRaw, winRaw, maxField, winField string) {
 		if v := strings.TrimSpace(maxRaw); v != "" {
 			n, err := strconv.Atoi(v)
@@ -176,14 +188,14 @@ func (c *Config) Validate() error {
 	}
 
 	if appEnv == "production" {
-		if strings.TrimSpace(c.NeticonAPIKey) == "" {
-			problems = append(problems, "NETICON_API_KEY wajib diisi di production")
+		if strings.TrimSpace(c.PakasirProject) == "" {
+			problems = append(problems, "PAKASIR_PROJECT wajib diisi di production")
 		}
-		if strings.TrimSpace(c.NeticonUserID) == "" {
-			problems = append(problems, "NETICON_USER_ID wajib diisi di production")
+		if strings.TrimSpace(c.PakasirAPIKey) == "" {
+			problems = append(problems, "PAKASIR_API_KEY wajib diisi di production")
 		}
-		if strings.TrimSpace(c.NeticonBaseURL) == "" {
-			problems = append(problems, "NETICON_BASE_URL wajib diisi di production")
+		if strings.TrimSpace(c.PakasirBaseURL) == "" {
+			problems = append(problems, "PAKASIR_BASE_URL wajib diisi di production")
 		}
 		if strings.TrimSpace(c.FiveSimAPIKey) == "" {
 			problems = append(problems, "FIVESIM_API_KEY wajib diisi di production")

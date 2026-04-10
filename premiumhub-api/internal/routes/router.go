@@ -45,7 +45,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
 	stockSvc := service.NewStockService(stockRepo)
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
-	paymentSvc := service.NewPaymentService(orderRepo, orderSvc)
+	paymentSvc := service.NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, nil)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
@@ -86,6 +86,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	products.GET("/:slug/prices", productHandler.GetPrices)
 
 	api.POST("/payment/webhook", paymentHandler.Webhook)
+	api.POST("/wallet/topups/webhook/pakasir", walletHandler.PakasirWebhook)
 	api.GET(
 		"/convert/track/:token",
 		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request tracking convert. Coba lagi sebentar."),

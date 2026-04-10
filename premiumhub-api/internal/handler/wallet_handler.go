@@ -150,6 +150,20 @@ func (h *WalletHandler) ReconcilePending(c *gin.Context) {
 	response.Success(c, "Rekonsiliasi selesai", res)
 }
 
+func (h *WalletHandler) PakasirWebhook(c *gin.Context) {
+	var input service.WalletPakasirWebhookInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.walletSvc.HandlePakasirWebhook(c.Request.Context(), input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "OK", gin.H{"acknowledged": true})
+}
+
 func parsePagination(c *gin.Context, defaultLimit, maxLimit int) (int, int) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(defaultLimit)))

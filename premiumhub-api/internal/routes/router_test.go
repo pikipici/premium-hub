@@ -55,6 +55,9 @@ func TestSetupProductionDisablesSimulateRoute(t *testing.T) {
 	if !hasRoute(routes, "POST", "/api/v1/admin/wallet/topups/reconcile") {
 		t.Fatalf("admin reconcile route should exist")
 	}
+	if !hasRoute(routes, "POST", "/api/v1/wallet/topups/webhook/pakasir") {
+		t.Fatalf("pakasir wallet webhook route should exist")
+	}
 	if !hasRoute(routes, "GET", "/api/v1/5sim/catalog/countries") {
 		t.Fatalf("5sim countries route should exist")
 	}

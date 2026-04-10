@@ -12,6 +12,8 @@ type WalletTopup struct {
 	UserID          uuid.UUID  `gorm:"type:uuid;not null;index;uniqueIndex:idx_wallet_topups_user_idem" json:"user_id"`
 	Provider        string     `gorm:"size:30;not null;default:neticon" json:"provider"`
 	ProviderTrxID   string     `gorm:"size:120;not null;uniqueIndex" json:"provider_trx_id"`
+	PaymentMethod   string     `gorm:"size:40" json:"payment_method"`
+	PaymentNumber   string     `gorm:"type:text" json:"payment_number"`
 	IdempotencyKey  string     `gorm:"size:80;not null;default:'';uniqueIndex:idx_wallet_topups_user_idem" json:"idempotency_key"`
 	RequestedAmount int64      `gorm:"not null" json:"requested_amount"`
 	UniqueCode      int        `gorm:"not null" json:"unique_code"`

@@ -95,6 +95,10 @@ func (s *OrderService) ConfirmPayment(orderID uuid.UUID) error {
 		return errors.New("order tidak ditemukan")
 	}
 
+	if order.PaymentStatus == "paid" && order.OrderStatus == "active" && order.StockID != nil {
+		return nil
+	}
+
 	now := time.Now()
 	order.PaymentStatus = "paid"
 	order.OrderStatus = "active"
