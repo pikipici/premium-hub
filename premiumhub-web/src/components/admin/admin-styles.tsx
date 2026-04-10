@@ -21,7 +21,19 @@ export default function AdminStyles() {
       }
 
       /* SIDEBAR */
-      .sidebar { width: var(--sidebar-w); min-height: 100vh; background: var(--dark); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; z-index: 100; padding: 0 0 24px; }
+      .sidebar {
+        width: var(--sidebar-w);
+        min-height: 100vh;
+        background: var(--dark);
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 100;
+        padding: 0 0 24px;
+        transition: width .18s ease;
+      }
       .sidebar-logo { padding: 22px 20px 18px; border-bottom: 1px solid rgba(255,255,255,.07); margin-bottom: 8px; }
       .sidebar-logo .logo-text { font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
       .sidebar-logo .logo-text span { color: var(--orange); }
@@ -32,6 +44,7 @@ export default function AdminStyles() {
       .nav-item:hover { background: rgba(255,255,255,.07); color: rgba(255,255,255,.85); }
       .nav-item.active { background: rgba(255,255,255,.1); color: #fff; }
       .nav-icon { font-size: 15px; opacity: .6; flex-shrink: 0; width: 20px; text-align: center; }
+      .nav-text { min-width: 0; }
       .nav-badge { margin-left: auto; font-size: 10px; font-weight: 700; background: var(--orange); color: #fff; padding: 2px 7px; border-radius: 100px; min-width: 20px; text-align: center; }
       .nav-badge.yellow { background: var(--yellow); }
       .sidebar-bottom { margin-top: auto; padding: 12px 12px 0; border-top: 1px solid rgba(255,255,255,.07); }
@@ -41,8 +54,43 @@ export default function AdminStyles() {
       .admin-name { font-size: 13px; font-weight: 600; color: #fff; }
       .admin-role { font-size: 11px; color: rgba(255,255,255,.35); }
 
+      .admin-page-wrapper.sidebar-collapsed .sidebar {
+        width: 72px;
+      }
+      .admin-page-wrapper.sidebar-collapsed .sidebar-logo {
+        padding: 14px 8px 12px;
+      }
+      .admin-page-wrapper.sidebar-collapsed .sidebar-logo .logo-text {
+        font-size: 15px;
+        text-align: center;
+      }
+      .admin-page-wrapper.sidebar-collapsed .nav-section {
+        padding: 8px 8px 4px;
+      }
+      .admin-page-wrapper.sidebar-collapsed .nav-section-label {
+        display: none;
+      }
+      .admin-page-wrapper.sidebar-collapsed .nav-item {
+        justify-content: center;
+        gap: 0;
+        padding: 9px 8px;
+      }
+      .admin-page-wrapper.sidebar-collapsed .nav-text,
+      .admin-page-wrapper.sidebar-collapsed .nav-badge,
+      .admin-page-wrapper.sidebar-collapsed .admin-profile-meta {
+        display: none;
+      }
+      .admin-page-wrapper.sidebar-collapsed .sidebar-bottom {
+        padding: 10px 8px 0;
+      }
+      .admin-page-wrapper.sidebar-collapsed .admin-profile {
+        justify-content: center;
+        padding: 8px 6px;
+      }
+
       /* MAIN */
-      .admin-main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+      .admin-main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; transition: margin-left .18s ease; }
+      .admin-page-wrapper.sidebar-collapsed .admin-main { margin-left: 72px; }
 
       /* TOPBAR */
       .topbar { height: 60px; background: var(--white); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; position: sticky; top: 0; z-index: 90; }
@@ -64,6 +112,20 @@ export default function AdminStyles() {
       }
       .mobile-menu-btn:hover { border-color: var(--dark); }
       .topbar-right { display: flex; align-items: center; gap: 12px; }
+      .sidebar-toggle-btn {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: .1px;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--white);
+        color: var(--dark);
+        cursor: pointer;
+        transition: all .15s;
+      }
+      .sidebar-toggle-btn:hover { border-color: var(--dark); }
       .topbar-btn { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; font-weight: 500; padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--white); color: var(--dark); cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 6px; text-decoration: none; }
       .topbar-btn:hover { border-color: var(--dark); }
       .topbar-btn.primary { background: var(--orange); border-color: var(--orange); color: #fff; }

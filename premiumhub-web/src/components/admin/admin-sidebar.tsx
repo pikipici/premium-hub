@@ -52,14 +52,26 @@ function isNavActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export default function AdminSidebar() {
+type AdminSidebarProps = {
+  collapsed?: boolean
+}
+
+export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
   const pathname = usePathname()
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-logo">
-        <div className="logo-text">Digi<span>Market</span></div>
-        <div className="admin-tag">Admin Panel</div>
+        <div className="logo-text">
+          {collapsed ? (
+            'DM'
+          ) : (
+            <>
+              Digi<span>Market</span>
+            </>
+          )}
+        </div>
+        {!collapsed ? <div className="admin-tag">Admin Panel</div> : null}
       </div>
 
       {NAV_SECTIONS.map((section) => (
@@ -69,9 +81,16 @@ export default function AdminSidebar() {
           {section.items.map((item) => {
             const active = isNavActive(pathname, item.href)
             return (
-              <Link key={item.href} href={item.href} className={`nav-item${active ? ' active' : ''}`}>
-                <span className="nav-icon">{item.icon}</span> {item.label}
-                {item.badge && <span className={`nav-badge${item.badgeClassName ?? ''}`}>{item.badge}</span>}
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-item${active ? ' active' : ''}`}
+                title={collapsed ? item.label : undefined}
+                aria-label={item.label}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-text">{item.label}</span>
+                {item.badge ? <span className={`nav-badge${item.badgeClassName ?? ''}`}>{item.badge}</span> : null}
               </Link>
             )
           })}
@@ -79,9 +98,9 @@ export default function AdminSidebar() {
       ))}
 
       <div className="sidebar-bottom">
-        <div className="admin-profile">
+        <div className="admin-profile" title={collapsed ? 'Admin - Super Admin' : undefined}>
           <div className="admin-avatar">A</div>
-          <div>
+          <div className="admin-profile-meta">
             <div className="admin-name">Admin</div>
             <div className="admin-role">Super Admin</div>
           </div>

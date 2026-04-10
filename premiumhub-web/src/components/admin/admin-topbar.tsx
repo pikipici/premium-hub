@@ -11,6 +11,8 @@ interface AdminTopbarProps {
   title: string
   sub: string
   onOpenMobileMenu?: () => void
+  onToggleSidebar?: () => void
+  sidebarCollapsed?: boolean
   actions?: TopbarAction[]
   activePathname?: string
 }
@@ -21,7 +23,15 @@ function isActionActive(pathname: string | undefined, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export default function AdminTopbar({ title, sub, onOpenMobileMenu, actions, activePathname }: AdminTopbarProps) {
+export default function AdminTopbar({
+  title,
+  sub,
+  onOpenMobileMenu,
+  onToggleSidebar,
+  sidebarCollapsed,
+  actions,
+  activePathname,
+}: AdminTopbarProps) {
   const router = useRouter()
 
   const hasCustomActions = Array.isArray(actions) && actions.length > 0
@@ -45,6 +55,15 @@ export default function AdminTopbar({ title, sub, onOpenMobileMenu, actions, act
       </div>
 
       <div className="topbar-right">
+        <button
+          type="button"
+          className="sidebar-toggle-btn"
+          aria-label={sidebarCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar'}
+          onClick={onToggleSidebar}
+        >
+          {sidebarCollapsed ? '☰ Sidebar' : '⇤ Collapse'}
+        </button>
+
         {hasCustomActions ? (
           actions.map((action) => {
             const active = isActionActive(activePathname, action.href)

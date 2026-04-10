@@ -35,6 +35,15 @@ function resolveConvertPageMeta(pathname: string): PageMeta {
 export default function AdminConvertLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+
+    try {
+      return window.localStorage.getItem('admin:sidebar:collapsed') === '1'
+    } catch {
+      return false
+    }
+  })
 
   const openMobileMenu = useCallback(() => {
     setMobileMenuOpen(true)
@@ -42,6 +51,18 @@ export default function AdminConvertLayout({ children }: { children: React.React
 
   const closeMobileMenu = useCallback(() => {
     setMobileMenuOpen(false)
+  }, [])
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      try {
+        window.localStorage.setItem('admin:sidebar:collapsed', next ? '1' : '0')
+      } catch {
+        // ignore storage write errors
+      }
+      return next
+    })
   }, [])
 
   const page = resolveConvertPageMeta(pathname)
@@ -55,14 +76,16 @@ export default function AdminConvertLayout({ children }: { children: React.React
 
   return (
     <>
-      <div className="admin-page-wrapper">
-        <AdminSidebar />
+      <div className={`admin-page-wrapper${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+        <AdminSidebar collapsed={sidebarCollapsed} />
 
         <div className="admin-main">
           <AdminTopbar
             title={page.title}
             sub={page.sub}
             onOpenMobileMenu={openMobileMenu}
+            onToggleSidebar={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
             actions={actions}
             activePathname={pathname}
           />

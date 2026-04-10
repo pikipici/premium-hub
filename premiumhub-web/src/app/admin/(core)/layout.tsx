@@ -47,6 +47,15 @@ function resolveCorePageMeta(pathname: string): PageMeta {
 export default function AdminCoreLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+
+    try {
+      return window.localStorage.getItem('admin:sidebar:collapsed') === '1'
+    } catch {
+      return false
+    }
+  })
 
   const openMobileMenu = useCallback(() => {
     setMobileMenuOpen(true)
@@ -56,15 +65,33 @@ export default function AdminCoreLayout({ children }: { children: React.ReactNod
     setMobileMenuOpen(false)
   }, [])
 
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      try {
+        window.localStorage.setItem('admin:sidebar:collapsed', next ? '1' : '0')
+      } catch {
+        // ignore storage write errors
+      }
+      return next
+    })
+  }, [])
+
   const page = resolveCorePageMeta(pathname)
 
   return (
     <>
-      <div className="admin-page-wrapper">
-        <AdminSidebar />
+      <div className={`admin-page-wrapper${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+        <AdminSidebar collapsed={sidebarCollapsed} />
 
         <div className="admin-main">
-          <AdminTopbar title={page.title} sub={page.sub} onOpenMobileMenu={openMobileMenu} />
+          <AdminTopbar
+            title={page.title}
+            sub={page.sub}
+            onOpenMobileMenu={openMobileMenu}
+            onToggleSidebar={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
           {children}
         </div>
       </div>
