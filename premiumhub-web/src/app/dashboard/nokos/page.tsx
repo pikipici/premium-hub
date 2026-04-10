@@ -1108,7 +1108,7 @@ export default function NomorVirtualPage() {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-            <section className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden flex flex-col xl:h-full">
+            <section className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden flex flex-col xl:h-full xl:min-h-0">
               <header className="border-b border-[#EBEBEB] px-4 py-3">
                 <h2 className="text-sm font-bold">Pilih Negara</h2>
                 <p className="text-xs text-[#888] mt-0.5">{countries.length} negara tersedia</p>
@@ -1127,7 +1127,7 @@ export default function NomorVirtualPage() {
                 </label>
               </div>
 
-              <div className="max-h-[420px] xl:max-h-none xl:flex-1 xl:min-h-0 overflow-y-auto p-2 space-y-1">
+              <div className="max-h-[420px] xl:max-h-none xl:flex-1 xl:basis-0 xl:min-h-0 overflow-y-auto p-2 space-y-1">
                 {countriesLoading ? (
                   <div className="text-center text-sm text-[#888] py-8 inline-flex items-center gap-2 justify-center w-full">
                     <Loader2 className="w-4 h-4 animate-spin" /> Memuat negara...
@@ -1175,7 +1175,7 @@ export default function NomorVirtualPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden flex flex-col xl:h-full">
+            <section className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden flex flex-col xl:h-full xl:min-h-0">
               <header className="border-b border-[#EBEBEB] px-4 py-3">
                 <h2 className="text-sm font-bold">Pilih Layanan</h2>
                 <p className="text-xs text-[#888] mt-0.5">
@@ -1197,7 +1197,7 @@ export default function NomorVirtualPage() {
                 </label>
               </div>
 
-              <div className="max-h-[420px] xl:max-h-none xl:flex-1 xl:min-h-0 overflow-y-auto p-2 space-y-1">
+              <div className="max-h-[420px] xl:max-h-none xl:flex-1 xl:basis-0 xl:min-h-0 overflow-y-auto p-2 space-y-1">
                 {!selectedCountry ? (
                   <div className="text-center text-sm text-[#888] py-8">Pilih negara dulu biar list layanan kebuka</div>
                 ) : productsLoading ? (
