@@ -70,6 +70,9 @@ func TestSetupProductionDisablesSimulateRoute(t *testing.T) {
 	if !hasRoute(routes, "GET", "/api/v1/admin/convert/orders/:id") {
 		t.Fatalf("admin convert detail route should exist")
 	}
+	if !hasRoute(routes, "POST", "/api/v1/admin/convert/orders/:id/settlement-proofs") {
+		t.Fatalf("admin convert settlement proof upload route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/convert/guest/orders") {
 		t.Fatalf("guest convert create route should exist")
 	}

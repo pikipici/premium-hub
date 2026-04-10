@@ -319,6 +319,29 @@ func (h *ConvertHandler) AdminUpdateOrderStatus(c *gin.Context) {
 	response.Success(c, "Status order convert diperbarui", res)
 }
 
+func (h *ConvertHandler) AdminUploadSettlementProof(c *gin.Context) {
+	adminID := c.MustGet("user_id").(uuid.UUID)
+	orderID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "order_id tidak valid")
+		return
+	}
+
+	input, err := h.parseConvertProofInput(c)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	res, err := h.svc.AdminUploadSettlementProof(c.Request.Context(), adminID, orderID, input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Bukti penyelesaian admin berhasil diunggah", res)
+}
+
 func (h *ConvertHandler) AdminExpirePending(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
 	if limit <= 0 {

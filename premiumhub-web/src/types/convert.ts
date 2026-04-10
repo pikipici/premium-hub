@@ -59,6 +59,8 @@ export interface ConvertOrderEvent {
   created_at: string
 }
 
+export type ConvertProofType = 'user_payment' | 'admin_settlement' | string
+
 export interface ConvertProof {
   id: string
   order_id: string
@@ -67,7 +69,8 @@ export interface ConvertProof {
   mime_type?: string
   file_size: number
   note?: string
-  uploaded_by_type: 'user' | 'admin' | string
+  proof_type: ConvertProofType
+  uploaded_by_type: 'user' | 'admin' | 'guest' | string
   uploaded_by_id?: string
   created_at: string
 }
@@ -76,6 +79,8 @@ export interface ConvertOrderDetail {
   order: ConvertOrderSummary
   events: ConvertOrderEvent[]
   proofs: ConvertProof[]
+  user_proofs: ConvertProof[]
+  admin_settlement_proofs: ConvertProof[]
 }
 
 export interface CreateConvertOrderPayload {

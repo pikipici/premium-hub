@@ -9,7 +9,7 @@ import ConvertTimelineSection from '@/components/convert/ConvertTimelineSection'
 import { getConvertStatusSummary, isFinalConvertStatus } from '@/lib/convertTimeline'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { convertService } from '@/services/convertService'
-import type { ConvertOrderDetail } from '@/types/convert'
+import type { ConvertOrderDetail, ConvertProof } from '@/types/convert'
 
 function formatRupiah(value: number) {
   return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
@@ -22,6 +22,24 @@ function formatDate(value?: string) {
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
+function shouldUseProofProxy(fileURL: string) {
+  const value = String(fileURL || '').trim()
+  if (!value) return false
+
+  try {
+    const parsed = new URL(value)
+    return parsed.hostname.endsWith('.r2.dev')
+  } catch {
+    return false
+  }
+}
+
+function resolveProofHref(proof: ConvertProof) {
+  if (shouldUseProofProxy(proof.file_url)) {
+    return `/api/v1/convert/proofs/${encodeURIComponent(proof.id)}/view`
+  }
+  return proof.file_url
+}
 
 export default function DashboardConvertOrderDetailPage() {
   const router = useRouter()
@@ -115,6 +133,18 @@ export default function DashboardConvertOrderDetailPage() {
     if (!detail) return 'Belum ada bukti transaksi'
     if (detail.proofs.length === 0) return 'Belum ada bukti transaksi'
     return `${detail.proofs.length} bukti transaksi tercatat`
+  }, [detail])
+
+  const userProofs = useMemo(() => {
+    if (!detail) return []
+    if (detail.user_proofs?.length) return detail.user_proofs
+    return detail.proofs.filter((proof) => (proof.proof_type || 'user_payment') !== 'admin_settlement')
+  }, [detail])
+
+  const adminSettlementProofs = useMemo(() => {
+    if (!detail) return []
+    if (detail.admin_settlement_proofs?.length) return detail.admin_settlement_proofs
+    return detail.proofs.filter((proof) => proof.proof_type === 'admin_settlement')
   }, [detail])
 
   return (
@@ -258,6 +288,74 @@ export default function DashboardConvertOrderDetailPage() {
                 Order sudah final ({statusBadge.label}). Upload bukti sudah ditutup.
               </p>
             )}
+          </section>
+
+          <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 md:p-6">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-[#888]">Bukti transfer dari user</h3>
+                  <span className="text-[11px] text-[#888]">{userProofs.length} bukti</span>
+                </div>
+
+                {userProofs.length === 0 ? (
+                  <p className="rounded-lg border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2 text-sm text-[#888]">Belum ada bukti transfer user.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {userProofs.map((proof) => (
+                      <div key={proof.id} className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <a
+                            href={resolveProofHref(proof)}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={proof.file_url}
+                            className="font-semibold text-[#141414] underline underline-offset-2"
+                          >
+                            {proof.file_name || proof.file_url}
+                          </a>
+                          <span className="text-xs text-[#888]">{formatDate(proof.created_at)}</span>
+                        </div>
+                        {proof.note ? <p className="mt-1 text-xs text-[#666]">{proof.note}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-[#888]">Bukti penyelesaian dari admin</h3>
+                  <span className="text-[11px] text-[#888]">{adminSettlementProofs.length} bukti</span>
+                </div>
+
+                {adminSettlementProofs.length === 0 ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Admin belum upload bukti penyelesaian transaksi.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {adminSettlementProofs.map((proof) => (
+                      <div key={proof.id} className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <a
+                            href={resolveProofHref(proof)}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={proof.file_url}
+                            className="font-semibold text-[#141414] underline underline-offset-2"
+                          >
+                            {proof.file_name || proof.file_url}
+                          </a>
+                          <span className="text-xs text-[#888]">{formatDate(proof.created_at)}</span>
+                        </div>
+                        {proof.note ? <p className="mt-1 text-xs text-[#666]">{proof.note}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </section>
 
           <ConvertTimelineSection detail={detail} title="Timeline Status" />

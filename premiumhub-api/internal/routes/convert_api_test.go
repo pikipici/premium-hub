@@ -42,8 +42,10 @@ type convertProofDTO struct {
 }
 
 type convertOrderDetailDTO struct {
-	Order  convertOrderDTO   `json:"order"`
-	Proofs []convertProofDTO `json:"proofs"`
+	Order                 convertOrderDTO   `json:"order"`
+	Proofs                []convertProofDTO `json:"proofs"`
+	UserProofs            []convertProofDTO `json:"user_proofs"`
+	AdminSettlementProofs []convertProofDTO `json:"admin_settlement_proofs"`
 }
 
 type expireResultDTO struct {
@@ -464,6 +466,107 @@ func TestConvertAPIAdminGetOrderDetail(t *testing.T) {
 	}
 	if detail.Proofs[0].FileURL == "" {
 		t.Fatalf("expected proof file_url in admin detail")
+	}
+}
+
+func TestConvertAPIAdminSettlementProofFlow(t *testing.T) {
+	db := openConvertAPITestDB(t)
+	cfg := &config.Config{
+		AppEnv:                     "development",
+		FrontendURL:                "http://localhost:3000",
+		JWTSecret:                  "super-secure-secret-value-32chars++",
+		ConvertExpiryWorkerEnabled: false,
+	}
+	r := Setup(db, cfg)
+
+	user := seedConvertAPIUser(t, db, "user", "convert-user-settlement-flow@example.com")
+	admin := seedConvertAPIUser(t, db, "admin", "convert-admin-settlement-flow@example.com")
+	userToken := mustToken(t, user, cfg.JWTSecret)
+	adminToken := mustToken(t, admin, cfg.JWTSecret)
+
+	createPayload := map[string]any{
+		"asset_type":                 "pulsa",
+		"source_amount":              120000,
+		"source_channel":             "Telkomsel",
+		"source_account":             "081234567890",
+		"destination_bank":           "BCA",
+		"destination_account_number": "1234567890",
+		"destination_account_name":   "Budi Santoso",
+		"idempotency_key":            "api-settlement-flow-001",
+	}
+	code, env := doJSONRequest(t, r, http.MethodPost, "/api/v1/convert/orders", userToken, createPayload)
+	if code != http.StatusCreated || !env.Success {
+		t.Fatalf("create order failed: code=%d msg=%s", code, env.Message)
+	}
+
+	var created convertOrderDetailDTO
+	if err := json.Unmarshal(env.Data, &created); err != nil {
+		t.Fatalf("decode create data: %v", err)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodPost, "/api/v1/convert/orders/"+created.Order.ID+"/proofs", userToken, map[string]any{
+		"file_url": "https://cdn.example.com/user-proof.png",
+		"note":     "proof user",
+	})
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("upload user proof failed: code=%d msg=%s", code, env.Message)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodPatch, "/api/v1/admin/convert/orders/"+created.Order.ID+"/status", adminToken, map[string]any{
+		"to_status": "approved",
+		"reason":    "valid",
+	})
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("approve failed: code=%d msg=%s", code, env.Message)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodPatch, "/api/v1/admin/convert/orders/"+created.Order.ID+"/status", adminToken, map[string]any{
+		"to_status": "processing",
+		"reason":    "on process",
+	})
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("processing failed: code=%d msg=%s", code, env.Message)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodPatch, "/api/v1/admin/convert/orders/"+created.Order.ID+"/status", adminToken, map[string]any{
+		"to_status": "success",
+		"reason":    "done",
+	})
+	if code != http.StatusBadRequest || env.Success {
+		t.Fatalf("success without settlement proof should fail: code=%d success=%v msg=%s", code, env.Success, env.Message)
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodPost, "/api/v1/admin/convert/orders/"+created.Order.ID+"/settlement-proofs", adminToken, map[string]any{
+		"file_url": "https://cdn.example.com/admin-settlement-proof.png",
+		"note":     "settlement done",
+	})
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("upload settlement proof failed: code=%d msg=%s", code, env.Message)
+	}
+	var detail convertOrderDetailDTO
+	if err := json.Unmarshal(env.Data, &detail); err != nil {
+		t.Fatalf("decode settlement upload detail: %v", err)
+	}
+	if len(detail.AdminSettlementProofs) == 0 {
+		t.Fatalf("expected admin settlement proofs")
+	}
+
+	code, env = doJSONRequest(t, r, http.MethodPatch, "/api/v1/admin/convert/orders/"+created.Order.ID+"/status", adminToken, map[string]any{
+		"to_status": "success",
+		"reason":    "done",
+	})
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("success after settlement proof failed: code=%d msg=%s", code, env.Message)
+	}
+
+	if err := json.Unmarshal(env.Data, &detail); err != nil {
+		t.Fatalf("decode final detail: %v", err)
+	}
+	if detail.Order.Status != "success" {
+		t.Fatalf("expected success status, got %s", detail.Order.Status)
+	}
+	if len(detail.AdminSettlementProofs) == 0 {
+		t.Fatalf("expected admin settlement proofs in final detail")
 	}
 }
 

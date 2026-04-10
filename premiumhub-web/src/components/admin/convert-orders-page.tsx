@@ -1,8 +1,8 @@
 "use client"
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Loader2, RefreshCcw } from 'lucide-react'
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { Loader2, RefreshCcw, UploadCloud } from 'lucide-react'
 
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { convertService } from '@/services/convertService'
@@ -100,6 +100,22 @@ function resolveProofHref(proof: ConvertProof) {
   return proof.file_url
 }
 
+function splitProofs(detail: ConvertOrderDetail | null) {
+  if (!detail) {
+    return { userProofs: [] as ConvertProof[], adminSettlementProofs: [] as ConvertProof[] }
+  }
+
+  const userProofs = detail.user_proofs?.length
+    ? detail.user_proofs
+    : detail.proofs.filter((proof) => (proof.proof_type || 'user_payment') !== 'admin_settlement')
+
+  const adminSettlementProofs = detail.admin_settlement_proofs?.length
+    ? detail.admin_settlement_proofs
+    : detail.proofs.filter((proof) => proof.proof_type === 'admin_settlement')
+
+  return { userProofs, adminSettlementProofs }
+}
+
 export default function ConvertOrdersPage() {
   const [orders, setOrders] = useState<ConvertOrderSummary[]>([])
   const [search, setSearch] = useState('')
@@ -118,8 +134,13 @@ export default function ConvertOrdersPage() {
   const [proofDrawerLoading, setProofDrawerLoading] = useState(false)
   const [proofDrawerError, setProofDrawerError] = useState('')
   const [selectedDetail, setSelectedDetail] = useState<ConvertOrderDetail | null>(null)
+  const [settlementProofURL, setSettlementProofURL] = useState('')
+  const [settlementProofNote, setSettlementProofNote] = useState('')
+  const [settlementProofFile, setSettlementProofFile] = useState<File | null>(null)
+  const [uploadingSettlementProof, setUploadingSettlementProof] = useState(false)
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
+  const { userProofs, adminSettlementProofs } = useMemo(() => splitProofs(selectedDetail), [selectedDetail])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -177,6 +198,9 @@ export default function ConvertOrdersPage() {
     setProofDrawerOpen(true)
     setProofDrawerLoading(true)
     setProofDrawerError('')
+    setSettlementProofURL('')
+    setSettlementProofNote('')
+    setSettlementProofFile(null)
 
     try {
       const res = await convertService.adminGetOrderByID(orderID)
@@ -197,6 +221,10 @@ export default function ConvertOrdersPage() {
     setProofDrawerLoading(false)
     setProofDrawerError('')
     setSelectedDetail(null)
+    setSettlementProofURL('')
+    setSettlementProofNote('')
+    setSettlementProofFile(null)
+    setUploadingSettlementProof(false)
   }
 
   const runAction = async (order: ConvertOrderSummary, action: QueueAction) => {
@@ -225,6 +253,50 @@ export default function ConvertOrdersPage() {
       setError(getHttpErrorMessage(err, 'Gagal update status order convert'))
     } finally {
       setActingKey('')
+    }
+  }
+
+  const submitSettlementProof = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedDetail || uploadingSettlementProof) return
+
+    if (!settlementProofFile && !settlementProofURL.trim()) {
+      setProofDrawerError('Isi URL bukti penyelesaian atau upload file terlebih dahulu.')
+      return
+    }
+
+    setUploadingSettlementProof(true)
+    setProofDrawerError('')
+
+    try {
+      const payload = settlementProofFile
+        ? (() => {
+            const formData = new FormData()
+            formData.append('file', settlementProofFile)
+            if (settlementProofNote.trim()) formData.append('note', settlementProofNote.trim())
+            return formData
+          })()
+        : {
+            file_url: settlementProofURL.trim(),
+            note: settlementProofNote.trim() || undefined,
+          }
+
+      const res = await convertService.adminUploadSettlementProof(selectedDetail.order.id, payload)
+      if (!res.success) {
+        setProofDrawerError(res.message || 'Gagal upload bukti penyelesaian admin')
+        return
+      }
+
+      setSelectedDetail(res.data)
+      setSettlementProofURL('')
+      setSettlementProofNote('')
+      setSettlementProofFile(null)
+      setNotice('Bukti penyelesaian admin berhasil diunggah.')
+      await loadOrders(true)
+    } catch (err: unknown) {
+      setProofDrawerError(getHttpErrorMessage(err, 'Gagal upload bukti penyelesaian admin'))
+    } finally {
+      setUploadingSettlementProof(false)
     }
   }
 
@@ -681,17 +753,97 @@ export default function ConvertOrdersPage() {
 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#141414' }}>Bukti yang di-submit user</h4>
-                    <span style={{ fontSize: 12, color: '#777' }}>{selectedDetail.proofs.length} bukti</span>
+                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#141414' }}>Bukti transfer dari user</h4>
+                    <span style={{ fontSize: 12, color: '#777' }}>{userProofs.length} bukti</span>
                   </div>
 
-                  {selectedDetail.proofs.length === 0 ? (
+                  {userProofs.length === 0 ? (
                     <div style={{ border: '1px solid #F7C6C6', borderRadius: 10, background: '#FFF4F4', color: '#B42318', fontSize: 12, padding: 10 }}>
                       Belum ada bukti transfer yang diunggah user.
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: 8 }}>
-                      {selectedDetail.proofs.map((proof) => (
+                      {userProofs.map((proof) => (
+                        <div key={proof.id} style={{ border: '1px solid #EBEBEB', borderRadius: 10, background: '#FAFAF8', padding: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                            <a
+                              href={resolveProofHref(proof)}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={proof.file_url}
+                              style={{ fontSize: 13, fontWeight: 700, color: '#141414', textDecoration: 'underline' }}
+                            >
+                              {proof.file_name || proof.file_url}
+                            </a>
+                            <span style={{ fontSize: 11, color: '#777' }}>{formatDate(proof.created_at)}</span>
+                          </div>
+                          <div style={{ marginTop: 4, fontSize: 11, color: '#666' }}>
+                            Upload via: <strong>{proof.uploaded_by_type}</strong>
+                            {proof.note ? ` · Note: ${proof.note}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ border: '1px solid #EBEBEB', borderRadius: 10, background: '#F9FAFF', padding: 12 }}>
+                  <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#141414' }}>Upload bukti penyelesaian admin</h4>
+                  <p style={{ marginTop: 6, marginBottom: 10, fontSize: 12, color: '#666' }}>
+                    Bukti ini wajib ada sebelum order di-set ke status sukses.
+                  </p>
+
+                  <form onSubmit={submitSettlementProof} style={{ display: 'grid', gap: 8 }}>
+                    <input
+                      type="url"
+                      value={settlementProofURL}
+                      onChange={(event) => setSettlementProofURL(event.target.value)}
+                      placeholder="URL bukti penyelesaian (opsional kalau upload file)"
+                      className="form-input"
+                    />
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px dashed #D7D7D3', borderRadius: 8, background: '#fff', padding: '8px 10px', cursor: 'pointer' }}>
+                      <UploadCloud size={16} />
+                      <span style={{ fontSize: 12, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {settlementProofFile ? settlementProofFile.name : 'Atau upload file bukti (jpg/png/webp/pdf)'}
+                      </span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".jpg,.jpeg,.png,.webp,.pdf"
+                        onChange={(event: ChangeEvent<HTMLInputElement>) => setSettlementProofFile(event.target.files?.[0] ?? null)}
+                      />
+                    </label>
+
+                    <textarea
+                      value={settlementProofNote}
+                      onChange={(event) => setSettlementProofNote(event.target.value)}
+                      rows={2}
+                      className="form-input"
+                      placeholder="Catatan settlement (opsional)"
+                    />
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button type="submit" className="action-btn orange" disabled={uploadingSettlementProof}>
+                        {uploadingSettlementProof ? 'Uploading...' : 'Upload Settlement Proof'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#141414' }}>Bukti penyelesaian dari admin</h4>
+                    <span style={{ fontSize: 12, color: '#777' }}>{adminSettlementProofs.length} bukti</span>
+                  </div>
+
+                  {adminSettlementProofs.length === 0 ? (
+                    <div style={{ border: '1px solid #F8E3B3', borderRadius: 10, background: '#FFF9EA', color: '#8A6100', fontSize: 12, padding: 10 }}>
+                      Belum ada bukti penyelesaian dari admin.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {adminSettlementProofs.map((proof) => (
                         <div key={proof.id} style={{ border: '1px solid #EBEBEB', borderRadius: 10, background: '#FAFAF8', padding: 10 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                             <a

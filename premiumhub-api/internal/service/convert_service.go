@@ -36,6 +36,11 @@ const (
 )
 
 const (
+	convertProofTypeUserPayment     = "user_payment"
+	convertProofTypeAdminSettlement = "admin_settlement"
+)
+
+const (
 	defaultConvertPPNRate = 0.11
 	defaultConvertExpiry  = 60 * time.Minute
 )
@@ -211,15 +216,18 @@ type ConvertProofResponse struct {
 	MimeType       string    `json:"mime_type,omitempty"`
 	FileSize       int64     `json:"file_size"`
 	Note           string    `json:"note,omitempty"`
+	ProofType      string    `json:"proof_type"`
 	UploadedByType string    `json:"uploaded_by_type"`
 	UploadedByID   string    `json:"uploaded_by_id,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
 type ConvertOrderDetailResponse struct {
-	Order  ConvertOrderSummaryResponse `json:"order"`
-	Events []ConvertOrderEventResponse `json:"events"`
-	Proofs []ConvertProofResponse      `json:"proofs"`
+	Order                 ConvertOrderSummaryResponse `json:"order"`
+	Events                []ConvertOrderEventResponse `json:"events"`
+	Proofs                []ConvertProofResponse      `json:"proofs"`
+	UserProofs            []ConvertProofResponse      `json:"user_proofs"`
+	AdminSettlementProofs []ConvertProofResponse      `json:"admin_settlement_proofs"`
 }
 
 type ConvertOrderListResponse struct {
@@ -549,6 +557,7 @@ func (s *ConvertService) UploadProof(ctx context.Context, userID, orderID uuid.U
 			MimeType:       strings.TrimSpace(input.MimeType),
 			FileSize:       input.FileSize,
 			Note:           note,
+			ProofType:      convertProofTypeUserPayment,
 			UploadedByType: "user",
 			UploadedByID:   &userID,
 			CreatedAt:      now,
@@ -645,6 +654,7 @@ func (s *ConvertService) UploadProofByTrackingToken(ctx context.Context, token s
 			MimeType:       strings.TrimSpace(input.MimeType),
 			FileSize:       input.FileSize,
 			Note:           note,
+			ProofType:      convertProofTypeUserPayment,
 			UploadedByType: "guest",
 			UploadedByID:   nil,
 			CreatedAt:      now,
@@ -743,6 +753,79 @@ func (s *ConvertService) GetProofByID(proofID uuid.UUID) (*model.ConvertProof, e
 	return row, nil
 }
 
+func (s *ConvertService) AdminUploadSettlementProof(ctx context.Context, adminID, orderID uuid.UUID, input UploadConvertProofInput) (*ConvertOrderDetailResponse, error) {
+	_ = ctx
+
+	if _, err := s.ensureActiveUser(adminID); err != nil {
+		return nil, err
+	}
+
+	fileURL := strings.TrimSpace(input.FileURL)
+	if fileURL == "" {
+		return nil, errors.New("bukti penyelesaian tidak valid")
+	}
+
+	note := strings.TrimSpace(input.Note)
+	if len(note) > 500 {
+		return nil, errors.New("catatan bukti terlalu panjang")
+	}
+
+	now := time.Now()
+	err := s.convertRepo.Transaction(func(tx *gorm.DB) error {
+		row, err := s.convertRepo.LockOrderByIDTx(tx, orderID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("order convert tidak ditemukan")
+			}
+			return err
+		}
+
+		status := normalizeConvertStatus(row.Status)
+		if status == convertStatusFailed || status == convertStatusExpired || status == convertStatusCanceled {
+			return errors.New("order convert sudah final")
+		}
+
+		proof := &model.ConvertProof{
+			OrderID:        row.ID,
+			FileURL:        fileURL,
+			FileName:       strings.TrimSpace(input.FileName),
+			MimeType:       strings.TrimSpace(input.MimeType),
+			FileSize:       input.FileSize,
+			Note:           note,
+			ProofType:      convertProofTypeAdminSettlement,
+			UploadedByType: "admin",
+			UploadedByID:   &adminID,
+			CreatedAt:      now,
+		}
+		if err := s.convertRepo.CreateProofTx(tx, proof); err != nil {
+			return err
+		}
+
+		event := &model.ConvertOrderEvent{
+			OrderID:    row.ID,
+			FromStatus: status,
+			ToStatus:   status,
+			Reason:     "bukti penyelesaian admin diunggah",
+			ActorType:  "admin",
+			ActorID:    &adminID,
+			CreatedAt:  now,
+		}
+		if err := s.convertRepo.CreateEventTx(tx, event); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		if err.Error() == "order convert tidak ditemukan" || err.Error() == "order convert sudah final" || err.Error() == "catatan bukti terlalu panjang" {
+			return nil, err
+		}
+		return nil, errors.New("gagal mengunggah bukti penyelesaian")
+	}
+
+	return s.AdminGetOrderByID(orderID)
+}
+
 func (s *ConvertService) AdminUpdateOrderStatus(ctx context.Context, adminID, orderID uuid.UUID, input AdminUpdateConvertStatusInput) (*ConvertOrderDetailResponse, error) {
 	_ = ctx
 
@@ -769,6 +852,16 @@ func (s *ConvertService) AdminUpdateOrderStatus(ctx context.Context, adminID, or
 			return errors.New("transisi status tidak valid")
 		}
 
+		if toStatus == convertStatusSuccess {
+			totalSettlementProof, err := s.convertRepo.CountProofsByOrderAndTypeTx(tx, row.ID, convertProofTypeAdminSettlement)
+			if err != nil {
+				return err
+			}
+			if totalSettlementProof == 0 {
+				return errors.New("unggah bukti penyelesaian admin sebelum set status sukses")
+			}
+		}
+
 		row.Status = toStatus
 		if err := s.convertRepo.SaveOrderTx(tx, row); err != nil {
 			return err
@@ -791,7 +884,7 @@ func (s *ConvertService) AdminUpdateOrderStatus(ctx context.Context, adminID, or
 		return nil
 	})
 	if err != nil {
-		if err.Error() == "order convert tidak ditemukan" || err.Error() == "transisi status tidak valid" {
+		if err.Error() == "order convert tidak ditemukan" || err.Error() == "transisi status tidak valid" || err.Error() == "unggah bukti penyelesaian admin sebelum set status sukses" {
 			return nil, err
 		}
 		return nil, errors.New("gagal update status order convert")
@@ -1235,10 +1328,15 @@ func (s *ConvertService) buildConvertOrderDetail(row *model.ConvertOrder, includ
 
 	trackingToken := s.resolveTrackingToken(row.ID)
 
+	allProofs := mapConvertProofs(proofs)
+	userProofs, adminSettlementProofs := splitProofsByType(allProofs)
+
 	resp := &ConvertOrderDetailResponse{
-		Order:  mapConvertOrderSummary(*row, trackingToken, includeUser),
-		Events: mapConvertOrderEvents(events),
-		Proofs: mapConvertProofs(proofs),
+		Order:                 mapConvertOrderSummary(*row, trackingToken, includeUser),
+		Events:                mapConvertOrderEvents(events),
+		Proofs:                allProofs,
+		UserProofs:            userProofs,
+		AdminSettlementProofs: adminSettlementProofs,
 	}
 	return resp, nil
 }
@@ -1507,6 +1605,7 @@ func mapConvertOrderEvents(rows []model.ConvertOrderEvent) []ConvertOrderEventRe
 func mapConvertProofs(rows []model.ConvertProof) []ConvertProofResponse {
 	items := make([]ConvertProofResponse, 0, len(rows))
 	for _, row := range rows {
+		proofType := normalizeProofType(row.ProofType)
 		item := ConvertProofResponse{
 			ID:             row.ID.String(),
 			OrderID:        row.OrderID.String(),
@@ -1515,6 +1614,7 @@ func mapConvertProofs(rows []model.ConvertProof) []ConvertProofResponse {
 			MimeType:       row.MimeType,
 			FileSize:       row.FileSize,
 			Note:           row.Note,
+			ProofType:      proofType,
 			UploadedByType: row.UploadedByType,
 			CreatedAt:      row.CreatedAt,
 		}
@@ -1524,6 +1624,27 @@ func mapConvertProofs(rows []model.ConvertProof) []ConvertProofResponse {
 		items = append(items, item)
 	}
 	return items
+}
+
+func splitProofsByType(rows []ConvertProofResponse) ([]ConvertProofResponse, []ConvertProofResponse) {
+	userProofs := make([]ConvertProofResponse, 0, len(rows))
+	adminSettlementProofs := make([]ConvertProofResponse, 0, len(rows))
+	for _, row := range rows {
+		if normalizeProofType(row.ProofType) == convertProofTypeAdminSettlement {
+			adminSettlementProofs = append(adminSettlementProofs, row)
+			continue
+		}
+		userProofs = append(userProofs, row)
+	}
+	return userProofs, adminSettlementProofs
+}
+
+func normalizeProofType(v string) string {
+	proofType := strings.TrimSpace(strings.ToLower(v))
+	if proofType == convertProofTypeAdminSettlement {
+		return convertProofTypeAdminSettlement
+	}
+	return convertProofTypeUserPayment
 }
 
 func isUniqueConstraintError(err error) bool {

@@ -188,6 +188,7 @@ Rule:
 - Minimal salah satu dari `file` atau `file_url`.
 - `file_url` harus URL valid `http/https`.
 - Untuk upload file, penyimpanan bisa di-local storage atau R2 sesuai env server.
+- Proof tipe endpoint ini: `user_payment`.
 - Setelah proof valid masuk, status boleh naik ke `waiting_review` (sesuai policy ops).
 
 ## 4.7 Upload proof by tracking token (guest/public)
@@ -197,6 +198,7 @@ Body sama seperti endpoint upload proof biasa.
 
 Rule tambahan:
 - Token tracking wajib valid dan aktif.
+- Proof tipe endpoint ini: `user_payment`.
 - Jika order sudah final (`success/failed/expired/canceled`), upload proof ditolak.
 
 ## 4.8 View proof via proxy (public)
@@ -222,7 +224,16 @@ Rule:
 Tujuan:
 - Admin bisa review detail order, termasuk semua bukti transfer yang sudah diunggah user.
 
-## 5.3 Update status/order action
+## 5.3 Upload admin settlement proof
+`POST /api/v1/admin/convert/orders/:id/settlement-proofs`
+
+Body sama seperti upload proof endpoint (`file` atau `file_url` + note optional).
+
+Rule:
+- Proof tipe endpoint ini: `admin_settlement`.
+- Bukti ini dipakai untuk menandai bahwa admin sudah menyelesaikan transfer ke user.
+
+## 5.4 Update status/order action
 `PATCH /api/v1/admin/convert/orders/:id/status`
 
 Body:
@@ -237,8 +248,9 @@ Body:
 Rule:
 - Wajib valid transition.
 - Wajib simpan actor admin + reason di event log.
+- Untuk transisi ke `success`, minimal harus ada 1 bukti `admin_settlement`.
 
-## 5.4 Expire pending orders (ops safety)
+## 5.5 Expire pending orders (ops safety)
 `POST /api/v1/admin/convert/orders/expire-pending?limit=200`
 
 Tujuan:
@@ -256,16 +268,16 @@ Response `200`:
 }
 ```
 
-## 5.5 Get pricing rules
+## 5.6 Get pricing rules
 `GET /api/v1/admin/convert/pricing`
 
-## 5.6 Update pricing rules
+## 5.7 Update pricing rules
 `PUT /api/v1/admin/convert/pricing`
 
-## 5.7 Get limits/access rules
+## 5.8 Get limits/access rules
 `GET /api/v1/admin/convert/limits`
 
-## 5.8 Update limits/access rules
+## 5.9 Update limits/access rules
 `PUT /api/v1/admin/convert/limits`
 
 ---
@@ -277,7 +289,7 @@ Response `200`:
 - `convert_order_events`
   - order_id, from_status, to_status, reason, actor_type, actor_id, created_at.
 - `convert_proofs`
-  - order_id, file_url/path, mime_type, size, note, uploaded_by.
+  - order_id, file_url/path, mime_type, size, note, uploaded_by, `proof_type` (`user_payment` | `admin_settlement`).
 - `convert_pricing_rules`
   - asset_type, rate, admin_fee, risk_fee, transfer_fee, guest_surcharge, enabled.
 - `convert_limit_rules`
@@ -336,3 +348,4 @@ Contoh message minimum:
 
 - `2026-04-09`: Initial freeze contract v1 (manual convert, isolated namespace).
 - `2026-04-09`: Phase 4 ops safety update (`expire-pending` admin endpoint + stronger safety guard notes).
+- `2026-04-10`: Added admin settlement proof flow (`admin_settlement`) + success guard requiring settlement evidence.

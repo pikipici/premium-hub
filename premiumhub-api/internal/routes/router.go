@@ -205,6 +205,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		middleware.NewUserRateLimiter(cfg.ConvertAdminStatusRateLimitMax, cfg.ConvertAdminStatusRateLimitWindow, "Terlalu banyak update status convert. Coba lagi sebentar."),
 		convertHandler.AdminUpdateOrderStatus,
 	)
+	admin.POST(
+		"/convert/orders/:id/settlement-proofs",
+		middleware.NewUserRateLimiter(cfg.ConvertProofRateLimitMax, cfg.ConvertProofRateLimitWindow, "Terlalu banyak upload bukti settlement convert. Coba lagi sebentar."),
+		convertHandler.AdminUploadSettlementProof,
+	)
 	admin.POST("/convert/orders/expire-pending", convertHandler.AdminExpirePending)
 	admin.GET("/convert/pricing", convertHandler.AdminGetPricingRules)
 	admin.PUT("/convert/pricing", convertHandler.AdminUpdatePricingRules)

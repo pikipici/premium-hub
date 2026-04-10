@@ -71,6 +71,15 @@ export const convertService = {
     return res.data
   },
 
+  adminUploadSettlementProof: async (orderID: string, payload: UploadConvertProofPayload | FormData) => {
+    const config = payload instanceof FormData
+      ? { timeout: PROOF_UPLOAD_TIMEOUT_MS, headers: { 'Content-Type': 'multipart/form-data' } }
+      : { timeout: PROOF_UPLOAD_TIMEOUT_MS }
+
+    const res = await api.post<ApiResponse<ConvertOrderDetail>>(`/admin/convert/orders/${orderID}/settlement-proofs`, payload, config)
+    return res.data
+  },
+
   adminGetPricingRules: async () => {
     const res = await api.get<ApiResponse<ConvertPricingRule[]>>('/admin/convert/pricing')
     return res.data

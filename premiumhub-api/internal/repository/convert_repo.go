@@ -164,6 +164,18 @@ func (r *ConvertRepo) FindProofByID(proofID uuid.UUID) (*model.ConvertProof, err
 	return &row, err
 }
 
+func (r *ConvertRepo) CountProofsByOrderAndType(orderID uuid.UUID, proofType string) (int64, error) {
+	var total int64
+	err := r.db.Model(&model.ConvertProof{}).Where("order_id = ? AND proof_type = ?", orderID, proofType).Count(&total).Error
+	return total, err
+}
+
+func (r *ConvertRepo) CountProofsByOrderAndTypeTx(tx *gorm.DB, orderID uuid.UUID, proofType string) (int64, error) {
+	var total int64
+	err := tx.Model(&model.ConvertProof{}).Where("order_id = ? AND proof_type = ?", orderID, proofType).Count(&total).Error
+	return total, err
+}
+
 func (r *ConvertRepo) CreateTrackingTokenTx(tx *gorm.DB, row *model.ConvertTrackingToken) error {
 	return tx.Create(row).Error
 }

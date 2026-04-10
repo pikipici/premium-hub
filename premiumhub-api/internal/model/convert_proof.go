@@ -13,11 +13,12 @@ type ConvertProof struct {
 	OrderID uuid.UUID    `gorm:"type:uuid;not null;index" json:"order_id"`
 	Order   ConvertOrder `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 
-	FileURL  string `gorm:"type:text;not null" json:"file_url"`
-	FileName string `gorm:"size:255" json:"file_name"`
-	MimeType string `gorm:"size:120" json:"mime_type"`
-	FileSize int64  `gorm:"not null;default:0" json:"file_size"`
-	Note     string `gorm:"type:text" json:"note"`
+	FileURL   string `gorm:"type:text;not null" json:"file_url"`
+	FileName  string `gorm:"size:255" json:"file_name"`
+	MimeType  string `gorm:"size:120" json:"mime_type"`
+	FileSize  int64  `gorm:"not null;default:0" json:"file_size"`
+	Note      string `gorm:"type:text" json:"note"`
+	ProofType string `gorm:"size:40;not null;default:user_payment;index" json:"proof_type"`
 
 	UploadedByType string     `gorm:"size:20;not null" json:"uploaded_by_type"`
 	UploadedByID   *uuid.UUID `gorm:"type:uuid;index" json:"uploaded_by_id,omitempty"`
@@ -28,6 +29,9 @@ type ConvertProof struct {
 func (p *ConvertProof) BeforeCreate(_ *gorm.DB) error {
 	if p.ID == uuid.Nil {
 		p.ID = uuid.New()
+	}
+	if p.ProofType == "" {
+		p.ProofType = "user_payment"
 	}
 	return nil
 }

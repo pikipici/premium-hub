@@ -177,6 +177,19 @@ func TestConvertServiceAdminStatusTransition(t *testing.T) {
 	if _, err := svc.AdminUpdateOrderStatus(context.Background(), admin.ID, orderID, AdminUpdateConvertStatusInput{ToStatus: convertStatusProcessing, Reason: "mulai proses"}); err != nil {
 		t.Fatalf("processing status: %v", err)
 	}
+
+	_, err = svc.AdminUpdateOrderStatus(context.Background(), admin.ID, orderID, AdminUpdateConvertStatusInput{ToStatus: convertStatusSuccess, Reason: "berhasil"})
+	if err == nil || !strings.Contains(err.Error(), "unggah bukti penyelesaian admin") {
+		t.Fatalf("expected settlement proof guard error, got: %v", err)
+	}
+
+	if _, err := svc.AdminUploadSettlementProof(context.Background(), admin.ID, orderID, UploadConvertProofInput{
+		FileURL: "https://cdn.example.com/settlement-proof-1.png",
+		Note:    "transfer ke user berhasil",
+	}); err != nil {
+		t.Fatalf("upload settlement proof: %v", err)
+	}
+
 	final, err := svc.AdminUpdateOrderStatus(context.Background(), admin.ID, orderID, AdminUpdateConvertStatusInput{ToStatus: convertStatusSuccess, Reason: "berhasil"})
 	if err != nil {
 		t.Fatalf("success status: %v", err)
@@ -184,6 +197,9 @@ func TestConvertServiceAdminStatusTransition(t *testing.T) {
 
 	if final.Order.Status != convertStatusSuccess {
 		t.Fatalf("expected final status success, got %s", final.Order.Status)
+	}
+	if len(final.AdminSettlementProofs) == 0 {
+		t.Fatalf("expected admin settlement proofs in detail")
 	}
 }
 
@@ -241,6 +257,35 @@ func TestConvertServiceCreateGuestOrderAndUploadProofByToken(t *testing.T) {
 	}
 	if len(updated.Proofs) == 0 {
 		t.Fatalf("expected proofs to be recorded")
+	}
+}
+
+func TestConvertServiceAdminUploadSettlementProof(t *testing.T) {
+	svc, _, member, admin := setupConvertService(t)
+
+	order := createBaselineConvertOrder(t, svc, member.ID, "idem-settlement-upload")
+	orderID := uuid.MustParse(order.Order.ID)
+
+	if _, err := svc.UploadProof(context.Background(), member.ID, orderID, UploadConvertProofInput{FileURL: "https://example.com/user-proof.png"}); err != nil {
+		t.Fatalf("upload user proof: %v", err)
+	}
+	if _, err := svc.AdminUpdateOrderStatus(context.Background(), admin.ID, orderID, AdminUpdateConvertStatusInput{ToStatus: convertStatusApproved, Reason: "valid"}); err != nil {
+		t.Fatalf("approve status: %v", err)
+	}
+
+	detail, err := svc.AdminUploadSettlementProof(context.Background(), admin.ID, orderID, UploadConvertProofInput{
+		FileURL: "https://example.com/admin-settlement-proof.png",
+		Note:    "sudah transfer",
+	})
+	if err != nil {
+		t.Fatalf("admin upload settlement proof: %v", err)
+	}
+
+	if len(detail.AdminSettlementProofs) == 0 {
+		t.Fatalf("expected admin settlement proof after upload")
+	}
+	if detail.AdminSettlementProofs[0].ProofType != convertProofTypeAdminSettlement {
+		t.Fatalf("unexpected proof type: %s", detail.AdminSettlementProofs[0].ProofType)
 	}
 }
 
@@ -306,6 +351,9 @@ func TestConvertServiceUploadProofRejectedWhenOrderFinal(t *testing.T) {
 	}
 	if _, err := svc.AdminUpdateOrderStatus(context.Background(), admin.ID, orderID, AdminUpdateConvertStatusInput{ToStatus: convertStatusProcessing, Reason: "proses"}); err != nil {
 		t.Fatalf("processing: %v", err)
+	}
+	if _, err := svc.AdminUploadSettlementProof(context.Background(), admin.ID, orderID, UploadConvertProofInput{FileURL: "https://example.com/admin-settlement-proof.png"}); err != nil {
+		t.Fatalf("upload settlement proof: %v", err)
 	}
 	if _, err := svc.AdminUpdateOrderStatus(context.Background(), admin.ID, orderID, AdminUpdateConvertStatusInput{ToStatus: convertStatusSuccess, Reason: "done"}); err != nil {
 		t.Fatalf("success: %v", err)

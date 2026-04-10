@@ -129,6 +129,18 @@ export default function GuestConvertTrackPage() {
   const statusBadge = useMemo(() => getConvertStatusSummary(detail?.order.status || 'pending_transfer'), [detail?.order.status])
   const canUploadProof = detail ? !isFinalConvertStatus(detail.order.status) : false
 
+  const userProofs = useMemo(() => {
+    if (!detail) return []
+    if (detail.user_proofs?.length) return detail.user_proofs
+    return detail.proofs.filter((proof) => (proof.proof_type || 'user_payment') !== 'admin_settlement')
+  }, [detail])
+
+  const adminSettlementProofs = useMemo(() => {
+    if (!detail) return []
+    if (detail.admin_settlement_proofs?.length) return detail.admin_settlement_proofs
+    return detail.proofs.filter((proof) => proof.proof_type === 'admin_settlement')
+  }, [detail])
+
   return (
     <>
       <Navbar />
@@ -219,7 +231,7 @@ export default function GuestConvertTrackPage() {
                 {canUploadProof ? (
                   <form onSubmit={submitProof} className="mb-4 space-y-3">
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#888]">URL bukti (opsional)</label>
+                      <label className="mb-1 block text-xs font-semibold text-[#888]">URL bukti transfer dari lu (opsional)</label>
                       <input
                         type="url"
                         value={proofURL}
@@ -230,7 +242,7 @@ export default function GuestConvertTrackPage() {
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-[#888]">Atau upload file bukti</label>
+                      <label className="mb-1 block text-xs font-semibold text-[#888]">Atau upload file bukti transfer</label>
                       <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[#D7D7D3] bg-[#FAFAF8] px-3 py-2.5 text-sm text-[#555]">
                         <UploadCloud className="h-4 w-4" />
                         <span className="truncate">{proofFile ? proofFile.name : 'Pilih file (jpg/png/webp/pdf, max 10MB)'}</span>
@@ -269,29 +281,73 @@ export default function GuestConvertTrackPage() {
                   </p>
                 )}
 
-                {detail.proofs.length === 0 ? (
-                  <p className="text-sm text-[#888]">Belum ada bukti transaksi yang diunggah.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {detail.proofs.map((proof) => (
-                      <div key={proof.id} className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <a
-                            href={resolveProofHref(proof)}
-                            target="_blank"
-                            rel="noreferrer"
-                            title={proof.file_url}
-                            className="font-semibold text-[#141414] underline underline-offset-2"
-                          >
-                            {proof.file_name || proof.file_url}
-                          </a>
-                          <span className="text-xs text-[#888]">{formatDate(proof.created_at)}</span>
-                        </div>
-                        {proof.note ? <p className="mt-1 text-xs text-[#666]">{proof.note}</p> : null}
+                <div className="space-y-4">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-[#888]">Bukti transfer dari user</h3>
+                      <span className="text-[11px] text-[#888]">{userProofs.length} bukti</span>
+                    </div>
+
+                    {userProofs.length === 0 ? (
+                      <p className="rounded-lg border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2 text-sm text-[#888]">
+                        Belum ada bukti transfer yang diunggah.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {userProofs.map((proof) => (
+                          <div key={proof.id} className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <a
+                                href={resolveProofHref(proof)}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={proof.file_url}
+                                className="font-semibold text-[#141414] underline underline-offset-2"
+                              >
+                                {proof.file_name || proof.file_url}
+                              </a>
+                              <span className="text-xs text-[#888]">{formatDate(proof.created_at)}</span>
+                            </div>
+                            {proof.note ? <p className="mt-1 text-xs text-[#666]">{proof.note}</p> : null}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-[#888]">Bukti penyelesaian dari admin</h3>
+                      <span className="text-[11px] text-[#888]">{adminSettlementProofs.length} bukti</span>
+                    </div>
+
+                    {adminSettlementProofs.length === 0 ? (
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        Admin belum upload bukti penyelesaian transaksi.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {adminSettlementProofs.map((proof) => (
+                          <div key={proof.id} className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <a
+                                href={resolveProofHref(proof)}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={proof.file_url}
+                                className="font-semibold text-[#141414] underline underline-offset-2"
+                              >
+                                {proof.file_name || proof.file_url}
+                              </a>
+                              <span className="text-xs text-[#888]">{formatDate(proof.created_at)}</span>
+                            </div>
+                            {proof.note ? <p className="mt-1 text-xs text-[#666]">{proof.note}</p> : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </section>
 
               <ConvertTimelineSection detail={detail} title="Timeline" />
