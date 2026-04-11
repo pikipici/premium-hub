@@ -5,18 +5,35 @@ import (
 	"errors"
 	"strings"
 
+	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
 
 	"gorm.io/gorm"
 )
 
+type orderWebhookLookup interface {
+	FindByGatewayOrderID(gatewayOrderID string) (*model.Order, error)
+}
+
+type walletWebhookLookup interface {
+	FindTopupByGatewayRef(provider, gatewayRef string) (*model.WalletTopup, error)
+}
+
+type orderWebhookHandler interface {
+	HandleWebhook(input WebhookInput) error
+}
+
+type walletWebhookHandler interface {
+	HandlePakasirWebhook(ctx context.Context, input WalletPakasirWebhookInput) error
+}
+
 // PakasirWebhookService menangani 1 endpoint webhook untuk banyak flow
 // (order checkout + wallet topup) dengan routing by order_id / lookup DB.
 type PakasirWebhookService struct {
-	orderRepo  *repository.OrderRepo
-	walletRepo *repository.WalletRepo
-	paymentSvc *PaymentService
-	walletSvc  *WalletService
+	orderLookup   orderWebhookLookup
+	walletLookup  walletWebhookLookup
+	orderHandler  orderWebhookHandler
+	walletHandler walletWebhookHandler
 }
 
 func NewPakasirWebhookService(
@@ -26,10 +43,10 @@ func NewPakasirWebhookService(
 	walletSvc *WalletService,
 ) *PakasirWebhookService {
 	return &PakasirWebhookService{
-		orderRepo:  orderRepo,
-		walletRepo: walletRepo,
-		paymentSvc: paymentSvc,
-		walletSvc:  walletSvc,
+		orderLookup:   orderRepo,
+		walletLookup:  walletRepo,
+		orderHandler:  paymentSvc,
+		walletHandler: walletSvc,
 	}
 }
 
@@ -41,23 +58,39 @@ func (s *PakasirWebhookService) Handle(ctx context.Context, input WebhookInput) 
 
 	upperID := strings.ToUpper(orderID)
 	if strings.HasPrefix(upperID, "ORD-") {
-		return s.paymentSvc.HandleWebhook(input)
+		if s.orderHandler == nil {
+			return errors.New("order webhook handler belum diinisialisasi")
+		}
+		return s.orderHandler.HandleWebhook(input)
 	}
 	if strings.HasPrefix(upperID, "WLT-") {
-		return s.walletSvc.HandlePakasirWebhook(ctx, toWalletWebhookInput(input))
+		if s.walletHandler == nil {
+			return errors.New("wallet webhook handler belum diinisialisasi")
+		}
+		return s.walletHandler.HandlePakasirWebhook(ctx, toWalletWebhookInput(input))
 	}
 
 	// Fallback akurat: resolve dari data existing, bukan tebak prefix.
-	if _, err := s.orderRepo.FindByGatewayOrderID(orderID); err == nil {
-		return s.paymentSvc.HandleWebhook(input)
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+	if s.orderLookup != nil {
+		if _, err := s.orderLookup.FindByGatewayOrderID(orderID); err == nil {
+			if s.orderHandler == nil {
+				return errors.New("order webhook handler belum diinisialisasi")
+			}
+			return s.orderHandler.HandleWebhook(input)
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 	}
 
-	if _, err := s.walletRepo.FindTopupByGatewayRef("pakasir", orderID); err == nil {
-		return s.walletSvc.HandlePakasirWebhook(ctx, toWalletWebhookInput(input))
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+	if s.walletLookup != nil {
+		if _, err := s.walletLookup.FindTopupByGatewayRef("pakasir", orderID); err == nil {
+			if s.walletHandler == nil {
+				return errors.New("wallet webhook handler belum diinisialisasi")
+			}
+			return s.walletHandler.HandlePakasirWebhook(ctx, toWalletWebhookInput(input))
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 	}
 
 	// Unknown order_id: ack supaya provider tidak retry tanpa henti.

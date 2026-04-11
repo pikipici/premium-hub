@@ -1,0 +1,235 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"premiumhub-api/internal/model"
+
+	"gorm.io/gorm"
+)
+
+type stubOrderWebhookLookup struct {
+	records map[string]bool
+	err     error
+	calls   int
+	lastID  string
+}
+
+func (s *stubOrderWebhookLookup) FindByGatewayOrderID(gatewayOrderID string) (*model.Order, error) {
+	s.calls++
+	s.lastID = gatewayOrderID
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.records != nil && s.records[gatewayOrderID] {
+		return &model.Order{GatewayOrderID: gatewayOrderID}, nil
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+type stubWalletWebhookLookup struct {
+	records map[string]bool
+	err     error
+	calls   int
+	lastID  string
+}
+
+func (s *stubWalletWebhookLookup) FindTopupByGatewayRef(_ string, gatewayRef string) (*model.WalletTopup, error) {
+	s.calls++
+	s.lastID = gatewayRef
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.records != nil && s.records[gatewayRef] {
+		return &model.WalletTopup{GatewayRef: gatewayRef, Provider: "pakasir"}, nil
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+type stubOrderWebhookHandler struct {
+	err       error
+	calls     int
+	lastInput WebhookInput
+}
+
+func (s *stubOrderWebhookHandler) HandleWebhook(input WebhookInput) error {
+	s.calls++
+	s.lastInput = input
+	return s.err
+}
+
+type stubWalletWebhookHandler struct {
+	err       error
+	calls     int
+	lastInput WalletPakasirWebhookInput
+}
+
+func (s *stubWalletWebhookHandler) HandlePakasirWebhook(_ context.Context, input WalletPakasirWebhookInput) error {
+	s.calls++
+	s.lastInput = input
+	return s.err
+}
+
+func TestPakasirWebhookService_RouteByPrefixOrder(t *testing.T) {
+	orderHandler := &stubOrderWebhookHandler{}
+	walletHandler := &stubWalletWebhookHandler{}
+
+	svc := &PakasirWebhookService{
+		orderHandler:  orderHandler,
+		walletHandler: walletHandler,
+	}
+
+	input := WebhookInput{OrderID: "ORD-123", Status: "completed"}
+	if err := svc.Handle(context.Background(), input); err != nil {
+		t.Fatalf("handle webhook: %v", err)
+	}
+	if orderHandler.calls != 1 {
+		t.Fatalf("expected order handler called once, got %d", orderHandler.calls)
+	}
+	if walletHandler.calls != 0 {
+		t.Fatalf("expected wallet handler not called, got %d", walletHandler.calls)
+	}
+}
+
+func TestPakasirWebhookService_RouteByPrefixWallet(t *testing.T) {
+	orderHandler := &stubOrderWebhookHandler{}
+	walletHandler := &stubWalletWebhookHandler{}
+
+	svc := &PakasirWebhookService{
+		orderHandler:  orderHandler,
+		walletHandler: walletHandler,
+	}
+
+	input := WebhookInput{OrderID: "wlt-abc", Status: "completed", Amount: 10000, PaymentMethod: "qris"}
+	if err := svc.Handle(context.Background(), input); err != nil {
+		t.Fatalf("handle webhook: %v", err)
+	}
+	if walletHandler.calls != 1 {
+		t.Fatalf("expected wallet handler called once, got %d", walletHandler.calls)
+	}
+	if walletHandler.lastInput.OrderID != input.OrderID || walletHandler.lastInput.Amount != input.Amount {
+		t.Fatalf("wallet input mapping mismatch: %+v", walletHandler.lastInput)
+	}
+	if orderHandler.calls != 0 {
+		t.Fatalf("expected order handler not called, got %d", orderHandler.calls)
+	}
+}
+
+func TestPakasirWebhookService_FallbackLookupOrderThenWallet(t *testing.T) {
+	orderLookup := &stubOrderWebhookLookup{records: map[string]bool{"X-ORDER": true}}
+	walletLookup := &stubWalletWebhookLookup{records: map[string]bool{"X-WALLET": true}}
+	orderHandler := &stubOrderWebhookHandler{}
+	walletHandler := &stubWalletWebhookHandler{}
+
+	svc := &PakasirWebhookService{
+		orderLookup:   orderLookup,
+		walletLookup:  walletLookup,
+		orderHandler:  orderHandler,
+		walletHandler: walletHandler,
+	}
+
+	if err := svc.Handle(context.Background(), WebhookInput{OrderID: "X-ORDER", Status: "completed"}); err != nil {
+		t.Fatalf("fallback order handle: %v", err)
+	}
+	if orderHandler.calls != 1 || walletHandler.calls != 0 {
+		t.Fatalf("unexpected handler call counts order=%d wallet=%d", orderHandler.calls, walletHandler.calls)
+	}
+	if orderLookup.calls != 1 {
+		t.Fatalf("expected order lookup once, got %d", orderLookup.calls)
+	}
+
+	if err := svc.Handle(context.Background(), WebhookInput{OrderID: "X-WALLET", Status: "completed"}); err != nil {
+		t.Fatalf("fallback wallet handle: %v", err)
+	}
+	if walletHandler.calls != 1 {
+		t.Fatalf("expected wallet handler once, got %d", walletHandler.calls)
+	}
+	if walletLookup.calls == 0 {
+		t.Fatalf("expected wallet lookup called")
+	}
+}
+
+func TestPakasirWebhookService_UnknownOrderIDAck(t *testing.T) {
+	svc := &PakasirWebhookService{
+		orderLookup:   &stubOrderWebhookLookup{},
+		walletLookup:  &stubWalletWebhookLookup{},
+		orderHandler:  &stubOrderWebhookHandler{},
+		walletHandler: &stubWalletWebhookHandler{},
+	}
+
+	if err := svc.Handle(context.Background(), WebhookInput{OrderID: "UNKNOWN-001", Status: "completed"}); err != nil {
+		t.Fatalf("unknown order id should ack nil, got: %v", err)
+	}
+}
+
+func TestPakasirWebhookService_ErrorPropagation(t *testing.T) {
+	t.Run("order handler error", func(t *testing.T) {
+		expected := errors.New("order failed")
+		svc := &PakasirWebhookService{orderHandler: &stubOrderWebhookHandler{err: expected}}
+		err := svc.Handle(context.Background(), WebhookInput{OrderID: "ORD-1", Status: "completed"})
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected %v, got %v", expected, err)
+		}
+	})
+
+	t.Run("wallet handler error", func(t *testing.T) {
+		expected := errors.New("wallet failed")
+		svc := &PakasirWebhookService{walletHandler: &stubWalletWebhookHandler{err: expected}}
+		err := svc.Handle(context.Background(), WebhookInput{OrderID: "WLT-1", Status: "completed"})
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected %v, got %v", expected, err)
+		}
+	})
+
+	t.Run("order lookup error", func(t *testing.T) {
+		expected := errors.New("db order error")
+		svc := &PakasirWebhookService{
+			orderLookup:  &stubOrderWebhookLookup{err: expected},
+			walletLookup: &stubWalletWebhookLookup{},
+		}
+		err := svc.Handle(context.Background(), WebhookInput{OrderID: "X-1", Status: "completed"})
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected %v, got %v", expected, err)
+		}
+	})
+
+	t.Run("wallet lookup error", func(t *testing.T) {
+		expected := errors.New("db wallet error")
+		svc := &PakasirWebhookService{
+			orderLookup:  &stubOrderWebhookLookup{},
+			walletLookup: &stubWalletWebhookLookup{err: expected},
+		}
+		err := svc.Handle(context.Background(), WebhookInput{OrderID: "X-2", Status: "completed"})
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected %v, got %v", expected, err)
+		}
+	})
+}
+
+func TestPakasirWebhookService_ValidationAndNilHandlers(t *testing.T) {
+	t.Run("missing order id", func(t *testing.T) {
+		svc := &PakasirWebhookService{}
+		err := svc.Handle(context.Background(), WebhookInput{})
+		if err == nil || err.Error() != "order_id wajib diisi" {
+			t.Fatalf("expected order_id validation error, got: %v", err)
+		}
+	})
+
+	t.Run("missing order handler on ORD prefix", func(t *testing.T) {
+		svc := &PakasirWebhookService{}
+		err := svc.Handle(context.Background(), WebhookInput{OrderID: "ORD-77"})
+		if err == nil || err.Error() != "order webhook handler belum diinisialisasi" {
+			t.Fatalf("expected missing order handler error, got: %v", err)
+		}
+	})
+
+	t.Run("missing wallet handler on WLT prefix", func(t *testing.T) {
+		svc := &PakasirWebhookService{}
+		err := svc.Handle(context.Background(), WebhookInput{OrderID: "WLT-77"})
+		if err == nil || err.Error() != "wallet webhook handler belum diinisialisasi" {
+			t.Fatalf("expected missing wallet handler error, got: %v", err)
+		}
+	})
+}
