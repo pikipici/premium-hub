@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
-import { Building2, Copy, QrCode } from 'lucide-react'
+import { Building2, Copy, Download, QrCode } from 'lucide-react'
 import QRCode from 'qrcode'
 
 type PakasirPaymentDisplayProps = {
@@ -116,6 +116,17 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
           </div>
 
           {qrError ? <div className="text-xs text-red-600">{qrError}</div> : null}
+
+          {qrDataUrl ? (
+            <a
+              href={qrDataUrl}
+              download="qris-payment.png"
+              className="mx-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF5733] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#e64d2e]"
+            >
+              <Download className="w-4 h-4" />
+              Download QRIS
+            </a>
+          ) : null}
         </div>
       ) : isVA ? (
         <div className="space-y-2">
