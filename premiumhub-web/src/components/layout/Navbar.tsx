@@ -40,13 +40,6 @@ export default function Navbar() {
             <span className="text-xl font-extrabold">Digi<span className="text-[#FF5733]">Market</span></span>
           </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-8">
-            <Link href="/product/prem-apps" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">Apps</Link>
-            <Link href="/product/convert" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">Convert Aset</Link>
-            <Link href="/faq" className="text-sm font-medium text-[#888] hover:text-[#141414] transition-colors">FAQ</Link>
-          </div>
-
           {/* Desktop Auth */}
           <div className="hidden md:flex items-center gap-3">
             {showAuthenticated ? (
@@ -89,14 +82,10 @@ export default function Navbar() {
         {/* Mobile menu */}
         {open && (
           <div className="md:hidden pb-4 border-t border-[#EBEBEB] mt-2 pt-4 space-y-3">
-            <Link href="/product/prem-apps" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Apps</Link>
-            <Link href="/product/convert" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Convert Aset</Link>
-            <Link href="/faq" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>FAQ</Link>
             {showAuthenticated ? (
               <>
                 <Link href="/dashboard" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Dashboard</Link>
                 <Link href="/dashboard/wallet" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Wallet</Link>
-                <Link href="/dashboard/convert/orders" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Convert</Link>
                 <Link href="/dashboard/nokos" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Nomor Virtual</Link>
                 {user?.role === 'admin' && <Link href="/admin" className="block text-sm font-medium py-2" onClick={() => setOpen(false)}>Admin Panel</Link>}
                 <button onClick={handleLogout} className="block text-sm font-medium text-red-500 py-2" disabled={logouting}>Logout</button>
