@@ -63,7 +63,7 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
           setQrState({
             source: value,
             dataUrl: '',
-            error: 'Gagal generate QR. Copy QR string lalu bayar dari aplikasi yang support QRIS string.',
+            error: 'Gagal generate QRIS. Coba refresh halaman atau buat ulang invoice jika tetap gagal.',
           })
         }
       })
@@ -87,7 +87,7 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
     <div className={`rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3 ${className || ''}`}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="text-xs text-[#777] font-semibold">{methodLabel(normalizedMethod)}</div>
-        {value ? (
+        {value && !isQris ? (
           <button
             type="button"
             onClick={handleCopy}
@@ -116,11 +116,6 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
           </div>
 
           {qrError ? <div className="text-xs text-red-600">{qrError}</div> : null}
-
-          <details className="text-xs text-[#666]">
-            <summary className="cursor-pointer select-none">Lihat QR string mentah</summary>
-            <div className="mt-2 font-mono break-all text-[#141414]">{value}</div>
-          </details>
         </div>
       ) : isVA ? (
         <div className="space-y-2">
