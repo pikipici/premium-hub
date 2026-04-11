@@ -121,7 +121,7 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
             <a
               href={qrDataUrl}
               download="qris-payment.png"
-              className="mx-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF5733] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#e64d2e]"
+              className="mx-auto flex w-fit items-center justify-center gap-2 rounded-xl bg-[#FF5733] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#e64d2e]"
             >
               <Download className="w-4 h-4" />
               Download QRIS
