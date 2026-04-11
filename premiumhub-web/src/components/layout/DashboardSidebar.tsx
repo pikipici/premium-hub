@@ -3,17 +3,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
-import { LayoutDashboard, ShoppingBag, History, ShieldCheck, Bell, UserCircle, LogOut, Wallet, Smartphone, RefreshCw } from 'lucide-react'
+import { UserCircle, LogOut, Wallet, Smartphone } from 'lucide-react'
 
 const MENU = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/wallet', icon: Wallet, label: 'Wallet' },
-  { href: '/dashboard/convert/orders', icon: RefreshCw, label: 'Convert' },
   { href: '/dashboard/nokos', icon: Smartphone, label: 'Nomor Virtual' },
-  { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Akun Aktif' },
-  { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order' },
-  { href: '/dashboard/klaim-garansi', icon: ShieldCheck, label: 'Klaim Garansi' },
-  { href: '/dashboard/notifikasi', icon: Bell, label: 'Notifikasi' },
   { href: '/dashboard/profil', icon: UserCircle, label: 'Profil' },
 ]
 
