@@ -67,6 +67,12 @@ WHERE (gateway_ref IS NULL OR gateway_ref = '')
 `).Error; err != nil {
 				return fmt.Errorf("backfill wallet_topups.gateway_ref: %w", err)
 			}
+
+			// Legacy kolom ini tidak dipakai lagi oleh runtime baru.
+			// Pastikan nullable agar insert topup baru tidak gagal di DB lama.
+			if err := db.Exec(`ALTER TABLE wallet_topups ALTER COLUMN provider_trx_id DROP NOT NULL`).Error; err != nil {
+				return fmt.Errorf("alter wallet_topups.provider_trx_id nullable: %w", err)
+			}
 		}
 	}
 
