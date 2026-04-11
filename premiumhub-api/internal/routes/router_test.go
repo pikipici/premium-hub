@@ -45,14 +45,17 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "POST", "/api/v1/auth/google") {
 		t.Fatalf("google auth route should exist")
 	}
+	if !hasRoute(routes, "POST", "/api/v1/payment/webhook") {
+		t.Fatalf("payment webhook route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/admin/wallet/topups/:id/recheck") {
 		t.Fatalf("admin recheck route should exist")
 	}
 	if !hasRoute(routes, "POST", "/api/v1/admin/wallet/topups/reconcile") {
 		t.Fatalf("admin reconcile route should exist")
 	}
-	if !hasRoute(routes, "POST", "/api/v1/wallet/topups/webhook/pakasir") {
-		t.Fatalf("pakasir wallet webhook route should exist")
+	if hasRoute(routes, "POST", "/api/v1/wallet/topups/webhook/pakasir") {
+		t.Fatalf("dedicated wallet webhook route should not exist (use /payment/webhook)")
 	}
 	if !hasRoute(routes, "GET", "/api/v1/5sim/catalog/countries") {
 		t.Fatalf("5sim countries route should exist")

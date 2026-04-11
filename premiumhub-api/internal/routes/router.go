@@ -46,6 +46,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
 	paymentSvc := service.NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, nil)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
+	pakasirWebhookSvc := service.NewPakasirWebhookService(orderRepo, walletRepo, paymentSvc, walletSvc)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
@@ -60,7 +61,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	authHandler := handler.NewAuthHandler(authSvc, cfg)
 	productHandler := handler.NewProductHandler(productSvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
-	paymentHandler := handler.NewPaymentHandler(paymentSvc)
+	paymentHandler := handler.NewPaymentHandler(paymentSvc, pakasirWebhookSvc)
 	walletHandler := handler.NewWalletHandler(walletSvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
 	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage, cfg)
@@ -85,7 +86,6 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	products.GET("/:slug/prices", productHandler.GetPrices)
 
 	api.POST("/payment/webhook", paymentHandler.Webhook)
-	api.POST("/wallet/topups/webhook/pakasir", walletHandler.PakasirWebhook)
 	api.GET(
 		"/convert/track/:token",
 		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request tracking convert. Coba lagi sebentar."),

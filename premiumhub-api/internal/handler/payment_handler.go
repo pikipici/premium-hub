@@ -10,10 +10,11 @@ import (
 
 type PaymentHandler struct {
 	paymentSvc *service.PaymentService
+	webhookSvc *service.PakasirWebhookService
 }
 
-func NewPaymentHandler(paymentSvc *service.PaymentService) *PaymentHandler {
-	return &PaymentHandler{paymentSvc: paymentSvc}
+func NewPaymentHandler(paymentSvc *service.PaymentService, webhookSvc *service.PakasirWebhookService) *PaymentHandler {
+	return &PaymentHandler{paymentSvc: paymentSvc, webhookSvc: webhookSvc}
 }
 
 func (h *PaymentHandler) Create(c *gin.Context) {
@@ -37,11 +38,21 @@ func (h *PaymentHandler) Webhook(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
+
+	if h.webhookSvc != nil {
+		if err := h.webhookSvc.Handle(c.Request.Context(), input); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.Success(c, "OK", gin.H{"acknowledged": true})
+		return
+	}
+
 	if err := h.paymentSvc.HandleWebhook(input); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	response.Success(c, "OK", nil)
+	response.Success(c, "OK", gin.H{"acknowledged": true})
 }
 
 func (h *PaymentHandler) GetStatus(c *gin.Context) {

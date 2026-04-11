@@ -81,6 +81,8 @@ Body expected:
 ```
 
 Behavior:
+- endpoint webhook dipakai bersama flow order + wallet
+- routing internal ditentukan dari `order_id` (prefix `ORD-` untuk order, `WLT-` untuk wallet)
 - webhook validasi project
 - backend verify ulang ke Pakasir `transactiondetail`
 - jika valid `COMPLETED` + amount cocok:

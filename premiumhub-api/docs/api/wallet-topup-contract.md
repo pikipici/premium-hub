@@ -114,9 +114,9 @@ Contoh item ledger topup:
 
 ## Endpoint Webhook Provider
 
-### Webhook topup Pakasir
+### Webhook topup Pakasir (shared endpoint)
 
-`POST /api/v1/wallet/topups/webhook/pakasir`
+`POST /api/v1/payment/webhook`
 
 Body expected (provider):
 
@@ -132,6 +132,8 @@ Body expected (provider):
 ```
 
 Behavior:
+- endpoint webhook dipakai bersama flow order + wallet
+- routing internal ditentukan dari `order_id` (prefix `WLT-` untuk wallet)
 - webhook divalidasi project + status
 - backend tetap verify ulang via `transactiondetail`
 - settlement tetap idempotent
