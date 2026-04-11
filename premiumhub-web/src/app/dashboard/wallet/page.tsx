@@ -346,7 +346,7 @@ export default function WalletPage() {
                 <span className="text-sm font-bold">Saldo setelah top up</span>
                 <span className="text-base font-extrabold">{formatRupiah(estimatedBalance)}</span>
               </div>
-              <p className="text-[11px] text-[#888]">Kode unik dari provider akan ditambahkan setelah invoice dibuat.</p>
+              <p className="text-[11px] text-[#888]">Total bayar final mengikuti response provider (bisa termasuk fee/channel).</p>
             </div>
 
             {error ? (
@@ -373,14 +373,14 @@ export default function WalletPage() {
           <section className="rounded-2xl bg-gradient-to-br from-[#141414] to-[#2A2A2A] p-5 text-white flex flex-col md:flex-row md:items-center gap-3">
             <div className="text-3xl">⚡</div>
             <div className="flex-1">
-              <h3 className="text-sm font-bold mb-1">Beli 1 Klik dengan Wallet</h3>
-              <p className="text-xs text-white/60">Nggak perlu redirect payment gateway tiap transaksi.</p>
+              <h3 className="text-sm font-bold mb-1">Wallet topup sudah aktif</h3>
+              <p className="text-xs text-white/60">Checkout pakai saldo wallet lagi disiapkan. Sementara order premium via Pakasir.</p>
             </div>
             <Link
               href="/product/prem-apps"
               className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#141414] hover:opacity-90"
             >
-              Beli Sekarang
+              Lihat Produk
             </Link>
           </section>
 

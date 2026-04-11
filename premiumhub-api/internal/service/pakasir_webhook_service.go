@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 
 	"premiumhub-api/internal/model"
@@ -56,17 +57,21 @@ func (s *PakasirWebhookService) Handle(ctx context.Context, input WebhookInput) 
 		return errors.New("order_id wajib diisi")
 	}
 
+	log.Printf("[pakasir-webhook] received order_id=%s status=%s project=%s", orderID, strings.TrimSpace(input.Status), strings.TrimSpace(input.Project))
+
 	upperID := strings.ToUpper(orderID)
 	if strings.HasPrefix(upperID, "ORD-") {
 		if s.orderHandler == nil {
 			return errors.New("order webhook handler belum diinisialisasi")
 		}
+		log.Printf("[pakasir-webhook] route=order by_prefix order_id=%s", orderID)
 		return s.orderHandler.HandleWebhook(input)
 	}
 	if strings.HasPrefix(upperID, "WLT-") {
 		if s.walletHandler == nil {
 			return errors.New("wallet webhook handler belum diinisialisasi")
 		}
+		log.Printf("[pakasir-webhook] route=wallet by_prefix order_id=%s", orderID)
 		return s.walletHandler.HandlePakasirWebhook(ctx, toWalletWebhookInput(input))
 	}
 
@@ -76,8 +81,10 @@ func (s *PakasirWebhookService) Handle(ctx context.Context, input WebhookInput) 
 			if s.orderHandler == nil {
 				return errors.New("order webhook handler belum diinisialisasi")
 			}
+			log.Printf("[pakasir-webhook] route=order by_lookup order_id=%s", orderID)
 			return s.orderHandler.HandleWebhook(input)
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[pakasir-webhook] lookup_error target=order order_id=%s err=%v", orderID, err)
 			return err
 		}
 	}
@@ -87,13 +94,16 @@ func (s *PakasirWebhookService) Handle(ctx context.Context, input WebhookInput) 
 			if s.walletHandler == nil {
 				return errors.New("wallet webhook handler belum diinisialisasi")
 			}
+			log.Printf("[pakasir-webhook] route=wallet by_lookup order_id=%s", orderID)
 			return s.walletHandler.HandlePakasirWebhook(ctx, toWalletWebhookInput(input))
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[pakasir-webhook] lookup_error target=wallet order_id=%s err=%v", orderID, err)
 			return err
 		}
 	}
 
 	// Unknown order_id: ack supaya provider tidak retry tanpa henti.
+	log.Printf("[pakasir-webhook] route=unknown ack order_id=%s", orderID)
 	return nil
 }
 

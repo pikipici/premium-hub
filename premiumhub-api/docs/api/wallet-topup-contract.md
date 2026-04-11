@@ -39,7 +39,7 @@ Body:
 ```
 
 Aturan:
-- minimal `amount` = `1000`
+- minimal `amount` = `10000`
 - jika `idempotency_key` sama untuk user yang sama, backend mengembalikan invoice lama (tidak buat invoice baru)
 - `payment_method` yang didukung backend saat ini:
   - `qris`
@@ -163,7 +163,7 @@ Format error standar:
 ```
 
 Contoh message penting:
-- `minimal topup Rp 1.000`
+- `minimal topup Rp 10.000`
 - `nominal topup terlalu besar`
 - `topup tidak ditemukan`
 - `akun diblokir`

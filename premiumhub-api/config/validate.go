@@ -57,6 +57,18 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if v := strings.TrimSpace(c.WalletTopupReconcileWorkerInterval); v != "" {
+		if _, err := time.ParseDuration(v); err != nil {
+			problems = append(problems, "WALLET_TOPUP_RECONCILE_WORKER_INTERVAL harus format duration valid (contoh: 1m, 30s)")
+		}
+	}
+	if v := strings.TrimSpace(c.WalletTopupReconcileWorkerBatchLimit); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 10_000 {
+			problems = append(problems, "WALLET_TOPUP_RECONCILE_WORKER_BATCH_LIMIT harus angka 1-10000")
+		}
+	}
+
 	validateRate := func(maxRaw, winRaw, maxField, winField string) {
 		if v := strings.TrimSpace(maxRaw); v != "" {
 			n, err := strconv.Atoi(v)

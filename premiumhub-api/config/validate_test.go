@@ -128,6 +128,25 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject malformed wallet reconcile worker config", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                               "development",
+			JWTSecret:                            "super-secure-secret-value-32chars++",
+			CookieSameSite:                       "lax",
+			AuthRateLimitMax:                     "20",
+			AuthRateLimitWindow:                  "1m",
+			WalletTopupReconcileWorkerInterval:   "not-duration",
+			WalletTopupReconcileWorkerBatchLimit: "0",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected wallet reconcile worker validation errors")
+		}
+		if !strings.Contains(err.Error(), "WALLET_TOPUP_RECONCILE_WORKER_INTERVAL") || !strings.Contains(err.Error(), "WALLET_TOPUP_RECONCILE_WORKER_BATCH_LIMIT") {
+			t.Fatalf("expected wallet reconcile worker errors, got: %v", err)
+		}
+	})
+
 	t.Run("reject malformed convert safety config", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:                            "development",

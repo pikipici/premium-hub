@@ -49,6 +49,7 @@ function WalletTopupStatusContent() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState('')
+  const [pollAttempt, setPollAttempt] = useState(0)
 
   const finalStatus = useMemo(() => {
     if (!topup) return false
@@ -106,6 +107,7 @@ function WalletTopupStatusContent() {
       }
 
       setTopup(res.data)
+      setPollAttempt(0)
       if (res.data.status === 'success' || res.data.status === 'paid') {
         refreshBalance()
       }
@@ -126,14 +128,20 @@ function WalletTopupStatusContent() {
   }, [loadTopup])
 
   useEffect(() => {
+    setPollAttempt(0)
+  }, [topupId])
+
+  useEffect(() => {
     if (!topupId || finalStatus) return
 
-    const timer = setInterval(() => {
+    const delayMs = pollAttempt < 5 ? 3000 : pollAttempt < 12 ? 5000 : 10000
+    const timer = setTimeout(() => {
       loadTopup()
-    }, 3000)
+      setPollAttempt((prev) => prev + 1)
+    }, delayMs)
 
-    return () => clearInterval(timer)
-  }, [finalStatus, loadTopup, topupId])
+    return () => clearTimeout(timer)
+  }, [finalStatus, loadTopup, pollAttempt, topupId])
 
   if (!topupId) {
     return (
@@ -226,7 +234,7 @@ function WalletTopupStatusContent() {
 
           {topup.status === 'pending' ? (
             <div className="mt-4 rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-4 py-3 text-xs text-[#666] leading-relaxed">
-              Polling otomatis jalan tiap 3 detik. Kalau udah transfer tapi status belum gerak, klik <strong>Cek Status Sekarang</strong>.
+              Polling adaptif jalan otomatis (3-10 detik). Kalau udah transfer tapi status belum gerak, klik <strong>Cek Status Sekarang</strong>.
             </div>
           ) : null}
         </section>

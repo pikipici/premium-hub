@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -140,8 +141,8 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 	}
 
 	amount := input.Amount
-	if amount < 1000 {
-		return nil, errors.New("minimal topup Rp 1.000")
+	if amount < 10000 {
+		return nil, errors.New("minimal topup Rp 10.000")
 	}
 	if amount > 1_000_000_000 {
 		return nil, errors.New("nominal topup terlalu besar")
@@ -389,26 +390,31 @@ func (s *WalletService) HandlePakasirWebhook(ctx context.Context, input WalletPa
 
 	if cfgProject := strings.TrimSpace(s.cfg.PakasirProject); cfgProject != "" {
 		if project := strings.TrimSpace(input.Project); project != "" && !strings.EqualFold(project, cfgProject) {
+			log.Printf("[pakasir-webhook][wallet] ignored project_mismatch order_id=%s incoming=%s expected=%s", orderID, project, cfgProject)
 			return nil
 		}
 	}
 
 	if !IsPakasirPaidStatus(input.Status) {
+		log.Printf("[pakasir-webhook][wallet] ignored unpaid_status order_id=%s status=%s", orderID, strings.TrimSpace(input.Status))
 		return nil
 	}
 
 	topup, err := s.walletRepo.FindTopupByGatewayRef("pakasir", orderID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[pakasir-webhook][wallet] ignored unknown_topup order_id=%s", orderID)
 			return nil
 		}
 		return errors.New("gagal memuat topup")
 	}
 
 	if input.Amount > 0 && topup.RequestedAmount > 0 && input.Amount != topup.RequestedAmount {
+		log.Printf("[pakasir-webhook][wallet] amount_mismatch order_id=%s expected=%d actual=%d", orderID, topup.RequestedAmount, input.Amount)
 		return fmt.Errorf("nominal webhook tidak cocok")
 	}
 
+	log.Printf("[pakasir-webhook][wallet] checking order_id=%s topup_id=%s", orderID, topup.ID.String())
 	return s.syncTopupStatus(ctx, topup)
 }
 

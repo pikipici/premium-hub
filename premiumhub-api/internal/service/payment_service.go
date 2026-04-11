@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -146,12 +147,14 @@ func (s *PaymentService) handlePakasirWebhook(input WebhookInput) error {
 
 	if configuredProject := strings.TrimSpace(s.cfg.PakasirProject); configuredProject != "" {
 		if incomingProject := strings.TrimSpace(input.Project); incomingProject != "" && !strings.EqualFold(incomingProject, configuredProject) {
+			log.Printf("[pakasir-webhook][order] ignored project_mismatch order_id=%s incoming=%s expected=%s", orderID, incomingProject, configuredProject)
 			return nil
 		}
 	}
 
 	status := NormalizePakasirStatus(strings.TrimSpace(input.Status))
 	if !IsPakasirPaidStatus(status) {
+		log.Printf("[pakasir-webhook][order] ignored unpaid_status order_id=%s status=%s", orderID, status)
 		return nil
 	}
 
@@ -170,6 +173,7 @@ func (s *PaymentService) handlePakasirWebhook(input WebhookInput) error {
 		return nil
 	}
 	if verified.Amount > 0 && verified.Amount != order.TotalPrice {
+		log.Printf("[pakasir-webhook][order] amount_mismatch order_id=%s expected=%d actual=%d", orderID, order.TotalPrice, verified.Amount)
 		return fmt.Errorf("nominal pembayaran tidak cocok")
 	}
 
@@ -185,6 +189,7 @@ func (s *PaymentService) handlePakasirWebhook(input WebhookInput) error {
 	if err := s.orderRepo.Update(order); err != nil {
 		return err
 	}
+	log.Printf("[pakasir-webhook][order] confirmed order_id=%s method=%s", orderID, method)
 	return s.orderSvc.ConfirmPayment(order.ID)
 }
 

@@ -51,6 +51,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
+	service.StartWalletTopupReconcileWorker(cfg, walletSvc)
 
 	convertProofStorage, err := storage.NewConvertProofStorage(cfg)
 	if err != nil {
