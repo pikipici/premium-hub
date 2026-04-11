@@ -3,11 +3,13 @@
 import { Suspense, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { CheckCircle, RefreshCcw } from 'lucide-react'
+
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import PakasirPaymentDisplay from '@/components/payment/PakasirPaymentDisplay'
 import { paymentService } from '@/services/paymentService'
 import { formatDate, formatRupiah } from '@/lib/utils'
-import { CheckCircle, Copy, RefreshCcw } from 'lucide-react'
 
 export default function CheckoutInvoicePage() {
   return (
@@ -28,7 +30,6 @@ function CheckoutInvoiceContent() {
   const expiresAt = search.get('expiresAt') || ''
   const amount = Number(search.get('amount') || 0)
 
-  const [copied, setCopied] = useState(false)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
 
@@ -36,13 +37,6 @@ function CheckoutInvoiceContent() {
     if (!expiresAt) return '-'
     return formatDate(expiresAt)
   }, [expiresAt])
-
-  const handleCopy = async () => {
-    if (!paymentNumber) return
-    await navigator.clipboard.writeText(paymentNumber)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
 
   const handleCheckStatus = async () => {
     if (!orderId) return
@@ -98,20 +92,7 @@ function CheckoutInvoiceContent() {
               <span className="font-semibold">{expireText}</span>
             </div>
 
-            <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3">
-              <div className="text-xs text-[#777] mb-1">Payment Number / QR String</div>
-              <div className="font-mono text-xs break-all text-[#141414]">{paymentNumber || '-'}</div>
-              {paymentNumber ? (
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="mt-2 inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-[#E2E2E2] hover:bg-white"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  {copied ? 'Tersalin' : 'Copy'}
-                </button>
-              ) : null}
-            </div>
+            <PakasirPaymentDisplay paymentMethod={paymentMethod} paymentNumber={paymentNumber} />
           </div>
 
           {error ? (
