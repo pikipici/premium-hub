@@ -35,14 +35,24 @@ func (s *ProductService) GetBySlug(slug string) (*model.Product, error) {
 }
 
 type CreateProductInput struct {
-	Name        string `json:"name" binding:"required"`
-	Slug        string `json:"slug"`
-	Category    string `json:"category" binding:"required"`
-	Description string `json:"description"`
-	Icon        string `json:"icon"`
-	Color       string `json:"color"`
-	IsPopular   bool   `json:"is_popular"`
-	IsActive    *bool  `json:"is_active"`
+	Name               string                 `json:"name" binding:"required"`
+	Slug               string                 `json:"slug"`
+	Category           string                 `json:"category" binding:"required"`
+	Description        string                 `json:"description"`
+	Tagline            string                 `json:"tagline"`
+	Icon               string                 `json:"icon"`
+	Color              string                 `json:"color"`
+	BadgePopularText   string                 `json:"badge_popular_text"`
+	BadgeGuaranteeText string                 `json:"badge_guarantee_text"`
+	SoldText           string                 `json:"sold_text"`
+	SharedNote         string                 `json:"shared_note"`
+	PrivateNote        string                 `json:"private_note"`
+	TrustItems         []string               `json:"trust_items"`
+	FAQItems           []model.ProductFAQItem `json:"faq_items"`
+	SeoDescription     string                 `json:"seo_description"`
+	SortPriority       *int                   `json:"sort_priority"`
+	IsPopular          bool                   `json:"is_popular"`
+	IsActive           *bool                  `json:"is_active"`
 }
 
 func (s *ProductService) Create(input CreateProductInput) (*model.Product, error) {
@@ -66,15 +76,30 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 		isActive = *input.IsActive
 	}
 
+	sortPriority := 0
+	if input.SortPriority != nil {
+		sortPriority = *input.SortPriority
+	}
+
 	product := &model.Product{
-		Name:        name,
-		Slug:        slug,
-		Category:    category,
-		Description: strings.TrimSpace(input.Description),
-		Icon:        strings.TrimSpace(input.Icon),
-		Color:       strings.TrimSpace(input.Color),
-		IsPopular:   input.IsPopular,
-		IsActive:    isActive,
+		Name:               name,
+		Slug:               slug,
+		Category:           category,
+		Description:        strings.TrimSpace(input.Description),
+		Tagline:            strings.TrimSpace(input.Tagline),
+		Icon:               strings.TrimSpace(input.Icon),
+		Color:              strings.TrimSpace(input.Color),
+		BadgePopularText:   strings.TrimSpace(input.BadgePopularText),
+		BadgeGuaranteeText: strings.TrimSpace(input.BadgeGuaranteeText),
+		SoldText:           strings.TrimSpace(input.SoldText),
+		SharedNote:         strings.TrimSpace(input.SharedNote),
+		PrivateNote:        strings.TrimSpace(input.PrivateNote),
+		TrustItems:         sanitizeStringList(input.TrustItems),
+		FAQItems:           sanitizeFAQItems(input.FAQItems),
+		SeoDescription:     strings.TrimSpace(input.SeoDescription),
+		SortPriority:       sortPriority,
+		IsPopular:          input.IsPopular,
+		IsActive:           isActive,
 	}
 	if err := s.productRepo.Create(product); err != nil {
 		return nil, errors.New("gagal membuat produk")
@@ -83,14 +108,24 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 }
 
 type UpdateProductInput struct {
-	Name        *string `json:"name"`
-	Slug        *string `json:"slug"`
-	Category    *string `json:"category"`
-	Description *string `json:"description"`
-	Icon        *string `json:"icon"`
-	Color       *string `json:"color"`
-	IsPopular   *bool   `json:"is_popular"`
-	IsActive    *bool   `json:"is_active"`
+	Name               *string                 `json:"name"`
+	Slug               *string                 `json:"slug"`
+	Category           *string                 `json:"category"`
+	Description        *string                 `json:"description"`
+	Tagline            *string                 `json:"tagline"`
+	Icon               *string                 `json:"icon"`
+	Color              *string                 `json:"color"`
+	BadgePopularText   *string                 `json:"badge_popular_text"`
+	BadgeGuaranteeText *string                 `json:"badge_guarantee_text"`
+	SoldText           *string                 `json:"sold_text"`
+	SharedNote         *string                 `json:"shared_note"`
+	PrivateNote        *string                 `json:"private_note"`
+	TrustItems         *[]string               `json:"trust_items"`
+	FAQItems           *[]model.ProductFAQItem `json:"faq_items"`
+	SeoDescription     *string                 `json:"seo_description"`
+	SortPriority       *int                    `json:"sort_priority"`
+	IsPopular          *bool                   `json:"is_popular"`
+	IsActive           *bool                   `json:"is_active"`
 }
 
 func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.Product, error) {
@@ -126,11 +161,41 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 	if input.Description != nil {
 		product.Description = strings.TrimSpace(*input.Description)
 	}
+	if input.Tagline != nil {
+		product.Tagline = strings.TrimSpace(*input.Tagline)
+	}
 	if input.Icon != nil {
 		product.Icon = strings.TrimSpace(*input.Icon)
 	}
 	if input.Color != nil {
 		product.Color = strings.TrimSpace(*input.Color)
+	}
+	if input.BadgePopularText != nil {
+		product.BadgePopularText = strings.TrimSpace(*input.BadgePopularText)
+	}
+	if input.BadgeGuaranteeText != nil {
+		product.BadgeGuaranteeText = strings.TrimSpace(*input.BadgeGuaranteeText)
+	}
+	if input.SoldText != nil {
+		product.SoldText = strings.TrimSpace(*input.SoldText)
+	}
+	if input.SharedNote != nil {
+		product.SharedNote = strings.TrimSpace(*input.SharedNote)
+	}
+	if input.PrivateNote != nil {
+		product.PrivateNote = strings.TrimSpace(*input.PrivateNote)
+	}
+	if input.TrustItems != nil {
+		product.TrustItems = sanitizeStringList(*input.TrustItems)
+	}
+	if input.FAQItems != nil {
+		product.FAQItems = sanitizeFAQItems(*input.FAQItems)
+	}
+	if input.SeoDescription != nil {
+		product.SeoDescription = strings.TrimSpace(*input.SeoDescription)
+	}
+	if input.SortPriority != nil {
+		product.SortPriority = *input.SortPriority
 	}
 	if input.IsPopular != nil {
 		product.IsPopular = *input.IsPopular
@@ -299,6 +364,40 @@ func (s *ProductService) AdminList(page, limit int) ([]model.Product, int64, err
 
 func (s *ProductService) GetStockCount(productID uuid.UUID, accountType string) (int64, error) {
 	return s.stockRepo.CountByProduct(productID, accountType)
+}
+
+func sanitizeStringList(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		result = append(result, trimmed)
+		if len(result) >= 10 {
+			break
+		}
+	}
+	return result
+}
+
+func sanitizeFAQItems(items []model.ProductFAQItem) []model.ProductFAQItem {
+	result := make([]model.ProductFAQItem, 0, len(items))
+	for _, item := range items {
+		question := strings.TrimSpace(item.Question)
+		answer := strings.TrimSpace(item.Answer)
+		if question == "" && answer == "" {
+			continue
+		}
+		if question == "" || answer == "" {
+			continue
+		}
+		result = append(result, model.ProductFAQItem{Question: question, Answer: answer})
+		if len(result) >= 10 {
+			break
+		}
+	}
+	return result
 }
 
 func normalizeAccountType(value string) string {
