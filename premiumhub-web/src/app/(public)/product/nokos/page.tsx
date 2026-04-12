@@ -16,6 +16,7 @@ import {
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { nokosPublicService } from '@/services/nokosPublicService'
+import { useAuthStore } from '@/store/authStore'
 import type { NokosLandingSummary } from '@/types/nokos'
 
 type PanelTab = 'country' | 'number' | 'sms'
@@ -186,6 +187,7 @@ export default function LandingPage() {
   const [activeNumber, setActiveNumber] = useState(numbers[0])
   const [copied, setCopied] = useState(false)
   const [landingSummary, setLandingSummary] = useState<NokosLandingSummary | null>(null)
+  const { isAuthenticated, hasHydrated } = useAuthStore()
 
   useEffect(() => {
     let canceled = false
@@ -265,6 +267,28 @@ export default function LandingPage() {
     },
   ].filter((item) => !item.hidden)
 
+  const nokosDashboardHref = '/dashboard/nokos'
+  const registerNokosHref = `/register?next=${encodeURIComponent(nokosDashboardHref)}`
+  const loginNokosHref = `/login?next=${encodeURIComponent(nokosDashboardHref)}`
+  const isReady = hasHydrated
+  const isLoggedIn = isReady && isAuthenticated
+
+  const heroPrimaryCta = isLoggedIn
+    ? { href: nokosDashboardHref, label: '🚀 Beli Nomor Sekarang' }
+    : { href: registerNokosHref, label: '🚀 Daftar Gratis' }
+
+  const heroSecondaryCta = isLoggedIn
+    ? { href: '/dashboard/wallet', label: '💳 Isi Saldo Wallet' }
+    : { href: loginNokosHref, label: '🔐 Masuk' }
+
+  const panelCta = isLoggedIn
+    ? { href: nokosDashboardHref, label: 'Buka Dashboard Nokos' }
+    : { href: registerNokosHref, label: 'Daftar untuk buka dashboard' }
+
+  const bottomCta = isLoggedIn
+    ? { href: nokosDashboardHref, label: 'Buka Dashboard Nokos' }
+    : { href: registerNokosHref, label: 'Daftar Gratis' }
+
   return (
     <>
       <Navbar />
@@ -292,16 +316,16 @@ export default function LandingPage() {
 
             <div className="mb-7 flex flex-col gap-3 sm:mb-8 sm:max-w-md sm:flex-row">
               <Link
-                href="/register"
+                href={heroPrimaryCta.href}
                 className="inline-flex items-center justify-center rounded-full bg-[#FF5733] px-7 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(255,87,51,0.28)] transition hover:-translate-y-0.5 hover:bg-[#D94420]"
               >
-                🚀 Beli Akses
+                {heroPrimaryCta.label}
               </Link>
               <Link
-                href="/product/prem-apps"
+                href={heroSecondaryCta.href}
                 className="inline-flex items-center justify-center rounded-full border border-[#EBEBEB] px-7 py-3.5 text-sm font-semibold text-[#141414] transition hover:border-[#141414] hover:bg-[#F7F7F5]"
               >
-                ✨ Coba Gratis
+                {heroSecondaryCta.label}
               </Link>
             </div>
 
@@ -369,10 +393,10 @@ export default function LandingPage() {
               </p>
             </div>
             <Link
-              href="/product/prem-apps"
+              href={panelCta.href}
               className="inline-flex items-center gap-1 self-start rounded-full border border-[#FF573333] px-4 py-2 text-sm font-semibold text-[#FF5733] transition hover:bg-[#FFF0ED]"
             >
-              Lihat semua negara <ArrowRight className="h-4 w-4" />
+              {panelCta.label} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
 
@@ -553,11 +577,11 @@ export default function LandingPage() {
 
           <div className="mt-10 flex justify-center">
             <Link
-              href="/register"
+              href={bottomCta.href}
               className="inline-flex items-center gap-2 rounded-full bg-[#141414] px-7 py-3.5 text-sm font-extrabold text-white transition hover:bg-black"
             >
               <Wallet className="h-4 w-4" />
-              Mulai Sekarang
+              {bottomCta.label}
             </Link>
           </div>
         </section>
