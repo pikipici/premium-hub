@@ -1,14 +1,22 @@
 import api from '@/lib/api'
 import type { ApiResponse } from '@/types/api'
-import type { Product } from '@/types/product'
+import type { Product, ProductPrice } from '@/types/product'
 
 export interface AdminProductPayload {
   name: string
+  slug?: string
   category: string
   description?: string
   icon?: string
   color?: string
   is_popular?: boolean
+  is_active?: boolean
+}
+
+export interface AdminProductPricePayload {
+  duration: number
+  account_type: ProductPrice['account_type']
+  price: number
   is_active?: boolean
 }
 
@@ -45,6 +53,21 @@ export const productService = {
 
   adminDelete: async (id: string) => {
     const res = await api.delete<ApiResponse<null>>(`/admin/products/${id}`)
+    return res.data
+  },
+
+  adminCreatePrice: async (productId: string, data: AdminProductPricePayload) => {
+    const res = await api.post<ApiResponse<ProductPrice>>(`/admin/products/${productId}/prices`, data)
+    return res.data
+  },
+
+  adminUpdatePrice: async (productId: string, priceId: string, data: Partial<AdminProductPricePayload>) => {
+    const res = await api.put<ApiResponse<ProductPrice>>(`/admin/products/${productId}/prices/${priceId}`, data)
+    return res.data
+  },
+
+  adminDeletePrice: async (productId: string, priceId: string) => {
+    const res = await api.delete<ApiResponse<null>>(`/admin/products/${productId}/prices/${priceId}`)
     return res.data
   },
 }

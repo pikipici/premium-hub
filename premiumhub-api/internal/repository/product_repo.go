@@ -64,3 +64,23 @@ func (r *ProductRepo) AdminList(page, limit int) ([]model.Product, int64, error)
 		Find(&products).Error
 	return products, total, err
 }
+
+func (r *ProductRepo) FindPriceByID(id uuid.UUID) (*model.ProductPrice, error) {
+	var price model.ProductPrice
+	err := r.db.First(&price, "id = ?", id).Error
+	return &price, err
+}
+
+func (r *ProductRepo) FindPriceBySignature(productID uuid.UUID, duration int, accountType string) (*model.ProductPrice, error) {
+	var price model.ProductPrice
+	err := r.db.Where("product_id = ? AND duration = ? AND account_type = ?", productID, duration, accountType).First(&price).Error
+	return &price, err
+}
+
+func (r *ProductRepo) CreatePrice(price *model.ProductPrice) error {
+	return r.db.Create(price).Error
+}
+
+func (r *ProductRepo) UpdatePrice(price *model.ProductPrice) error {
+	return r.db.Save(price).Error
+}
