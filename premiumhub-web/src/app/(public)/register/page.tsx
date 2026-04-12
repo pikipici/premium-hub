@@ -4,16 +4,39 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import Link from 'next/link'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/store/authStore'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { Eye, EyeOff, UserPlus } from 'lucide-react'
 
+function resolvePostAuthPath(nextParam: string | null, role: string) {
+  const fallback = role === 'admin' ? '/admin' : '/dashboard'
+  if (!nextParam) return fallback
+
+  const candidate = nextParam.trim()
+  if (!candidate || !candidate.startsWith('/') || candidate.startsWith('//')) {
+    return fallback
+  }
+
+  return candidate
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const { setUser } = useAuthStore()
+  const [nextAuthPath, setNextAuthPath] = useState<string | null>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setNextAuthPath(params.get('next'))
+  }, [])
+
+  const loginHref = useMemo(() => {
+    if (!nextAuthPath) return '/login'
+    return `/login?next=${encodeURIComponent(nextAuthPath)}`
+  }, [nextAuthPath])
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirm: '' })
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
@@ -36,7 +59,7 @@ export default function RegisterPage() {
       const res = await authService.register({ name: form.name, email: form.email, phone: form.phone, password: form.password })
       if (res.success) {
         setUser(res.data.user)
-        router.push('/dashboard')
+        router.push(resolvePostAuthPath(nextAuthPath, res.data.user.role))
       }
     } catch (err: unknown) {
       setError(getHttpErrorMessage(err, 'Registrasi gagal'))
@@ -52,14 +75,14 @@ export default function RegisterPage() {
       const res = await authService.googleLogin({ id_token: idToken })
       if (res.success) {
         setUser(res.data.user)
-        router.push('/dashboard')
+        router.push(resolvePostAuthPath(nextAuthPath, res.data.user.role))
       }
     } catch (err: unknown) {
       setError(getHttpErrorMessage(err, 'Google signup gagal'))
     } finally {
       setLoading(false)
     }
-  }, [router, setUser])
+  }, [nextAuthPath, router, setUser])
 
   return (
     <>
@@ -134,7 +157,7 @@ export default function RegisterPage() {
 
             <p className="text-center text-sm text-[#888] mt-6">
               Sudah punya akun?{' '}
-              <Link href="/login" className="text-[#FF5733] font-semibold hover:underline">Masuk</Link>
+              <Link href={loginHref} className="text-[#FF5733] font-semibold hover:underline">Masuk</Link>
             </p>
           </div>
         </div>

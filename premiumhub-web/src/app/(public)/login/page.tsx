@@ -4,16 +4,39 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import Link from 'next/link'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/store/authStore'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
 
+function resolvePostAuthPath(nextParam: string | null, role: string) {
+  const fallback = role === 'admin' ? '/admin' : '/dashboard'
+  if (!nextParam) return fallback
+
+  const candidate = nextParam.trim()
+  if (!candidate || !candidate.startsWith('/') || candidate.startsWith('//')) {
+    return fallback
+  }
+
+  return candidate
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const { setUser } = useAuthStore()
+  const [nextAuthPath, setNextAuthPath] = useState<string | null>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setNextAuthPath(params.get('next'))
+  }, [])
+
+  const registerHref = useMemo(() => {
+    if (!nextAuthPath) return '/register'
+    return `/register?next=${encodeURIComponent(nextAuthPath)}`
+  }, [nextAuthPath])
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
@@ -27,7 +50,7 @@ export default function LoginPage() {
       const res = await authService.login(form)
       if (res.success) {
         setUser(res.data.user)
-        router.push(res.data.user.role === 'admin' ? '/admin' : '/dashboard')
+        router.push(resolvePostAuthPath(nextAuthPath, res.data.user.role))
       }
     } catch (err: unknown) {
       setError(getHttpErrorMessage(err, 'Login gagal'))
@@ -43,14 +66,14 @@ export default function LoginPage() {
       const res = await authService.googleLogin({ id_token: idToken })
       if (res.success) {
         setUser(res.data.user)
-        router.push(res.data.user.role === 'admin' ? '/admin' : '/dashboard')
+        router.push(resolvePostAuthPath(nextAuthPath, res.data.user.role))
       }
     } catch (err: unknown) {
       setError(getHttpErrorMessage(err, 'Login Google gagal'))
     } finally {
       setLoading(false)
     }
-  }, [setUser, router])
+  }, [nextAuthPath, router, setUser])
 
   return (
     <>
@@ -129,7 +152,7 @@ export default function LoginPage() {
 
             <p className="text-center text-sm text-[#888] mt-6">
               Belum punya akun?{' '}
-              <Link href="/register" className="text-[#FF5733] font-semibold hover:underline">Daftar</Link>
+              <Link href={registerHref} className="text-[#FF5733] font-semibold hover:underline">Daftar</Link>
             </p>
           </div>
         </div>
