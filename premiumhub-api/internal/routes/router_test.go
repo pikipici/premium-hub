@@ -93,6 +93,9 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "GET", "/api/v1/public/nokos/landing-summary") {
 		t.Fatalf("public nokos landing summary route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/public/nokos/countries") {
+		t.Fatalf("public nokos countries route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/admin/wallet/topups/:id/recheck") {
 		t.Fatalf("admin recheck route should exist")
 	}
@@ -150,5 +153,8 @@ func TestSetupDevelopmentPaymentRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "GET", "/api/v1/public/nokos/landing-summary") {
 		t.Fatalf("public nokos landing summary route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/public/nokos/countries") {
+		t.Fatalf("public nokos countries route should exist")
 	}
 }

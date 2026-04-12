@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,6 +41,15 @@ type NokosLandingSummaryResponse struct {
 	LastSyncStatus   string     `json:"last_sync_status"`
 }
 
+type NokosLandingCountriesResponse struct {
+	Source         string                      `json:"source"`
+	Countries      []model.NokosLandingCountry `json:"countries"`
+	CountriesCount int64                       `json:"countries_count"`
+	LastSyncedAt   *time.Time                  `json:"last_synced_at"`
+	IsStale        bool                        `json:"is_stale"`
+	LastSyncStatus string                      `json:"last_sync_status"`
+}
+
 type NokosLandingSummaryService struct {
 	cfg     *config.Config
 	repo    *repository.NokosLandingSummaryRepo
@@ -70,6 +80,22 @@ func NewNokosLandingSummaryService(
 }
 
 func (s *NokosLandingSummaryService) GetPublicSummary(ctx context.Context) (*NokosLandingSummaryResponse, error) {
+	row, err := s.getSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.toResponse(row), nil
+}
+
+func (s *NokosLandingSummaryService) GetPublicCountries(ctx context.Context) (*NokosLandingCountriesResponse, error) {
+	row, err := s.getSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.toCountriesResponse(row), nil
+}
+
+func (s *NokosLandingSummaryService) getSnapshot(ctx context.Context) (*model.NokosLandingSummary, error) {
 	row, err := s.repo.FindBySource(nokosLandingSourceFiveSim)
 	if err != nil {
 		if !errorsIsNotFound(err) {
@@ -91,7 +117,7 @@ func (s *NokosLandingSummaryService) GetPublicSummary(ctx context.Context) (*Nok
 		}
 	}
 
-	return s.toResponse(row), nil
+	return row, nil
 }
 
 func (s *NokosLandingSummaryService) Sync(ctx context.Context) error {
@@ -107,16 +133,18 @@ func (s *NokosLandingSummaryService) Sync(ctx context.Context) error {
 	}
 
 	countriesCount := row.CountriesCount
+	countries := append([]model.NokosLandingCountry{}, row.Countries...)
 	activationTotal := row.ActivationSentTotal
 	hostingTotal := row.HostingSentTotal
 	paymentMethods := row.PaymentMethods
 
-	errorsList := make([]string, 0, 3)
+	errorsList := make([]string, 0, 4)
 
-	if count, e := s.fetchCountriesCount(ctx); e != nil {
+	if fetchedCountries, e := s.fetchCountries(ctx); e != nil {
 		errorsList = append(errorsList, "countries:"+e.Error())
 	} else {
-		countriesCount = count
+		countries = fetchedCountries
+		countriesCount = int64(len(fetchedCountries))
 	}
 
 	if count, e := s.fetchSentTotalByCategory(ctx, "activation"); e != nil {
@@ -139,6 +167,7 @@ func (s *NokosLandingSummaryService) Sync(ctx context.Context) error {
 
 	now := time.Now().UTC()
 	row.CountriesCount = countriesCount
+	row.Countries = countries
 	row.ActivationSentTotal = activationTotal
 	row.HostingSentTotal = hostingTotal
 	row.SentTotalAllTime = activationTotal + hostingTotal
@@ -166,32 +195,59 @@ func (s *NokosLandingSummaryService) Sync(ctx context.Context) error {
 	return nil
 }
 
-func (s *NokosLandingSummaryService) fetchCountriesCount(ctx context.Context) (int64, error) {
+func (s *NokosLandingSummaryService) fetchCountries(ctx context.Context) ([]model.NokosLandingCountry, error) {
 	res, err := s.fiveSim.GetCountries(ctx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if len(res) == 0 {
-		return 0, nil
+		return []model.NokosLandingCountry{}, nil
 	}
 
-	if dataNode, ok := res["Data"]; ok {
-		if rows, ok := dataNode.([]any); ok {
-			return int64(len(rows)), nil
-		}
-	}
-
-	count := int64(0)
-	for key := range res {
+	countries := make([]model.NokosLandingCountry, 0, len(res))
+	for key, raw := range res {
 		upper := strings.ToUpper(strings.TrimSpace(key))
 		switch upper {
 		case "DATA", "TOTAL", "STATUSES", "PRODUCTNAMES":
 			continue
-		default:
-			count++
 		}
+
+		rec, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		iso := strings.ToUpper(firstMapKey(rec["iso"]))
+		dialCode := firstMapKey(rec["prefix"])
+		name := strings.TrimSpace(asString(rec["text_en"]))
+		if name == "" {
+			name = strings.TrimSpace(asString(rec["name"]))
+		}
+		if name == "" {
+			name = titleFromSlug(key)
+		}
+
+		countryKey := strings.ToUpper(strings.TrimSpace(iso))
+		if countryKey == "" {
+			countryKey = strings.ToUpper(strings.TrimSpace(key))
+		}
+
+		countries = append(countries, model.NokosLandingCountry{
+			Key:      countryKey,
+			Name:     name,
+			ISO:      strings.ToUpper(strings.TrimSpace(iso)),
+			DialCode: strings.TrimSpace(dialCode),
+		})
 	}
-	return count, nil
+
+	sort.Slice(countries, func(i, j int) bool {
+		if countries[i].Name == countries[j].Name {
+			return countries[i].Key < countries[j].Key
+		}
+		return countries[i].Name < countries[j].Name
+	})
+
+	return countries, nil
 }
 
 func (s *NokosLandingSummaryService) fetchSentTotalByCategory(ctx context.Context, category string) (int64, error) {
@@ -351,6 +407,53 @@ func countNonCanceledRows(rows []map[string]any) int64 {
 	return total
 }
 
+func firstMapKey(v any) string {
+	switch m := v.(type) {
+	case map[string]any:
+		for key := range m {
+			return strings.TrimSpace(key)
+		}
+	case map[string]string:
+		for key := range m {
+			return strings.TrimSpace(key)
+		}
+	}
+	return ""
+}
+
+func asString(v any) string {
+	switch s := v.(type) {
+	case string:
+		return s
+	case fmt.Stringer:
+		return s.String()
+	case json.Number:
+		return s.String()
+	}
+	return ""
+}
+
+func titleFromSlug(slug string) string {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return ""
+	}
+	parts := strings.FieldsFunc(slug, func(r rune) bool {
+		return r == '-' || r == '_' || r == ' '
+	})
+	if len(parts) == 0 {
+		parts = []string{slug}
+	}
+	for i := range parts {
+		p := strings.ToLower(parts[i])
+		if p == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(p[:1]) + p[1:]
+	}
+	return strings.Join(parts, " ")
+}
+
 func asInt64(v any) int64 {
 	switch n := v.(type) {
 	case int:
@@ -414,6 +517,29 @@ func (s *NokosLandingSummaryService) toResponse(row *model.NokosLandingSummary) 
 		LastSyncedAt:     row.LastSyncedAt,
 		IsStale:          s.isStale(row.LastSyncedAt),
 		LastSyncStatus:   row.LastSyncStatus,
+	}
+}
+
+func (s *NokosLandingSummaryService) toCountriesResponse(row *model.NokosLandingSummary) *NokosLandingCountriesResponse {
+	if row == nil {
+		return &NokosLandingCountriesResponse{
+			Source:         nokosLandingSourceFiveSim,
+			Countries:      []model.NokosLandingCountry{},
+			CountriesCount: 0,
+			LastSyncedAt:   nil,
+			IsStale:        true,
+			LastSyncStatus: "unknown",
+		}
+	}
+
+	countries := append([]model.NokosLandingCountry{}, row.Countries...)
+	return &NokosLandingCountriesResponse{
+		Source:         row.Source,
+		Countries:      countries,
+		CountriesCount: row.CountriesCount,
+		LastSyncedAt:   row.LastSyncedAt,
+		IsStale:        s.isStale(row.LastSyncedAt),
+		LastSyncStatus: row.LastSyncStatus,
 	}
 }
 

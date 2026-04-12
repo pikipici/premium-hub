@@ -106,6 +106,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	api.POST("/payment/webhook", paymentHandler.Webhook)
 	api.GET("/public/nokos/landing-summary", nokosPublicHandler.GetLandingSummary)
+	api.GET("/public/nokos/countries", nokosPublicHandler.GetCountries)
 	api.GET(
 		"/convert/track/:token",
 		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request tracking convert. Coba lagi sebentar."),
