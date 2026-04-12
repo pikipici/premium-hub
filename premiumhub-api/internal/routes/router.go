@@ -35,6 +35,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	notifRepo := repository.NewNotificationRepo(db)
 	walletRepo := repository.NewWalletRepo(db)
 	fiveSimOrderRepo := repository.NewFiveSimOrderRepo(db)
+	nokosLandingRepo := repository.NewNokosLandingSummaryRepo(db)
 	convertRepo := repository.NewConvertRepo(db)
 
 	// Services
@@ -48,10 +49,12 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
 	pakasirWebhookSvc := service.NewPakasirWebhookService(orderRepo, walletRepo, paymentSvc, walletSvc)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
+	nokosLandingSvc := service.NewNokosLandingSummaryService(cfg, nokosLandingRepo, nil, nil)
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
 	service.StartWalletTopupReconcileWorker(cfg, walletSvc)
+	service.StartNokosLandingSummaryWorker(cfg, nokosLandingSvc)
 
 	convertProofStorage, err := storage.NewConvertProofStorage(cfg)
 	if err != nil {
@@ -65,6 +68,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	paymentHandler := handler.NewPaymentHandler(paymentSvc, pakasirWebhookSvc)
 	walletHandler := handler.NewWalletHandler(walletSvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
+	nokosPublicHandler := handler.NewNokosPublicHandler(nokosLandingSvc)
 	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage, cfg)
 	claimHandler := handler.NewClaimHandler(claimSvc)
 	stockHandler := handler.NewStockHandler(stockSvc)
@@ -87,6 +91,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	products.GET("/:slug/prices", productHandler.GetPrices)
 
 	api.POST("/payment/webhook", paymentHandler.Webhook)
+	api.GET("/public/nokos/landing-summary", nokosPublicHandler.GetLandingSummary)
 	api.GET(
 		"/convert/track/:token",
 		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request tracking convert. Coba lagi sebentar."),

@@ -69,6 +69,30 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if v := strings.TrimSpace(c.NokosLandingWorkerInterval); v != "" {
+		if _, err := time.ParseDuration(v); err != nil {
+			problems = append(problems, "NOKOS_LANDING_WORKER_INTERVAL harus format duration valid (contoh: 10m)")
+		}
+	}
+	if v := strings.TrimSpace(c.NokosLandingSyncTimeout); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 || d > 5*time.Minute {
+			problems = append(problems, "NOKOS_LANDING_SYNC_TIMEOUT harus duration valid > 0 dan <= 5m")
+		}
+	}
+	if v := strings.TrimSpace(c.NokosLandingStaleAfter); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 || d > 24*time.Hour {
+			problems = append(problems, "NOKOS_LANDING_STALE_AFTER harus duration valid > 0 dan <= 24h")
+		}
+	}
+	if v := strings.TrimSpace(c.NokosLandingMethodProbeAmount); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 1_000_000_000 {
+			problems = append(problems, "NOKOS_LANDING_METHOD_PROBE_AMOUNT harus angka > 0 dan <= 1000000000")
+		}
+	}
+
 	validateRate := func(maxRaw, winRaw, maxField, winField string) {
 		if v := strings.TrimSpace(maxRaw); v != "" {
 			n, err := strconv.Atoi(v)

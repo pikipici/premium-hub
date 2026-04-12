@@ -9,35 +9,38 @@ import (
 )
 
 type Config struct {
-	AppPort, AppEnv                                                          string
-	DBHost, DBPort, DBUser, DBPassword, DBName                               string
-	JWTSecret, JWTExpiry                                                     string
-	PakasirBaseURL, PakasirProject, PakasirAPIKey, PakasirHTTPTimeoutSec     string
-	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                     string
-	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                      string
-	FiveSimReconcileWorkerInterval, FiveSimReconcileWorkerBatchLimit         string
-	FiveSimReconcileSyncMinAge, FiveSimOrderMaxWaitingDuration               string
-	FiveSimResolveNotFoundThreshold, FiveSimResolveNotFoundMinAge            string
-	FiveSimReconcileWorkerEnabled                                            bool
-	WalletTopupExpiryMinutes                                                 string
-	WalletTopupReconcileWorkerEnabled                                        bool
-	WalletTopupReconcileWorkerInterval, WalletTopupReconcileWorkerBatchLimit string
-	SMTPHost, SMTPPort, SMTPUser, SMTPPass, FrontendURL                      string
-	CookieDomain, CookieSameSite                                             string
-	CookieSecure                                                             bool
-	GoogleClientID                                                           string
-	AuthRateLimitMax, AuthRateLimitWindow                                    string
-	ConvertTrackRateLimitMax, ConvertTrackRateLimitWindow                    string
-	ConvertCreateRateLimitMax, ConvertCreateRateLimitWindow                  string
-	ConvertProofRateLimitMax, ConvertProofRateLimitWindow                    string
-	ConvertAdminStatusRateLimitMax, ConvertAdminStatusRateLimitWindow        string
-	ConvertExpiryWorkerEnabled                                               bool
-	ConvertExpiryWorkerInterval, ConvertExpiryWorkerBatchLimit               string
-	ConvertProofStorageMode, ConvertProofLocalDir, ConvertProofMaxFileMB     string
-	ConvertProofR2Endpoint, ConvertProofR2Bucket, ConvertProofR2Region       string
-	ConvertProofR2AccessKeyID, ConvertProofR2SecretAccessKey                 string
-	ConvertProofR2PublicBaseURL, ConvertProofR2Prefix                        string
-	ConvertProofR2UploadTimeout                                              string
+	AppPort, AppEnv                                                             string
+	DBHost, DBPort, DBUser, DBPassword, DBName                                  string
+	JWTSecret, JWTExpiry                                                        string
+	PakasirBaseURL, PakasirProject, PakasirAPIKey, PakasirHTTPTimeoutSec        string
+	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                        string
+	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                         string
+	FiveSimReconcileWorkerInterval, FiveSimReconcileWorkerBatchLimit            string
+	FiveSimReconcileSyncMinAge, FiveSimOrderMaxWaitingDuration                  string
+	FiveSimResolveNotFoundThreshold, FiveSimResolveNotFoundMinAge               string
+	FiveSimReconcileWorkerEnabled                                               bool
+	WalletTopupExpiryMinutes                                                    string
+	WalletTopupReconcileWorkerEnabled                                           bool
+	WalletTopupReconcileWorkerInterval, WalletTopupReconcileWorkerBatchLimit    string
+	NokosLandingWorkerEnabled                                                   bool
+	NokosLandingWorkerInterval, NokosLandingSyncTimeout, NokosLandingStaleAfter string
+	NokosLandingMethodCandidates, NokosLandingMethodProbeAmount                 string
+	SMTPHost, SMTPPort, SMTPUser, SMTPPass, FrontendURL                         string
+	CookieDomain, CookieSameSite                                                string
+	CookieSecure                                                                bool
+	GoogleClientID                                                              string
+	AuthRateLimitMax, AuthRateLimitWindow                                       string
+	ConvertTrackRateLimitMax, ConvertTrackRateLimitWindow                       string
+	ConvertCreateRateLimitMax, ConvertCreateRateLimitWindow                     string
+	ConvertProofRateLimitMax, ConvertProofRateLimitWindow                       string
+	ConvertAdminStatusRateLimitMax, ConvertAdminStatusRateLimitWindow           string
+	ConvertExpiryWorkerEnabled                                                  bool
+	ConvertExpiryWorkerInterval, ConvertExpiryWorkerBatchLimit                  string
+	ConvertProofStorageMode, ConvertProofLocalDir, ConvertProofMaxFileMB        string
+	ConvertProofR2Endpoint, ConvertProofR2Bucket, ConvertProofR2Region          string
+	ConvertProofR2AccessKeyID, ConvertProofR2SecretAccessKey                    string
+	ConvertProofR2PublicBaseURL, ConvertProofR2Prefix                           string
+	ConvertProofR2UploadTimeout                                                 string
 }
 
 func Load() *Config {
@@ -78,6 +81,12 @@ func Load() *Config {
 		WalletTopupReconcileWorkerEnabled:    eb("WALLET_TOPUP_RECONCILE_WORKER_ENABLED", true),
 		WalletTopupReconcileWorkerInterval:   e("WALLET_TOPUP_RECONCILE_WORKER_INTERVAL", "1m"),
 		WalletTopupReconcileWorkerBatchLimit: e("WALLET_TOPUP_RECONCILE_WORKER_BATCH_LIMIT", "200"),
+		NokosLandingWorkerEnabled:            eb("NOKOS_LANDING_WORKER_ENABLED", true),
+		NokosLandingWorkerInterval:           e("NOKOS_LANDING_WORKER_INTERVAL", "10m"),
+		NokosLandingSyncTimeout:              e("NOKOS_LANDING_SYNC_TIMEOUT", "25s"),
+		NokosLandingStaleAfter:               e("NOKOS_LANDING_STALE_AFTER", "30m"),
+		NokosLandingMethodCandidates:         e("NOKOS_LANDING_METHOD_CANDIDATES", "qris,bri_va,bni_va,permata_va"),
+		NokosLandingMethodProbeAmount:        e("NOKOS_LANDING_METHOD_PROBE_AMOUNT", "10000"),
 		SMTPHost:                             e("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:                             e("SMTP_PORT", "587"),
 		SMTPUser:                             e("SMTP_USER", ""),

@@ -147,6 +147,30 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject malformed nokos landing config", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                        "development",
+			JWTSecret:                     "super-secure-secret-value-32chars++",
+			CookieSameSite:                "lax",
+			AuthRateLimitMax:              "20",
+			AuthRateLimitWindow:           "1m",
+			NokosLandingWorkerInterval:    "bad-duration",
+			NokosLandingSyncTimeout:       "0",
+			NokosLandingStaleAfter:        "48h",
+			NokosLandingMethodProbeAmount: "-1",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected nokos landing validation errors")
+		}
+		if !strings.Contains(err.Error(), "NOKOS_LANDING_WORKER_INTERVAL") ||
+			!strings.Contains(err.Error(), "NOKOS_LANDING_SYNC_TIMEOUT") ||
+			!strings.Contains(err.Error(), "NOKOS_LANDING_STALE_AFTER") ||
+			!strings.Contains(err.Error(), "NOKOS_LANDING_METHOD_PROBE_AMOUNT") {
+			t.Fatalf("expected nokos landing config errors, got: %v", err)
+		}
+	})
+
 	t.Run("reject malformed convert safety config", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:                            "development",

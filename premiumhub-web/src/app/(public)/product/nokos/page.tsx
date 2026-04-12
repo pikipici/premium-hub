@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
   BadgeCheck,
@@ -11,11 +11,12 @@ import {
   Headphones,
   Shield,
   Wallet,
-  Zap,
 } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
+import { nokosPublicService } from '@/services/nokosPublicService'
+import type { NokosLandingSummary } from '@/types/nokos'
 
 type PanelTab = 'country' | 'number' | 'sms'
 
@@ -149,12 +150,61 @@ const smsItems: SmsItem[] = [
   },
 ]
 
+const formatCompact = (value: number) =>
+  new Intl.NumberFormat('id-ID', {
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: 1,
+  }).format(value)
+
+const formatNumber = (value: number) => new Intl.NumberFormat('id-ID').format(value)
+
+const paymentMethodLabel = (method: string) => {
+  const normalized = method.trim().toLowerCase()
+  switch (normalized) {
+    case 'qris':
+      return 'QRIS'
+    case 'bri_va':
+      return 'BRI VA'
+    case 'bni_va':
+      return 'BNI VA'
+    case 'permata_va':
+      return 'Permata VA'
+    case 'cimb_niaga_va':
+      return 'CIMB VA'
+    case 'paypal':
+      return 'PayPal'
+    default:
+      return normalized.replaceAll('_', ' ').toUpperCase()
+  }
+}
+
 export default function LandingPage() {
   const [tab, setTab] = useState<PanelTab>('country')
   const [countryQuery, setCountryQuery] = useState('')
   const [activeCountry, setActiveCountry] = useState(countries[0].key)
   const [activeNumber, setActiveNumber] = useState(numbers[0])
   const [copied, setCopied] = useState(false)
+  const [landingSummary, setLandingSummary] = useState<NokosLandingSummary | null>(null)
+
+  useEffect(() => {
+    let canceled = false
+
+    nokosPublicService
+      .getLandingSummary()
+      .then((res) => {
+        if (!canceled && res.success) {
+          setLandingSummary(res.data)
+        }
+      })
+      .catch(() => {
+        // keep silent fallback to static defaults
+      })
+
+    return () => {
+      canceled = true
+    }
+  }, [])
 
   const filteredCountries = useMemo(() => {
     const query = countryQuery.trim().toLowerCase()
@@ -182,6 +232,39 @@ export default function LandingPage() {
     }
   }
 
+  const hasLiveSummary = Boolean(landingSummary)
+  const countriesCount = landingSummary?.countries_count ?? 0
+  const sentTotalAllTime = landingSummary?.sent_total_all_time ?? 0
+  const activePaymentMethods = (landingSummary?.payment_methods || []).map(paymentMethodLabel)
+
+  const heroBadgeLabel = hasLiveSummary ? `${formatNumber(sentTotalAllTime)} nomor terkirim` : 'Memuat data penjualan...'
+  const statItems = [
+    { value: hasLiveSummary ? `${formatCompact(countriesCount)}+` : '—', label: 'Negara tersedia' },
+    { value: hasLiveSummary ? `${formatCompact(sentTotalAllTime)}+` : '—', label: 'Nomor terkirim' },
+    { value: hasLiveSummary ? `${activePaymentMethods.length}` : '—', label: 'Metode bayar aktif' },
+  ]
+
+  const trustItems = [
+    {
+      key: 'countries',
+      icon: <Globe className="h-4 w-4" />,
+      label: hasLiveSummary ? `${formatNumber(countriesCount)} Negara` : 'Negara: memuat...',
+    },
+    { key: 'privacy', icon: <Shield className="h-4 w-4" />, label: '100% Anonim' },
+    {
+      key: 'payments',
+      icon: <CreditCard className="h-4 w-4" />,
+      label: activePaymentMethods.join(' / '),
+      hidden: activePaymentMethods.length === 0,
+    },
+    { key: 'support', icon: <Headphones className="h-4 w-4" />, label: 'Support 24/7' },
+    {
+      key: 'sent',
+      icon: <BadgeCheck className="h-4 w-4" />,
+      label: hasLiveSummary ? `${formatCompact(sentTotalAllTime)}+ Terkirim` : 'Penjualan: memuat...',
+    },
+  ].filter((item) => !item.hidden)
+
   return (
     <>
       <Navbar />
@@ -191,7 +274,7 @@ export default function LandingPage() {
           <div>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#FF573333] bg-[#FFF0ED] px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#FF5733]">
               <span className="h-2 w-2 rounded-full bg-[#22C55E] shadow-[0_0_0_5px_rgba(34,197,94,0.16)]" />
-              50.000+ nomor terkirim
+              {heroBadgeLabel}
             </div>
 
             <h1 className="mb-4 text-[2rem] font-extrabold leading-[1.12] tracking-tight text-[#141414] sm:mb-5 sm:text-5xl sm:leading-tight">
@@ -199,7 +282,8 @@ export default function LandingPage() {
             </h1>
 
             <p className="mb-2 text-[15px] leading-relaxed text-[#888]">
-              Verifikasi akun tanpa nomor HP asli. Tersedia untuk 100+ negara, instan &lt; 30 detik.
+              Verifikasi akun tanpa nomor HP asli.{' '}
+              {hasLiveSummary ? `Tersedia untuk ${formatNumber(countriesCount)} negara.` : 'Data negara sedang dimuat...'}
             </p>
 
             <p className="mb-7 text-sm leading-relaxed text-[#888] sm:mb-8">
@@ -222,11 +306,7 @@ export default function LandingPage() {
             </div>
 
             <div className="grid max-w-md grid-cols-3 gap-3 sm:gap-4">
-              {[
-                { value: '100+', label: 'Negara tersedia' },
-                { value: '50k+', label: 'Nomor terkirim' },
-                { value: '<30s', label: 'Waktu OTP' },
-              ].map((stat) => (
+              {statItems.map((stat) => (
                 <div key={stat.label} className="rounded-xl bg-[#FAFAF9] px-2 py-2.5 text-center sm:bg-transparent sm:px-0 sm:py-0 sm:text-left">
                   <div className="text-xl font-extrabold tracking-tight text-[#141414] sm:text-2xl">{stat.value}</div>
                   <div className="mt-0.5 text-[11px] text-[#888] sm:text-xs">{stat.label}</div>
@@ -265,16 +345,9 @@ export default function LandingPage() {
         </section>
 
         <section className="hidden border-y border-[#EBEBEB] bg-[#F7F7F5] md:block">
-          <div className="mx-auto grid w-full max-w-7xl grid-cols-3 gap-5 px-6 py-4 lg:grid-cols-6 lg:px-10">
-            {[
-              { icon: <Globe className="h-4 w-4" />, label: '100+ Negara' },
-              { icon: <Zap className="h-4 w-4" />, label: 'OTP <30 Detik' },
-              { icon: <Shield className="h-4 w-4" />, label: '100% Anonim' },
-              { icon: <CreditCard className="h-4 w-4" />, label: 'QRIS / GoPay / Dana' },
-              { icon: <Headphones className="h-4 w-4" />, label: 'Support 24/7' },
-              { icon: <BadgeCheck className="h-4 w-4" />, label: '50.000+ Terkirim' },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center gap-2 text-sm font-semibold text-[#2a2a2a]">
+          <div className="mx-auto grid w-full max-w-7xl grid-cols-3 gap-5 px-6 py-4 lg:grid-cols-5 lg:px-10">
+            {trustItems.map((item) => (
+              <div key={item.key} className="flex items-center gap-2 text-sm font-semibold text-[#2a2a2a]">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#EBEBEB] bg-white text-[#FF5733]">
                   {item.icon}
                 </span>
