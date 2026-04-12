@@ -1,0 +1,422 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"premiumhub-api/config"
+	"premiumhub-api/internal/model"
+	"premiumhub-api/internal/repository"
+
+	"gorm.io/gorm"
+)
+
+const nokosLandingSourceFiveSim = "5sim"
+
+type nokosLandingFiveSimClient interface {
+	GetCountries(ctx context.Context) (map[string]any, error)
+	GetProviderOrderHistory(ctx context.Context, category string, limit, offset int, order string, reverse bool) (map[string]any, error)
+}
+
+type nokosLandingPakasirClient interface {
+	CreateTransaction(ctx context.Context, method, orderID string, amount int64) (*PakasirCreateResult, []byte, error)
+	TransactionCancel(ctx context.Context, orderID string, amount int64) ([]byte, error)
+}
+
+type NokosLandingSummaryResponse struct {
+	Source           string     `json:"source"`
+	CountriesCount   int64      `json:"countries_count"`
+	SentTotalAllTime int64      `json:"sent_total_all_time"`
+	PaymentMethods   []string   `json:"payment_methods"`
+	LastSyncedAt     *time.Time `json:"last_synced_at"`
+	IsStale          bool       `json:"is_stale"`
+	LastSyncStatus   string     `json:"last_sync_status"`
+}
+
+type NokosLandingSummaryService struct {
+	cfg     *config.Config
+	repo    *repository.NokosLandingSummaryRepo
+	fiveSim nokosLandingFiveSimClient
+	pakasir nokosLandingPakasirClient
+
+	syncMu sync.Mutex
+}
+
+func NewNokosLandingSummaryService(
+	cfg *config.Config,
+	repo *repository.NokosLandingSummaryRepo,
+	fiveSim nokosLandingFiveSimClient,
+	pakasir nokosLandingPakasirClient,
+) *NokosLandingSummaryService {
+	if fiveSim == nil {
+		fiveSim = NewFiveSimClient(cfg)
+	}
+	if pakasir == nil {
+		pakasir = NewPakasirClient(cfg)
+	}
+	return &NokosLandingSummaryService{
+		cfg:     cfg,
+		repo:    repo,
+		fiveSim: fiveSim,
+		pakasir: pakasir,
+	}
+}
+
+func (s *NokosLandingSummaryService) GetPublicSummary(ctx context.Context) (*NokosLandingSummaryResponse, error) {
+	row, err := s.repo.FindBySource(nokosLandingSourceFiveSim)
+	if err != nil {
+		if !errorsIsNotFound(err) {
+			return nil, err
+		}
+		row = &model.NokosLandingSummary{Source: nokosLandingSourceFiveSim}
+	}
+
+	if s.isStale(row.LastSyncedAt) {
+		timeout := parseConvertWorkerDuration(s.cfg.NokosLandingSyncTimeout, 25*time.Second)
+		syncCtx, cancel := context.WithTimeout(ctx, timeout)
+		if err := s.Sync(syncCtx); err != nil {
+			log.Printf("[nokos-landing] on-demand sync failed: %v", err)
+		}
+		cancel()
+
+		if refreshed, loadErr := s.repo.FindBySource(nokosLandingSourceFiveSim); loadErr == nil {
+			row = refreshed
+		}
+	}
+
+	return s.toResponse(row), nil
+}
+
+func (s *NokosLandingSummaryService) Sync(ctx context.Context) error {
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
+
+	row, err := s.repo.FindBySource(nokosLandingSourceFiveSim)
+	if err != nil {
+		if !errorsIsNotFound(err) {
+			return err
+		}
+		row = &model.NokosLandingSummary{Source: nokosLandingSourceFiveSim}
+	}
+
+	countriesCount := row.CountriesCount
+	activationTotal := row.ActivationSentTotal
+	hostingTotal := row.HostingSentTotal
+	paymentMethods := row.PaymentMethods
+
+	errorsList := make([]string, 0, 3)
+
+	if count, e := s.fetchCountriesCount(ctx); e != nil {
+		errorsList = append(errorsList, "countries:"+e.Error())
+	} else {
+		countriesCount = count
+	}
+
+	if count, e := s.fetchSentTotalByCategory(ctx, "activation"); e != nil {
+		errorsList = append(errorsList, "activation_sales:"+e.Error())
+	} else {
+		activationTotal = count
+	}
+
+	if count, e := s.fetchSentTotalByCategory(ctx, "hosting"); e != nil {
+		errorsList = append(errorsList, "hosting_sales:"+e.Error())
+	} else {
+		hostingTotal = count
+	}
+
+	if methods, e := s.fetchActivePaymentMethods(ctx); e != nil {
+		errorsList = append(errorsList, "payment_methods:"+e.Error())
+	} else {
+		paymentMethods = methods
+	}
+
+	now := time.Now().UTC()
+	row.CountriesCount = countriesCount
+	row.ActivationSentTotal = activationTotal
+	row.HostingSentTotal = hostingTotal
+	row.SentTotalAllTime = activationTotal + hostingTotal
+	row.PaymentMethods = paymentMethods
+	row.LastSyncedAt = &now
+
+	if len(errorsList) == 0 {
+		row.LastSyncStatus = "ok"
+		row.LastSyncError = ""
+	} else {
+		row.LastSyncStatus = "degraded"
+		row.LastSyncError = strings.Join(errorsList, "; ")
+	}
+
+	if err := s.repo.Save(row); err != nil {
+		return err
+	}
+
+	if len(errorsList) == 0 {
+		log.Printf("[nokos-landing] sync ok countries=%d sent_total=%d methods=%v", row.CountriesCount, row.SentTotalAllTime, row.PaymentMethods)
+	} else {
+		log.Printf("[nokos-landing] sync degraded countries=%d sent_total=%d methods=%v errors=%s", row.CountriesCount, row.SentTotalAllTime, row.PaymentMethods, row.LastSyncError)
+	}
+
+	return nil
+}
+
+func (s *NokosLandingSummaryService) fetchCountriesCount(ctx context.Context) (int64, error) {
+	res, err := s.fiveSim.GetCountries(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if len(res) == 0 {
+		return 0, nil
+	}
+
+	if dataNode, ok := res["Data"]; ok {
+		if rows, ok := dataNode.([]any); ok {
+			return int64(len(rows)), nil
+		}
+	}
+
+	count := int64(0)
+	for key := range res {
+		upper := strings.ToUpper(strings.TrimSpace(key))
+		switch upper {
+		case "DATA", "TOTAL", "STATUSES", "PRODUCTNAMES":
+			continue
+		default:
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (s *NokosLandingSummaryService) fetchSentTotalByCategory(ctx context.Context, category string) (int64, error) {
+	res, err := s.fiveSim.GetProviderOrderHistory(ctx, category, 1, 0, "id", true)
+	if err != nil {
+		return 0, err
+	}
+
+	if total, ok := sumStatusesCount(res); ok {
+		return total, nil
+	}
+
+	batch := 100
+	offset := 0
+	var total int64
+	for page := 0; page < 2000; page++ {
+		pageRes, e := s.fiveSim.GetProviderOrderHistory(ctx, category, batch, offset, "id", true)
+		if e != nil {
+			return 0, e
+		}
+
+		rows, n := historyRows(pageRes)
+		if n == 0 {
+			break
+		}
+
+		total += countNonCanceledRows(rows)
+		offset += n
+		if n < batch {
+			break
+		}
+	}
+
+	return total, nil
+}
+
+func (s *NokosLandingSummaryService) fetchActivePaymentMethods(ctx context.Context) ([]string, error) {
+	if strings.TrimSpace(s.cfg.PakasirProject) == "" || strings.TrimSpace(s.cfg.PakasirAPIKey) == "" {
+		return []string{}, nil
+	}
+
+	candidates := parseMethodCandidates(s.cfg.NokosLandingMethodCandidates)
+	if len(candidates) == 0 {
+		return []string{}, nil
+	}
+
+	probeAmount := int64(parseConvertWorkerPositiveInt(s.cfg.NokosLandingMethodProbeAmount, 10000))
+	active := make([]string, 0, len(candidates))
+	for _, method := range candidates {
+		probeOrderID := buildMethodProbeOrderID(method)
+		created, _, err := s.pakasir.CreateTransaction(ctx, method, probeOrderID, probeAmount)
+		if err != nil {
+			continue
+		}
+		active = append(active, method)
+
+		cancelAmount := created.Amount
+		if cancelAmount <= 0 {
+			cancelAmount = probeAmount
+		}
+		if _, cancelErr := s.pakasir.TransactionCancel(ctx, created.OrderID, cancelAmount); cancelErr != nil {
+			log.Printf("[nokos-landing] payment method probe cancel failed method=%s order_id=%s err=%v", method, created.OrderID, cancelErr)
+		}
+	}
+
+	return active, nil
+}
+
+func parseMethodCandidates(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		raw = "qris,bri_va,bni_va,permata_va"
+	}
+
+	seen := map[string]struct{}{}
+	out := make([]string, 0, 8)
+	for _, part := range strings.Split(raw, ",") {
+		method := NormalizePakasirPaymentMethod(part)
+		if method == "" {
+			continue
+		}
+		if _, ok := seen[method]; ok {
+			continue
+		}
+		seen[method] = struct{}{}
+		out = append(out, method)
+	}
+	return out
+}
+
+func buildMethodProbeOrderID(method string) string {
+	clean := strings.ToUpper(strings.ReplaceAll(method, "_", ""))
+	if len(clean) > 10 {
+		clean = clean[:10]
+	}
+	id := fmt.Sprintf("HLT-%s-%d", clean, time.Now().UTC().UnixNano()%1_000_000_000)
+	if len(id) > 40 {
+		id = id[:40]
+	}
+	return id
+}
+
+func sumStatusesCount(res map[string]any) (int64, bool) {
+	statusesNode, ok := res["Statuses"]
+	if !ok || statusesNode == nil {
+		return 0, false
+	}
+
+	statuses, ok := statusesNode.(map[string]any)
+	if !ok || len(statuses) == 0 {
+		return 0, false
+	}
+
+	var total int64
+	for rawStatus, rawCount := range statuses {
+		status := normalizeFiveSimOrderStatus(rawStatus)
+		if status == fiveSimStatusCanceled || status == fiveSimStatusBanned {
+			continue
+		}
+		n := asInt64(rawCount)
+		if n > 0 {
+			total += n
+		}
+	}
+
+	return total, true
+}
+
+func historyRows(res map[string]any) ([]map[string]any, int) {
+	node, ok := res["Data"]
+	if !ok || node == nil {
+		return nil, 0
+	}
+
+	items, ok := node.([]any)
+	if !ok {
+		return nil, 0
+	}
+	rows := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if rec, ok := item.(map[string]any); ok {
+			rows = append(rows, rec)
+		}
+	}
+	return rows, len(rows)
+}
+
+func countNonCanceledRows(rows []map[string]any) int64 {
+	var total int64
+	for _, row := range rows {
+		status, _ := row["status"].(string)
+		norm := normalizeFiveSimOrderStatus(status)
+		if norm == fiveSimStatusCanceled || norm == fiveSimStatusBanned {
+			continue
+		}
+		total++
+	}
+	return total
+}
+
+func asInt64(v any) int64 {
+	switch n := v.(type) {
+	case int:
+		return int64(n)
+	case int32:
+		return int64(n)
+	case int64:
+		return n
+	case float32:
+		return int64(n)
+	case float64:
+		return int64(n)
+	case json.Number:
+		i, err := n.Int64()
+		if err == nil {
+			return i
+		}
+		f, err := n.Float64()
+		if err == nil {
+			return int64(f)
+		}
+	case string:
+		i, err := strconv.ParseInt(strings.TrimSpace(n), 10, 64)
+		if err == nil {
+			return i
+		}
+		f, err := strconv.ParseFloat(strings.TrimSpace(n), 64)
+		if err == nil {
+			return int64(f)
+		}
+	}
+	return 0
+}
+
+func (s *NokosLandingSummaryService) isStale(lastSyncedAt *time.Time) bool {
+	if lastSyncedAt == nil {
+		return true
+	}
+	staleAfter := parseConvertWorkerDuration(s.cfg.NokosLandingStaleAfter, 30*time.Minute)
+	return time.Since(lastSyncedAt.UTC()) > staleAfter
+}
+
+func (s *NokosLandingSummaryService) toResponse(row *model.NokosLandingSummary) *NokosLandingSummaryResponse {
+	if row == nil {
+		return &NokosLandingSummaryResponse{
+			Source:           nokosLandingSourceFiveSim,
+			CountriesCount:   0,
+			SentTotalAllTime: 0,
+			PaymentMethods:   []string{},
+			LastSyncedAt:     nil,
+			IsStale:          true,
+			LastSyncStatus:   "unknown",
+		}
+	}
+
+	return &NokosLandingSummaryResponse{
+		Source:           row.Source,
+		CountriesCount:   row.CountriesCount,
+		SentTotalAllTime: row.SentTotalAllTime,
+		PaymentMethods:   append([]string{}, row.PaymentMethods...),
+		LastSyncedAt:     row.LastSyncedAt,
+		IsStale:          s.isStale(row.LastSyncedAt),
+		LastSyncStatus:   row.LastSyncStatus,
+	}
+}
+
+func errorsIsNotFound(err error) bool {
+	return errors.Is(err, gorm.ErrRecordNotFound)
+}

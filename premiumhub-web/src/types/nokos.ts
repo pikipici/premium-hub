@@ -1,0 +1,9 @@
+export interface NokosLandingSummary {
+  source: string
+  countries_count: number
+  sent_total_all_time: number
+  payment_methods: string[]
+  last_synced_at?: string | null
+  is_stale: boolean
+  last_sync_status: string
+}
