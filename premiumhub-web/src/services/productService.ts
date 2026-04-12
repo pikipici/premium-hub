@@ -1,14 +1,24 @@
 import api from '@/lib/api'
 import type { ApiResponse } from '@/types/api'
-import type { Product, ProductPrice } from '@/types/product'
+import type { Product, ProductFAQItem, ProductPrice } from '@/types/product'
 
 export interface AdminProductPayload {
   name: string
   slug?: string
   category: string
   description?: string
+  tagline?: string
   icon?: string
   color?: string
+  badge_popular_text?: string
+  badge_guarantee_text?: string
+  sold_text?: string
+  shared_note?: string
+  private_note?: string
+  trust_items?: string[]
+  faq_items?: ProductFAQItem[]
+  seo_description?: string
+  sort_priority?: number
   is_popular?: boolean
   is_active?: boolean
 }
@@ -61,8 +71,15 @@ export const productService = {
     return res.data
   },
 
-  adminUpdatePrice: async (productId: string, priceId: string, data: Partial<AdminProductPricePayload>) => {
-    const res = await api.put<ApiResponse<ProductPrice>>(`/admin/products/${productId}/prices/${priceId}`, data)
+  adminUpdatePrice: async (
+    productId: string,
+    priceId: string,
+    data: Partial<AdminProductPricePayload>
+  ) => {
+    const res = await api.put<ApiResponse<ProductPrice>>(
+      `/admin/products/${productId}/prices/${priceId}`,
+      data
+    )
     return res.data
   },
 

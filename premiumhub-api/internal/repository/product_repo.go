@@ -41,7 +41,7 @@ func (r *ProductRepo) List(category string, page, limit int) ([]model.Product, i
 	q.Count(&total)
 	err := q.Preload("Prices", "is_active = ?", true).
 		Offset((page - 1) * limit).Limit(limit).
-		Order("is_popular DESC, created_at DESC").
+		Order("sort_priority DESC, is_popular DESC, created_at DESC").
 		Find(&products).Error
 	return products, total, err
 }
@@ -60,7 +60,7 @@ func (r *ProductRepo) AdminList(page, limit int) ([]model.Product, int64, error)
 	r.db.Model(&model.Product{}).Count(&total)
 	err := r.db.Preload("Prices").
 		Offset((page - 1) * limit).Limit(limit).
-		Order("created_at DESC").
+		Order("sort_priority DESC, created_at DESC").
 		Find(&products).Error
 	return products, total, err
 }

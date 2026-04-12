@@ -2,16 +2,27 @@
 
 import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
+
 import { productService } from '@/services/productService'
-import type { Product, ProductPrice } from '@/types/product'
+import type { Product, ProductFAQItem, ProductPrice } from '@/types/product'
 
 type FormState = {
   name: string
   slug: string
   category: string
   description: string
+  tagline: string
   icon: string
   color: string
+  badge_popular_text: string
+  badge_guarantee_text: string
+  sold_text: string
+  shared_note: string
+  private_note: string
+  trust_items: string[]
+  faq_items: ProductFAQItem[]
+  seo_description: string
+  sort_priority: number
   is_popular: boolean
   is_active: boolean
 }
@@ -38,67 +49,42 @@ const ACCOUNT_TYPE_OPTIONS: Array<{ value: ProductPrice['account_type']; label: 
   { value: 'private', label: 'Private' },
 ]
 
-const EMPTY_FORM: FormState = {
-  name: '',
-  slug: '',
-  category: 'streaming',
-  description: '',
-  icon: '📦',
-  color: '#FDDAC8',
-  is_popular: false,
-  is_active: true,
-}
-
-function formatRupiah(value: number) {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-function getLowestPrice(product: Product): number | null {
-  if (!product.prices || product.prices.length === 0) return null
-
-  const activePrices = product.prices.filter((p) => p.is_active)
-  const source = activePrices.length > 0 ? activePrices : product.prices
-  const sorted = source.map((p) => p.price).sort((a, b) => a - b)
-  return sorted[0] ?? null
-}
-
-function getCategoryLabel(value: string) {
-  return CATEGORY_OPTIONS.find((c) => c.value === value)?.label ?? value
-}
-
-function mapErrorMessage(err: unknown, fallback: string) {
-  if (axios.isAxiosError(err)) {
-    const message = (err.response?.data as { message?: string } | undefined)?.message
-    if (message) return message
+function createDefaultForm(): FormState {
+  return {
+    name: '',
+    slug: '',
+    category: 'streaming',
+    description: '',
+    tagline: '',
+    icon: '📦',
+    color: '#FDDAC8',
+    badge_popular_text: '🔥 Terlaris',
+    badge_guarantee_text: '🛡 Garansi 30 Hari',
+    sold_text: '',
+    shared_note: 'Berbagi dengan pengguna lain',
+    private_note: 'Akun pribadi, akses penuh',
+    trust_items: ['Garansi 30 Hari', 'Pengiriman Instan', 'Support 24/7'],
+    faq_items: [
+      {
+        question: 'Apakah akun ini aman digunakan?',
+        answer: 'Aman. Akun premium dikirim dari stok terverifikasi dan ada dukungan CS kalau ada kendala.',
+      },
+    ],
+    seo_description: '',
+    sort_priority: 0,
+    is_popular: false,
+    is_active: true,
   }
-  return fallback
-}
-
-function slugify(input: string) {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/\+/g, 'plus')
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
-function createLocalID() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `price-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 function createPriceDraft(partial?: Partial<ProductPriceDraft>): ProductPriceDraft {
+  const localId =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `price-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
   return {
-    local_id: createLocalID(),
+    local_id: localId,
     duration: 1,
     account_type: 'shared',
     price: 10000,
@@ -107,7 +93,7 @@ function createPriceDraft(partial?: Partial<ProductPriceDraft>): ProductPriceDra
   }
 }
 
-function normalizeDrafts(prices: ProductPrice[]): ProductPriceDraft[] {
+function normalizePriceDrafts(prices: ProductPrice[]): ProductPriceDraft[] {
   return prices
     .slice()
     .sort((a, b) => {
@@ -127,6 +113,46 @@ function normalizeDrafts(prices: ProductPrice[]): ProductPriceDraft[] {
     )
 }
 
+function normalizeStringItems(items: string[], max = 10): string[] {
+  return items
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, max)
+}
+
+function normalizeFaqItems(items: ProductFAQItem[], max = 10): ProductFAQItem[] {
+  return items
+    .map((item) => ({
+      question: item.question.trim(),
+      answer: item.answer.trim(),
+    }))
+    .filter((item) => item.question && item.answer)
+    .slice(0, max)
+}
+
+function slugify(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/\+/g, 'plus')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+function formatRupiah(value: number) {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function getCategoryLabel(value: string) {
+  return CATEGORY_OPTIONS.find((c) => c.value === value)?.label ?? value
+}
+
 function summarizePrices(prices: ProductPrice[]) {
   if (!prices || prices.length === 0) return 'Belum ada paket'
 
@@ -138,17 +164,34 @@ function summarizePrices(prices: ProductPrice[]) {
     return acc
   }, {})
 
-  const pieces = Object.entries(byType)
+  return Object.entries(byType)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([type, total]) => `${type} ${total}`)
+    .join(' · ')
+}
 
-  return pieces.join(' · ')
+function getLowestPrice(product: Product): number | null {
+  if (!product.prices || product.prices.length === 0) return null
+  const activePrices = product.prices.filter((p) => p.is_active)
+  const source = activePrices.length > 0 ? activePrices : product.prices
+  const sorted = source.map((p) => p.price).sort((a, b) => a - b)
+  return sorted[0] ?? null
+}
+
+function mapErrorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err)) {
+    const message = (err.response?.data as { message?: string } | undefined)?.message
+    if (message) return message
+  }
+  return fallback
 }
 
 export default function ProdukPage() {
   const [products, setProducts] = useState<Product[]>([])
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -159,7 +202,7 @@ export default function ProdukPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [form, setForm] = useState<FormState>(createDefaultForm())
   const [slugTouched, setSlugTouched] = useState(false)
 
   const [priceDrafts, setPriceDrafts] = useState<ProductPriceDraft[]>([])
@@ -170,15 +213,15 @@ export default function ProdukPage() {
     setError('')
 
     try {
-      const res = await productService.adminList({ page: 1, limit: 100 })
-      if (res.success) {
-        setProducts(res.data)
-      } else {
+      const res = await productService.adminList({ page: 1, limit: 200 })
+      if (!res.success) {
         setError(res.message || 'Gagal memuat produk')
+        return
       }
+
+      setProducts(res.data)
     } catch (err) {
-      console.error('admin products fetch error', err)
-      setError('Gagal memuat produk admin. Coba refresh lagi.')
+      setError(mapErrorMessage(err, 'Gagal memuat produk admin'))
     } finally {
       setLoading(false)
     }
@@ -191,24 +234,32 @@ export default function ProdukPage() {
   const filteredProducts = useMemo(() => {
     const keyword = search.trim().toLowerCase()
 
-    return products.filter((p) => {
-      if (categoryFilter !== 'all' && p.category !== categoryFilter) return false
-
-      if (statusFilter === 'active' && !p.is_active) return false
-      if (statusFilter === 'inactive' && p.is_active) return false
+    return products.filter((product) => {
+      if (categoryFilter !== 'all' && product.category !== categoryFilter) return false
+      if (statusFilter === 'active' && !product.is_active) return false
+      if (statusFilter === 'inactive' && product.is_active) return false
 
       if (!keyword) return true
 
-      const haystack = [p.name, p.slug, p.description, p.category].join(' ').toLowerCase()
+      const haystack = [
+        product.name,
+        product.slug,
+        product.description,
+        product.tagline || '',
+        product.category,
+      ]
+        .join(' ')
+        .toLowerCase()
+
       return haystack.includes(keyword)
     })
-  }, [products, search, categoryFilter, statusFilter])
+  }, [categoryFilter, products, search, statusFilter])
 
   const openCreate = () => {
     setFormMode('create')
     setEditingId(null)
-    setForm(EMPTY_FORM)
     setSlugTouched(false)
+    setForm(createDefaultForm())
     setPriceDrafts([
       createPriceDraft({ account_type: 'shared', duration: 1, price: 25000 }),
       createPriceDraft({ account_type: 'private', duration: 1, price: 50000 }),
@@ -220,25 +271,52 @@ export default function ProdukPage() {
   const openEdit = (product: Product) => {
     setFormMode('edit')
     setEditingId(product.id)
+    setSlugTouched(true)
+
     setForm({
       name: product.name,
       slug: product.slug,
       category: product.category,
       description: product.description ?? '',
+      tagline: product.tagline ?? '',
       icon: product.icon || '📦',
       color: product.color || '#FDDAC8',
+      badge_popular_text: product.badge_popular_text || '🔥 Terlaris',
+      badge_guarantee_text: product.badge_guarantee_text || '🛡 Garansi 30 Hari',
+      sold_text: product.sold_text || '',
+      shared_note: product.shared_note || 'Berbagi dengan pengguna lain',
+      private_note: product.private_note || 'Akun pribadi, akses penuh',
+      trust_items:
+        product.trust_items && product.trust_items.length > 0
+          ? normalizeStringItems(product.trust_items)
+          : ['Garansi 30 Hari', 'Pengiriman Instan', 'Support 24/7'],
+      faq_items:
+        product.faq_items && product.faq_items.length > 0
+          ? product.faq_items.map((item) => ({
+              question: item.question || '',
+              answer: item.answer || '',
+            }))
+          : [
+              {
+                question: 'Apakah akun ini aman digunakan?',
+                answer: 'Aman. Akun premium dikirim dari stok terverifikasi dan ada dukungan CS kalau ada kendala.',
+              },
+            ],
+      seo_description: product.seo_description || '',
+      sort_priority: product.sort_priority || 0,
       is_popular: product.is_popular,
       is_active: product.is_active,
     })
-    setSlugTouched(true)
+
     setPriceDrafts(
-      product.prices?.length > 0
-        ? normalizeDrafts(product.prices)
+      product.prices?.length
+        ? normalizePriceDrafts(product.prices)
         : [
             createPriceDraft({ account_type: 'shared', duration: 1, price: 25000 }),
             createPriceDraft({ account_type: 'private', duration: 1, price: 50000 }),
           ]
     )
+
     setRemovedPriceIds([])
     setFormOpen(true)
   }
@@ -248,25 +326,82 @@ export default function ProdukPage() {
     setFormOpen(false)
   }
 
-  const addPriceRow = (accountType: ProductPrice['account_type']) => {
-    setPriceDrafts((prev) => [...prev, createPriceDraft({ account_type: accountType })])
+  const addPriceRow = (type: ProductPrice['account_type']) => {
+    setPriceDrafts((prev) => [...prev, createPriceDraft({ account_type: type })])
   }
 
-  const updatePriceRow = (localID: string, patch: Partial<ProductPriceDraft>) => {
+  const updatePriceRow = (localId: string, patch: Partial<ProductPriceDraft>) => {
     setPriceDrafts((prev) =>
-      prev.map((row) => (row.local_id === localID ? { ...row, ...patch } : row))
+      prev.map((row) => (row.local_id === localId ? { ...row, ...patch } : row))
     )
   }
 
-  const removePriceRow = (localID: string) => {
+  const removePriceRow = (localId: string) => {
     setPriceDrafts((prev) => {
-      const target = prev.find((row) => row.local_id === localID)
+      const target = prev.find((item) => item.local_id === localId)
       if (target?.id) {
-        setRemovedPriceIds((current) =>
-          current.includes(target.id as string) ? current : [...current, target.id as string]
-        )
+        setRemovedPriceIds((current) => (current.includes(target.id as string) ? current : [...current, target.id as string]))
       }
-      return prev.filter((row) => row.local_id !== localID)
+
+      return prev.filter((item) => item.local_id !== localId)
+    })
+  }
+
+  const updateTrustItem = (index: number, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      trust_items: prev.trust_items.map((item, itemIndex) =>
+        itemIndex === index ? value : item
+      ),
+    }))
+  }
+
+  const addTrustItem = () => {
+    setForm((prev) => {
+      if (prev.trust_items.length >= 10) return prev
+      return {
+        ...prev,
+        trust_items: [...prev.trust_items, ''],
+      }
+    })
+  }
+
+  const removeTrustItem = (index: number) => {
+    setForm((prev) => {
+      if (prev.trust_items.length <= 1) return prev
+      return {
+        ...prev,
+        trust_items: prev.trust_items.filter((_, itemIndex) => itemIndex !== index),
+      }
+    })
+  }
+
+  const updateFaqItem = (index: number, patch: Partial<ProductFAQItem>) => {
+    setForm((prev) => ({
+      ...prev,
+      faq_items: prev.faq_items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item
+      ),
+    }))
+  }
+
+  const addFaqItem = () => {
+    setForm((prev) => {
+      if (prev.faq_items.length >= 10) return prev
+      return {
+        ...prev,
+        faq_items: [...prev.faq_items, { question: '', answer: '' }],
+      }
+    })
+  }
+
+  const removeFaqItem = (index: number) => {
+    setForm((prev) => {
+      if (prev.faq_items.length <= 1) return prev
+      return {
+        ...prev,
+        faq_items: prev.faq_items.filter((_, itemIndex) => itemIndex !== index),
+      }
     })
   }
 
@@ -277,12 +412,8 @@ export default function ProdukPage() {
 
     const seen = new Set<string>()
     for (const row of priceDrafts) {
-      if (row.duration < 1) {
-        return 'Durasi paket harga minimal 1 bulan.'
-      }
-      if (row.price < 1) {
-        return 'Nominal harga paket tidak boleh nol.'
-      }
+      if (row.duration < 1) return 'Durasi paket harga minimal 1 bulan.'
+      if (row.price < 1) return 'Nominal harga paket tidak boleh nol.'
 
       const signature = `${row.account_type}:${row.duration}`
       if (seen.has(signature)) {
@@ -314,8 +445,18 @@ export default function ProdukPage() {
       slug: form.slug.trim(),
       category: form.category,
       description: form.description.trim(),
+      tagline: form.tagline.trim(),
       icon: form.icon.trim() || '📦',
       color: form.color.trim() || '#FDDAC8',
+      badge_popular_text: form.badge_popular_text.trim(),
+      badge_guarantee_text: form.badge_guarantee_text.trim(),
+      sold_text: form.sold_text.trim(),
+      shared_note: form.shared_note.trim(),
+      private_note: form.private_note.trim(),
+      trust_items: normalizeStringItems(form.trust_items),
+      faq_items: normalizeFaqItems(form.faq_items),
+      seo_description: form.seo_description.trim(),
+      sort_priority: Number(form.sort_priority) || 0,
       is_popular: form.is_popular,
       is_active: form.is_active,
     }
@@ -331,26 +472,26 @@ export default function ProdukPage() {
         return
       }
 
-      const productID = productRes.data.id
+      const productId = productRes.data.id
 
-      for (const priceID of removedPriceIds) {
-        const deleteRes = await productService.adminDeletePrice(productID, priceID)
-        if (!deleteRes.success) {
-          setError(deleteRes.message || 'Gagal menonaktifkan harga produk')
+      for (const priceId of removedPriceIds) {
+        const removeRes = await productService.adminDeletePrice(productId, priceId)
+        if (!removeRes.success) {
+          setError(removeRes.message || 'Gagal menonaktifkan harga produk')
           return
         }
       }
 
-      for (const row of priceDrafts) {
+      for (const draft of priceDrafts) {
         const pricePayload = {
-          duration: row.duration,
-          account_type: row.account_type,
-          price: row.price,
-          is_active: row.is_active,
+          duration: draft.duration,
+          account_type: draft.account_type,
+          price: draft.price,
+          is_active: draft.is_active,
         }
 
-        if (row.id) {
-          const updateRes = await productService.adminUpdatePrice(productID, row.id, pricePayload)
+        if (draft.id) {
+          const updateRes = await productService.adminUpdatePrice(productId, draft.id, pricePayload)
           if (!updateRes.success) {
             setError(updateRes.message || 'Gagal update harga produk')
             return
@@ -358,7 +499,7 @@ export default function ProdukPage() {
           continue
         }
 
-        const createRes = await productService.adminCreatePrice(productID, pricePayload)
+        const createRes = await productService.adminCreatePrice(productId, pricePayload)
         if (!createRes.success) {
           setError(createRes.message || 'Gagal membuat harga produk')
           return
@@ -373,8 +514,7 @@ export default function ProdukPage() {
       )
       await loadProducts()
     } catch (err) {
-      console.error('admin product save error', err)
-      setError(mapErrorMessage(err, 'Gagal menyimpan produk + paket harga. Coba lagi sebentar.'))
+      setError(mapErrorMessage(err, 'Gagal menyimpan produk + paket harga'))
     } finally {
       setSaving(false)
     }
@@ -395,8 +535,7 @@ export default function ProdukPage() {
       )
       await loadProducts()
     } catch (err) {
-      console.error('toggle active error', err)
-      setError('Gagal mengubah status produk')
+      setError(mapErrorMessage(err, 'Gagal mengubah status produk'))
     }
   }
 
@@ -414,8 +553,7 @@ export default function ProdukPage() {
       setNotice(`Produk "${product.name}" berhasil diarsipkan.`)
       await loadProducts()
     } catch (err) {
-      console.error('archive product error', err)
-      setError('Gagal mengarsipkan produk')
+      setError(mapErrorMessage(err, 'Gagal mengarsipkan produk'))
     }
   }
 
@@ -424,11 +562,7 @@ export default function ProdukPage() {
       {!!notice && (
         <div className="alert-bar" style={{ marginBottom: 12 }}>
           ✅ <strong>{notice}</strong>
-          <button
-            className="link-btn"
-            style={{ marginLeft: 'auto', color: 'inherit' }}
-            onClick={() => setNotice('')}
-          >
+          <button className="link-btn" style={{ marginLeft: 'auto', color: 'inherit' }} onClick={() => setNotice('')}>
             tutup
           </button>
         </div>
@@ -437,79 +571,40 @@ export default function ProdukPage() {
       {!!error && (
         <div
           className="alert-bar"
-          style={{
-            marginBottom: 12,
-            background: '#FEF2F2',
-            borderColor: '#FECACA',
-            color: '#991B1B',
-          }}
+          style={{ marginBottom: 12, background: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' }}
         >
           ⚠️ <strong>{error}</strong>
         </div>
       )}
 
       <div className="admin-desktop-only">
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 14,
-            gap: 8,
-            flexWrap: 'wrap',
-          }}
-        >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="🔍 Cari nama/slug produk..."
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13,
-                padding: '8px 14px',
-                border: '1px solid var(--border)',
-                borderRadius: 9,
-                background: 'var(--white)',
-                outline: 'none',
-                width: 260,
-              }}
+              style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 14px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none', width: 260 }}
             />
 
             <select
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13,
-                padding: '8px 12px',
-                border: '1px solid var(--border)',
-                borderRadius: 9,
-                background: 'var(--white)',
-                outline: 'none',
-              }}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none' }}
             >
               <option value="all">Semua Kategori</option>
-              {CATEGORY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
 
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13,
-                padding: '8px 12px',
-                border: '1px solid var(--border)',
-                borderRadius: 9,
-                background: 'var(--white)',
-                outline: 'none',
-              }}
+              onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+              style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none' }}
             >
               <option value="all">Semua Status</option>
               <option value="active">Aktif</option>
@@ -531,6 +626,7 @@ export default function ProdukPage() {
                   <th>Kategori</th>
                   <th>Harga Mulai</th>
                   <th>Paket</th>
+                  <th>Priority</th>
                   <th>Popular</th>
                   <th>Status</th>
                   <th>Aksi</th>
@@ -539,60 +635,59 @@ export default function ProdukPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
                       Memuat data produk...
                     </td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
                       Tidak ada produk yang cocok dengan filter.
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((p) => {
-                    const minPrice = getLowestPrice(p)
+                  filteredProducts.map((product) => {
+                    const minPrice = getLowestPrice(product)
+
                     return (
-                      <tr key={p.id}>
+                      <tr key={product.id}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 22 }}>{p.icon || '📦'}</span>
+                            <span style={{ fontSize: 22 }}>{product.icon || '📦'}</span>
                             <div>
-                              <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
-                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>/{p.slug}</div>
+                              <div style={{ fontWeight: 600, fontSize: 13 }}>{product.name}</div>
+                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>/{product.slug}</div>
                             </div>
                           </div>
                         </td>
                         <td>
-                          <span className="product-pill">{getCategoryLabel(p.category)}</span>
+                          <span className="product-pill">{getCategoryLabel(product.category)}</span>
                         </td>
                         <td style={{ fontWeight: 600 }}>{minPrice ? formatRupiah(minPrice) : '-'}</td>
-                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{summarizePrices(p.prices)}</td>
+                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{summarizePrices(product.prices)}</td>
+                        <td style={{ fontWeight: 600, fontSize: 12 }}>{product.sort_priority || 0}</td>
                         <td>
-                          <span className={`status-badge ${p.is_popular ? 's-lunas' : 's-pending'}`}>
-                            {p.is_popular ? 'Populer' : 'Normal'}
+                          <span className={`status-badge ${product.is_popular ? 's-lunas' : 's-pending'}`}>
+                            {product.is_popular ? 'Populer' : 'Normal'}
                           </span>
                         </td>
                         <td>
-                          <span className={`status-badge ${p.is_active ? 's-lunas' : 's-gagal'}`}>
-                            {p.is_active ? 'Aktif' : 'Nonaktif'}
+                          <span className={`status-badge ${product.is_active ? 's-lunas' : 's-gagal'}`}>
+                            {product.is_active ? 'Aktif' : 'Nonaktif'}
                           </span>
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <button className="action-btn" onClick={() => openEdit(p)}>
+                            <button className="action-btn" onClick={() => openEdit(product)}>
                               ✏ Edit
                             </button>
-                            <button
-                              className={`action-btn${p.is_active ? '' : ' orange'}`}
-                              onClick={() => toggleActive(p)}
-                            >
-                              {p.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                            <button className={`action-btn${product.is_active ? '' : ' orange'}`} onClick={() => toggleActive(product)}>
+                              {product.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                             </button>
                             <button
                               className="action-btn"
                               style={{ color: 'var(--red)', borderColor: '#FECACA' }}
-                              onClick={() => archiveProduct(p)}
+                              onClick={() => archiveProduct(product)}
                             >
                               Arsipkan
                             </button>
@@ -625,29 +720,21 @@ export default function ProdukPage() {
               type="text"
               className="form-input"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Cari nama / slug produk"
             />
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: 8,
-              }}
-            >
-              <select className="form-select" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+              <select className="form-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
                 <option value="all">Semua Kategori</option>
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                {CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
-              <select
-                className="form-select"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-              >
+
+              <select className="form-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}>
                 <option value="all">Semua Status</option>
                 <option value="active">Aktif</option>
                 <option value="inactive">Nonaktif</option>
@@ -666,25 +753,26 @@ export default function ProdukPage() {
               <div className="mobile-card-sub">Tidak ada produk untuk filter saat ini.</div>
             </article>
           ) : (
-            filteredProducts.map((p) => {
-              const minPrice = getLowestPrice(p)
+            filteredProducts.map((product) => {
+              const minPrice = getLowestPrice(product)
+
               return (
-                <article className="mobile-card" key={p.id}>
+                <article className="mobile-card" key={product.id}>
                   <div className="mobile-card-head">
                     <div>
                       <div className="mobile-card-title">
-                        {p.icon || '📦'} {p.name}
+                        {product.icon || '📦'} {product.name}
                       </div>
-                      <div className="mobile-card-sub">/{p.slug}</div>
+                      <div className="mobile-card-sub">/{product.slug}</div>
                     </div>
-                    <span className={`status-badge ${p.is_active ? 's-lunas' : 's-gagal'}`}>
-                      {p.is_active ? 'Aktif' : 'Nonaktif'}
+                    <span className={`status-badge ${product.is_active ? 's-lunas' : 's-gagal'}`}>
+                      {product.is_active ? 'Aktif' : 'Nonaktif'}
                     </span>
                   </div>
 
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Kategori</span>
-                    <span className="mobile-card-value">{getCategoryLabel(p.category)}</span>
+                    <span className="mobile-card-value">{getCategoryLabel(product.category)}</span>
                   </div>
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Harga mulai</span>
@@ -693,25 +781,29 @@ export default function ProdukPage() {
                   <div className="mobile-card-row" style={{ alignItems: 'flex-start' }}>
                     <span className="mobile-card-label">Paket</span>
                     <span className="mobile-card-value" style={{ maxWidth: '68%' }}>
-                      {summarizePrices(p.prices)}
+                      {summarizePrices(product.prices)}
                     </span>
                   </div>
                   <div className="mobile-card-row">
+                    <span className="mobile-card-label">Priority</span>
+                    <span className="mobile-card-value">{product.sort_priority || 0}</span>
+                  </div>
+                  <div className="mobile-card-row">
                     <span className="mobile-card-label">Flag</span>
-                    <span className="mobile-card-value">{p.is_popular ? 'Populer' : 'Normal'}</span>
+                    <span className="mobile-card-value">{product.is_popular ? 'Populer' : 'Normal'}</span>
                   </div>
 
                   <div className="mobile-card-actions">
-                    <button className="action-btn" onClick={() => openEdit(p)}>
+                    <button className="action-btn" onClick={() => openEdit(product)}>
                       Edit
                     </button>
-                    <button className={`action-btn${p.is_active ? '' : ' orange'}`} onClick={() => toggleActive(p)}>
-                      {p.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                    <button className={`action-btn${product.is_active ? '' : ' orange'}`} onClick={() => toggleActive(product)}>
+                      {product.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                     </button>
                     <button
                       className="action-btn"
                       style={{ color: 'var(--red)', borderColor: '#FECACA' }}
-                      onClick={() => archiveProduct(p)}
+                      onClick={() => archiveProduct(product)}
                     >
                       Arsip
                     </button>
@@ -729,28 +821,11 @@ export default function ProdukPage() {
 
       {formOpen && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(20,20,20,.35)',
-            zIndex: 120,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 12,
-          }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(20,20,20,.35)', zIndex: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}
         >
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: 720,
-              maxHeight: '90vh',
-              overflow: 'auto',
-            }}
-          >
+          <div className="card" style={{ width: '100%', maxWidth: 780, maxHeight: '90vh', overflow: 'auto' }}>
             <div className="card-header">
-              <h2>{formMode === 'create' ? 'Tambah Produk Baru' : 'Edit Produk + Harga'}</h2>
+              <h2>{formMode === 'create' ? 'Tambah Produk Baru' : 'Edit Produk + Konten + Harga'}</h2>
               <button className="action-btn" onClick={closeForm} disabled={saving}>
                 Tutup
               </button>
@@ -762,8 +837,8 @@ export default function ProdukPage() {
                 <input
                   className="form-input"
                   value={form.name}
-                  onChange={(e) => {
-                    const nextName = e.target.value
+                  onChange={(event) => {
+                    const nextName = event.target.value
                     setForm((prev) => ({
                       ...prev,
                       name: nextName,
@@ -780,9 +855,12 @@ export default function ProdukPage() {
                   <input
                     className="form-input"
                     value={form.slug}
-                    onChange={(e) => {
+                    onChange={(event) => {
                       setSlugTouched(true)
-                      setForm((prev) => ({ ...prev, slug: slugify(e.target.value) }))
+                      setForm((prev) => ({
+                        ...prev,
+                        slug: slugify(event.target.value),
+                      }))
                     }}
                     placeholder="contoh: netflix-premium"
                   />
@@ -790,16 +868,17 @@ export default function ProdukPage() {
                     URL publik: /product/prem-apps/{form.slug || 'slug-produk'}
                   </div>
                 </div>
+
                 <div>
                   <label className="form-label">Kategori</label>
                   <select
                     className="form-select"
                     value={form.category}
-                    onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+                    onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
                   >
-                    {CATEGORY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                    {CATEGORY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </select>
@@ -812,7 +891,7 @@ export default function ProdukPage() {
                   <input
                     className="form-input"
                     value={form.icon}
-                    onChange={(e) => setForm((prev) => ({ ...prev, icon: e.target.value }))}
+                    onChange={(event) => setForm((prev) => ({ ...prev, icon: event.target.value }))}
                     placeholder="🎬"
                   />
                 </div>
@@ -821,7 +900,7 @@ export default function ProdukPage() {
                   <input
                     className="form-input"
                     value={form.color}
-                    onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))}
+                    onChange={(event) => setForm((prev) => ({ ...prev, color: event.target.value }))}
                     placeholder="#FDDAC8"
                   />
                 </div>
@@ -833,8 +912,192 @@ export default function ProdukPage() {
                   className="form-textarea"
                   rows={3}
                   value={form.description}
-                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                   placeholder="Deskripsi singkat produk"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="form-label">Tagline Header</label>
+                  <input
+                    className="form-input"
+                    value={form.tagline}
+                    onChange={(event) => setForm((prev) => ({ ...prev, tagline: event.target.value }))}
+                    placeholder="Shared 4K Ultra HD · 1 profil aktif"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Sort Priority</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={form.sort_priority}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        sort_priority: Number(event.target.value) || 0,
+                      }))
+                    }
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="form-label">Badge Populer</label>
+                  <input
+                    className="form-input"
+                    value={form.badge_popular_text}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, badge_popular_text: event.target.value }))
+                    }
+                    placeholder="🔥 Terlaris"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Badge Garansi</label>
+                  <input
+                    className="form-input"
+                    value={form.badge_guarantee_text}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, badge_guarantee_text: event.target.value }))
+                    }
+                    placeholder="🛡 Garansi 30 Hari"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Teks Highlight / Sold</label>
+                <input
+                  className="form-input"
+                  value={form.sold_text}
+                  onChange={(event) => setForm((prev) => ({ ...prev, sold_text: event.target.value }))}
+                  placeholder="🛒 5.800+ terjual bulan ini"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="form-label">Catatan Shared</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    value={form.shared_note}
+                    onChange={(event) => setForm((prev) => ({ ...prev, shared_note: event.target.value }))}
+                    placeholder="Berbagi dengan pengguna lain"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Catatan Private</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    value={form.private_note}
+                    onChange={(event) => setForm((prev) => ({ ...prev, private_note: event.target.value }))}
+                    placeholder="Akun pribadi, akses penuh"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>
+                    Trust Chips / Benefit
+                  </label>
+                  <button className="action-btn" type="button" onClick={addTrustItem}>
+                    + Tambah Trust
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {form.trust_items.map((item, index) => (
+                    <div key={`trust-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                      <input
+                        className="form-input"
+                        value={item}
+                        onChange={(event) => updateTrustItem(index, event.target.value)}
+                        placeholder="Contoh: Garansi 30 Hari"
+                      />
+                      <button
+                        className="action-btn"
+                        type="button"
+                        style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                        onClick={() => removeTrustItem(index)}
+                        disabled={form.trust_items.length <= 1}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>
+                    FAQ Produk
+                  </label>
+                  <button className="action-btn" type="button" onClick={addFaqItem}>
+                    + Tambah FAQ
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {form.faq_items.map((item, index) => (
+                    <div key={`faq-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
+                      <input
+                        className="form-input"
+                        value={item.question}
+                        onChange={(event) =>
+                          updateFaqItem(index, {
+                            question: event.target.value,
+                          })
+                        }
+                        placeholder={`Pertanyaan ${index + 1}`}
+                      />
+                      <textarea
+                        className="form-textarea"
+                        rows={2}
+                        value={item.answer}
+                        onChange={(event) =>
+                          updateFaqItem(index, {
+                            answer: event.target.value,
+                          })
+                        }
+                        placeholder="Jawaban FAQ"
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          className="action-btn"
+                          type="button"
+                          style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                          onClick={() => removeFaqItem(index)}
+                          disabled={form.faq_items.length <= 1}
+                        >
+                          Hapus FAQ
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Meta Description (SEO)</label>
+                <textarea
+                  className="form-textarea"
+                  rows={2}
+                  value={form.seo_description}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      seo_description: event.target.value,
+                    }))
+                  }
+                  placeholder="Deskripsi SEO untuk halaman produk"
                 />
               </div>
 
@@ -843,7 +1106,7 @@ export default function ProdukPage() {
                   <input
                     type="checkbox"
                     checked={form.is_popular}
-                    onChange={(e) => setForm((prev) => ({ ...prev, is_popular: e.target.checked }))}
+                    onChange={(event) => setForm((prev) => ({ ...prev, is_popular: event.target.checked }))}
                   />
                   Populer
                 </label>
@@ -851,7 +1114,7 @@ export default function ProdukPage() {
                   <input
                     type="checkbox"
                     checked={form.is_active}
-                    onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                    onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
                   />
                   Aktif
                 </label>
@@ -860,16 +1123,7 @@ export default function ProdukPage() {
               <hr style={{ border: 0, borderTop: '1px solid var(--border)' }} />
 
               <div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 8,
-                    gap: 8,
-                    flexWrap: 'wrap',
-                  }}
-                >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
                   <div>
                     <label className="form-label" style={{ marginBottom: 0 }}>
                       Paket Harga Prem-Apps
@@ -891,44 +1145,27 @@ export default function ProdukPage() {
 
                 <div style={{ display: 'grid', gap: 8 }}>
                   {priceDrafts.length === 0 ? (
-                    <div
-                      style={{
-                        border: '1px dashed var(--border)',
-                        borderRadius: 10,
-                        padding: 12,
-                        fontSize: 12,
-                        color: 'var(--muted)',
-                      }}
-                    >
+                    <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 12, fontSize: 12, color: 'var(--muted)' }}>
                       Belum ada paket harga. Tambahkan minimal satu paket agar produk bisa dibeli.
                     </div>
                   ) : (
                     priceDrafts.map((row) => (
-                      <div
-                        key={row.local_id}
-                        style={{
-                          border: '1px solid var(--border)',
-                          borderRadius: 10,
-                          padding: 10,
-                          display: 'grid',
-                          gap: 8,
-                        }}
-                      >
+                      <div key={row.local_id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                           <div>
                             <label className="form-label">Tipe</label>
                             <select
                               className="form-select"
                               value={row.account_type}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 updatePriceRow(row.local_id, {
-                                  account_type: e.target.value as ProductPrice['account_type'],
+                                  account_type: event.target.value as ProductPrice['account_type'],
                                 })
                               }
                             >
-                              {ACCOUNT_TYPE_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
+                              {ACCOUNT_TYPE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
                                 </option>
                               ))}
                             </select>
@@ -941,9 +1178,9 @@ export default function ProdukPage() {
                               type="number"
                               min={1}
                               value={row.duration}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 updatePriceRow(row.local_id, {
-                                  duration: Number(e.target.value) || 0,
+                                  duration: Number(event.target.value) || 0,
                                 })
                               }
                             />
@@ -956,31 +1193,23 @@ export default function ProdukPage() {
                               type="number"
                               min={1}
                               value={row.price}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 updatePriceRow(row.local_id, {
-                                  price: Number(e.target.value) || 0,
+                                  price: Number(event.target.value) || 0,
                                 })
                               }
                             />
                           </div>
                         </div>
 
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: 8,
-                            flexWrap: 'wrap',
-                          }}
-                        >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
                             <input
                               type="checkbox"
                               checked={row.is_active}
-                              onChange={(e) =>
+                              onChange={(event) =>
                                 updatePriceRow(row.local_id, {
-                                  is_active: e.target.checked,
+                                  is_active: event.target.checked,
                                 })
                               }
                             />
@@ -1019,8 +1248,8 @@ export default function ProdukPage() {
                   {saving
                     ? 'Menyimpan...'
                     : formMode === 'create'
-                      ? 'Simpan Produk + Harga'
-                      : 'Update Produk + Harga'}
+                      ? 'Simpan Produk + Konten + Harga'
+                      : 'Update Produk + Konten + Harga'}
                 </button>
               </div>
             </div>
