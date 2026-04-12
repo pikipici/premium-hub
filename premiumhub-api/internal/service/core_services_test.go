@@ -343,13 +343,44 @@ func TestProductService_AllBranches(t *testing.T) {
 		t.Fatalf("get by slug failed: %v", err)
 	}
 
-	created, err := svc.Create(CreateProductInput{Name: "Netflix Pro", Category: "streaming", Description: "desc", Icon: "🎬", Color: "#fff", IsPopular: true})
+	showWA := true
+	created, err := svc.Create(CreateProductInput{
+		Name:               "Netflix Pro",
+		Category:           "streaming",
+		Description:        "desc",
+		Icon:               "🎬",
+		Color:              "#fff",
+		FeatureItems:       []string{" 4K UHD ", "No Ads", ""},
+		SpecItems:          []model.ProductSpecItem{{Label: "Resolusi", Value: "4K"}, {Label: " ", Value: "Invalid"}},
+		TrustBadges:        []model.ProductTrustBadge{{Icon: "🛡", Text: "Garansi 30 Hari"}, {Icon: "", Text: "Support 24/7"}},
+		FAQItems:           []model.ProductFAQItem{{Question: "Q1", Answer: "A1"}, {Question: "", Answer: "A2"}},
+		PriceOriginalText:  "Rp 50.000",
+		PricePerDayText:    "≈ Rp 1.600/hari",
+		DiscountBadgeText:  "Hemat 20%",
+		ShowWhatsAppButton: &showWA,
+		WhatsAppNumber:     "+62 812-0000-1111",
+		WhatsAppButtonText: "Chat Admin",
+		IsPopular:          true,
+	})
 	if err != nil {
 		t.Fatalf("create product: %v", err)
 	}
 	if created.Slug == "" {
 		t.Fatalf("slug should be generated")
 	}
+	if len(created.FeatureItems) != 2 {
+		t.Fatalf("feature items should be sanitized, got %d", len(created.FeatureItems))
+	}
+	if len(created.SpecItems) != 1 || created.SpecItems[0].Label != "Resolusi" {
+		t.Fatalf("spec items should be sanitized")
+	}
+	if len(created.TrustBadges) != 2 || len(created.TrustItems) != 2 {
+		t.Fatalf("trust badges/items should be filled")
+	}
+	if created.WhatsAppNumber != "6281200001111" {
+		t.Fatalf("whatsapp number should be normalized, got %s", created.WhatsAppNumber)
+	}
+
 	if _, err := svc.Create(CreateProductInput{Name: "Netflix Pro", Category: "streaming"}); err == nil || !strings.Contains(err.Error(), "gagal membuat produk") {
 		t.Fatalf("expected duplicate create error, got: %v", err)
 	}
@@ -366,20 +397,91 @@ func TestProductService_AllBranches(t *testing.T) {
 	updateDescription := "new desc"
 	updateIcon := "📺"
 	updateColor := "#000"
+	updateFeatureItems := []string{"Device Limit 1", "Fast Replace"}
+	updateSpecItems := []model.ProductSpecItem{{Label: "Resolusi", Value: "Full HD"}, {Label: "Profil", Value: "1"}}
+	updateTrustBadges := []model.ProductTrustBadge{{Icon: "⚡", Text: "Instan"}}
+	updatePriceOriginal := "Rp 80.000"
+	updatePricePerDay := "≈ Rp 2.500/hari"
+	updateDiscountBadge := "Promo terbatas"
+	updateShowWA := false
+	updateWANumber := "+62 811 222 333"
+	updateWAButtonText := "Konsultasi dulu"
 	upd, err := svc.Update(created.ID, UpdateProductInput{
-		Name:        &updateName,
-		Category:    &updateCategory,
-		Description: &updateDescription,
-		Icon:        &updateIcon,
-		Color:       &updateColor,
-		IsPopular:   &isPopular,
-		IsActive:    &isActive,
+		Name:               &updateName,
+		Category:           &updateCategory,
+		Description:        &updateDescription,
+		Icon:               &updateIcon,
+		Color:              &updateColor,
+		FeatureItems:       &updateFeatureItems,
+		SpecItems:          &updateSpecItems,
+		TrustBadges:        &updateTrustBadges,
+		PriceOriginalText:  &updatePriceOriginal,
+		PricePerDayText:    &updatePricePerDay,
+		DiscountBadgeText:  &updateDiscountBadge,
+		ShowWhatsAppButton: &updateShowWA,
+		WhatsAppNumber:     &updateWANumber,
+		WhatsAppButtonText: &updateWAButtonText,
+		IsPopular:          &isPopular,
+		IsActive:           &isActive,
 	})
 	if err != nil {
 		t.Fatalf("update product: %v", err)
 	}
 	if upd.Name != "Netflix Ultra" || upd.Category != "movie" || upd.IsPopular || upd.IsActive {
-		t.Fatalf("product not updated correctly")
+		t.Fatalf("product core fields not updated correctly")
+	}
+	if len(upd.FeatureItems) != 2 || len(upd.SpecItems) != 2 || len(upd.TrustBadges) != 1 {
+		t.Fatalf("extended product fields not updated correctly")
+	}
+	if upd.ShowWhatsAppButton || upd.WhatsAppNumber != "62811222333" {
+		t.Fatalf("whatsapp fields not updated correctly")
+	}
+
+	createdPrice, err := svc.CreatePrice(created.ID, CreateProductPriceInput{
+		Duration:    3,
+		AccountType: "shared",
+		Label:       "3 Bulan Hemat",
+		SavingsText: "Hemat 15%",
+		Price:       99000,
+	})
+	if err != nil {
+		t.Fatalf("create price should succeed: %v", err)
+	}
+	if createdPrice.Label != "3 Bulan Hemat" || createdPrice.SavingsText != "Hemat 15%" {
+		t.Fatalf("price metadata should be persisted")
+	}
+
+	upsertPrice, err := svc.CreatePrice(created.ID, CreateProductPriceInput{
+		Duration:    3,
+		AccountType: "shared",
+		Label:       "Paket 3 Bulan",
+		SavingsText: "Best Value",
+		Price:       95000,
+	})
+	if err != nil {
+		t.Fatalf("upsert price by signature should succeed: %v", err)
+	}
+	if upsertPrice.ID != createdPrice.ID || upsertPrice.Price != 95000 {
+		t.Fatalf("duplicate signature should update existing price")
+	}
+
+	newDuration := 6
+	newLabel := "6 Bulan"
+	newSavings := "Hemat 30%"
+	newPrice := int64(180000)
+	priceActive := false
+	updatedPrice, err := svc.UpdatePrice(created.ID, createdPrice.ID, UpdateProductPriceInput{
+		Duration:    &newDuration,
+		Label:       &newLabel,
+		SavingsText: &newSavings,
+		Price:       &newPrice,
+		IsActive:    &priceActive,
+	})
+	if err != nil {
+		t.Fatalf("update price should succeed: %v", err)
+	}
+	if updatedPrice.Duration != 6 || updatedPrice.Label != "6 Bulan" || updatedPrice.SavingsText != "Hemat 30%" || updatedPrice.Price != 180000 || updatedPrice.IsActive {
+		t.Fatalf("price update fields mismatch")
 	}
 
 	removeProductUpdateFail := registerUpdateFailCallback(t, db, "products", "forced product update failure")

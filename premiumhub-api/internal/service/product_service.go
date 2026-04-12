@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 
 	"premiumhub-api/internal/model"
@@ -35,24 +36,33 @@ func (s *ProductService) GetBySlug(slug string) (*model.Product, error) {
 }
 
 type CreateProductInput struct {
-	Name               string                 `json:"name" binding:"required"`
-	Slug               string                 `json:"slug"`
-	Category           string                 `json:"category" binding:"required"`
-	Description        string                 `json:"description"`
-	Tagline            string                 `json:"tagline"`
-	Icon               string                 `json:"icon"`
-	Color              string                 `json:"color"`
-	BadgePopularText   string                 `json:"badge_popular_text"`
-	BadgeGuaranteeText string                 `json:"badge_guarantee_text"`
-	SoldText           string                 `json:"sold_text"`
-	SharedNote         string                 `json:"shared_note"`
-	PrivateNote        string                 `json:"private_note"`
-	TrustItems         []string               `json:"trust_items"`
-	FAQItems           []model.ProductFAQItem `json:"faq_items"`
-	SeoDescription     string                 `json:"seo_description"`
-	SortPriority       *int                   `json:"sort_priority"`
-	IsPopular          bool                   `json:"is_popular"`
-	IsActive           *bool                  `json:"is_active"`
+	Name               string                    `json:"name" binding:"required"`
+	Slug               string                    `json:"slug"`
+	Category           string                    `json:"category" binding:"required"`
+	Description        string                    `json:"description"`
+	Tagline            string                    `json:"tagline"`
+	Icon               string                    `json:"icon"`
+	Color              string                    `json:"color"`
+	BadgePopularText   string                    `json:"badge_popular_text"`
+	BadgeGuaranteeText string                    `json:"badge_guarantee_text"`
+	SoldText           string                    `json:"sold_text"`
+	SharedNote         string                    `json:"shared_note"`
+	PrivateNote        string                    `json:"private_note"`
+	FeatureItems       []string                  `json:"feature_items"`
+	SpecItems          []model.ProductSpecItem   `json:"spec_items"`
+	TrustItems         []string                  `json:"trust_items"`
+	TrustBadges        []model.ProductTrustBadge `json:"trust_badges"`
+	FAQItems           []model.ProductFAQItem    `json:"faq_items"`
+	PriceOriginalText  string                    `json:"price_original_text"`
+	PricePerDayText    string                    `json:"price_per_day_text"`
+	DiscountBadgeText  string                    `json:"discount_badge_text"`
+	ShowWhatsAppButton *bool                     `json:"show_whatsapp_button"`
+	WhatsAppNumber     string                    `json:"whatsapp_number"`
+	WhatsAppButtonText string                    `json:"whatsapp_button_text"`
+	SeoDescription     string                    `json:"seo_description"`
+	SortPriority       *int                      `json:"sort_priority"`
+	IsPopular          bool                      `json:"is_popular"`
+	IsActive           *bool                     `json:"is_active"`
 }
 
 func (s *ProductService) Create(input CreateProductInput) (*model.Product, error) {
@@ -76,9 +86,20 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 		isActive = *input.IsActive
 	}
 
+	showWhatsAppButton := true
+	if input.ShowWhatsAppButton != nil {
+		showWhatsAppButton = *input.ShowWhatsAppButton
+	}
+
 	sortPriority := 0
 	if input.SortPriority != nil {
 		sortPriority = *input.SortPriority
+	}
+
+	trustBadges := sanitizeTrustBadges(input.TrustBadges)
+	trustItems := sanitizeStringList(input.TrustItems)
+	if len(trustItems) == 0 {
+		trustItems = deriveTrustItemsFromBadges(trustBadges)
 	}
 
 	product := &model.Product{
@@ -94,8 +115,17 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 		SoldText:           strings.TrimSpace(input.SoldText),
 		SharedNote:         strings.TrimSpace(input.SharedNote),
 		PrivateNote:        strings.TrimSpace(input.PrivateNote),
-		TrustItems:         sanitizeStringList(input.TrustItems),
+		FeatureItems:       sanitizeStringListWithLimit(input.FeatureItems, 12),
+		SpecItems:          sanitizeSpecItems(input.SpecItems),
+		TrustItems:         trustItems,
+		TrustBadges:        trustBadges,
 		FAQItems:           sanitizeFAQItems(input.FAQItems),
+		PriceOriginalText:  strings.TrimSpace(input.PriceOriginalText),
+		PricePerDayText:    strings.TrimSpace(input.PricePerDayText),
+		DiscountBadgeText:  strings.TrimSpace(input.DiscountBadgeText),
+		ShowWhatsAppButton: showWhatsAppButton,
+		WhatsAppNumber:     sanitizeWhatsAppNumber(input.WhatsAppNumber),
+		WhatsAppButtonText: defaultString(strings.TrimSpace(input.WhatsAppButtonText), "Tanya via WhatsApp"),
 		SeoDescription:     strings.TrimSpace(input.SeoDescription),
 		SortPriority:       sortPriority,
 		IsPopular:          input.IsPopular,
@@ -108,24 +138,33 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 }
 
 type UpdateProductInput struct {
-	Name               *string                 `json:"name"`
-	Slug               *string                 `json:"slug"`
-	Category           *string                 `json:"category"`
-	Description        *string                 `json:"description"`
-	Tagline            *string                 `json:"tagline"`
-	Icon               *string                 `json:"icon"`
-	Color              *string                 `json:"color"`
-	BadgePopularText   *string                 `json:"badge_popular_text"`
-	BadgeGuaranteeText *string                 `json:"badge_guarantee_text"`
-	SoldText           *string                 `json:"sold_text"`
-	SharedNote         *string                 `json:"shared_note"`
-	PrivateNote        *string                 `json:"private_note"`
-	TrustItems         *[]string               `json:"trust_items"`
-	FAQItems           *[]model.ProductFAQItem `json:"faq_items"`
-	SeoDescription     *string                 `json:"seo_description"`
-	SortPriority       *int                    `json:"sort_priority"`
-	IsPopular          *bool                   `json:"is_popular"`
-	IsActive           *bool                   `json:"is_active"`
+	Name               *string                    `json:"name"`
+	Slug               *string                    `json:"slug"`
+	Category           *string                    `json:"category"`
+	Description        *string                    `json:"description"`
+	Tagline            *string                    `json:"tagline"`
+	Icon               *string                    `json:"icon"`
+	Color              *string                    `json:"color"`
+	BadgePopularText   *string                    `json:"badge_popular_text"`
+	BadgeGuaranteeText *string                    `json:"badge_guarantee_text"`
+	SoldText           *string                    `json:"sold_text"`
+	SharedNote         *string                    `json:"shared_note"`
+	PrivateNote        *string                    `json:"private_note"`
+	FeatureItems       *[]string                  `json:"feature_items"`
+	SpecItems          *[]model.ProductSpecItem   `json:"spec_items"`
+	TrustItems         *[]string                  `json:"trust_items"`
+	TrustBadges        *[]model.ProductTrustBadge `json:"trust_badges"`
+	FAQItems           *[]model.ProductFAQItem    `json:"faq_items"`
+	PriceOriginalText  *string                    `json:"price_original_text"`
+	PricePerDayText    *string                    `json:"price_per_day_text"`
+	DiscountBadgeText  *string                    `json:"discount_badge_text"`
+	ShowWhatsAppButton *bool                      `json:"show_whatsapp_button"`
+	WhatsAppNumber     *string                    `json:"whatsapp_number"`
+	WhatsAppButtonText *string                    `json:"whatsapp_button_text"`
+	SeoDescription     *string                    `json:"seo_description"`
+	SortPriority       *int                       `json:"sort_priority"`
+	IsPopular          *bool                      `json:"is_popular"`
+	IsActive           *bool                      `json:"is_active"`
 }
 
 func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.Product, error) {
@@ -185,11 +224,41 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 	if input.PrivateNote != nil {
 		product.PrivateNote = strings.TrimSpace(*input.PrivateNote)
 	}
+	if input.FeatureItems != nil {
+		product.FeatureItems = sanitizeStringListWithLimit(*input.FeatureItems, 12)
+	}
+	if input.SpecItems != nil {
+		product.SpecItems = sanitizeSpecItems(*input.SpecItems)
+	}
+	if input.TrustBadges != nil {
+		product.TrustBadges = sanitizeTrustBadges(*input.TrustBadges)
+		if input.TrustItems == nil {
+			product.TrustItems = deriveTrustItemsFromBadges(product.TrustBadges)
+		}
+	}
 	if input.TrustItems != nil {
 		product.TrustItems = sanitizeStringList(*input.TrustItems)
 	}
 	if input.FAQItems != nil {
 		product.FAQItems = sanitizeFAQItems(*input.FAQItems)
+	}
+	if input.PriceOriginalText != nil {
+		product.PriceOriginalText = strings.TrimSpace(*input.PriceOriginalText)
+	}
+	if input.PricePerDayText != nil {
+		product.PricePerDayText = strings.TrimSpace(*input.PricePerDayText)
+	}
+	if input.DiscountBadgeText != nil {
+		product.DiscountBadgeText = strings.TrimSpace(*input.DiscountBadgeText)
+	}
+	if input.ShowWhatsAppButton != nil {
+		product.ShowWhatsAppButton = *input.ShowWhatsAppButton
+	}
+	if input.WhatsAppNumber != nil {
+		product.WhatsAppNumber = sanitizeWhatsAppNumber(*input.WhatsAppNumber)
+	}
+	if input.WhatsAppButtonText != nil {
+		product.WhatsAppButtonText = defaultString(strings.TrimSpace(*input.WhatsAppButtonText), "Tanya via WhatsApp")
 	}
 	if input.SeoDescription != nil {
 		product.SeoDescription = strings.TrimSpace(*input.SeoDescription)
@@ -212,6 +281,8 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 type CreateProductPriceInput struct {
 	Duration    int    `json:"duration" binding:"required,min=1"`
 	AccountType string `json:"account_type" binding:"required"`
+	Label       string `json:"label"`
+	SavingsText string `json:"savings_text"`
 	Price       int64  `json:"price" binding:"required,min=1"`
 	IsActive    *bool  `json:"is_active"`
 }
@@ -219,6 +290,8 @@ type CreateProductPriceInput struct {
 type UpdateProductPriceInput struct {
 	Duration    *int    `json:"duration"`
 	AccountType *string `json:"account_type"`
+	Label       *string `json:"label"`
+	SavingsText *string `json:"savings_text"`
 	Price       *int64  `json:"price"`
 	IsActive    *bool   `json:"is_active"`
 }
@@ -244,8 +317,13 @@ func (s *ProductService) CreatePrice(productID uuid.UUID, input CreateProductPri
 		isActive = *input.IsActive
 	}
 
+	label := normalizePriceLabel(input.Label, input.Duration)
+	savingsText := strings.TrimSpace(input.SavingsText)
+
 	existing, err := s.productRepo.FindPriceBySignature(productID, input.Duration, accountType)
 	if err == nil {
+		existing.Label = label
+		existing.SavingsText = savingsText
 		existing.Price = input.Price
 		existing.IsActive = isActive
 		if err := s.productRepo.UpdatePrice(existing); err != nil {
@@ -261,6 +339,8 @@ func (s *ProductService) CreatePrice(productID uuid.UUID, input CreateProductPri
 		ProductID:   productID,
 		Duration:    input.Duration,
 		AccountType: accountType,
+		Label:       label,
+		SavingsText: savingsText,
 		Price:       input.Price,
 		IsActive:    isActive,
 	}
@@ -315,6 +395,15 @@ func (s *ProductService) UpdatePrice(productID, priceID uuid.UUID, input UpdateP
 
 	price.Duration = nextDuration
 	price.AccountType = nextAccountType
+	if input.Label != nil {
+		price.Label = normalizePriceLabel(*input.Label, nextDuration)
+	}
+	if input.SavingsText != nil {
+		price.SavingsText = strings.TrimSpace(*input.SavingsText)
+	}
+	if strings.TrimSpace(price.Label) == "" {
+		price.Label = normalizePriceLabel("", nextDuration)
+	}
 	if input.Price != nil {
 		price.Price = *input.Price
 	}
@@ -367,6 +456,14 @@ func (s *ProductService) GetStockCount(productID uuid.UUID, accountType string) 
 }
 
 func sanitizeStringList(values []string) []string {
+	return sanitizeStringListWithLimit(values, 10)
+}
+
+func sanitizeStringListWithLimit(values []string, max int) []string {
+	if max < 1 {
+		max = 1
+	}
+
 	result := make([]string, 0, len(values))
 	for _, value := range values {
 		trimmed := strings.TrimSpace(value)
@@ -374,6 +471,56 @@ func sanitizeStringList(values []string) []string {
 			continue
 		}
 		result = append(result, trimmed)
+		if len(result) >= max {
+			break
+		}
+	}
+	return result
+}
+
+func sanitizeSpecItems(items []model.ProductSpecItem) []model.ProductSpecItem {
+	result := make([]model.ProductSpecItem, 0, len(items))
+	for _, item := range items {
+		label := strings.TrimSpace(item.Label)
+		value := strings.TrimSpace(item.Value)
+		if label == "" || value == "" {
+			continue
+		}
+		result = append(result, model.ProductSpecItem{Label: label, Value: value})
+		if len(result) >= 16 {
+			break
+		}
+	}
+	return result
+}
+
+func sanitizeTrustBadges(items []model.ProductTrustBadge) []model.ProductTrustBadge {
+	result := make([]model.ProductTrustBadge, 0, len(items))
+	for _, item := range items {
+		text := strings.TrimSpace(item.Text)
+		if text == "" {
+			continue
+		}
+		icon := strings.TrimSpace(item.Icon)
+		if icon == "" {
+			icon = "✨"
+		}
+		result = append(result, model.ProductTrustBadge{Icon: icon, Text: text})
+		if len(result) >= 10 {
+			break
+		}
+	}
+	return result
+}
+
+func deriveTrustItemsFromBadges(items []model.ProductTrustBadge) []string {
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		text := strings.TrimSpace(item.Text)
+		if text == "" {
+			continue
+		}
+		result = append(result, text)
 		if len(result) >= 10 {
 			break
 		}
@@ -398,6 +545,43 @@ func sanitizeFAQItems(items []model.ProductFAQItem) []model.ProductFAQItem {
 		}
 	}
 	return result
+}
+
+func sanitizeWhatsAppNumber(raw string) string {
+	normalized := strings.TrimSpace(raw)
+	if normalized == "" {
+		return ""
+	}
+
+	builder := strings.Builder{}
+	for _, r := range normalized {
+		if r >= '0' && r <= '9' {
+			builder.WriteRune(r)
+		}
+	}
+	result := builder.String()
+	if len(result) > 20 {
+		result = result[:20]
+	}
+	return result
+}
+
+func defaultString(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
+func normalizePriceLabel(label string, duration int) string {
+	trimmed := strings.TrimSpace(label)
+	if trimmed != "" {
+		return trimmed
+	}
+	if duration < 1 {
+		duration = 1
+	}
+	return strings.TrimSpace(strconv.Itoa(duration) + " Bulan")
 }
 
 func normalizeAccountType(value string) string {

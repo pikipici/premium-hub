@@ -3,6 +3,16 @@ export interface ProductFAQItem {
   answer: string
 }
 
+export interface ProductSpecItem {
+  label: string
+  value: string
+}
+
+export interface ProductTrustBadge {
+  icon: string
+  text: string
+}
+
 export interface Product {
   id: string
   name: string
@@ -17,8 +27,17 @@ export interface Product {
   sold_text?: string
   shared_note?: string
   private_note?: string
+  feature_items?: string[]
+  spec_items?: ProductSpecItem[]
   trust_items?: string[]
+  trust_badges?: ProductTrustBadge[]
   faq_items?: ProductFAQItem[]
+  price_original_text?: string
+  price_per_day_text?: string
+  discount_badge_text?: string
+  show_whatsapp_button?: boolean
+  whatsapp_number?: string
+  whatsapp_button_text?: string
   seo_description?: string
   sort_priority?: number
   is_popular: boolean
@@ -31,6 +50,8 @@ export interface ProductPrice {
   product_id: string
   duration: number
   account_type: 'shared' | 'private'
+  label?: string
+  savings_text?: string
   price: number
   is_active: boolean
 }

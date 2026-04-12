@@ -4,7 +4,13 @@ import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 
 import { productService } from '@/services/productService'
-import type { Product, ProductFAQItem, ProductPrice } from '@/types/product'
+import type {
+  Product,
+  ProductFAQItem,
+  ProductPrice,
+  ProductSpecItem,
+  ProductTrustBadge,
+} from '@/types/product'
 
 type FormState = {
   name: string
@@ -19,8 +25,17 @@ type FormState = {
   sold_text: string
   shared_note: string
   private_note: string
+  feature_items: string[]
+  spec_items: ProductSpecItem[]
   trust_items: string[]
+  trust_badges: ProductTrustBadge[]
   faq_items: ProductFAQItem[]
+  price_original_text: string
+  price_per_day_text: string
+  discount_badge_text: string
+  show_whatsapp_button: boolean
+  whatsapp_number: string
+  whatsapp_button_text: string
   seo_description: string
   sort_priority: number
   is_popular: boolean
@@ -32,6 +47,8 @@ type ProductPriceDraft = {
   id?: string
   duration: number
   account_type: ProductPrice['account_type']
+  label: string
+  savings_text: string
   price: number
   is_active: boolean
 }
@@ -49,6 +66,31 @@ const ACCOUNT_TYPE_OPTIONS: Array<{ value: ProductPrice['account_type']; label: 
   { value: 'private', label: 'Private' },
 ]
 
+const DEFAULT_TRUST_BADGES: ProductTrustBadge[] = [
+  { icon: '🛡', text: 'Garansi 30 Hari' },
+  { icon: '⚡', text: 'Pengiriman Instan' },
+  { icon: '💬', text: 'Support 24/7' },
+]
+
+const DEFAULT_FEATURE_ITEMS = [
+  'Akun dari stok terverifikasi',
+  'Pengiriman otomatis setelah pembayaran',
+  'Garansi aktif selama masa langganan',
+]
+
+const DEFAULT_SPEC_ITEMS: ProductSpecItem[] = [
+  { label: 'Jenis Akun', value: 'Shared / Private sesuai paket' },
+  { label: 'Pengiriman', value: 'Otomatis setelah pembayaran sukses' },
+  { label: 'Garansi', value: 'Berlaku sesuai kebijakan produk' },
+]
+
+const DEFAULT_FAQ_ITEMS: ProductFAQItem[] = [
+  {
+    question: 'Apakah akun ini aman digunakan?',
+    answer: 'Aman. Akun premium dikirim dari stok terverifikasi dan ada dukungan CS kalau ada kendala.',
+  },
+]
+
 function createDefaultForm(): FormState {
   return {
     name: '',
@@ -63,13 +105,17 @@ function createDefaultForm(): FormState {
     sold_text: '',
     shared_note: 'Berbagi dengan pengguna lain',
     private_note: 'Akun pribadi, akses penuh',
-    trust_items: ['Garansi 30 Hari', 'Pengiriman Instan', 'Support 24/7'],
-    faq_items: [
-      {
-        question: 'Apakah akun ini aman digunakan?',
-        answer: 'Aman. Akun premium dikirim dari stok terverifikasi dan ada dukungan CS kalau ada kendala.',
-      },
-    ],
+    feature_items: [...DEFAULT_FEATURE_ITEMS],
+    spec_items: DEFAULT_SPEC_ITEMS.map((item) => ({ ...item })),
+    trust_items: DEFAULT_TRUST_BADGES.map((item) => item.text),
+    trust_badges: DEFAULT_TRUST_BADGES.map((item) => ({ ...item })),
+    faq_items: DEFAULT_FAQ_ITEMS.map((item) => ({ ...item })),
+    price_original_text: '',
+    price_per_day_text: '',
+    discount_badge_text: '',
+    show_whatsapp_button: true,
+    whatsapp_number: '',
+    whatsapp_button_text: 'Tanya via WhatsApp',
     seo_description: '',
     sort_priority: 0,
     is_popular: false,
@@ -87,6 +133,8 @@ function createPriceDraft(partial?: Partial<ProductPriceDraft>): ProductPriceDra
     local_id: localId,
     duration: 1,
     account_type: 'shared',
+    label: '1 Bulan',
+    savings_text: '',
     price: 10000,
     is_active: true,
     ...partial,
@@ -107,6 +155,8 @@ function normalizePriceDrafts(prices: ProductPrice[]): ProductPriceDraft[] {
         id: price.id,
         duration: price.duration,
         account_type: price.account_type,
+        label: price.label || `${price.duration} Bulan`,
+        savings_text: price.savings_text || '',
         price: price.price,
         is_active: price.is_active,
       })
@@ -128,6 +178,40 @@ function normalizeFaqItems(items: ProductFAQItem[], max = 10): ProductFAQItem[] 
     }))
     .filter((item) => item.question && item.answer)
     .slice(0, max)
+}
+
+function normalizeSpecItems(items: ProductSpecItem[], max = 16): ProductSpecItem[] {
+  return items
+    .map((item) => ({
+      label: item.label.trim(),
+      value: item.value.trim(),
+    }))
+    .filter((item) => item.label && item.value)
+    .slice(0, max)
+}
+
+function normalizeTrustBadges(items: ProductTrustBadge[], max = 10): ProductTrustBadge[] {
+  return items
+    .map((item) => ({
+      icon: item.icon.trim() || '✨',
+      text: item.text.trim(),
+    }))
+    .filter((item) => item.text)
+    .slice(0, max)
+}
+
+function deriveTrustItemsFromBadges(items: ProductTrustBadge[]): string[] {
+  return items.map((item) => item.text).filter(Boolean)
+}
+
+function sanitizeWhatsAppNumber(raw: string) {
+  return raw.replace(/\D/g, '').slice(0, 20)
+}
+
+function normalizePriceLabel(label: string, duration: number) {
+  const trimmed = label.trim()
+  if (trimmed) return trimmed
+  return `${Math.max(duration, 1)} Bulan`
 }
 
 function slugify(input: string) {
@@ -273,6 +357,16 @@ export default function ProdukPage() {
     setEditingId(product.id)
     setSlugTouched(true)
 
+    const normalizedTrustBadges =
+      product.trust_badges && product.trust_badges.length > 0
+        ? normalizeTrustBadges(product.trust_badges)
+        : product.trust_items && product.trust_items.length > 0
+          ? normalizeStringItems(product.trust_items).map((text, index) => ({
+              icon: DEFAULT_TRUST_BADGES[index % DEFAULT_TRUST_BADGES.length]?.icon || '✨',
+              text,
+            }))
+          : DEFAULT_TRUST_BADGES.map((item) => ({ ...item }))
+
     setForm({
       name: product.name,
       slug: product.slug,
@@ -286,22 +380,29 @@ export default function ProdukPage() {
       sold_text: product.sold_text || '',
       shared_note: product.shared_note || 'Berbagi dengan pengguna lain',
       private_note: product.private_note || 'Akun pribadi, akses penuh',
-      trust_items:
-        product.trust_items && product.trust_items.length > 0
-          ? normalizeStringItems(product.trust_items)
-          : ['Garansi 30 Hari', 'Pengiriman Instan', 'Support 24/7'],
+      feature_items:
+        product.feature_items && product.feature_items.length > 0
+          ? normalizeStringItems(product.feature_items, 12)
+          : [...DEFAULT_FEATURE_ITEMS],
+      spec_items:
+        product.spec_items && product.spec_items.length > 0
+          ? normalizeSpecItems(product.spec_items)
+          : DEFAULT_SPEC_ITEMS.map((item) => ({ ...item })),
+      trust_items: deriveTrustItemsFromBadges(normalizedTrustBadges),
+      trust_badges: normalizedTrustBadges,
       faq_items:
         product.faq_items && product.faq_items.length > 0
           ? product.faq_items.map((item) => ({
               question: item.question || '',
               answer: item.answer || '',
             }))
-          : [
-              {
-                question: 'Apakah akun ini aman digunakan?',
-                answer: 'Aman. Akun premium dikirim dari stok terverifikasi dan ada dukungan CS kalau ada kendala.',
-              },
-            ],
+          : DEFAULT_FAQ_ITEMS.map((item) => ({ ...item })),
+      price_original_text: product.price_original_text || '',
+      price_per_day_text: product.price_per_day_text || '',
+      discount_badge_text: product.discount_badge_text || '',
+      show_whatsapp_button: product.show_whatsapp_button !== false,
+      whatsapp_number: product.whatsapp_number || '',
+      whatsapp_button_text: product.whatsapp_button_text || 'Tanya via WhatsApp',
       seo_description: product.seo_description || '',
       sort_priority: product.sort_priority || 0,
       is_popular: product.is_popular,
@@ -347,31 +448,97 @@ export default function ProdukPage() {
     })
   }
 
-  const updateTrustItem = (index: number, value: string) => {
+  const updateFeatureItem = (index: number, value: string) => {
     setForm((prev) => ({
       ...prev,
-      trust_items: prev.trust_items.map((item, itemIndex) =>
+      feature_items: prev.feature_items.map((item, itemIndex) =>
         itemIndex === index ? value : item
       ),
     }))
   }
 
-  const addTrustItem = () => {
+  const addFeatureItem = () => {
     setForm((prev) => {
-      if (prev.trust_items.length >= 10) return prev
+      if (prev.feature_items.length >= 12) return prev
       return {
         ...prev,
-        trust_items: [...prev.trust_items, ''],
+        feature_items: [...prev.feature_items, ''],
       }
     })
   }
 
-  const removeTrustItem = (index: number) => {
+  const removeFeatureItem = (index: number) => {
     setForm((prev) => {
-      if (prev.trust_items.length <= 1) return prev
+      if (prev.feature_items.length <= 1) return prev
       return {
         ...prev,
-        trust_items: prev.trust_items.filter((_, itemIndex) => itemIndex !== index),
+        feature_items: prev.feature_items.filter((_, itemIndex) => itemIndex !== index),
+      }
+    })
+  }
+
+  const updateSpecItem = (index: number, patch: Partial<ProductSpecItem>) => {
+    setForm((prev) => ({
+      ...prev,
+      spec_items: prev.spec_items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item
+      ),
+    }))
+  }
+
+  const addSpecItem = () => {
+    setForm((prev) => {
+      if (prev.spec_items.length >= 16) return prev
+      return {
+        ...prev,
+        spec_items: [...prev.spec_items, { label: '', value: '' }],
+      }
+    })
+  }
+
+  const removeSpecItem = (index: number) => {
+    setForm((prev) => {
+      if (prev.spec_items.length <= 1) return prev
+      return {
+        ...prev,
+        spec_items: prev.spec_items.filter((_, itemIndex) => itemIndex !== index),
+      }
+    })
+  }
+
+  const updateTrustBadge = (index: number, patch: Partial<ProductTrustBadge>) => {
+    setForm((prev) => {
+      const trustBadges = prev.trust_badges.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item
+      )
+      return {
+        ...prev,
+        trust_badges: trustBadges,
+        trust_items: deriveTrustItemsFromBadges(normalizeTrustBadges(trustBadges)),
+      }
+    })
+  }
+
+  const addTrustBadge = () => {
+    setForm((prev) => {
+      if (prev.trust_badges.length >= 10) return prev
+      const trustBadges = [...prev.trust_badges, { icon: '✨', text: '' }]
+      return {
+        ...prev,
+        trust_badges: trustBadges,
+        trust_items: deriveTrustItemsFromBadges(normalizeTrustBadges(trustBadges)),
+      }
+    })
+  }
+
+  const removeTrustBadge = (index: number) => {
+    setForm((prev) => {
+      if (prev.trust_badges.length <= 1) return prev
+      const trustBadges = prev.trust_badges.filter((_, itemIndex) => itemIndex !== index)
+      return {
+        ...prev,
+        trust_badges: trustBadges,
+        trust_items: deriveTrustItemsFromBadges(normalizeTrustBadges(trustBadges)),
       }
     })
   }
@@ -440,6 +607,8 @@ export default function ProdukPage() {
     setSaving(true)
     setError('')
 
+    const trustBadges = normalizeTrustBadges(form.trust_badges)
+
     const payload = {
       name: form.name.trim(),
       slug: form.slug.trim(),
@@ -453,8 +622,17 @@ export default function ProdukPage() {
       sold_text: form.sold_text.trim(),
       shared_note: form.shared_note.trim(),
       private_note: form.private_note.trim(),
-      trust_items: normalizeStringItems(form.trust_items),
+      feature_items: normalizeStringItems(form.feature_items, 12),
+      spec_items: normalizeSpecItems(form.spec_items),
+      trust_badges: trustBadges,
+      trust_items: deriveTrustItemsFromBadges(trustBadges),
       faq_items: normalizeFaqItems(form.faq_items),
+      price_original_text: form.price_original_text.trim(),
+      price_per_day_text: form.price_per_day_text.trim(),
+      discount_badge_text: form.discount_badge_text.trim(),
+      show_whatsapp_button: form.show_whatsapp_button,
+      whatsapp_number: sanitizeWhatsAppNumber(form.whatsapp_number),
+      whatsapp_button_text: form.whatsapp_button_text.trim(),
       seo_description: form.seo_description.trim(),
       sort_priority: Number(form.sort_priority) || 0,
       is_popular: form.is_popular,
@@ -486,6 +664,8 @@ export default function ProdukPage() {
         const pricePayload = {
           duration: draft.duration,
           account_type: draft.account_type,
+          label: normalizePriceLabel(draft.label, draft.duration),
+          savings_text: draft.savings_text.trim(),
           price: draft.price,
           is_active: draft.is_active,
         }
@@ -917,6 +1097,39 @@ export default function ProdukPage() {
                 />
               </div>
 
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>
+                    Fitur Produk (Checklist)
+                  </label>
+                  <button className="action-btn" type="button" onClick={addFeatureItem}>
+                    + Tambah Fitur
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {form.feature_items.map((item, index) => (
+                    <div key={`feature-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                      <input
+                        className="form-input"
+                        value={item}
+                        onChange={(event) => updateFeatureItem(index, event.target.value)}
+                        placeholder={`Fitur ${index + 1}`}
+                      />
+                      <button
+                        className="action-btn"
+                        type="button"
+                        style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                        onClick={() => removeFeatureItem(index)}
+                        disabled={form.feature_items.length <= 1}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <label className="form-label">Tagline Header</label>
@@ -1005,28 +1218,89 @@ export default function ProdukPage() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
                   <label className="form-label" style={{ marginBottom: 0 }}>
+                    Spesifikasi Produk (Label / Nilai)
+                  </label>
+                  <button className="action-btn" type="button" onClick={addSpecItem}>
+                    + Tambah Spek
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {form.spec_items.map((item, index) => (
+                    <div key={`spec-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}>
+                      <input
+                        className="form-input"
+                        value={item.label}
+                        onChange={(event) =>
+                          updateSpecItem(index, {
+                            label: event.target.value,
+                          })
+                        }
+                        placeholder="Label (contoh: Kualitas)"
+                      />
+                      <input
+                        className="form-input"
+                        value={item.value}
+                        onChange={(event) =>
+                          updateSpecItem(index, {
+                            value: event.target.value,
+                          })
+                        }
+                        placeholder="Nilai (contoh: 4K UHD)"
+                      />
+                      <button
+                        className="action-btn"
+                        type="button"
+                        style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                        onClick={() => removeSpecItem(index)}
+                        disabled={form.spec_items.length <= 1}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>
                     Trust Chips / Benefit
                   </label>
-                  <button className="action-btn" type="button" onClick={addTrustItem}>
+                  <button className="action-btn" type="button" onClick={addTrustBadge}>
                     + Tambah Trust
                   </button>
                 </div>
 
                 <div style={{ display: 'grid', gap: 8 }}>
-                  {form.trust_items.map((item, index) => (
-                    <div key={`trust-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+                  {form.trust_badges.map((item, index) => (
+                    <div key={`trust-${index}`} style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 8 }}>
                       <input
                         className="form-input"
-                        value={item}
-                        onChange={(event) => updateTrustItem(index, event.target.value)}
+                        value={item.icon}
+                        onChange={(event) =>
+                          updateTrustBadge(index, {
+                            icon: event.target.value,
+                          })
+                        }
+                        placeholder="✨"
+                      />
+                      <input
+                        className="form-input"
+                        value={item.text}
+                        onChange={(event) =>
+                          updateTrustBadge(index, {
+                            text: event.target.value,
+                          })
+                        }
                         placeholder="Contoh: Garansi 30 Hari"
                       />
                       <button
                         className="action-btn"
                         type="button"
                         style={{ color: 'var(--red)', borderColor: '#FECACA' }}
-                        onClick={() => removeTrustItem(index)}
-                        disabled={form.trust_items.length <= 1}
+                        onClick={() => removeTrustBadge(index)}
+                        disabled={form.trust_badges.length <= 1}
                       >
                         Hapus
                       </button>
@@ -1082,6 +1356,97 @@ export default function ProdukPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="form-label">Harga Coret / Normal</label>
+                  <input
+                    className="form-input"
+                    value={form.price_original_text}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        price_original_text: event.target.value,
+                      }))
+                    }
+                    placeholder="Contoh: Rp 54.000"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Teks Harga Harian</label>
+                  <input
+                    className="form-input"
+                    value={form.price_per_day_text}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        price_per_day_text: event.target.value,
+                      }))
+                    }
+                    placeholder="Contoh: ≈ Rp 1.300/hari"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Teks Badge Diskon</label>
+                  <input
+                    className="form-input"
+                    value={form.discount_badge_text}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        discount_badge_text: event.target.value,
+                      }))
+                    }
+                    placeholder="Contoh: Promo aktif · hemat 25%"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, alignItems: 'end' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.show_whatsapp_button}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        show_whatsapp_button: event.target.checked,
+                      }))
+                    }
+                  />
+                  Tampilkan Tombol WhatsApp
+                </label>
+
+                <div>
+                  <label className="form-label">Nomor WhatsApp CS</label>
+                  <input
+                    className="form-input"
+                    value={form.whatsapp_number}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        whatsapp_number: sanitizeWhatsAppNumber(event.target.value),
+                      }))
+                    }
+                    placeholder="62812xxxx"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Label Tombol WhatsApp</label>
+                  <input
+                    className="form-input"
+                    value={form.whatsapp_button_text}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        whatsapp_button_text: event.target.value,
+                      }))
+                    }
+                    placeholder="Tanya via WhatsApp"
+                  />
                 </div>
               </div>
 
@@ -1178,11 +1543,19 @@ export default function ProdukPage() {
                               type="number"
                               min={1}
                               value={row.duration}
-                              onChange={(event) =>
+                              onChange={(event) => {
+                                const nextDuration = Number(event.target.value) || 0
+                                const currentDefaultLabel = normalizePriceLabel('', row.duration)
+                                const shouldSyncLabel =
+                                  !row.label.trim() || row.label.trim() === currentDefaultLabel
+
                                 updatePriceRow(row.local_id, {
-                                  duration: Number(event.target.value) || 0,
+                                  duration: nextDuration,
+                                  label: shouldSyncLabel
+                                    ? normalizePriceLabel('', nextDuration)
+                                    : row.label,
                                 })
-                              }
+                              }}
                             />
                           </div>
 
@@ -1198,6 +1571,36 @@ export default function ProdukPage() {
                                   price: Number(event.target.value) || 0,
                                 })
                               }
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <div>
+                            <label className="form-label">Label Paket</label>
+                            <input
+                              className="form-input"
+                              value={row.label}
+                              onChange={(event) =>
+                                updatePriceRow(row.local_id, {
+                                  label: event.target.value,
+                                })
+                              }
+                              placeholder={`${row.duration} Bulan`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="form-label">Teks Hemat (opsional)</label>
+                            <input
+                              className="form-input"
+                              value={row.savings_text}
+                              onChange={(event) =>
+                                updatePriceRow(row.local_id, {
+                                  savings_text: event.target.value,
+                                })
+                              }
+                              placeholder="Contoh: Hemat 20%"
                             />
                           </div>
                         </div>

@@ -1,6 +1,12 @@
 import api from '@/lib/api'
 import type { ApiResponse } from '@/types/api'
-import type { Product, ProductFAQItem, ProductPrice } from '@/types/product'
+import type {
+  Product,
+  ProductFAQItem,
+  ProductPrice,
+  ProductSpecItem,
+  ProductTrustBadge,
+} from '@/types/product'
 
 export interface AdminProductPayload {
   name: string
@@ -15,8 +21,17 @@ export interface AdminProductPayload {
   sold_text?: string
   shared_note?: string
   private_note?: string
+  feature_items?: string[]
+  spec_items?: ProductSpecItem[]
   trust_items?: string[]
+  trust_badges?: ProductTrustBadge[]
   faq_items?: ProductFAQItem[]
+  price_original_text?: string
+  price_per_day_text?: string
+  discount_badge_text?: string
+  show_whatsapp_button?: boolean
+  whatsapp_number?: string
+  whatsapp_button_text?: string
   seo_description?: string
   sort_priority?: number
   is_popular?: boolean
@@ -26,6 +41,8 @@ export interface AdminProductPayload {
 export interface AdminProductPricePayload {
   duration: number
   account_type: ProductPrice['account_type']
+  label?: string
+  savings_text?: string
   price: number
   is_active?: boolean
 }
