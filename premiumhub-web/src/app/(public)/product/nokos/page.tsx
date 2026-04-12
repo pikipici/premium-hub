@@ -104,52 +104,109 @@ const fallbackCountries: Country[] = [
   { key: 'SG', flag: '🇸🇬', name: 'Singapura', dialCode: '+65' },
 ]
 
-const numbers = [
-  '+1 415 823 9047',
-  '+1 650 341 7762',
-  '+1 213 940 5581',
-  '+1 312 674 2209',
-  '+1 718 503 8834',
-  '+1 646 287 4401',
-  '+1 408 119 6653',
-  '+1 202 876 3318',
-]
+type SmsTemplate = Omit<SmsItem, 'time' | 'code'>
 
-const smsItems: SmsItem[] = [
+const smsTemplates: SmsTemplate[] = [
   {
     sender: 'Google',
     senderTag: 'G',
     senderTagClassName: 'bg-[#FFE6DE] text-[#FF5733]',
-    time: '2 menit lalu',
     before: 'Your Google verification code is',
-    code: '847291',
   },
   {
     sender: 'Uber',
     senderTag: 'U',
     senderTagClassName: 'bg-[#FFF3CD] text-[#D97706]',
-    time: '5 menit lalu',
     before: 'Code Uber:',
-    code: '1597',
   },
   {
     sender: 'Netflix',
     senderTag: 'N',
     senderTagClassName: 'bg-[#FEE2E2] text-[#DC2626]',
-    time: '12 menit lalu',
     before: 'Your Netflix verification code is',
-    code: '295206',
   },
   {
     sender: 'Shopee',
     senderTag: 'S',
     senderTagClassName: 'bg-[#D1FAE5] text-[#059669]',
-    time: '18 menit lalu',
     before: '[Shopee] Your verification code is',
-    code: '304918',
     after: 'Valid for 5 minutes.',
   },
+  {
+    sender: 'Telegram',
+    senderTag: 'TG',
+    senderTagClassName: 'bg-[#E0F2FE] text-[#0284C7]',
+    before: 'Telegram login code:',
+    after: 'Do not share with anyone.',
+  },
 ]
+
+const smsTimeLabels = ['1 menit lalu', '3 menit lalu', '6 menit lalu', '11 menit lalu', '17 menit lalu', '23 menit lalu']
+
+const hashSeed = (input: string) => {
+  let hash = 0
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 31 + input.charCodeAt(i)) % 2147483647
+  }
+  return hash || 97
+}
+
+const buildDigitSequence = (seed: number, length: number) => {
+  let value = seed
+  let out = ''
+  for (let i = 0; i < length; i++) {
+    value = (value * 48271) % 2147483647
+    out += String(value % 10)
+  }
+  return out
+}
+
+const normalizeDialCode = (dialCode: string) => {
+  const raw = (dialCode || '').trim()
+  if (!raw || raw === '-') return '+1'
+  return raw.startsWith('+') ? raw : `+${raw.replace(/\D/g, '')}`
+}
+
+const formatDemoNumber = (dialCode: string, digits: string) => {
+  const d = digits.replace(/\D/g, '')
+  const g1 = d.slice(0, 3)
+  const g2 = d.slice(3, 6)
+  const g3 = d.slice(6, 10)
+  const g4 = d.slice(10)
+  return [normalizeDialCode(dialCode), g1, g2, g3, g4].filter(Boolean).join(' ')
+}
+
+const buildDemoNumbersByCountry = (country: Country, count = 8) => {
+  const base = hashSeed(`${country.key}|${country.dialCode}|${country.name}`)
+  return Array.from({ length: count }, (_, idx) => {
+    const length = 10 + ((base + idx) % 2)
+    const digits = buildDigitSequence(base + (idx + 1) * 97, length)
+    return formatDemoNumber(country.dialCode, digits)
+  })
+}
+
+const buildDemoSmsByCountry = (country: Country, count = 4): SmsItem[] => {
+  const base = hashSeed(`${country.key}|${country.name}`)
+
+  return Array.from({ length: count }, (_, idx) => {
+    const tmpl = smsTemplates[(base + idx) % smsTemplates.length]
+    const codeLength = tmpl.sender === 'Uber' ? 4 : 6
+    const rawCode = buildDigitSequence(base + (idx + 1) * 131, codeLength)
+    const formattedCode = codeLength === 6 && idx % 2 === 0 ? `${rawCode.slice(0, 3)}-${rawCode.slice(3)}` : rawCode
+
+    return {
+      sender: tmpl.sender,
+      senderTag: tmpl.senderTag,
+      senderTagClassName: tmpl.senderTagClassName,
+      time: smsTimeLabels[(base + idx) % smsTimeLabels.length],
+      before: tmpl.before,
+      code: formattedCode,
+      after: tmpl.after,
+    }
+  })
+}
+
+const initialDemoNumbers = buildDemoNumbersByCountry(fallbackCountries[0])
 
 const formatCompact = (value: number) =>
   new Intl.NumberFormat('id-ID', {
@@ -202,7 +259,7 @@ export default function LandingPage() {
   const [countryQuery, setCountryQuery] = useState('')
   const [countries, setCountries] = useState<Country[]>(fallbackCountries)
   const [activeCountry, setActiveCountry] = useState(fallbackCountries[0].key)
-  const [activeNumber, setActiveNumber] = useState(numbers[0])
+  const [activeNumber, setActiveNumber] = useState(initialDemoNumbers[0] || '')
   const [copied, setCopied] = useState(false)
   const [landingSummary, setLandingSummary] = useState<NokosLandingSummary | null>(null)
   const { isAuthenticated, hasHydrated } = useAuthStore()
@@ -257,9 +314,31 @@ export default function LandingPage() {
     filteredCountries.find((country) => country.key === activeCountry) ??
     filteredCountries[0] ??
     countries.find((country) => country.key === activeCountry) ??
-    countries[0]
+    countries[0] ??
+    fallbackCountries[0]
+
+  const demoNumbers = useMemo(
+    () => buildDemoNumbersByCountry(selectedCountry),
+    [selectedCountry.key, selectedCountry.dialCode, selectedCountry.name]
+  )
+
+  const demoSmsItems = useMemo(
+    () => buildDemoSmsByCountry(selectedCountry),
+    [selectedCountry.key, selectedCountry.name]
+  )
+
+  useEffect(() => {
+    if (demoNumbers.length === 0) {
+      setActiveNumber('')
+      return
+    }
+
+    setActiveNumber((prev) => (demoNumbers.includes(prev) ? prev : demoNumbers[0]))
+  }, [demoNumbers])
 
   const handleCopyNumber = async () => {
+    if (!activeNumber) return
+
     try {
       await navigator.clipboard.writeText(activeNumber)
       setCopied(true)
@@ -497,7 +576,7 @@ export default function LandingPage() {
                 Nomor tersedia
               </div>
               <div className="max-h-[340px] overflow-y-auto md:max-h-[420px]">
-                {numbers.map((number) => {
+                {demoNumbers.map((number) => {
                   const isActive = number === activeNumber
                   return (
                     <button
@@ -540,8 +619,8 @@ export default function LandingPage() {
               </div>
 
               <div className="max-h-[340px] overflow-y-auto md:max-h-[420px]">
-                {smsItems.map((item) => (
-                  <article key={`${item.sender}-${item.code}`} className="border-b border-[#F1F5F9] px-4 py-4">
+                {demoSmsItems.map((item, index) => (
+                  <article key={`${item.sender}-${item.code}-${index}`} className="border-b border-[#F1F5F9] px-4 py-4">
                     <div className="mb-1.5 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-sm font-bold text-[#141414]">
                         <span className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-[11px] ${item.senderTagClassName}`}>
