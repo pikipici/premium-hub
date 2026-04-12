@@ -5,14 +5,12 @@ import { useMemo, useState } from 'react'
 import {
   ArrowRight,
   BadgeCheck,
-  Check,
   Copy,
   CreditCard,
   Globe,
   Headphones,
   Shield,
   Wallet,
-  X,
   Zap,
 } from 'lucide-react'
 
@@ -431,116 +429,6 @@ export default function LandingPage() {
                   </article>
                 ))}
               </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="pricing" className="relative overflow-hidden bg-[#141414] px-4 py-14 sm:px-6 md:px-8 lg:px-10 lg:py-16">
-          <div className="absolute -right-28 top-1/2 h-[420px] w-[420px] -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,87,51,0.15)_0%,transparent_70%)]" />
-          <div className="absolute -bottom-20 -left-20 h-[260px] w-[260px] rounded-full bg-[radial-gradient(circle,rgba(255,87,51,0.12)_0%,transparent_70%)]" />
-
-          <div className="relative mx-auto w-full max-w-7xl">
-            <div className="mb-10 text-center">
-              <div className="mb-3 inline-flex rounded-full border border-[#FF573333] bg-[#FF573326] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FFB8A8]">
-                💳 Harga
-              </div>
-              <h2 className="text-[1.72rem] font-extrabold leading-tight tracking-tight text-white sm:text-4xl">
-                Pilih paket yang sesuai kebutuhanmu
-              </h2>
-              <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-white/60">
-                Nomor sementara atau sewa jangka panjang — harga transparan, tanpa biaya tersembunyi.
-              </p>
-            </div>
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <article className="relative rounded-3xl border-2 border-[#FF5733] bg-white p-5 pt-11 shadow-[0_16px_40px_rgba(0,0,0,0.25)] sm:p-7 sm:pt-7">
-                <span className="absolute right-5 top-5 rounded-full bg-[#FF5733] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-white">
-                  Populer
-                </span>
-                <h3 className="text-xl font-extrabold text-[#141414]">Nomor Sementara (OTP 1x)</h3>
-                <p className="mt-1 text-sm font-semibold text-[#FF5733]">🌍 Semua negara tersedia</p>
-                <p className="mt-4 text-xs text-[#888]">mulai dari</p>
-                <p className="text-[2rem] font-extrabold tracking-tight text-[#141414] sm:text-4xl">
-                  Rp 1.200 <span className="text-base font-medium text-[#888]">/ OTP</span>
-                </p>
-
-                <div className="mt-6 space-y-3">
-                  {[
-                    { ok: true, label: 'Waktu terima SMS', value: 'Hingga 20 menit' },
-                    { ok: false, label: 'Nomor permanen', value: 'Hanya sekali pakai' },
-                    { ok: true, label: '100+ negara', value: 'Termasuk US, UK, ID' },
-                    { ok: true, label: 'Semua platform', value: 'WA, IG, TG, Gmail, dll' },
-                  ].map((feature) => (
-                    <div key={feature.label} className="flex items-start gap-2.5">
-                      <span
-                        className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full ${
-                          feature.ok ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEE2E2] text-[#EF4444]'
-                        }`}
-                      >
-                        {feature.ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-                      </span>
-                      <div>
-                        <p className="text-sm font-bold text-[#141414]">{feature.label}</p>
-                        <p className="text-xs text-[#888]">{feature.value}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <Link
-                  href="/register"
-                  className="mt-7 inline-flex w-full items-center justify-center rounded-full bg-[#FF5733] px-5 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#D94420]"
-                >
-                  Beli Sekarang
-                </Link>
-              </article>
-
-              <article className="rounded-3xl bg-white p-5 shadow-[0_16px_40px_rgba(0,0,0,0.25)] sm:p-7">
-                <h3 className="text-xl font-extrabold text-[#141414]">Nomor Sewa Bulanan</h3>
-                <p className="mt-1 text-sm font-semibold text-[#FF5733]">🇺🇸 Amerika / Eropa</p>
-                <p className="mt-4 text-xs text-[#888]">mulai dari</p>
-                <p className="text-[2rem] font-extrabold tracking-tight text-[#141414] sm:text-4xl">
-                  Rp 45.000 <span className="text-base font-medium text-[#888]">/ bulan</span>
-                </p>
-
-                <div className="mt-6 space-y-3">
-                  {[
-                    { ok: true, label: 'Nomor permanen 30 hari', value: 'Pakai berulang kali' },
-                    { ok: true, label: 'SMS tak terbatas', value: 'Terima OTP berulang' },
-                    { ok: true, label: 'Perpanjangan mudah', value: '1 klik dari dashboard' },
-                    { ok: false, label: 'Telepon masuk', value: 'Hanya untuk SMS' },
-                  ].map((feature) => (
-                    <div key={feature.label} className="flex items-start gap-2.5">
-                      <span
-                        className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full ${
-                          feature.ok ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEE2E2] text-[#EF4444]'
-                        }`}
-                      >
-                        {feature.ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-                      </span>
-                      <div>
-                        <p className="text-sm font-bold text-[#141414]">{feature.label}</p>
-                        <p className="text-xs text-[#888]">{feature.value}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-7 grid gap-2 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center rounded-xl bg-[#229ED9] px-4 py-3 text-sm font-bold text-white transition hover:opacity-90"
-                  >
-                    Notif Telegram
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center rounded-xl border border-[#EBEBEB] bg-white px-4 py-3 text-sm font-bold text-[#141414] transition hover:bg-[#F7F7F5]"
-                  >
-                    Email Saya
-                  </button>
-                </div>
-              </article>
             </div>
           </div>
         </section>
