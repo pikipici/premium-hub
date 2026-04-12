@@ -17,7 +17,7 @@ import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { nokosPublicService } from '@/services/nokosPublicService'
 import { useAuthStore } from '@/store/authStore'
-import type { NokosLandingSummary } from '@/types/nokos'
+import type { NokosCountry, NokosLandingSummary } from '@/types/nokos'
 
 type PanelTab = 'country' | 'number' | 'sms'
 
@@ -89,7 +89,7 @@ const otpCards: OtpCard[] = [
   },
 ]
 
-const countries: Country[] = [
+const fallbackCountries: Country[] = [
   { key: 'US', flag: '🇺🇸', name: 'Amerika Serikat', dialCode: '+1' },
   { key: 'GB', flag: '🇬🇧', name: 'Inggris', dialCode: '+44' },
   { key: 'ID', flag: '🇮🇩', name: 'Indonesia', dialCode: '+62' },
@@ -180,10 +180,28 @@ const paymentMethodLabel = (method: string) => {
   }
 }
 
+const isoToFlag = (iso?: string) => {
+  const normalized = (iso || '').trim().toUpperCase()
+  if (normalized.length !== 2 || !/^[A-Z]{2}$/.test(normalized)) {
+    return '🌐'
+  }
+
+  const points = [...normalized].map((c) => 127397 + c.charCodeAt(0))
+  return String.fromCodePoint(...points)
+}
+
+const mapCountryFromApi = (country: NokosCountry): Country => ({
+  key: (country.key || country.iso || country.name || '').toUpperCase(),
+  flag: isoToFlag(country.iso || country.key),
+  name: country.name || country.key || '-',
+  dialCode: country.dial_code || '-',
+})
+
 export default function LandingPage() {
   const [tab, setTab] = useState<PanelTab>('country')
   const [countryQuery, setCountryQuery] = useState('')
-  const [activeCountry, setActiveCountry] = useState(countries[0].key)
+  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
+  const [activeCountry, setActiveCountry] = useState(fallbackCountries[0].key)
   const [activeNumber, setActiveNumber] = useState(numbers[0])
   const [copied, setCopied] = useState(false)
   const [landingSummary, setLandingSummary] = useState<NokosLandingSummary | null>(null)
@@ -192,11 +210,28 @@ export default function LandingPage() {
   useEffect(() => {
     let canceled = false
 
-    nokosPublicService
-      .getLandingSummary()
-      .then((res) => {
-        if (!canceled && res.success) {
-          setLandingSummary(res.data)
+    Promise.allSettled([nokosPublicService.getLandingSummary(), nokosPublicService.getCountries()])
+      .then(([summaryResult, countriesResult]) => {
+        if (canceled) return
+
+        if (summaryResult.status === 'fulfilled' && summaryResult.value.success) {
+          setLandingSummary(summaryResult.value.data)
+        }
+
+        if (countriesResult.status === 'fulfilled' && countriesResult.value.success) {
+          const mapped = (countriesResult.value.data.countries || [])
+            .map(mapCountryFromApi)
+            .filter((country) => country.key && country.name)
+
+          if (mapped.length > 0) {
+            setCountries(mapped)
+            setActiveCountry((prev) => {
+              if (mapped.some((country) => country.key === prev)) {
+                return prev
+              }
+              return mapped[0].key
+            })
+          }
         }
       })
       .catch(() => {
@@ -216,7 +251,7 @@ export default function LandingPage() {
       const haystack = `${country.name} ${country.dialCode}`.toLowerCase()
       return haystack.includes(query)
     })
-  }, [countryQuery])
+  }, [countryQuery, countries])
 
   const selectedCountry =
     filteredCountries.find((country) => country.key === activeCountry) ??
@@ -235,7 +270,7 @@ export default function LandingPage() {
   }
 
   const hasLiveSummary = Boolean(landingSummary)
-  const countriesCount = landingSummary?.countries_count ?? 0
+  const countriesCount = landingSummary?.countries_count ?? countries.length
   const sentTotalAllTime = landingSummary?.sent_total_all_time ?? 0
   const activePaymentMethods = (landingSummary?.payment_methods || []).map(paymentMethodLabel)
 

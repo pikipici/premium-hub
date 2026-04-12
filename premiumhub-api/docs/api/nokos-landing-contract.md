@@ -8,6 +8,8 @@ Endpoint ini dipakai landing page `/product/nokos` untuk render metrik real data
 
 `GET /api/v1/public/nokos/landing-summary`
 
+`GET /api/v1/public/nokos/countries`
+
 - **Public** (tanpa login)
 - Read-only
 
@@ -29,10 +31,32 @@ Endpoint ini dipakai landing page `/product/nokos` untuk render metrik real data
 }
 ```
 
+Contoh response countries:
+
+```json
+{
+  "success": true,
+  "message": "OK",
+  "data": {
+    "source": "5sim",
+    "countries_count": 153,
+    "countries": [
+      { "key": "ID", "name": "Indonesia", "iso": "ID", "dial_code": "+62" },
+      { "key": "US", "name": "United States", "iso": "US", "dial_code": "+1" }
+    ],
+    "last_synced_at": "2026-04-12T14:20:11Z",
+    "is_stale": false,
+    "last_sync_status": "ok"
+  }
+}
+```
+
 ## Semantik data
 
 - `countries_count`
   - jumlah negara tersedia dari provider (`5sim guest countries`).
+- `countries`
+  - daftar negara real provider hasil snapshot (key, nama, ISO, dan dial code jika tersedia).
 - `sent_total_all_time`
   - total all-time order provider (kategori `activation + hosting`) dengan rule:
   - **exclude** status `canceled/cancelled` dan `banned/ban`.

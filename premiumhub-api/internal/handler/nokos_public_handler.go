@@ -23,3 +23,12 @@ func (h *NokosPublicHandler) GetLandingSummary(c *gin.Context) {
 	}
 	response.Success(c, "OK", res)
 }
+
+func (h *NokosPublicHandler) GetCountries(c *gin.Context) {
+	res, err := h.svc.GetPublicCountries(c.Request.Context())
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "OK", res)
+}
