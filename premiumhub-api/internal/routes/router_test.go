@@ -45,6 +45,12 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "POST", "/api/v1/auth/google") {
 		t.Fatalf("google auth route should exist")
 	}
+	if !hasRoute(routes, "POST", "/api/v1/admin/products/:id/prices") {
+		t.Fatalf("admin product create price route should exist")
+	}
+	if !hasRoute(routes, "PUT", "/api/v1/admin/products/:id/prices/:priceId") {
+		t.Fatalf("admin product update price route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/payment/webhook") {
 		t.Fatalf("payment webhook route should exist")
 	}

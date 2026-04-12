@@ -354,18 +354,24 @@ func TestProductService_AllBranches(t *testing.T) {
 		t.Fatalf("expected duplicate create error, got: %v", err)
 	}
 
-	if _, err := svc.Update(uuid.New(), UpdateProductInput{Name: "X"}); err == nil || !strings.Contains(err.Error(), "produk tidak ditemukan") {
+	updateNameNotFound := "X"
+	if _, err := svc.Update(uuid.New(), UpdateProductInput{Name: &updateNameNotFound}); err == nil || !strings.Contains(err.Error(), "produk tidak ditemukan") {
 		t.Fatalf("expected not found on update, got: %v", err)
 	}
 
 	isPopular := false
 	isActive := false
+	updateName := "Netflix Ultra"
+	updateCategory := "movie"
+	updateDescription := "new desc"
+	updateIcon := "📺"
+	updateColor := "#000"
 	upd, err := svc.Update(created.ID, UpdateProductInput{
-		Name:        "Netflix Ultra",
-		Category:    "movie",
-		Description: "new desc",
-		Icon:        "📺",
-		Color:       "#000",
+		Name:        &updateName,
+		Category:    &updateCategory,
+		Description: &updateDescription,
+		Icon:        &updateIcon,
+		Color:       &updateColor,
 		IsPopular:   &isPopular,
 		IsActive:    &isActive,
 	})
@@ -377,7 +383,8 @@ func TestProductService_AllBranches(t *testing.T) {
 	}
 
 	removeProductUpdateFail := registerUpdateFailCallback(t, db, "products", "forced product update failure")
-	if _, err := svc.Update(created.ID, UpdateProductInput{Name: "Force Fail Product"}); err == nil || !strings.Contains(err.Error(), "forced product update failure") {
+	forceFailProductName := "Force Fail Product"
+	if _, err := svc.Update(created.ID, UpdateProductInput{Name: &forceFailProductName}); err == nil || !strings.Contains(err.Error(), "forced product update failure") {
 		removeProductUpdateFail()
 		t.Fatalf("expected product update repo error, got: %v", err)
 	}

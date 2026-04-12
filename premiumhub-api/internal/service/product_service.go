@@ -8,6 +8,7 @@ import (
 	"premiumhub-api/internal/repository"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type ProductService struct {
@@ -35,24 +36,45 @@ func (s *ProductService) GetBySlug(slug string) (*model.Product, error) {
 
 type CreateProductInput struct {
 	Name        string `json:"name" binding:"required"`
+	Slug        string `json:"slug"`
 	Category    string `json:"category" binding:"required"`
 	Description string `json:"description"`
 	Icon        string `json:"icon"`
 	Color       string `json:"color"`
 	IsPopular   bool   `json:"is_popular"`
+	IsActive    *bool  `json:"is_active"`
 }
 
 func (s *ProductService) Create(input CreateProductInput) (*model.Product, error) {
-	slug := generateSlug(input.Name)
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return nil, errors.New("nama produk wajib diisi")
+	}
+
+	category := strings.TrimSpace(input.Category)
+	if category == "" {
+		return nil, errors.New("kategori produk wajib diisi")
+	}
+
+	slug := sanitizeSlug(input.Slug, name)
+	if slug == "" {
+		return nil, errors.New("slug produk tidak valid")
+	}
+
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+
 	product := &model.Product{
-		Name:        input.Name,
+		Name:        name,
 		Slug:        slug,
-		Category:    input.Category,
-		Description: input.Description,
-		Icon:        input.Icon,
-		Color:       input.Color,
+		Category:    category,
+		Description: strings.TrimSpace(input.Description),
+		Icon:        strings.TrimSpace(input.Icon),
+		Color:       strings.TrimSpace(input.Color),
 		IsPopular:   input.IsPopular,
-		IsActive:    true,
+		IsActive:    isActive,
 	}
 	if err := s.productRepo.Create(product); err != nil {
 		return nil, errors.New("gagal membuat produk")
@@ -61,13 +83,14 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 }
 
 type UpdateProductInput struct {
-	Name        string `json:"name"`
-	Category    string `json:"category"`
-	Description string `json:"description"`
-	Icon        string `json:"icon"`
-	Color       string `json:"color"`
-	IsPopular   *bool  `json:"is_popular"`
-	IsActive    *bool  `json:"is_active"`
+	Name        *string `json:"name"`
+	Slug        *string `json:"slug"`
+	Category    *string `json:"category"`
+	Description *string `json:"description"`
+	Icon        *string `json:"icon"`
+	Color       *string `json:"color"`
+	IsPopular   *bool   `json:"is_popular"`
+	IsActive    *bool   `json:"is_active"`
 }
 
 func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.Product, error) {
@@ -75,21 +98,39 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 	if err != nil {
 		return nil, errors.New("produk tidak ditemukan")
 	}
-	if input.Name != "" {
-		product.Name = input.Name
-		product.Slug = generateSlug(input.Name)
+
+	if input.Name != nil {
+		name := strings.TrimSpace(*input.Name)
+		if name == "" {
+			return nil, errors.New("nama produk wajib diisi")
+		}
+		product.Name = name
 	}
-	if input.Category != "" {
-		product.Category = input.Category
+
+	if input.Slug != nil {
+		slug := sanitizeSlug(*input.Slug, product.Name)
+		if slug == "" {
+			return nil, errors.New("slug produk tidak valid")
+		}
+		product.Slug = slug
 	}
-	if input.Description != "" {
-		product.Description = input.Description
+
+	if input.Category != nil {
+		category := strings.TrimSpace(*input.Category)
+		if category == "" {
+			return nil, errors.New("kategori produk wajib diisi")
+		}
+		product.Category = category
 	}
-	if input.Icon != "" {
-		product.Icon = input.Icon
+
+	if input.Description != nil {
+		product.Description = strings.TrimSpace(*input.Description)
 	}
-	if input.Color != "" {
-		product.Color = input.Color
+	if input.Icon != nil {
+		product.Icon = strings.TrimSpace(*input.Icon)
+	}
+	if input.Color != nil {
+		product.Color = strings.TrimSpace(*input.Color)
 	}
 	if input.IsPopular != nil {
 		product.IsPopular = *input.IsPopular
@@ -101,6 +142,145 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 		return nil, err
 	}
 	return product, nil
+}
+
+type CreateProductPriceInput struct {
+	Duration    int    `json:"duration" binding:"required,min=1"`
+	AccountType string `json:"account_type" binding:"required"`
+	Price       int64  `json:"price" binding:"required,min=1"`
+	IsActive    *bool  `json:"is_active"`
+}
+
+type UpdateProductPriceInput struct {
+	Duration    *int    `json:"duration"`
+	AccountType *string `json:"account_type"`
+	Price       *int64  `json:"price"`
+	IsActive    *bool   `json:"is_active"`
+}
+
+func (s *ProductService) CreatePrice(productID uuid.UUID, input CreateProductPriceInput) (*model.ProductPrice, error) {
+	if _, err := s.productRepo.FindByID(productID); err != nil {
+		return nil, errors.New("produk tidak ditemukan")
+	}
+
+	accountType := normalizeAccountType(input.AccountType)
+	if accountType == "" {
+		return nil, errors.New("account_type wajib diisi")
+	}
+	if input.Duration < 1 {
+		return nil, errors.New("durasi harus lebih dari 0")
+	}
+	if input.Price < 1 {
+		return nil, errors.New("harga harus lebih dari 0")
+	}
+
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+
+	existing, err := s.productRepo.FindPriceBySignature(productID, input.Duration, accountType)
+	if err == nil {
+		existing.Price = input.Price
+		existing.IsActive = isActive
+		if err := s.productRepo.UpdatePrice(existing); err != nil {
+			return nil, errors.New("gagal memperbarui harga produk")
+		}
+		return existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("gagal memeriksa duplikasi harga produk")
+	}
+
+	price := &model.ProductPrice{
+		ProductID:   productID,
+		Duration:    input.Duration,
+		AccountType: accountType,
+		Price:       input.Price,
+		IsActive:    isActive,
+	}
+	if err := s.productRepo.CreatePrice(price); err != nil {
+		return nil, errors.New("gagal membuat harga produk")
+	}
+	return price, nil
+}
+
+func (s *ProductService) UpdatePrice(productID, priceID uuid.UUID, input UpdateProductPriceInput) (*model.ProductPrice, error) {
+	if _, err := s.productRepo.FindByID(productID); err != nil {
+		return nil, errors.New("produk tidak ditemukan")
+	}
+
+	price, err := s.productRepo.FindPriceByID(priceID)
+	if err != nil {
+		return nil, errors.New("harga produk tidak ditemukan")
+	}
+	if price.ProductID != productID {
+		return nil, errors.New("harga produk tidak cocok dengan produk")
+	}
+
+	nextDuration := price.Duration
+	nextAccountType := price.AccountType
+
+	if input.Duration != nil {
+		if *input.Duration < 1 {
+			return nil, errors.New("durasi harus lebih dari 0")
+		}
+		nextDuration = *input.Duration
+	}
+	if input.AccountType != nil {
+		normalized := normalizeAccountType(*input.AccountType)
+		if normalized == "" {
+			return nil, errors.New("account_type wajib diisi")
+		}
+		nextAccountType = normalized
+	}
+	if input.Price != nil && *input.Price < 1 {
+		return nil, errors.New("harga harus lebih dari 0")
+	}
+
+	if nextDuration != price.Duration || nextAccountType != price.AccountType {
+		duplicate, err := s.productRepo.FindPriceBySignature(productID, nextDuration, nextAccountType)
+		if err == nil && duplicate.ID != priceID {
+			return nil, errors.New("kombinasi durasi dan tipe akun sudah ada")
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("gagal memeriksa duplikasi harga produk")
+		}
+	}
+
+	price.Duration = nextDuration
+	price.AccountType = nextAccountType
+	if input.Price != nil {
+		price.Price = *input.Price
+	}
+	if input.IsActive != nil {
+		price.IsActive = *input.IsActive
+	}
+
+	if err := s.productRepo.UpdatePrice(price); err != nil {
+		return nil, errors.New("gagal memperbarui harga produk")
+	}
+	return price, nil
+}
+
+func (s *ProductService) DeletePrice(productID, priceID uuid.UUID) error {
+	price, err := s.productRepo.FindPriceByID(priceID)
+	if err != nil {
+		return errors.New("harga produk tidak ditemukan")
+	}
+	if price.ProductID != productID {
+		return errors.New("harga produk tidak cocok dengan produk")
+	}
+
+	if !price.IsActive {
+		return nil
+	}
+
+	price.IsActive = false
+	if err := s.productRepo.UpdatePrice(price); err != nil {
+		return errors.New("gagal menonaktifkan harga produk")
+	}
+	return nil
 }
 
 func (s *ProductService) Delete(id uuid.UUID) error {
@@ -119,6 +299,18 @@ func (s *ProductService) AdminList(page, limit int) ([]model.Product, int64, err
 
 func (s *ProductService) GetStockCount(productID uuid.UUID, accountType string) (int64, error) {
 	return s.stockRepo.CountByProduct(productID, accountType)
+}
+
+func normalizeAccountType(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func sanitizeSlug(value, fallback string) string {
+	slug := generateSlug(strings.TrimSpace(value))
+	if slug != "" {
+		return slug
+	}
+	return generateSlug(strings.TrimSpace(fallback))
 }
 
 func generateSlug(name string) string {

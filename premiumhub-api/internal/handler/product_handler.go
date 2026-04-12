@@ -117,3 +117,72 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 	}
 	response.Success(c, "Produk dihapus", nil)
 }
+
+func (h *ProductHandler) CreatePrice(c *gin.Context) {
+	productID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID produk tidak valid")
+		return
+	}
+
+	var input service.CreateProductPriceInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	price, err := h.productSvc.CreatePrice(productID, input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Created(c, "Harga produk berhasil dibuat", price)
+}
+
+func (h *ProductHandler) UpdatePrice(c *gin.Context) {
+	productID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID produk tidak valid")
+		return
+	}
+	priceID, err := uuid.Parse(c.Param("priceId"))
+	if err != nil {
+		response.BadRequest(c, "ID harga tidak valid")
+		return
+	}
+
+	var input service.UpdateProductPriceInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	price, err := h.productSvc.UpdatePrice(productID, priceID, input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Harga produk diperbarui", price)
+}
+
+func (h *ProductHandler) DeletePrice(c *gin.Context) {
+	productID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID produk tidak valid")
+		return
+	}
+	priceID, err := uuid.Parse(c.Param("priceId"))
+	if err != nil {
+		response.BadRequest(c, "ID harga tidak valid")
+		return
+	}
+
+	if err := h.productSvc.DeletePrice(productID, priceID); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Harga produk dinonaktifkan", nil)
+}
