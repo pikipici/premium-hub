@@ -46,6 +46,7 @@ type fakeFiveSimClient struct {
 
 	checkHits   int
 	cancelHits  int
+	inboxHits   int
 	checkHitsBy map[int64]int
 }
 
@@ -175,6 +176,7 @@ func (f *fakeFiveSimClient) BanOrder(_ context.Context, _ int64) (*FiveSimOrderP
 }
 
 func (f *fakeFiveSimClient) GetSMSInbox(_ context.Context, _ int64) (map[string]any, error) {
+	f.inboxHits++
 	if f.inbox == nil {
 		return map[string]any{"Data": []any{}, "Total": 0}, nil
 	}
@@ -374,6 +376,56 @@ func TestFiveSimServiceBuyActivationCreatesLocalOrder(t *testing.T) {
 	}
 }
 
+func TestFiveSimServiceBuyActivationTerminalStatusAutoRefundImmediately(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	fake.buyActivationResp = &FiveSimOrderPayload{
+		ID:       991133,
+		Phone:    "+447000002222",
+		Operator: "vodafone",
+		Product:  "telegram",
+		Price:    0.34,
+		Status:   "CANCELED",
+		Country:  "england",
+		SMS:      []FiveSimSMS{},
+	}
+
+	localOrder, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:  "england",
+		Operator: "any",
+		Product:  "telegram",
+	})
+	if err != nil {
+		t.Fatalf("buy activation canceled: %v", err)
+	}
+	if localOrder.ProviderStatus != "CANCELED" {
+		t.Fatalf("expected local order status CANCELED, got %s", localOrder.ProviderStatus)
+	}
+
+	var updatedUser model.User
+	if err := db.First(&updatedUser, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user: %v", err)
+	}
+	if updatedUser.WalletBalance != 50_000 {
+		t.Fatalf("wallet should be auto-refunded to 50000, got %d", updatedUser.WalletBalance)
+	}
+
+	var chargeCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", "fivesim_order:991133:charge").Count(&chargeCount).Error; err != nil {
+		t.Fatalf("count charge ledger: %v", err)
+	}
+	if chargeCount != 1 {
+		t.Fatalf("expected charge ledger exactly once, got %d", chargeCount)
+	}
+
+	var refundCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", "fivesim_order:991133:refund").Count(&refundCount).Error; err != nil {
+		t.Fatalf("count refund ledger: %v", err)
+	}
+	if refundCount != 1 {
+		t.Fatalf("expected refund ledger exactly once, got %d", refundCount)
+	}
+}
+
 func TestFiveSimServiceCheckOrderRespectsOwnership(t *testing.T) {
 	svc, db, fake, activeUser, otherUser := setupFiveSimService(t)
 	seed := model.FiveSimOrder{
@@ -506,21 +558,75 @@ func TestFiveSimServiceBuyActivationInsufficientWalletCancelFailureEscalates(t *
 	}
 }
 
+func TestFiveSimServiceCheckOrderBlockedWhenUnbilled(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	seedFiveSimOrderUnbilled(t, db, activeUser.ID, 550001, "PENDING", time.Now().Add(-2*time.Minute))
+
+	fake.checkRespByID = map[int64]*FiveSimOrderPayload{
+		550001: {
+			ID:      550001,
+			Status:  "RECEIVED",
+			Country: "indonesia",
+			Product: "telegram",
+			SMS: []FiveSimSMS{{
+				Code: "12345",
+			}},
+		},
+	}
+
+	_, _, err := svc.CheckOrder(context.Background(), activeUser.ID, 550001)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "belum berhasil didebit") {
+		t.Fatalf("expected unbilled order blocked error, got: %v", err)
+	}
+	if fake.checkHits != 0 {
+		t.Fatalf("provider check should not be called for unbilled order")
+	}
+}
+
+func TestFiveSimServiceGetSMSInboxBlockedWhenUnbilled(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	seedFiveSimOrderUnbilled(t, db, activeUser.ID, 550002, "PENDING", time.Now().Add(-2*time.Minute))
+
+	_, err := svc.GetSMSInbox(context.Background(), activeUser.ID, 550002)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "belum berhasil didebit") {
+		t.Fatalf("expected unbilled sms inbox blocked error, got: %v", err)
+	}
+	if fake.inboxHits != 0 {
+		t.Fatalf("provider inbox should not be called for unbilled order")
+	}
+}
+
+func TestFiveSimServiceCancelOrderAllowedWhenUnbilled(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	seedFiveSimOrderUnbilled(t, db, activeUser.ID, 550003, "PENDING", time.Now().Add(-2*time.Minute))
+
+	fake.cancelRespByID = map[int64]*FiveSimOrderPayload{
+		550003: {
+			ID:       550003,
+			Status:   "CANCELED",
+			Country:  "indonesia",
+			Operator: "any",
+			Product:  "telegram",
+			SMS:      []FiveSimSMS{},
+		},
+	}
+
+	localOrder, _, err := svc.CancelOrder(context.Background(), activeUser.ID, 550003)
+	if err != nil {
+		t.Fatalf("cancel unbilled order should succeed: %v", err)
+	}
+	if localOrder.ProviderStatus != "CANCELED" {
+		t.Fatalf("expected local order canceled, got %s", localOrder.ProviderStatus)
+	}
+	if fake.cancelHits != 1 {
+		t.Fatalf("provider cancel should be called once, got %d", fake.cancelHits)
+	}
+}
+
 func TestFiveSimServiceCheckOrderPersistsStatusAndSnapshot(t *testing.T) {
 	svc, db, fake, activeUser, _ := setupFiveSimService(t)
 
-	seed := model.FiveSimOrder{
-		ID:              uuid.New(),
-		UserID:          activeUser.ID,
-		ProviderOrderID: 551100,
-		OrderType:       "activation",
-		ProviderStatus:  "PENDING",
-		CreatedAt:       time.Now().Add(-2 * time.Minute),
-		UpdatedAt:       time.Now().Add(-2 * time.Minute),
-	}
-	if err := db.Create(&seed).Error; err != nil {
-		t.Fatalf("seed order: %v", err)
-	}
+	seedFiveSimOrderWithCharge(t, db, activeUser.ID, 551100, "PENDING", 1000, time.Now().Add(-2*time.Minute))
 
 	fake.checkRespByID = map[int64]*FiveSimOrderPayload{
 		551100: {
@@ -798,6 +904,28 @@ func TestFiveSimServiceReconcileOpenOrdersNotFoundBelowThresholdKeepsOpen(t *tes
 	}
 	if userAfter.WalletBalance != 49_000 {
 		t.Fatalf("wallet should remain deducted, got %d", userAfter.WalletBalance)
+	}
+}
+
+func seedFiveSimOrderUnbilled(t *testing.T, db *gorm.DB, userID uuid.UUID, providerOrderID int64, status string, createdAt time.Time) {
+	t.Helper()
+
+	order := model.FiveSimOrder{
+		ID:              uuid.New(),
+		UserID:          userID,
+		ProviderOrderID: providerOrderID,
+		OrderType:       "activation",
+		Phone:           "+628123000000",
+		Country:         "indonesia",
+		Operator:        "any",
+		Product:         "telegram",
+		ProviderPrice:   0.5,
+		ProviderStatus:  status,
+		CreatedAt:       createdAt,
+		UpdatedAt:       createdAt,
+	}
+	if err := db.Create(&order).Error; err != nil {
+		t.Fatalf("create seed unbilled order: %v", err)
 	}
 }
 

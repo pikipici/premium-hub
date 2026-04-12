@@ -308,6 +308,31 @@ func TestWalletHandleWebhook(t *testing.T) {
 	}
 }
 
+func TestWalletHandleWebhookAcceptsPayableAmount(t *testing.T) {
+	svc, db, fake, user := setupWalletService(t)
+
+	topup, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{Amount: 10000, PaymentMethod: "qris"})
+	if err != nil {
+		t.Fatalf("create topup: %v", err)
+	}
+
+	fake.statusMap[topup.GatewayRef] = "COMPLETED"
+
+	if err := svc.HandlePakasirWebhook(context.Background(), WalletPakasirWebhookInput{
+		OrderID: topup.GatewayRef,
+		Project: "premiumhub",
+		Status:  "COMPLETED",
+		Amount:  topup.PayableAmount,
+	}); err != nil {
+		t.Fatalf("webhook with payable amount should be accepted: %v", err)
+	}
+
+	userAfter := mustLoadUser(t, db, user.ID)
+	if userAfter.WalletBalance != 10000 {
+		t.Fatalf("expected wallet balance 10000, got %d", userAfter.WalletBalance)
+	}
+}
+
 func TestWalletReconcilePending(t *testing.T) {
 	svc, db, fake, user := setupWalletService(t)
 

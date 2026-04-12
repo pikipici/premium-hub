@@ -279,9 +279,13 @@ func (s *FiveSimService) finalizePurchasedOrder(ctx context.Context, userID uuid
 
 	if _, err := s.debitWalletForOrder(userID, orderType, providerOrder); err != nil {
 		if cancelErr := s.cancelProviderOrderAndSyncLocal(ctx, localOrder, providerOrder.ID); cancelErr != nil {
-			return nil, fmt.Errorf("%s; order provider gagal dibatalkan otomatis, hubungi admin", err.Error())
+			return nil, fmt.Errorf("%s; order provider gagal dibatalkan otomatis, order diblokir sampai billing clear, hubungi admin", err.Error())
 		}
 		return nil, err
+	}
+
+	if _, err := s.settleWalletAfterSync(localOrder, providerOrder, "post-purchase-initial-sync"); err != nil {
+		return nil, fmt.Errorf("order 5sim dibuat, tapi settlement wallet gagal: %w", err)
 	}
 
 	return localOrder, nil
@@ -325,6 +329,24 @@ func (s *FiveSimService) cancelProviderOrderAndSyncLocal(ctx context.Context, lo
 	}
 
 	return nil
+}
+
+func (s *FiveSimService) ensureOrderBilled(providerOrderID int64) error {
+	if s.walletRepo == nil {
+		return errors.New("konfigurasi wallet belum siap")
+	}
+	if providerOrderID <= 0 {
+		return errors.New("provider_order_id tidak valid")
+	}
+
+	reference := fmt.Sprintf("fivesim_order:%d:charge", providerOrderID)
+	if _, err := s.walletRepo.FindLedgerByReference(reference); err == nil {
+		return nil
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		return errors.New("order belum berhasil didebit, silakan cancel order atau hubungi admin")
+	} else {
+		return errors.New("gagal validasi billing order 5sim")
+	}
 }
 
 func (s *FiveSimService) debitWalletForOrder(userID uuid.UUID, orderType string, providerOrder *FiveSimOrderPayload) (int64, error) {
@@ -766,6 +788,10 @@ func (s *FiveSimService) GetSMSInbox(ctx context.Context, userID uuid.UUID, prov
 		return nil, errors.New("gagal memuat order 5sim")
 	}
 
+	if err := s.ensureOrderBilled(localOrder.ProviderOrderID); err != nil {
+		return nil, err
+	}
+
 	inbox, err := s.client.GetSMSInbox(ctx, providerOrderID)
 	if err != nil {
 		return nil, s.normalizeProviderErr(err)
@@ -962,6 +988,12 @@ func (s *FiveSimService) runOrderAction(
 			return nil, nil, errors.New("order 5sim tidak ditemukan")
 		}
 		return nil, nil, errors.New("gagal memuat order 5sim")
+	}
+
+	if action != "cancel" {
+		if err := s.ensureOrderBilled(localOrder.ProviderOrderID); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	providerOrder, err := providerFn(ctx, providerOrderID)
