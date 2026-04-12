@@ -78,6 +78,12 @@ func (r *WalletRepo) ListLedgerByUser(userID uuid.UUID, page, limit int) ([]mode
 	return rows, total, err
 }
 
+func (r *WalletRepo) FindLedgerByReference(reference string) (*model.WalletLedger, error) {
+	var row model.WalletLedger
+	err := r.db.Where("reference = ?", reference).First(&row).Error
+	return &row, err
+}
+
 func (r *WalletRepo) FindLedgerByReferenceTx(tx *gorm.DB, reference string) (*model.WalletLedger, error) {
 	var row model.WalletLedger
 	err := tx.Where("reference = ?", reference).First(&row).Error

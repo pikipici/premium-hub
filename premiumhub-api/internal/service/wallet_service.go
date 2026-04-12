@@ -409,9 +409,15 @@ func (s *WalletService) HandlePakasirWebhook(ctx context.Context, input WalletPa
 		return errors.New("gagal memuat topup")
 	}
 
-	if input.Amount > 0 && topup.RequestedAmount > 0 && input.Amount != topup.RequestedAmount {
-		log.Printf("[pakasir-webhook][wallet] amount_mismatch order_id=%s expected=%d actual=%d", orderID, topup.RequestedAmount, input.Amount)
-		return fmt.Errorf("nominal webhook tidak cocok")
+	if input.Amount > 0 {
+		requested := topup.RequestedAmount
+		payable := topup.PayableAmount
+		if requested > 0 && input.Amount != requested {
+			if payable <= 0 || input.Amount != payable {
+				log.Printf("[pakasir-webhook][wallet] amount_mismatch order_id=%s expected_requested=%d expected_payable=%d actual=%d", orderID, requested, payable, input.Amount)
+				return fmt.Errorf("nominal webhook tidak cocok")
+			}
+		}
 	}
 
 	log.Printf("[pakasir-webhook][wallet] checking order_id=%s topup_id=%s", orderID, topup.ID.String())
