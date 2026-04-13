@@ -1,11 +1,9 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  ArrowRight,
   BadgeCheck,
-  Copy,
   CreditCard,
   Globe,
   Headphones,
@@ -17,31 +15,12 @@ import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { nokosPublicService } from '@/services/nokosPublicService'
 import { useAuthStore } from '@/store/authStore'
-import type { NokosCountry, NokosLandingSummary } from '@/types/nokos'
-
-type PanelTab = 'country' | 'number' | 'sms'
-
-type Country = {
-  key: string
-  flag: string
-  name: string
-  dialCode: string
-}
+import type { NokosLandingSummary } from '@/types/nokos'
 
 type OtpCard = {
   app: string
   icon: string
   iconClassName: string
-  before: string
-  code: string
-  after?: string
-}
-
-type SmsItem = {
-  sender: string
-  senderTag: string
-  senderTagClassName: string
-  time: string
   before: string
   code: string
   after?: string
@@ -89,125 +68,6 @@ const otpCards: OtpCard[] = [
   },
 ]
 
-const fallbackCountries: Country[] = [
-  { key: 'US', flag: '🇺🇸', name: 'Amerika Serikat', dialCode: '+1' },
-  { key: 'GB', flag: '🇬🇧', name: 'Inggris', dialCode: '+44' },
-  { key: 'ID', flag: '🇮🇩', name: 'Indonesia', dialCode: '+62' },
-  { key: 'IN', flag: '🇮🇳', name: 'India', dialCode: '+91' },
-  { key: 'RU', flag: '🇷🇺', name: 'Rusia', dialCode: '+7' },
-  { key: 'DE', flag: '🇩🇪', name: 'Jerman', dialCode: '+49' },
-  { key: 'FR', flag: '🇫🇷', name: 'Prancis', dialCode: '+33' },
-  { key: 'BR', flag: '🇧🇷', name: 'Brasil', dialCode: '+55' },
-  { key: 'CA', flag: '🇨🇦', name: 'Kanada', dialCode: '+1' },
-  { key: 'AU', flag: '🇦🇺', name: 'Australia', dialCode: '+61' },
-  { key: 'JP', flag: '🇯🇵', name: 'Jepang', dialCode: '+81' },
-  { key: 'SG', flag: '🇸🇬', name: 'Singapura', dialCode: '+65' },
-]
-
-type SmsTemplate = Omit<SmsItem, 'time' | 'code'>
-
-const smsTemplates: SmsTemplate[] = [
-  {
-    sender: 'Google',
-    senderTag: 'G',
-    senderTagClassName: 'bg-[#FFE6DE] text-[#FF5733]',
-    before: 'Your Google verification code is',
-  },
-  {
-    sender: 'Uber',
-    senderTag: 'U',
-    senderTagClassName: 'bg-[#FFF3CD] text-[#D97706]',
-    before: 'Code Uber:',
-  },
-  {
-    sender: 'Netflix',
-    senderTag: 'N',
-    senderTagClassName: 'bg-[#FEE2E2] text-[#DC2626]',
-    before: 'Your Netflix verification code is',
-  },
-  {
-    sender: 'Shopee',
-    senderTag: 'S',
-    senderTagClassName: 'bg-[#D1FAE5] text-[#059669]',
-    before: '[Shopee] Your verification code is',
-    after: 'Valid for 5 minutes.',
-  },
-  {
-    sender: 'Telegram',
-    senderTag: 'TG',
-    senderTagClassName: 'bg-[#E0F2FE] text-[#0284C7]',
-    before: 'Telegram login code:',
-    after: 'Do not share with anyone.',
-  },
-]
-
-const smsTimeLabels = ['1 menit lalu', '3 menit lalu', '6 menit lalu', '11 menit lalu', '17 menit lalu', '23 menit lalu']
-
-const hashSeed = (input: string) => {
-  let hash = 0
-  for (let i = 0; i < input.length; i++) {
-    hash = (hash * 31 + input.charCodeAt(i)) % 2147483647
-  }
-  return hash || 97
-}
-
-const buildDigitSequence = (seed: number, length: number) => {
-  let value = seed
-  let out = ''
-  for (let i = 0; i < length; i++) {
-    value = (value * 48271) % 2147483647
-    out += String(value % 10)
-  }
-  return out
-}
-
-const normalizeDialCode = (dialCode: string) => {
-  const raw = (dialCode || '').trim()
-  if (!raw || raw === '-') return '+1'
-  return raw.startsWith('+') ? raw : `+${raw.replace(/\D/g, '')}`
-}
-
-const formatDemoNumber = (dialCode: string, digits: string) => {
-  const d = digits.replace(/\D/g, '')
-  const g1 = d.slice(0, 3)
-  const g2 = d.slice(3, 6)
-  const g3 = d.slice(6, 10)
-  const g4 = d.slice(10)
-  return [normalizeDialCode(dialCode), g1, g2, g3, g4].filter(Boolean).join(' ')
-}
-
-const buildDemoNumbersByCountry = (country: Country, count = 8) => {
-  const base = hashSeed(`${country.key}|${country.dialCode}|${country.name}`)
-  return Array.from({ length: count }, (_, idx) => {
-    const length = 10 + ((base + idx) % 2)
-    const digits = buildDigitSequence(base + (idx + 1) * 97, length)
-    return formatDemoNumber(country.dialCode, digits)
-  })
-}
-
-const buildDemoSmsByCountry = (country: Country, count = 4): SmsItem[] => {
-  const base = hashSeed(`${country.key}|${country.name}`)
-
-  return Array.from({ length: count }, (_, idx) => {
-    const tmpl = smsTemplates[(base + idx) % smsTemplates.length]
-    const codeLength = tmpl.sender === 'Uber' ? 4 : 6
-    const rawCode = buildDigitSequence(base + (idx + 1) * 131, codeLength)
-    const formattedCode = codeLength === 6 && idx % 2 === 0 ? `${rawCode.slice(0, 3)}-${rawCode.slice(3)}` : rawCode
-
-    return {
-      sender: tmpl.sender,
-      senderTag: tmpl.senderTag,
-      senderTagClassName: tmpl.senderTagClassName,
-      time: smsTimeLabels[(base + idx) % smsTimeLabels.length],
-      before: tmpl.before,
-      code: formattedCode,
-      after: tmpl.after,
-    }
-  })
-}
-
-const initialDemoNumbers = buildDemoNumbersByCountry(fallbackCountries[0])
-
 const formatCompact = (value: number) =>
   new Intl.NumberFormat('id-ID', {
     notation: 'compact',
@@ -237,62 +97,23 @@ const paymentMethodLabel = (method: string) => {
   }
 }
 
-const isoToFlag = (iso?: string) => {
-  const normalized = (iso || '').trim().toUpperCase()
-  if (normalized.length !== 2 || !/^[A-Z]{2}$/.test(normalized)) {
-    return '🌐'
-  }
-
-  const points = [...normalized].map((c) => 127397 + c.charCodeAt(0))
-  return String.fromCodePoint(...points)
-}
-
-const mapCountryFromApi = (country: NokosCountry): Country => ({
-  key: (country.key || country.iso || country.name || '').toUpperCase(),
-  flag: isoToFlag(country.iso || country.key),
-  name: country.name || country.key || '-',
-  dialCode: country.dial_code || '-',
-})
-
 export default function LandingPage() {
-  const [tab, setTab] = useState<PanelTab>('country')
-  const [countryQuery, setCountryQuery] = useState('')
-  const [countries, setCountries] = useState<Country[]>(fallbackCountries)
-  const [activeCountry, setActiveCountry] = useState(fallbackCountries[0].key)
-  const [activeNumber, setActiveNumber] = useState(initialDemoNumbers[0] || '')
-  const [copied, setCopied] = useState(false)
   const [landingSummary, setLandingSummary] = useState<NokosLandingSummary | null>(null)
   const { isAuthenticated, hasHydrated } = useAuthStore()
 
   useEffect(() => {
     let canceled = false
 
-    Promise.allSettled([nokosPublicService.getLandingSummary(), nokosPublicService.getCountries()])
-      .then(([summaryResult, countriesResult]) => {
+    nokosPublicService
+      .getLandingSummary()
+      .then((result) => {
         if (canceled) return
-
-        if (summaryResult.status === 'fulfilled' && summaryResult.value.success) {
-          setLandingSummary(summaryResult.value.data)
-        }
-
-        if (countriesResult.status === 'fulfilled' && countriesResult.value.success) {
-          const mapped = (countriesResult.value.data.countries || [])
-            .map(mapCountryFromApi)
-            .filter((country) => country.key && country.name)
-
-          if (mapped.length > 0) {
-            setCountries(mapped)
-            setActiveCountry((prev) => {
-              if (mapped.some((country) => country.key === prev)) {
-                return prev
-              }
-              return mapped[0].key
-            })
-          }
+        if (result.success) {
+          setLandingSummary(result.data)
         }
       })
       .catch(() => {
-        // keep silent fallback to static defaults
+        // keep silent fallback
       })
 
     return () => {
@@ -300,56 +121,8 @@ export default function LandingPage() {
     }
   }, [])
 
-  const filteredCountries = useMemo(() => {
-    const query = countryQuery.trim().toLowerCase()
-    if (!query) return countries
-
-    return countries.filter((country) => {
-      const haystack = `${country.name} ${country.dialCode}`.toLowerCase()
-      return haystack.includes(query)
-    })
-  }, [countryQuery, countries])
-
-  const selectedCountry =
-    filteredCountries.find((country) => country.key === activeCountry) ??
-    filteredCountries[0] ??
-    countries.find((country) => country.key === activeCountry) ??
-    countries[0] ??
-    fallbackCountries[0]
-
-  const demoNumbers = useMemo(
-    () => buildDemoNumbersByCountry(selectedCountry),
-    [selectedCountry.key, selectedCountry.dialCode, selectedCountry.name]
-  )
-
-  const demoSmsItems = useMemo(
-    () => buildDemoSmsByCountry(selectedCountry),
-    [selectedCountry.key, selectedCountry.name]
-  )
-
-  useEffect(() => {
-    if (demoNumbers.length === 0) {
-      setActiveNumber('')
-      return
-    }
-
-    setActiveNumber((prev) => (demoNumbers.includes(prev) ? prev : demoNumbers[0]))
-  }, [demoNumbers])
-
-  const handleCopyNumber = async () => {
-    if (!activeNumber) return
-
-    try {
-      await navigator.clipboard.writeText(activeNumber)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      setCopied(false)
-    }
-  }
-
   const hasLiveSummary = Boolean(landingSummary)
-  const countriesCount = landingSummary?.countries_count ?? countries.length
+  const countriesCount = landingSummary?.countries_count ?? 0
   const sentTotalAllTime = landingSummary?.sent_total_all_time ?? 0
   const activePaymentMethods = (landingSummary?.payment_methods || []).map(paymentMethodLabel)
 
@@ -394,10 +167,6 @@ export default function LandingPage() {
   const heroSecondaryCta = isLoggedIn
     ? { href: '/dashboard/wallet', label: '💳 Isi Saldo Wallet' }
     : { href: loginNokosHref, label: '🔐 Masuk' }
-
-  const panelCta = isLoggedIn
-    ? { href: nokosDashboardHref, label: 'Buka Dashboard Nokos' }
-    : { href: registerNokosHref, label: 'Daftar untuk buka dashboard' }
 
   const bottomCta = isLoggedIn
     ? { href: nokosDashboardHref, label: 'Buka Dashboard Nokos' }
@@ -495,154 +264,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="panel" className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 md:px-8 lg:px-10 lg:py-16">
-          <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="mb-2 inline-flex rounded-full border border-[#FF573326] bg-[#FFF0ED] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5733]">
-                🌐 Live Preview
-              </div>
-              <h2 className="text-[1.72rem] font-extrabold leading-tight tracking-tight text-[#141414] sm:text-3xl">Pilih negara & lihat nomor tersedia</h2>
-              <p className="mt-1 text-sm text-[#888]">
-                Pilih negara, salin nomor, dan gunakan untuk verifikasi platform favoritmu.
-              </p>
-            </div>
-            <Link
-              href={panelCta.href}
-              className="inline-flex items-center gap-1 self-start rounded-full border border-[#FF573333] px-4 py-2 text-sm font-semibold text-[#FF5733] transition hover:bg-[#FFF0ED]"
-            >
-              {panelCta.label} <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-
-          <div className="mb-3 flex rounded-xl border border-[#EBEBEB] bg-[#F7F7F5] p-1 md:hidden">
-            {([
-              { key: 'country', label: '🌍 Negara' },
-              { key: 'number', label: '📞 Nomor' },
-              { key: 'sms', label: '✉️ SMS' },
-            ] as { key: PanelTab; label: string }[]).map((tabItem) => (
-              <button
-                key={tabItem.key}
-                type="button"
-                onClick={() => setTab(tabItem.key)}
-                className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                  tab === tabItem.key ? 'bg-white text-[#FF5733] shadow-sm' : 'text-[#888]'
-                }`}
-              >
-                {tabItem.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid overflow-hidden rounded-2xl border border-[#EBEBEB] md:grid-cols-[220px_1fr_1fr]">
-            <div className={`border-b border-[#EBEBEB] bg-white md:border-b-0 md:border-r ${tab !== 'country' ? 'hidden md:block' : ''}`}>
-              <div className="border-b border-[#EBEBEB] p-3">
-                <input
-                  value={countryQuery}
-                  onChange={(event) => setCountryQuery(event.target.value)}
-                  placeholder="🔍 Cari negara..."
-                  className="w-full rounded-lg border border-[#EBEBEB] bg-[#F7F7F5] px-3 py-2 text-sm text-[#141414] outline-none transition focus:border-[#FF5733]"
-                />
-              </div>
-              <div className="max-h-[340px] overflow-y-auto py-1 md:max-h-[420px]">
-                {filteredCountries.map((country) => {
-                  const isActive = country.key === selectedCountry.key
-                  return (
-                    <button
-                      key={country.key}
-                      type="button"
-                      onClick={() => setActiveCountry(country.key)}
-                      className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition ${
-                        isActive
-                          ? 'border-r-2 border-r-[#FF5733] bg-[#FFF0ED] font-semibold text-[#141414]'
-                          : 'text-[#2a2a2a] hover:bg-[#F7F7F5]'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>{country.flag}</span>
-                        {country.name}
-                      </span>
-                      <span className="text-xs text-[#888]">{country.dialCode}</span>
-                    </button>
-                  )
-                })}
-                {filteredCountries.length === 0 && (
-                  <div className="px-3 py-6 text-center text-sm text-[#888]">Negara tidak ditemukan.</div>
-                )}
-              </div>
-            </div>
-
-            <div className={`border-b border-[#EBEBEB] bg-white md:border-b-0 md:border-r ${tab !== 'number' ? 'hidden md:block' : ''}`}>
-              <div className="sticky top-0 border-b border-[#EBEBEB] bg-[#F7F7F5] px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#888]">
-                Nomor tersedia
-              </div>
-              <div className="max-h-[340px] overflow-y-auto md:max-h-[420px]">
-                {demoNumbers.map((number) => {
-                  const isActive = number === activeNumber
-                  return (
-                    <button
-                      key={number}
-                      type="button"
-                      onClick={() => setActiveNumber(number)}
-                      className={`flex w-full items-center justify-between border-b border-[#F1F5F9] px-4 py-3 text-left text-sm transition ${
-                        isActive
-                          ? 'border-r-2 border-r-[#FF5733] bg-[#FFF0ED] font-semibold text-[#141414]'
-                          : 'text-[#2a2a2a] hover:bg-[#F7F7F5]'
-                      }`}
-                    >
-                      <span>📞 {number}</span>
-                      <span className="text-lg font-bold text-[#FF5733]">›</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className={`bg-white ${tab !== 'sms' ? 'hidden md:block' : ''}`}>
-              <div className="sticky top-0 border-b border-[#EBEBEB] bg-[#F7F7F5] px-4 py-3">
-                <div className="mb-1 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-sm font-bold text-[#141414]">
-                    <span className="text-base">{selectedCountry.flag}</span>
-                    {activeNumber}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyNumber}
-                    className="inline-flex items-center gap-1 rounded-md border border-[#FF573333] bg-[#FFF0ED] px-2.5 py-1 text-xs font-semibold text-[#FF5733] transition hover:bg-[#FF5733] hover:text-white"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    {copied ? 'Tersalin!' : 'Salin'}
-                  </button>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-[#DCFCE7] px-2.5 py-1 text-[11px] font-bold text-[#16A34A]">
-                  ● Aktif
-                </span>
-              </div>
-
-              <div className="max-h-[340px] overflow-y-auto md:max-h-[420px]">
-                {demoSmsItems.map((item, index) => (
-                  <article key={`${item.sender}-${item.code}-${index}`} className="border-b border-[#F1F5F9] px-4 py-4">
-                    <div className="mb-1.5 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-sm font-bold text-[#141414]">
-                        <span className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-[11px] ${item.senderTagClassName}`}>
-                          {item.senderTag}
-                        </span>
-                        {item.sender}
-                      </div>
-                      <span className="text-xs text-[#888]">{item.time}</span>
-                    </div>
-                    <p className="text-sm leading-relaxed text-[#2a2a2a]">
-                      {item.before}{' '}
-                      <span className="rounded-md border border-[#FF573326] bg-[#FFF0ED] px-2 py-0.5 text-xs font-extrabold text-[#FF5733]">
-                        {item.code}
-                      </span>{' '}
-                      {item.after}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
 
         <section id="how" className="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 md:px-8 lg:px-10 lg:py-20">
           <div className="mb-10 text-center">
