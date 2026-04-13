@@ -118,17 +118,44 @@ export default function WalletPage() {
 
   const affordabilityCount = useMemo(() => Math.floor(balance / NETFLIX_PRICE), [balance])
 
-  const totalTopup = useMemo(() => {
+  const totalBalanceIn = useMemo(() => {
     return ledgers
-      .filter((ledger) => normalizeLedgerGroup(ledger) === 'topup')
+      .filter((ledger) => {
+        const category = (ledger.category || '').toLowerCase().trim()
+        const type = (ledger.type || '').toLowerCase().trim()
+
+        if (category === 'manual_adjustment' && type === 'credit') return true
+        return normalizeLedgerGroup(ledger) === 'topup'
+      })
       .reduce((sum, ledger) => sum + ledger.amount, 0)
   }, [ledgers])
 
-  const totalSpent = useMemo(() => {
+  const totalSpentGross = useMemo(() => {
     return ledgers
       .filter((ledger) => normalizeLedgerGroup(ledger) === 'purchase')
       .reduce((sum, ledger) => sum + ledger.amount, 0)
   }, [ledgers])
+
+  const totalRefund = useMemo(() => {
+    return ledgers
+      .filter((ledger) => normalizeLedgerGroup(ledger) === 'refund')
+      .reduce((sum, ledger) => sum + ledger.amount, 0)
+  }, [ledgers])
+
+  const totalSpentNet = useMemo(() => {
+    const value = totalSpentGross - totalRefund
+    return value > 0 ? value : 0
+  }, [totalSpentGross, totalRefund])
+
+  const purchaseCount = useMemo(
+    () => ledgers.filter((ledger) => normalizeLedgerGroup(ledger) === 'purchase').length,
+    [ledgers]
+  )
+
+  const refundCount = useMemo(
+    () => ledgers.filter((ledger) => normalizeLedgerGroup(ledger) === 'refund').length,
+    [ledgers]
+  )
 
   const filteredLedgers = useMemo(() => {
     if (txFilter === 'all') return ledgers
@@ -250,17 +277,21 @@ export default function WalletPage() {
 
         <div className="relative grid grid-cols-3 overflow-hidden rounded-xl border border-white/10 bg-white/5">
           <div className="p-3 md:p-4 border-r border-white/10">
-            <div className="text-[11px] text-white/45 mb-1">Total Top Up</div>
-            <div className="text-sm md:text-base font-bold text-emerald-300">{formatRupiah(totalTopup)}</div>
+            <div className="text-[11px] text-white/45 mb-1">Total Isi Saldo</div>
+            <div className="text-sm md:text-base font-bold text-emerald-300">{formatRupiah(totalBalanceIn)}</div>
           </div>
           <div className="p-3 md:p-4 border-r border-white/10">
-            <div className="text-[11px] text-white/45 mb-1">Total Digunakan</div>
-            <div className="text-sm md:text-base font-bold text-rose-300">{formatRupiah(totalSpent)}</div>
+            <div className="text-[11px] text-white/45 mb-1">Total Dipakai Bersih</div>
+            <div className="text-sm md:text-base font-bold text-rose-300">{formatRupiah(totalSpentNet)}</div>
           </div>
           <div className="p-3 md:p-4">
-            <div className="text-[11px] text-white/45 mb-1">Transaksi</div>
-            <div className="text-sm md:text-base font-bold text-white/85">{ledgers.length} kali</div>
+            <div className="text-[11px] text-white/45 mb-1">Total Refund</div>
+            <div className="text-sm md:text-base font-bold text-sky-300">{formatRupiah(totalRefund)}</div>
           </div>
+        </div>
+
+        <div className="relative mt-2 text-[11px] text-white/45">
+          Dipakai bersih = pembelian - refund • Refund {refundCount}/{purchaseCount} transaksi pembelian.
         </div>
       </section>
 
