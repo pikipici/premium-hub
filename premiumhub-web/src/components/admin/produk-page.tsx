@@ -739,18 +739,9 @@ export default function ProdukPage() {
 
   const hardDeleteProduct = async (product: Product) => {
     const ok = window.confirm(
-      `Hapus permanen produk "${product.name}"? Data produk, stok, dan paket harga akan dihapus.`
+      `Hapus permanen produk "${product.name}"?\n\nData produk, stok, dan paket harga akan dihapus.\nRiwayat order tetap aman (produk dengan order tidak bisa dihapus permanen).`
     )
     if (!ok) return
-
-    const confirmText = window.prompt(
-      `Konfirmasi terakhir untuk hapus permanen "${product.name}". Ketik HAPUS lalu OK:`
-    )
-
-    if (confirmText?.trim().toUpperCase() !== 'HAPUS') {
-      setError('Konfirmasi hapus permanen dibatalkan. Ketik HAPUS kalau mau lanjut.')
-      return
-    }
 
     try {
       const res = await productService.adminDeletePermanent(product.id)
