@@ -43,8 +43,6 @@ const PAGE_LIMIT = 30
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const ACCOUNT_TYPE_SUGGESTIONS = ['shared', 'private', 'family']
-
 const STATUS_FILTERS: Array<{ value: StockFilter; label: string }> = [
   { value: 'all', label: 'Semua Status' },
   { value: 'available', label: 'Tersedia' },
@@ -53,7 +51,7 @@ const STATUS_FILTERS: Array<{ value: StockFilter; label: string }> = [
 
 const EMPTY_FORM: StockFormState = {
   product_id: '',
-  account_type: 'shared',
+  account_type: '',
   email: '',
   password: '',
   profile_name: '',
@@ -61,7 +59,7 @@ const EMPTY_FORM: StockFormState = {
 
 const EMPTY_BULK_FORM: BulkFormState = {
   product_id: '',
-  account_type: 'shared',
+  account_type: '',
   rows: '',
 }
 
@@ -162,6 +160,25 @@ function parseBulkRows(text: string): { accounts: AdminBulkStockAccount[]; error
   return { accounts }
 }
 
+function normalizeAccountType(value?: string | null) {
+  return (value || '').trim().toLowerCase()
+}
+
+function extractProductAccountTypes(product?: Product | null) {
+  if (!product) return []
+
+  const set = new Set<string>()
+  product.prices?.forEach((price) => {
+    if (price.is_active === false) return
+    const accountType = normalizeAccountType(price.account_type)
+    if (accountType) {
+      set.add(accountType)
+    }
+  })
+
+  return Array.from(set)
+}
+
 export default function StokPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [stocks, setStocks] = useState<Stock[]>([])
@@ -193,6 +210,14 @@ export default function StokPage() {
       return acc
     }, {})
   }, [products])
+
+  const getProductAccountTypes = useCallback(
+    (productID?: string) => {
+      if (!productID) return []
+      return extractProductAccountTypes(productLookup[productID])
+    },
+    [productLookup]
+  )
 
   const resolveProduct = useCallback(
     (stock: Stock) => {
@@ -230,13 +255,19 @@ export default function StokPage() {
       setProducts(res.data)
 
       if (res.data.length > 0) {
+        const firstProductID = res.data[0].id
+        const firstTypes = extractProductAccountTypes(res.data[0])
+        const firstAccountType = firstTypes[0] || ''
+
         setForm((prev) => ({
           ...prev,
-          product_id: prev.product_id || res.data[0].id,
+          product_id: prev.product_id || firstProductID,
+          account_type: prev.account_type || firstAccountType,
         }))
         setBulkForm((prev) => ({
           ...prev,
-          product_id: prev.product_id || res.data[0].id,
+          product_id: prev.product_id || firstProductID,
+          account_type: prev.account_type || firstAccountType,
         }))
       }
     } catch {
@@ -296,6 +327,16 @@ export default function StokPage() {
   useEffect(() => {
     void loadStocks()
   }, [loadStocks])
+
+  const formAccountTypeOptions = useMemo(
+    () => getProductAccountTypes(form.product_id),
+    [form.product_id, getProductAccountTypes]
+  )
+
+  const bulkAccountTypeOptions = useMemo(
+    () => getProductAccountTypes(bulkForm.product_id),
+    [bulkForm.product_id, getProductAccountTypes]
+  )
 
   const filteredStocks = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -373,9 +414,12 @@ export default function StokPage() {
       products[0]?.id ||
       ''
 
+    const accountTypes = getProductAccountTypes(fallbackProductID)
+
     setForm({
       ...EMPTY_FORM,
       product_id: fallbackProductID,
+      account_type: accountTypes[0] || '',
     })
     setEditingStock(null)
     setModalMode('create')
@@ -383,9 +427,15 @@ export default function StokPage() {
 
   const openEditModal = (stock: Stock) => {
     setEditingStock(stock)
+
+    const accountTypes = getProductAccountTypes(stock.product_id)
+    const currentAccountType = normalizeAccountType(stock.account_type)
+    const accountType =
+      accountTypes.find((item) => item === currentAccountType) || accountTypes[0] || currentAccountType
+
     setForm({
       product_id: stock.product_id,
-      account_type: stock.account_type || 'shared',
+      account_type: accountType,
       email: stock.email,
       password: '',
       profile_name: stock.profile_name || '',
@@ -400,9 +450,12 @@ export default function StokPage() {
       products[0]?.id ||
       ''
 
+    const accountTypes = getProductAccountTypes(fallbackProductID)
+
     setBulkForm({
       ...EMPTY_BULK_FORM,
       product_id: fallbackProductID,
+      account_type: accountTypes[0] || '',
     })
     setModalMode('bulk')
   }
@@ -1156,7 +1209,19 @@ export default function StokPage() {
                 <select
                   className="form-select"
                   value={form.product_id}
-                  onChange={(event) => setForm((prev) => ({ ...prev, product_id: event.target.value }))}
+                  onChange={(event) => {
+                    const nextProductID = event.target.value
+                    const options = getProductAccountTypes(nextProductID)
+                    setForm((prev) => {
+                      const currentAccountType = normalizeAccountType(prev.account_type)
+                      return {
+                        ...prev,
+                        product_id: nextProductID,
+                        account_type:
+                          options.find((item) => item === currentAccountType) || options[0] || '',
+                      }
+                    })
+                  }}
                 >
                   <option value="">Pilih produk...</option>
                   {products.map((product) => (
@@ -1169,8 +1234,8 @@ export default function StokPage() {
 
               <div>
                 <label className="form-label">Tipe Akun</label>
-                <input
-                  className="form-input"
+                <select
+                  className="form-select"
                   value={form.account_type}
                   onChange={(event) =>
                     setForm((prev) => ({
@@ -1178,14 +1243,22 @@ export default function StokPage() {
                       account_type: event.target.value,
                     }))
                   }
-                  list="stock-account-type-list"
-                  placeholder="shared"
-                />
-                <datalist id="stock-account-type-list">
-                  {ACCOUNT_TYPE_SUGGESTIONS.map((item) => (
-                    <option key={item} value={item} />
+                  disabled={formAccountTypeOptions.length === 0}
+                >
+                  <option value="">
+                    {form.product_id ? 'Pilih tipe akun...' : 'Pilih produk dulu...'}
+                  </option>
+                  {formAccountTypeOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
                   ))}
-                </datalist>
+                </select>
+                {form.product_id && formAccountTypeOptions.length === 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                    Produk ini belum punya tipe akun aktif.
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1275,12 +1348,19 @@ export default function StokPage() {
                   <select
                     className="form-select"
                     value={bulkForm.product_id}
-                    onChange={(event) =>
-                      setBulkForm((prev) => ({
-                        ...prev,
-                        product_id: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => {
+                      const nextProductID = event.target.value
+                      const options = getProductAccountTypes(nextProductID)
+                      setBulkForm((prev) => {
+                        const currentAccountType = normalizeAccountType(prev.account_type)
+                        return {
+                          ...prev,
+                          product_id: nextProductID,
+                          account_type:
+                            options.find((item) => item === currentAccountType) || options[0] || '',
+                        }
+                      })
+                    }}
                   >
                     <option value="">Pilih produk...</option>
                     {products.map((product) => (
@@ -1293,8 +1373,8 @@ export default function StokPage() {
 
                 <div>
                   <label className="form-label">Tipe Akun</label>
-                  <input
-                    className="form-input"
+                  <select
+                    className="form-select"
                     value={bulkForm.account_type}
                     onChange={(event) =>
                       setBulkForm((prev) => ({
@@ -1302,9 +1382,22 @@ export default function StokPage() {
                         account_type: event.target.value,
                       }))
                     }
-                    list="stock-account-type-list"
-                    placeholder="shared"
-                  />
+                    disabled={bulkAccountTypeOptions.length === 0}
+                  >
+                    <option value="">
+                      {bulkForm.product_id ? 'Pilih tipe akun...' : 'Pilih produk dulu...'}
+                    </option>
+                    {bulkAccountTypeOptions.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                  {bulkForm.product_id && bulkAccountTypeOptions.length === 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                      Produk ini belum punya tipe akun aktif.
+                    </div>
+                  )}
                 </div>
               </div>
 

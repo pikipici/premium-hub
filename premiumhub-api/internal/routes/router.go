@@ -41,7 +41,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	authSvc := service.NewAuthService(userRepo, cfg)
 	notifSvc := service.NewNotificationService(notifRepo)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
-	stockSvc := service.NewStockService(stockRepo)
+	stockSvc := service.NewStockService(stockRepo, productRepo)
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
 	paymentSvc := service.NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, nil)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)

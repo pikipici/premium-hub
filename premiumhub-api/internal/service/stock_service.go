@@ -2,20 +2,29 @@ package service
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
 	"premiumhub-api/pkg/hash"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type StockService struct {
-	stockRepo *repository.StockRepo
+	stockRepo   *repository.StockRepo
+	productRepo *repository.ProductRepo
 }
 
-func NewStockService(stockRepo *repository.StockRepo) *StockService {
-	return &StockService{stockRepo: stockRepo}
+func NewStockService(stockRepo *repository.StockRepo, productRepos ...*repository.ProductRepo) *StockService {
+	var productRepo *repository.ProductRepo
+	if len(productRepos) > 0 {
+		productRepo = productRepos[0]
+	}
+
+	return &StockService{stockRepo: stockRepo, productRepo: productRepo}
 }
 
 type CreateStockInput struct {
@@ -26,23 +35,85 @@ type CreateStockInput struct {
 	ProfileName string `json:"profile_name"`
 }
 
+func (s *StockService) validateAccountType(productID uuid.UUID, accountType string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(accountType))
+	if normalized == "" {
+		return "", errors.New("account_type wajib diisi")
+	}
+
+	if s.productRepo == nil {
+		return normalized, nil
+	}
+
+	product, err := s.productRepo.FindByID(productID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", errors.New("produk tidak ditemukan")
+		}
+		return "", errors.New("gagal validasi account_type produk")
+	}
+
+	allowed := make(map[string]struct{})
+	ordered := make([]string, 0, len(product.Prices))
+	for _, price := range product.Prices {
+		if !price.IsActive {
+			continue
+		}
+
+		key := strings.ToLower(strings.TrimSpace(price.AccountType))
+		if key == "" {
+			continue
+		}
+
+		if _, exists := allowed[key]; !exists {
+			allowed[key] = struct{}{}
+			ordered = append(ordered, key)
+		}
+	}
+
+	if len(allowed) == 0 {
+		return "", errors.New("produk belum punya tipe akun aktif")
+	}
+
+	if _, exists := allowed[normalized]; !exists {
+		return "", fmt.Errorf("account_type \"%s\" tidak valid untuk produk ini. Opsi: %s", normalized, strings.Join(ordered, ", "))
+	}
+
+	return normalized, nil
+}
+
 func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {
 	productID, err := uuid.Parse(input.ProductID)
 	if err != nil {
 		return nil, errors.New("product_id tidak valid")
 	}
 
-	encryptedPw, err := hash.Password(input.Password)
+	accountType, err := s.validateAccountType(productID, input.AccountType)
+	if err != nil {
+		return nil, err
+	}
+
+	email := strings.TrimSpace(input.Email)
+	if email == "" {
+		return nil, errors.New("email wajib diisi")
+	}
+
+	password := strings.TrimSpace(input.Password)
+	if password == "" {
+		return nil, errors.New("password wajib diisi")
+	}
+
+	encryptedPw, err := hash.Password(password)
 	if err != nil {
 		return nil, errors.New("gagal enkripsi password")
 	}
 
 	stock := &model.Stock{
 		ProductID:   productID,
-		AccountType: input.AccountType,
-		Email:       input.Email,
+		AccountType: accountType,
+		Email:       email,
 		Password:    encryptedPw,
-		ProfileName: input.ProfileName,
+		ProfileName: strings.TrimSpace(input.ProfileName),
 		Status:      "available",
 	}
 
@@ -68,15 +139,34 @@ func (s *StockService) CreateBulk(input BulkStockInput) (int, error) {
 		return 0, errors.New("product_id tidak valid")
 	}
 
+	accountType, err := s.validateAccountType(productID, input.AccountType)
+	if err != nil {
+		return 0, err
+	}
+
 	var stocks []model.Stock
-	for _, acc := range input.Accounts {
-		encPw, _ := hash.Password(acc.Password)
+	for index, acc := range input.Accounts {
+		email := strings.TrimSpace(acc.Email)
+		if email == "" {
+			return 0, fmt.Errorf("email akun bulk baris %d wajib diisi", index+1)
+		}
+
+		password := strings.TrimSpace(acc.Password)
+		if password == "" {
+			return 0, fmt.Errorf("password akun bulk baris %d wajib diisi", index+1)
+		}
+
+		encPw, err := hash.Password(password)
+		if err != nil {
+			return 0, errors.New("gagal enkripsi password")
+		}
+
 		stocks = append(stocks, model.Stock{
 			ProductID:   productID,
-			AccountType: input.AccountType,
-			Email:       acc.Email,
+			AccountType: accountType,
+			Email:       email,
 			Password:    encPw,
-			ProfileName: acc.ProfileName,
+			ProfileName: strings.TrimSpace(acc.ProfileName),
 			Status:      "available",
 		})
 	}
@@ -102,13 +192,37 @@ func (s *StockService) Update(id uuid.UUID, input CreateStockInput) (*model.Stoc
 	if err != nil {
 		return nil, errors.New("stok tidak ditemukan")
 	}
-	stock.Email = input.Email
-	if input.Password != "" {
-		encPw, _ := hash.Password(input.Password)
+
+	if input.ProductID != "" {
+		productID, err := uuid.Parse(input.ProductID)
+		if err != nil {
+			return nil, errors.New("product_id tidak valid")
+		}
+		if productID != stock.ProductID {
+			return nil, errors.New("product_id tidak boleh diubah")
+		}
+	}
+
+	accountType, err := s.validateAccountType(stock.ProductID, input.AccountType)
+	if err != nil {
+		return nil, err
+	}
+
+	email := strings.TrimSpace(input.Email)
+	if email == "" {
+		return nil, errors.New("email wajib diisi")
+	}
+
+	stock.Email = email
+	if strings.TrimSpace(input.Password) != "" {
+		encPw, err := hash.Password(strings.TrimSpace(input.Password))
+		if err != nil {
+			return nil, errors.New("gagal enkripsi password")
+		}
 		stock.Password = encPw
 	}
-	stock.ProfileName = input.ProfileName
-	stock.AccountType = input.AccountType
+	stock.ProfileName = strings.TrimSpace(input.ProfileName)
+	stock.AccountType = accountType
 	if err := s.stockRepo.Update(stock); err != nil {
 		return nil, err
 	}
