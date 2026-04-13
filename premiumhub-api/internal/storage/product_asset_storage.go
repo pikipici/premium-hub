@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -58,6 +59,14 @@ func (s *ProductAssetStorage) Store(ctx context.Context, productID, kind string,
 	mimeType := http.DetectContentType(head[:n])
 	if !isAllowedProductAssetMime(mimeType) {
 		return "", fmt.Errorf("format file harus png/jpg/webp")
+	}
+
+	if seeker, ok := opened.(io.Seeker); ok {
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			return "", fmt.Errorf("gagal reset stream file asset")
+		}
+	} else {
+		return "", fmt.Errorf("stream file asset tidak dapat diproses")
 	}
 
 	safeName := sanitizeConvertProofName(file.Filename)
