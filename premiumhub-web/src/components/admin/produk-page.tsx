@@ -1244,6 +1244,9 @@ export default function ProdukPage() {
                     disabled={uploadingAssetKind === 'icon' || formMode !== 'edit'}
                     style={{ marginTop: 8, fontSize: 12 }}
                   />
+                  <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
+                    Wajib rasio 1:1, minimal 256x256 (rekomendasi 512x512).
+                  </div>
                 </div>
 
                 <div>
@@ -1261,6 +1264,9 @@ export default function ProdukPage() {
                     disabled={uploadingAssetKind === 'hero' || formMode !== 'edit'}
                     style={{ marginTop: 8, fontSize: 12 }}
                   />
+                  <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
+                    Wajib rasio 16:9, minimal 1280x720 (rekomendasi 1600x900).
+                  </div>
                 </div>
               </div>
 
