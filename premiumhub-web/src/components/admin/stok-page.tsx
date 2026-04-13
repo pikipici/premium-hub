@@ -63,6 +63,17 @@ const EMPTY_BULK_FORM: BulkFormState = {
   rows: '',
 }
 
+const ACCOUNT_TYPE_PRIORITY: Record<string, number> = {
+  shared: 0,
+  private: 1,
+}
+
+const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  shared: 'Shared · Akun Bersama',
+  private: 'Private · Akun Pribadi',
+  family: 'Family · Akun Keluarga',
+}
+
 function mapErrorMessage(err: unknown, fallback: string) {
   if (axios.isAxiosError(err)) {
     const message = (err.response?.data as { message?: string } | undefined)?.message
@@ -164,6 +175,30 @@ function normalizeAccountType(value?: string | null) {
   return (value || '').trim().toLowerCase()
 }
 
+function formatAccountTypeLabel(value?: string | null) {
+  const normalized = normalizeAccountType(value)
+  if (!normalized) return '-'
+
+  const directLabel = ACCOUNT_TYPE_LABELS[normalized]
+  if (directLabel) return directLabel
+
+  return normalized
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(' ')
+}
+
+function sortAccountTypes(types: string[]) {
+  return [...types].sort((a, b) => {
+    const left = ACCOUNT_TYPE_PRIORITY[a] ?? 999
+    const right = ACCOUNT_TYPE_PRIORITY[b] ?? 999
+
+    if (left !== right) return left - right
+    return a.localeCompare(b, 'id')
+  })
+}
+
 function extractProductAccountTypes(product?: Product | null) {
   if (!product) return []
 
@@ -176,7 +211,7 @@ function extractProductAccountTypes(product?: Product | null) {
     }
   })
 
-  return Array.from(set)
+  return sortAccountTypes(Array.from(set))
 }
 
 export default function StokPage() {
@@ -349,6 +384,7 @@ export default function StokPage() {
         stock.email,
         stock.profile_name || '',
         stock.account_type,
+        formatAccountTypeLabel(stock.account_type),
         stock.status,
         product.name,
       ]
@@ -902,7 +938,7 @@ export default function StokPage() {
                           <div className="order-id" style={{ fontSize: 12 }}>{stock.email}</div>
                           <div className="order-email">ID: {shortID(stock.id)}</div>
                         </td>
-                        <td>{stock.account_type}</td>
+                        <td>{formatAccountTypeLabel(stock.account_type)}</td>
                         <td>{stock.profile_name || '-'}</td>
                         <td>
                           <span className={`status-badge ${status.className}`}>{status.label}</span>
@@ -1113,7 +1149,7 @@ export default function StokPage() {
                       <div>
                         <div className="mobile-card-title">{stock.email}</div>
                         <div className="mobile-card-sub">
-                          {product.icon} {product.name} · {stock.account_type}
+                          {product.icon} {product.name} · {formatAccountTypeLabel(stock.account_type)}
                         </div>
                       </div>
                       <span className={`status-badge ${status.className}`}>{status.label}</span>
@@ -1250,7 +1286,7 @@ export default function StokPage() {
                   </option>
                   {formAccountTypeOptions.map((item) => (
                     <option key={item} value={item}>
-                      {item}
+                      {formatAccountTypeLabel(item)}
                     </option>
                   ))}
                 </select>
@@ -1389,7 +1425,7 @@ export default function StokPage() {
                     </option>
                     {bulkAccountTypeOptions.map((item) => (
                       <option key={item} value={item}>
-                        {item}
+                        {formatAccountTypeLabel(item)}
                       </option>
                     ))}
                   </select>
