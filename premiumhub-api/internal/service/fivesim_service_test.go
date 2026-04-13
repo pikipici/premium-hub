@@ -278,26 +278,25 @@ func TestFiveSimServiceGetCatalogPricesSanitizesProviderCost(t *testing.T) {
 	if res.Product != "twitter" {
 		t.Fatalf("unexpected product: %s", res.Product)
 	}
-	if len(res.Prices) != 2 {
-		t.Fatalf("expected 2 rows, got %d", len(res.Prices))
+	if len(res.Prices) != 1 {
+		t.Fatalf("expected 1 buyable row, got %d", len(res.Prices))
 	}
 
-	rows := map[string]FiveSimCatalogPriceRow{}
-	for _, row := range res.Prices {
-		rows[row.Operator] = row
+	row := res.Prices[0]
+	if row.Operator != "virtual4" {
+		t.Fatalf("unexpected operator: %s", row.Operator)
 	}
-
-	if rows["virtual52"].WalletDebit != 356 {
-		t.Fatalf("unexpected wallet debit virtual52: got %d want %d", rows["virtual52"].WalletDebit, 356)
+	if row.WalletDebit != 6475 {
+		t.Fatalf("unexpected wallet debit virtual4: got %d want %d", row.WalletDebit, 6475)
 	}
-	if rows["virtual4"].WalletDebit != 6475 {
-		t.Fatalf("unexpected wallet debit virtual4: got %d want %d", rows["virtual4"].WalletDebit, 6475)
+	if row.NumberCount == nil || *row.NumberCount != 12 {
+		t.Fatalf("unexpected number_count virtual4: %#v", row.NumberCount)
 	}
-	if rows["virtual52"].NumberCount == nil || *rows["virtual52"].NumberCount != 0 {
-		t.Fatalf("unexpected number_count virtual52: %#v", rows["virtual52"].NumberCount)
+	if !row.BuyEnabled {
+		t.Fatalf("expected buy_enabled true")
 	}
-	if rows["virtual4"].NumberCount == nil || *rows["virtual4"].NumberCount != 12 {
-		t.Fatalf("unexpected number_count virtual4: %#v", rows["virtual4"].NumberCount)
+	if row.AvailabilityStatus != fiveSimAvailabilityAvailable {
+		t.Fatalf("unexpected availability status: %s", row.AvailabilityStatus)
 	}
 }
 
@@ -317,6 +316,105 @@ func TestFiveSimServiceGetCatalogPricesHandlesMalformedPayload(t *testing.T) {
 	}
 	if len(res.Prices) != 0 {
 		t.Fatalf("expected empty rows for malformed payload, got %d", len(res.Prices))
+	}
+}
+
+func TestFiveSimServiceBuyActivationRejectsOutOfStockOperatorBeforeProviderCall(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	svc.cfg.FiveSimWalletPriceMultiplier = "18500"
+	svc.cfg.FiveSimWalletMinDebit = "1"
+
+	fake.prices = map[string]any{
+		"indonesia": map[string]any{
+			"telegram": map[string]any{
+				"virtual52": map[string]any{"cost": 0.0192, "count": 0},
+				"virtual4":  map[string]any{"cost": 0.35, "count": 12},
+			},
+		},
+	}
+
+	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:        "indonesia",
+		Operator:       "virtual52",
+		Product:        "telegram",
+		IdempotencyKey: "idem-precheck-out-of-stock",
+	})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "stok nomor operator ini sedang habis") {
+		t.Fatalf("expected out of stock error, got: %v", err)
+	}
+	if fake.buyActivationHits != 0 {
+		t.Fatalf("provider buy should not be called on out of stock precheck, got %d", fake.buyActivationHits)
+	}
+
+	var idemCount int64
+	if err := db.Model(&model.FiveSimOrderIdempotency{}).Count(&idemCount).Error; err != nil {
+		t.Fatalf("count idempotency rows: %v", err)
+	}
+	if idemCount != 0 {
+		t.Fatalf("out of stock precheck should not create idempotency row, got %d", idemCount)
+	}
+}
+
+func TestFiveSimServiceBuyActivationNoFreePhonesTriggersCooldownBlock(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	svc.cfg.FiveSimWalletPriceMultiplier = "18500"
+	svc.cfg.FiveSimWalletMinDebit = "1"
+
+	fake.prices = map[string]any{
+		"usa": map[string]any{
+			"michat": map[string]any{
+				"virtual28": map[string]any{"cost": 0.0206, "count": 10},
+			},
+		},
+	}
+	fake.buyActivationErr = &FiveSimAPIError{StatusCode: 400, Message: "no free phones"}
+
+	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:        "usa",
+		Operator:       "virtual28",
+		Product:        "michat",
+		IdempotencyKey: "idem-no-free-phones-1",
+	})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "stok nomor operator ini sedang habis") {
+		t.Fatalf("expected no free phones normalized error, got: %v", err)
+	}
+	if fake.buyActivationHits != 1 {
+		t.Fatalf("expected first provider buy hit, got %d", fake.buyActivationHits)
+	}
+
+	fake.buyActivationErr = nil
+	fake.buyActivationResp = &FiveSimOrderPayload{
+		ID:       991140,
+		Phone:    "+11234567890",
+		Operator: "virtual28",
+		Product:  "michat",
+		Price:    0.0206,
+		Status:   "PENDING",
+		Country:  "usa",
+	}
+
+	_, _, err = svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:        "usa",
+		Operator:       "virtual28",
+		Product:        "michat",
+		IdempotencyKey: "idem-no-free-phones-2",
+	})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "stok nomor operator ini sedang habis") {
+		t.Fatalf("expected cooldown out of stock error, got: %v", err)
+	}
+	if fake.buyActivationHits != 1 {
+		t.Fatalf("provider buy should be blocked by cooldown, got %d", fake.buyActivationHits)
+	}
+
+	var idem model.FiveSimOrderIdempotency
+	if err := db.Where("idempotency_key = ?", "idem-no-free-phones-1").First(&idem).Error; err != nil {
+		t.Fatalf("load idempotency row: %v", err)
+	}
+	if idem.Status != fiveSimIdemStatusFailed {
+		t.Fatalf("expected failed idempotency status, got %s", idem.Status)
+	}
+	if !strings.Contains(strings.ToLower(idem.ErrorMessage), "stok nomor operator") {
+		t.Fatalf("expected localized idempotency error, got %s", idem.ErrorMessage)
 	}
 }
 

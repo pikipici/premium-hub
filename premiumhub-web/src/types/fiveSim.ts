@@ -59,6 +59,9 @@ export interface FiveSimCatalogPriceRow {
   operator: string
   wallet_debit: number
   number_count?: number
+  buy_enabled?: boolean
+  availability_status?: 'available' | 'out_of_stock' | 'unknown'
+  availability_reason?: string
 }
 
 export interface FiveSimCatalogPricesPayload {
