@@ -80,15 +80,18 @@ export interface FiveSimBuyActivationPayload {
   voice?: boolean
   ref?: string
   max_price?: number
+  idempotency_key?: string
 }
 
 export interface FiveSimBuyHostingPayload {
   country: string
   operator: string
   product: string
+  idempotency_key?: string
 }
 
 export interface FiveSimReusePayload {
   product: string
   number: string
+  idempotency_key?: string
 }

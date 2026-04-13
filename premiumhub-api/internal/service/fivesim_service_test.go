@@ -44,10 +44,13 @@ type fakeFiveSimClient struct {
 	banResp           *FiveSimOrderPayload
 	banErr            error
 
-	checkHits   int
-	cancelHits  int
-	inboxHits   int
-	checkHitsBy map[int64]int
+	buyActivationHits int
+	buyHostingHits    int
+	reuseHits         int
+	checkHits         int
+	cancelHits        int
+	inboxHits         int
+	checkHitsBy       map[int64]int
 }
 
 func (f *fakeFiveSimClient) GetProfile(_ context.Context) (map[string]any, error) {
@@ -79,6 +82,7 @@ func (f *fakeFiveSimClient) GetPrices(_ context.Context, _, _ string) (map[strin
 }
 
 func (f *fakeFiveSimClient) BuyActivation(_ context.Context, _, _, _ string, _ FiveSimBuyActivationOptions) (*FiveSimOrderPayload, error) {
+	f.buyActivationHits++
 	if f.buyActivationErr != nil {
 		return nil, f.buyActivationErr
 	}
@@ -89,6 +93,7 @@ func (f *fakeFiveSimClient) BuyActivation(_ context.Context, _, _, _ string, _ F
 }
 
 func (f *fakeFiveSimClient) BuyHosting(_ context.Context, _, _, _ string) (*FiveSimOrderPayload, error) {
+	f.buyHostingHits++
 	if f.buyHostingErr != nil {
 		return nil, f.buyHostingErr
 	}
@@ -99,6 +104,7 @@ func (f *fakeFiveSimClient) BuyHosting(_ context.Context, _, _, _ string) (*Five
 }
 
 func (f *fakeFiveSimClient) ReuseNumber(_ context.Context, _, _ string) (*FiveSimOrderPayload, error) {
+	f.reuseHits++
 	if f.reuseErr != nil {
 		return nil, f.reuseErr
 	}
@@ -199,7 +205,7 @@ func setupFiveSimService(t *testing.T) (*FiveSimService, *gorm.DB, *fakeFiveSimC
 		t.Fatalf("open db: %v", err)
 	}
 
-	if err := db.AutoMigrate(&model.User{}, &model.FiveSimOrder{}, &model.WalletLedger{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.FiveSimOrder{}, &model.FiveSimOrderIdempotency{}, &model.WalletLedger{}); err != nil {
 		t.Fatalf("migrate db: %v", err)
 	}
 
@@ -373,6 +379,226 @@ func TestFiveSimServiceBuyActivationCreatesLocalOrder(t *testing.T) {
 	}
 	if ledger.Amount != 1000 {
 		t.Fatalf("unexpected debit amount: got %d want %d", ledger.Amount, 1000)
+	}
+}
+
+func TestFiveSimServiceBuyActivationIdempotencyReturnsExistingOrder(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	fake.buyActivationResp = &FiveSimOrderPayload{
+		ID:       991124,
+		Phone:    "+447000001124",
+		Operator: "vodafone",
+		Product:  "telegram",
+		Price:    0.34,
+		Status:   "PENDING",
+		Country:  "england",
+	}
+
+	input := FiveSimBuyActivationInput{
+		Country:        "england",
+		Operator:       "any",
+		Product:        "telegram",
+		IdempotencyKey: "idem-fivesim-activation-001",
+	}
+
+	firstOrder, firstProvider, err := svc.BuyActivation(context.Background(), activeUser.ID, input)
+	if err != nil {
+		t.Fatalf("first buy activation: %v", err)
+	}
+
+	secondOrder, secondProvider, err := svc.BuyActivation(context.Background(), activeUser.ID, input)
+	if err != nil {
+		t.Fatalf("second buy activation idempotent: %v", err)
+	}
+
+	if fake.buyActivationHits != 1 {
+		t.Fatalf("provider buy should be called once, got %d", fake.buyActivationHits)
+	}
+	if firstOrder.ProviderOrderID != secondOrder.ProviderOrderID {
+		t.Fatalf("idempotency should return same provider order id, got %d and %d", firstOrder.ProviderOrderID, secondOrder.ProviderOrderID)
+	}
+	if firstProvider.ID != secondProvider.ID {
+		t.Fatalf("idempotency should return same provider payload id, got %d and %d", firstProvider.ID, secondProvider.ID)
+	}
+
+	var updatedUser model.User
+	if err := db.First(&updatedUser, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user: %v", err)
+	}
+	if updatedUser.WalletBalance != 49_000 {
+		t.Fatalf("wallet should be debited once to 49000, got %d", updatedUser.WalletBalance)
+	}
+
+	var chargeCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", "fivesim_order:991124:charge").Count(&chargeCount).Error; err != nil {
+		t.Fatalf("count charge ledger: %v", err)
+	}
+	if chargeCount != 1 {
+		t.Fatalf("expected one charge ledger, got %d", chargeCount)
+	}
+}
+
+func TestFiveSimServiceBuyActivationIdempotencyRejectsDifferentPayload(t *testing.T) {
+	svc, _, fake, activeUser, _ := setupFiveSimService(t)
+	fake.buyActivationResp = &FiveSimOrderPayload{
+		ID:       991125,
+		Phone:    "+447000001125",
+		Operator: "vodafone",
+		Product:  "telegram",
+		Price:    0.34,
+		Status:   "PENDING",
+		Country:  "england",
+	}
+
+	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:        "england",
+		Operator:       "any",
+		Product:        "telegram",
+		IdempotencyKey: "idem-fivesim-activation-002",
+	})
+	if err != nil {
+		t.Fatalf("first buy activation should succeed: %v", err)
+	}
+
+	_, _, err = svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:        "england",
+		Operator:       "any",
+		Product:        "whatsapp",
+		IdempotencyKey: "idem-fivesim-activation-002",
+	})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "request berbeda") {
+		t.Fatalf("expected idempotency mismatch error, got: %v", err)
+	}
+	if fake.buyActivationHits != 1 {
+		t.Fatalf("provider buy should stay one hit, got %d", fake.buyActivationHits)
+	}
+}
+
+func TestFiveSimServiceBuyActivationIdempotencyRejectsTooLongKey(t *testing.T) {
+	svc, _, fake, activeUser, _ := setupFiveSimService(t)
+	fake.buyActivationResp = &FiveSimOrderPayload{
+		ID:       991128,
+		Phone:    "+447000001128",
+		Operator: "vodafone",
+		Product:  "telegram",
+		Price:    0.34,
+		Status:   "PENDING",
+		Country:  "england",
+	}
+
+	tooLong := strings.Repeat("x", 81)
+	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:        "england",
+		Operator:       "any",
+		Product:        "telegram",
+		IdempotencyKey: tooLong,
+	})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "idempotency_key") {
+		t.Fatalf("expected idempotency length error, got: %v", err)
+	}
+	if fake.buyActivationHits != 0 {
+		t.Fatalf("provider buy should not be called for invalid idempotency key")
+	}
+}
+
+func TestFiveSimServiceBuyActivationIdempotencyProcessingBlocksDuplicate(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+
+	seed := model.FiveSimOrderIdempotency{
+		ID:              uuid.New(),
+		UserID:          activeUser.ID,
+		OrderType:       "activation",
+		IdempotencyKey:  "idem-fivesim-activation-processing",
+		RequestHash:     buildFiveSimBuyRequestHash("activation", "england", "any", "telegram", "null", "", "false", "false", "", "null"),
+		Status:          fiveSimIdemStatusProcessing,
+		ProviderOrderID: 0,
+	}
+	if err := db.Create(&seed).Error; err != nil {
+		t.Fatalf("seed idempotency row: %v", err)
+	}
+
+	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:        "england",
+		Operator:       "any",
+		Product:        "telegram",
+		IdempotencyKey: "idem-fivesim-activation-processing",
+	})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "sedang diproses") {
+		t.Fatalf("expected processing idempotency error, got: %v", err)
+	}
+	if fake.buyActivationHits != 0 {
+		t.Fatalf("provider buy should not be called when processing, got %d", fake.buyActivationHits)
+	}
+}
+
+func TestFiveSimServiceBuyHostingIdempotencyReturnsExistingOrder(t *testing.T) {
+	svc, _, fake, activeUser, _ := setupFiveSimService(t)
+	fake.buyHostingResp = &FiveSimOrderPayload{
+		ID:       991126,
+		Phone:    "+447000001126",
+		Operator: "vodafone",
+		Product:  "telegram",
+		Price:    0.34,
+		Status:   "PENDING",
+		Country:  "england",
+	}
+
+	input := FiveSimBuyHostingInput{
+		Country:        "england",
+		Operator:       "any",
+		Product:        "telegram",
+		IdempotencyKey: "idem-fivesim-hosting-001",
+	}
+
+	first, _, err := svc.BuyHosting(context.Background(), activeUser.ID, input)
+	if err != nil {
+		t.Fatalf("first buy hosting: %v", err)
+	}
+	second, _, err := svc.BuyHosting(context.Background(), activeUser.ID, input)
+	if err != nil {
+		t.Fatalf("second buy hosting idempotent: %v", err)
+	}
+
+	if fake.buyHostingHits != 1 {
+		t.Fatalf("provider hosting buy should be called once, got %d", fake.buyHostingHits)
+	}
+	if first.ProviderOrderID != second.ProviderOrderID {
+		t.Fatalf("hosting idempotency should return same provider order id, got %d and %d", first.ProviderOrderID, second.ProviderOrderID)
+	}
+}
+
+func TestFiveSimServiceReuseNumberIdempotencyReturnsExistingOrder(t *testing.T) {
+	svc, _, fake, activeUser, _ := setupFiveSimService(t)
+	fake.reuseResp = &FiveSimOrderPayload{
+		ID:       991127,
+		Phone:    "+447000001127",
+		Operator: "vodafone",
+		Product:  "telegram",
+		Price:    0.34,
+		Status:   "PENDING",
+		Country:  "england",
+	}
+
+	input := FiveSimReuseInput{
+		Product:        "telegram",
+		Number:         "+447000001127",
+		IdempotencyKey: "idem-fivesim-reuse-001",
+	}
+
+	first, _, err := svc.ReuseNumber(context.Background(), activeUser.ID, input)
+	if err != nil {
+		t.Fatalf("first reuse number: %v", err)
+	}
+	second, _, err := svc.ReuseNumber(context.Background(), activeUser.ID, input)
+	if err != nil {
+		t.Fatalf("second reuse number idempotent: %v", err)
+	}
+
+	if fake.reuseHits != 1 {
+		t.Fatalf("provider reuse should be called once, got %d", fake.reuseHits)
+	}
+	if first.ProviderOrderID != second.ProviderOrderID {
+		t.Fatalf("reuse idempotency should return same provider order id, got %d and %d", first.ProviderOrderID, second.ProviderOrderID)
 	}
 }
 

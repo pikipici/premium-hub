@@ -33,6 +33,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.WalletTopup{},
 		&model.WalletLedger{},
 		&model.FiveSimOrder{},
+		&model.FiveSimOrderIdempotency{},
 		&model.NokosLandingSummary{},
 		&model.ConvertOrder{},
 		&model.ConvertOrderEvent{},

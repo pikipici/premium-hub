@@ -2,7 +2,7 @@
 
 import axios from 'axios'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   CheckCircle2,
@@ -85,6 +85,16 @@ const FALLBACK_WALLET_MIN_DEBIT = (() => {
   if (Number.isFinite(parsed) && parsed > 0) return Math.ceil(parsed)
   return 1
 })()
+
+function buildFiveSimIdempotencyKey(prefix: string) {
+  const now = Date.now()
+  const randomPart =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID().replace(/-/g, '')
+      : Math.random().toString(36).slice(2)
+
+  return `${prefix}-${now}-${randomPart}`.slice(0, 80)
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -522,8 +532,25 @@ export default function NomorVirtualPage() {
   const [liveOrderId, setLiveOrderId] = useState<number | null>(null)
   const [nowTs, setNowTs] = useState(() => Date.now())
 
+  const activationIdempotencyKeyRef = useRef('')
+  const activationIdempotencyScopeRef = useRef('')
+
   const selectedCountryKey = selectedCountry?.key || ''
   const selectedProductKey = selectedProduct?.key || ''
+
+  const resetActivationIdempotencyKey = useCallback(() => {
+    activationIdempotencyKeyRef.current = ''
+    activationIdempotencyScopeRef.current = ''
+  }, [])
+
+  const ensureActivationIdempotencyKey = useCallback(() => {
+    const scope = `${selectedCountryKey}|${selectedProductKey}|${selectedPrice?.operator || DEFAULT_OPERATOR}`
+    if (!activationIdempotencyKeyRef.current || activationIdempotencyScopeRef.current !== scope) {
+      activationIdempotencyScopeRef.current = scope
+      activationIdempotencyKeyRef.current = buildFiveSimIdempotencyKey('fivesim-activation')
+    }
+    return activationIdempotencyKeyRef.current
+  }, [selectedCountryKey, selectedProductKey, selectedPrice?.operator])
 
   const filteredCountries = useMemo(() => {
     const query = countryQuery.trim().toLowerCase()
@@ -771,6 +798,7 @@ export default function NomorVirtualPage() {
     setProducts([])
     setPriceOptions([])
     setInsufficientByServer(false)
+    resetActivationIdempotencyKey()
   }
 
   const applyMutateSuccess = useCallback(
@@ -814,12 +842,14 @@ export default function NomorVirtualPage() {
     setBuying(true)
 
     try {
+      const idempotencyKey = ensureActivationIdempotencyKey()
       const res = await fiveSimService.buyActivation({
         country: selectedCountry.key,
         operator: selectedPrice.operator || DEFAULT_OPERATOR,
         product: selectedProduct.key,
         reuse: false,
         voice: false,
+        idempotency_key: idempotencyKey,
       })
 
       if (!res.success) {
