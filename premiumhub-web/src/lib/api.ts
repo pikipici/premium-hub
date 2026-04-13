@@ -4,7 +4,6 @@ import { useAuthStore } from '@/store/authStore'
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
   withCredentials: true,
-  headers: { 'Content-Type': 'application/json' },
 })
 
 const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/google', '/auth/logout']

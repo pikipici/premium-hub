@@ -815,8 +815,8 @@ export default function ProdukPage() {
         hero_bg_url: kind === 'hero' ? nextUrl : prev.hero_bg_url,
       }))
       setNotice(kind === 'icon' ? 'Icon image berhasil diupload ke R2.' : 'Background hero berhasil diupload ke R2.')
-    } catch {
-      setError('Gagal upload gambar produk')
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal upload gambar produk'))
     } finally {
       setUploadingAssetKind(null)
     }
