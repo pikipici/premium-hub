@@ -105,6 +105,25 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject malformed fivesim buy rate limit config", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                    "development",
+			JWTSecret:                 "super-secure-secret-value-32chars++",
+			CookieSameSite:            "lax",
+			AuthRateLimitMax:          "20",
+			AuthRateLimitWindow:       "1m",
+			FiveSimBuyRateLimitMax:    "0",
+			FiveSimBuyRateLimitWindow: "bad-window",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected fivesim buy rate limit validation error")
+		}
+		if !strings.Contains(err.Error(), "FIVESIM_BUY_RATE_LIMIT_MAX") || !strings.Contains(err.Error(), "FIVESIM_BUY_RATE_LIMIT_WINDOW") {
+			t.Fatalf("expected fivesim buy rate limit errors, got: %v", err)
+		}
+	})
+
 	t.Run("production requires pakasir fields", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:    "production",

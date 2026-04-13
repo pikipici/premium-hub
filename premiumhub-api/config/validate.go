@@ -111,6 +111,7 @@ func (c *Config) Validate() error {
 	validateRate(c.ConvertCreateRateLimitMax, c.ConvertCreateRateLimitWindow, "CONVERT_CREATE_RATE_LIMIT_MAX", "CONVERT_CREATE_RATE_LIMIT_WINDOW")
 	validateRate(c.ConvertProofRateLimitMax, c.ConvertProofRateLimitWindow, "CONVERT_PROOF_RATE_LIMIT_MAX", "CONVERT_PROOF_RATE_LIMIT_WINDOW")
 	validateRate(c.ConvertAdminStatusRateLimitMax, c.ConvertAdminStatusRateLimitWindow, "CONVERT_ADMIN_STATUS_RATE_LIMIT_MAX", "CONVERT_ADMIN_STATUS_RATE_LIMIT_WINDOW")
+	validateRate(c.FiveSimBuyRateLimitMax, c.FiveSimBuyRateLimitWindow, "FIVESIM_BUY_RATE_LIMIT_MAX", "FIVESIM_BUY_RATE_LIMIT_WINDOW")
 
 	if v := strings.TrimSpace(c.ConvertExpiryWorkerInterval); v != "" {
 		if _, err := time.ParseDuration(v); err != nil {

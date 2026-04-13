@@ -34,6 +34,7 @@ type Config struct {
 	ConvertCreateRateLimitMax, ConvertCreateRateLimitWindow                     string
 	ConvertProofRateLimitMax, ConvertProofRateLimitWindow                       string
 	ConvertAdminStatusRateLimitMax, ConvertAdminStatusRateLimitWindow           string
+	FiveSimBuyRateLimitMax, FiveSimBuyRateLimitWindow                           string
 	ConvertExpiryWorkerEnabled                                                  bool
 	ConvertExpiryWorkerInterval, ConvertExpiryWorkerBatchLimit                  string
 	ConvertProofStorageMode, ConvertProofLocalDir, ConvertProofMaxFileMB        string
@@ -106,6 +107,8 @@ func Load() *Config {
 		ConvertProofRateLimitWindow:          e("CONVERT_PROOF_RATE_LIMIT_WINDOW", "5m"),
 		ConvertAdminStatusRateLimitMax:       e("CONVERT_ADMIN_STATUS_RATE_LIMIT_MAX", "120"),
 		ConvertAdminStatusRateLimitWindow:    e("CONVERT_ADMIN_STATUS_RATE_LIMIT_WINDOW", "1m"),
+		FiveSimBuyRateLimitMax:               e("FIVESIM_BUY_RATE_LIMIT_MAX", "8"),
+		FiveSimBuyRateLimitWindow:            e("FIVESIM_BUY_RATE_LIMIT_WINDOW", "1m"),
 		ConvertExpiryWorkerEnabled:           eb("CONVERT_EXPIRY_WORKER_ENABLED", true),
 		ConvertExpiryWorkerInterval:          e("CONVERT_EXPIRY_WORKER_INTERVAL", "1m"),
 		ConvertExpiryWorkerBatchLimit:        e("CONVERT_EXPIRY_WORKER_BATCH_LIMIT", "200"),
