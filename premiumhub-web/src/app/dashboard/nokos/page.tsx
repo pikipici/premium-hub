@@ -1458,7 +1458,7 @@ export default function NomorVirtualPage() {
                     className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#141414] text-white px-4 py-3 text-sm font-bold disabled:opacity-60"
                   >
                     {buying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
-                    {buying ? 'Memproses...' : 'Beli Nomor Activation'}
+                    {buying ? 'Memproses...' : 'Beli'}
                   </button>
                 </div>
               </div>
