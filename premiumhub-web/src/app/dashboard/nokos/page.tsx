@@ -510,15 +510,27 @@ function parseSMSList(payload: unknown): FiveSimSMS[] {
   return parseSMSList(rec.sms)
 }
 
+function sanitizeNokosUserMessage(message: string): string {
+  const trimmed = message.trim()
+  if (!trimmed) return trimmed
+
+  return trimmed
+    .replace(/provider order id/gi, 'ID order')
+    .replace(/status provider/gi, 'status sistem')
+    .replace(/order 5sim/gi, 'order nomor virtual')
+    .replace(/nomor 5sim/gi, 'nomor virtual')
+    .replace(/\b5sim\b/gi, 'nomor virtual')
+}
+
 function resolveErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
     const payload = error.response?.data
     const rec = asRecord(payload)
     const apiMessage = asString(rec?.message)
-    return apiMessage || error.message || fallback
+    return sanitizeNokosUserMessage(apiMessage || error.message || fallback)
   }
-  if (error instanceof Error) return error.message
-  return fallback
+  if (error instanceof Error) return sanitizeNokosUserMessage(error.message)
+  return sanitizeNokosUserMessage(fallback)
 }
 
 function isInsufficientBalance(message: string): boolean {
@@ -697,7 +709,7 @@ export default function NomorVirtualPage() {
     try {
       const res = await fiveSimService.getCountries()
       if (!res.success) {
-        setBannerError(res.message || 'Gagal memuat daftar negara')
+        setBannerError(sanitizeNokosUserMessage(res.message || 'Gagal memuat daftar negara'))
         return
       }
       setCountries(parseCountries(res.data))
@@ -713,7 +725,7 @@ export default function NomorVirtualPage() {
     try {
       const res = await fiveSimService.getProducts({ country: countryKey, operator: DEFAULT_OPERATOR })
       if (!res.success) {
-        setBannerError(res.message || 'Gagal memuat layanan')
+        setBannerError(sanitizeNokosUserMessage(res.message || 'Gagal memuat layanan'))
         return
       }
       setProducts(parseProducts(res.data))
@@ -729,7 +741,7 @@ export default function NomorVirtualPage() {
     try {
       const res = await fiveSimService.getPrices({ country: countryKey, product: productKey })
       if (!res.success) {
-        setBannerError(res.message || 'Gagal memuat harga operator')
+        setBannerError(sanitizeNokosUserMessage(res.message || 'Gagal memuat harga operator'))
         return
       }
       setPriceOptions(
@@ -753,7 +765,7 @@ export default function NomorVirtualPage() {
     try {
       const res = await fiveSimService.listOrders({ page, limit: ORDER_PAGE_LIMIT })
       if (!res.success) {
-        setBannerError(res.message || 'Gagal memuat order 5sim')
+        setBannerError(sanitizeNokosUserMessage(res.message || 'Gagal memuat riwayat order'))
         return
       }
 
@@ -761,7 +773,7 @@ export default function NomorVirtualPage() {
       setOrdersTotal(res.meta?.total ?? res.data.length)
       setOrdersTotalPages(res.meta?.total_pages ?? 1)
     } catch (error: unknown) {
-      setBannerError(resolveErrorMessage(error, 'Gagal memuat order 5sim'))
+      setBannerError(resolveErrorMessage(error, 'Gagal memuat riwayat order'))
     } finally {
       setOrdersLoading(false)
     }
@@ -856,7 +868,7 @@ export default function NomorVirtualPage() {
   const applyMutateSuccess = useCallback(
     async (payload: FiveSimMutateResponse, infoMessage: string) => {
       setBannerError('')
-      setBannerInfo(infoMessage)
+      setBannerInfo(sanitizeNokosUserMessage(infoMessage))
       setInsufficientByServer(false)
 
       const updatedOrder = payload.local_order
@@ -905,13 +917,13 @@ export default function NomorVirtualPage() {
       })
 
       if (!res.success) {
-        const message = res.message || 'Gagal membeli nomor activation'
+        const message = sanitizeNokosUserMessage(res.message || 'Gagal membeli nomor activation')
         setBannerError(message)
         setInsufficientByServer(isInsufficientBalance(message))
         return
       }
 
-      await applyMutateSuccess(res.data, res.message || 'Nomor activation berhasil dibeli')
+      await applyMutateSuccess(res.data, sanitizeNokosUserMessage(res.message || 'Nomor activation berhasil dibeli'))
       resetCatalogSelection()
     } catch (error: unknown) {
       const message = resolveErrorMessage(error, 'Gagal membeli nomor activation')
@@ -945,12 +957,12 @@ export default function NomorVirtualPage() {
               : await fiveSimService.banOrder(order.provider_order_id)
 
       if (!response.success) {
-        setBannerError(response.message || 'Gagal memproses aksi order')
+        setBannerError(sanitizeNokosUserMessage(response.message || 'Gagal memproses aksi order'))
         return false
       }
 
       if (!options?.silentSuccess) {
-        setBannerInfo(response.message || 'Aksi order berhasil')
+        setBannerInfo(sanitizeNokosUserMessage(response.message || 'Aksi order berhasil'))
       }
 
       const updatedOrder = response.data.local_order
@@ -1015,7 +1027,7 @@ export default function NomorVirtualPage() {
           [order.provider_order_id]: {
             open: true,
             loading: false,
-            error: res.message || 'Gagal memuat SMS inbox',
+            error: sanitizeNokosUserMessage(res.message || 'Gagal memuat SMS inbox'),
           },
         }))
         return
@@ -1502,7 +1514,7 @@ export default function NomorVirtualPage() {
                             </div>
                             <p className="text-[11px] text-[#888]">
                               {liveSLAExpired
-                                ? 'Melewati 15 menit. Sistem akan auto-handle sesuai status provider.'
+                                ? 'Melewati 15 menit. Sistem akan auto-handle sesuai status order.'
                                 : 'Auto-cancel + refund jalan otomatis kalau sampai 15 menit belum ada SMS.'}
                             </p>
                           </div>
@@ -1639,7 +1651,7 @@ export default function NomorVirtualPage() {
                   type="text"
                   value={orderSearch}
                   onChange={(event) => setOrderSearch(event.target.value)}
-                  placeholder="Cari provider order id, nomor, layanan..."
+                  placeholder="Cari ID order, nomor, layanan..."
                   className="w-full outline-none bg-transparent"
                 />
               </label>
