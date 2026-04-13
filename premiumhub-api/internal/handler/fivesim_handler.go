@@ -71,7 +71,7 @@ func (h *FiveSimHandler) BuyActivation(c *gin.Context) {
 		return
 	}
 
-	response.Created(c, "Nomor 5sim berhasil dibeli", gin.H{
+	response.Created(c, "Nomor virtual berhasil dibeli", gin.H{
 		"local_order":    sanitizeFiveSimLocalOrder(localOrder),
 		"provider_order": sanitizeFiveSimProviderOrder(providerOrder),
 	})
@@ -91,7 +91,7 @@ func (h *FiveSimHandler) BuyHosting(c *gin.Context) {
 		return
 	}
 
-	response.Created(c, "Nomor hosting 5sim berhasil dibeli", gin.H{
+	response.Created(c, "Nomor hosting berhasil dibeli", gin.H{
 		"local_order":    sanitizeFiveSimLocalOrder(localOrder),
 		"provider_order": sanitizeFiveSimProviderOrder(providerOrder),
 	})
@@ -111,7 +111,7 @@ func (h *FiveSimHandler) ReuseNumber(c *gin.Context) {
 		return
 	}
 
-	response.Created(c, "Reuse nomor 5sim berhasil", gin.H{
+	response.Created(c, "Reuse nomor berhasil", gin.H{
 		"local_order":    sanitizeFiveSimLocalOrder(localOrder),
 		"provider_order": sanitizeFiveSimProviderOrder(providerOrder),
 	})
@@ -146,26 +146,26 @@ func (h *FiveSimHandler) ListOrders(c *gin.Context) {
 }
 
 func (h *FiveSimHandler) CheckOrder(c *gin.Context) {
-	h.runOrderAction(c, h.svc.CheckOrder, "Order 5sim berhasil disinkronkan")
+	h.runOrderAction(c, h.svc.CheckOrder, "Order berhasil disinkronkan")
 }
 
 func (h *FiveSimHandler) FinishOrder(c *gin.Context) {
-	h.runOrderAction(c, h.svc.FinishOrder, "Order 5sim di-finish")
+	h.runOrderAction(c, h.svc.FinishOrder, "Order berhasil diselesaikan")
 }
 
 func (h *FiveSimHandler) CancelOrder(c *gin.Context) {
-	h.runOrderAction(c, h.svc.CancelOrder, "Order 5sim dibatalkan")
+	h.runOrderAction(c, h.svc.CancelOrder, "Order berhasil dibatalkan")
 }
 
 func (h *FiveSimHandler) BanOrder(c *gin.Context) {
-	h.runOrderAction(c, h.svc.BanOrder, "Order 5sim di-ban")
+	h.runOrderAction(c, h.svc.BanOrder, "Order berhasil diblokir")
 }
 
 func (h *FiveSimHandler) GetSMSInbox(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	providerOrderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || providerOrderID <= 0 {
-		response.BadRequest(c, "provider_order_id tidak valid")
+		response.BadRequest(c, "id order tidak valid")
 		return
 	}
 
@@ -215,7 +215,7 @@ func (h *FiveSimHandler) runOrderAction(
 	userID := c.MustGet("user_id").(uuid.UUID)
 	providerOrderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || providerOrderID <= 0 {
-		response.BadRequest(c, "provider_order_id tidak valid")
+		response.BadRequest(c, "id order tidak valid")
 		return
 	}
 
