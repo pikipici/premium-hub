@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const ICONS = ['🎬', '🎵', '📺', '🎮', '🎨', '▶️', '☁️', '🔐', '📧']
 
@@ -23,7 +23,25 @@ interface EditProdukPageProps {
 
 export default function EditProdukPage({ onNavigate, showToast }: EditProdukPageProps) {
   const [selectedIcon, setSelectedIcon] = useState('🎬')
+  const [limitModalMessage, setLimitModalMessage] = useState('')
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false)
   const breadcrumbName = 'Netflix Premium'
+
+  const showLimitModal = (message: string) => {
+    setLimitModalMessage(message)
+    setIsLimitModalOpen(true)
+  }
+
+  useEffect(() => {
+    if (!isLimitModalOpen) return
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsLimitModalOpen(false)
+    }
+
+    window.addEventListener('keydown', onEscape)
+    return () => window.removeEventListener('keydown', onEscape)
+  }, [isLimitModalOpen])
 
   const updatePreview = () => {
     const nameEl = document.getElementById('f-name') as HTMLInputElement | null
@@ -97,7 +115,7 @@ export default function EditProdukPage({ onNavigate, showToast }: EditProdukPage
       const list = document.getElementById('features-list')
       if (!list) return
       if (list.children.length >= 8) {
-        alert('Maksimal 8 fitur')
+        showLimitModal('Maksimal 8 fitur')
         return
       }
 
@@ -121,7 +139,7 @@ export default function EditProdukPage({ onNavigate, showToast }: EditProdukPage
       const list = document.getElementById('durations-list')
       if (!list) return
       if (list.children.length >= 4) {
-        alert('Maksimal 4 paket durasi')
+        showLimitModal('Maksimal 4 paket durasi')
         return
       }
 
@@ -392,6 +410,27 @@ export default function EditProdukPage({ onNavigate, showToast }: EditProdukPage
           </div>
         </div>
       </div>
+
+      {isLimitModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Batas item"
+          onClick={() => setIsLimitModalOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 14, border: '1px solid var(--border)', boxShadow: '0 24px 60px rgba(0,0,0,.25)', padding: 16 }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>Perhatian</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 14 }}>{limitModalMessage}</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="topbar-btn primary" onClick={() => setIsLimitModalOpen(false)}>Oke</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
