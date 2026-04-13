@@ -199,6 +199,40 @@ function sortAccountTypes(types: string[]) {
   })
 }
 
+function accountTypeBadgeStyle(value?: string | null) {
+  const normalized = normalizeAccountType(value)
+
+  if (normalized === 'shared') {
+    return {
+      color: '#047857',
+      borderColor: '#A7F3D0',
+      backgroundColor: '#ECFDF5',
+    }
+  }
+
+  if (normalized === 'private') {
+    return {
+      color: '#1D4ED8',
+      borderColor: '#BFDBFE',
+      backgroundColor: '#EFF6FF',
+    }
+  }
+
+  if (normalized === 'family') {
+    return {
+      color: '#7C3AED',
+      borderColor: '#DDD6FE',
+      backgroundColor: '#F5F3FF',
+    }
+  }
+
+  return {
+    color: '#475467',
+    borderColor: '#D0D5DD',
+    backgroundColor: '#F9FAFB',
+  }
+}
+
 function extractProductAccountTypes(product?: Product | null) {
   if (!product) return []
 
@@ -924,6 +958,8 @@ export default function StokPage() {
                   filteredStocks.map((stock) => {
                     const product = resolveProduct(stock)
                     const status = stockStatusMeta(stock.status)
+                    const accountTypeLabel = formatAccountTypeLabel(stock.account_type)
+                    const accountTypeStyle = accountTypeBadgeStyle(stock.account_type)
                     const isUsed = stock.status === 'used'
                     const isDeleting = deletingID === stock.id
 
@@ -938,7 +974,25 @@ export default function StokPage() {
                           <div className="order-id" style={{ fontSize: 12 }}>{stock.email}</div>
                           <div className="order-email">ID: {shortID(stock.id)}</div>
                         </td>
-                        <td>{formatAccountTypeLabel(stock.account_type)}</td>
+                        <td>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '4px 10px',
+                              borderRadius: 999,
+                              border: `1px solid ${accountTypeStyle.borderColor}`,
+                              background: accountTypeStyle.backgroundColor,
+                              color: accountTypeStyle.color,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              letterSpacing: 0.1,
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {accountTypeLabel}
+                          </span>
+                        </td>
                         <td>{stock.profile_name || '-'}</td>
                         <td>
                           <span className={`status-badge ${status.className}`}>{status.label}</span>
@@ -1140,6 +1194,8 @@ export default function StokPage() {
               filteredStocks.map((stock) => {
                 const product = resolveProduct(stock)
                 const status = stockStatusMeta(stock.status)
+                const accountTypeLabel = formatAccountTypeLabel(stock.account_type)
+                const accountTypeStyle = accountTypeBadgeStyle(stock.account_type)
                 const isUsed = stock.status === 'used'
                 const isDeleting = deletingID === stock.id
 
@@ -1148,8 +1204,26 @@ export default function StokPage() {
                     <div className="mobile-card-head">
                       <div>
                         <div className="mobile-card-title">{stock.email}</div>
-                        <div className="mobile-card-sub">
-                          {product.icon} {product.name} · {formatAccountTypeLabel(stock.account_type)}
+                        <div className="mobile-card-sub" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span>
+                            {product.icon} {product.name}
+                          </span>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              border: `1px solid ${accountTypeStyle.borderColor}`,
+                              background: accountTypeStyle.backgroundColor,
+                              color: accountTypeStyle.color,
+                              fontSize: 10,
+                              fontWeight: 600,
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {accountTypeLabel}
+                          </span>
                         </div>
                       </div>
                       <span className={`status-badge ${status.className}`}>{status.label}</span>
