@@ -253,12 +253,7 @@ export default function PremAppsProductDetailPage() {
 
       <section className="py-12 md:py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div
-            className="rounded-3xl p-8 md:p-10 mb-8"
-            style={{
-              backgroundColor: product.color || '#F7F7F5',
-            }}
-          >
+          <div className="rounded-3xl p-8 md:p-10 mb-8 border border-[#EBEBEB] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
             <div className="flex items-start gap-4">
               {product.icon_image_url ? (
                 <div className="w-14 h-14 rounded-2xl bg-white/95 border border-white shadow-sm p-1.5">
@@ -274,7 +269,7 @@ export default function PremAppsProductDetailPage() {
                       {popularBadge}
                     </span>
                   )}
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/80 text-[#1F2937]">
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#F3F4F6] text-[#1F2937]">
                     {guaranteeBadge}
                   </span>
                 </div>
@@ -289,7 +284,7 @@ export default function PremAppsProductDetailPage() {
             <p className="mt-4 text-sm text-[#666] leading-relaxed">{product.description}</p>
 
             {!!product.sold_text?.trim() && (
-              <div className="mt-4 text-xs font-semibold text-[#2F3A4A] bg-white/70 rounded-full inline-flex px-3 py-1.5">
+              <div className="mt-4 text-xs font-semibold text-[#2F3A4A] bg-[#F8FAFC] border border-[#E5E7EB] rounded-full inline-flex px-3 py-1.5">
                 {product.sold_text}
               </div>
             )}
@@ -308,7 +303,7 @@ export default function PremAppsProductDetailPage() {
                 return (
                   <div
                     key={`${item.text}-${index}`}
-                    className="flex items-center gap-1.5 text-xs font-medium text-[#141414] bg-white/60 px-3 py-1.5 rounded-full"
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#141414] bg-[#F8FAFC] border border-[#E5E7EB] px-3 py-1.5 rounded-full"
                   >
                     <span>{item.icon}</span>
                     {iconNode}
