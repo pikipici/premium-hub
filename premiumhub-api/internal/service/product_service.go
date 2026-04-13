@@ -16,9 +16,11 @@ import (
 )
 
 type ProductService struct {
-	productRepo   *repository.ProductRepo
-	stockRepo     *repository.StockRepo
-	productAssets *storage.ProductAssetStorage
+	productRepo     *repository.ProductRepo
+	stockRepo       *repository.StockRepo
+	productAssets   *storage.ProductAssetStorage
+	accountTypeRepo *repository.AccountTypeRepo
+	accountTypeSvc  *AccountTypeService
 }
 
 func NewProductService(productRepo *repository.ProductRepo, stockRepo *repository.StockRepo, productAssets ...*storage.ProductAssetStorage) *ProductService {
@@ -27,6 +29,14 @@ func NewProductService(productRepo *repository.ProductRepo, stockRepo *repositor
 		assets = productAssets[0]
 	}
 	return &ProductService{productRepo: productRepo, stockRepo: stockRepo, productAssets: assets}
+}
+
+func (s *ProductService) SetAccountTypeRepo(repo *repository.AccountTypeRepo) *ProductService {
+	s.accountTypeRepo = repo
+	if repo != nil {
+		s.accountTypeSvc = NewAccountTypeService(repo)
+	}
+	return s
 }
 
 func (s *ProductService) List(category string, page, limit int) ([]model.Product, int64, error) {
@@ -316,14 +326,32 @@ type UpdateProductPriceInput struct {
 	IsActive    *bool   `json:"is_active"`
 }
 
+func (s *ProductService) validateCatalogAccountType(raw string) (string, error) {
+	accountType := normalizeAccountType(raw)
+	if accountType == "" {
+		return "", errors.New("account_type wajib diisi")
+	}
+
+	if s.accountTypeSvc == nil {
+		return accountType, nil
+	}
+
+	validated, err := s.accountTypeSvc.ValidateActiveCode(accountType)
+	if err != nil {
+		return "", err
+	}
+
+	return validated, nil
+}
+
 func (s *ProductService) CreatePrice(productID uuid.UUID, input CreateProductPriceInput) (*model.ProductPrice, error) {
 	if _, err := s.productRepo.FindByID(productID); err != nil {
 		return nil, errors.New("produk tidak ditemukan")
 	}
 
-	accountType := normalizeAccountType(input.AccountType)
-	if accountType == "" {
-		return nil, errors.New("account_type wajib diisi")
+	accountType, err := s.validateCatalogAccountType(input.AccountType)
+	if err != nil {
+		return nil, err
 	}
 	if input.Duration < 1 {
 		return nil, errors.New("durasi harus lebih dari 0")
@@ -393,11 +421,11 @@ func (s *ProductService) UpdatePrice(productID, priceID uuid.UUID, input UpdateP
 		nextDuration = *input.Duration
 	}
 	if input.AccountType != nil {
-		normalized := normalizeAccountType(*input.AccountType)
-		if normalized == "" {
-			return nil, errors.New("account_type wajib diisi")
+		validated, err := s.validateCatalogAccountType(*input.AccountType)
+		if err != nil {
+			return nil, err
 		}
-		nextAccountType = normalized
+		nextAccountType = validated
 	}
 	if input.Price != nil && *input.Price < 1 {
 		return nil, errors.New("harga harus lebih dari 0")

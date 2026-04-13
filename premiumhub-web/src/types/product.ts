@@ -51,7 +51,7 @@ export interface ProductPrice {
   id: string
   product_id: string
   duration: number
-  account_type: 'shared' | 'private'
+  account_type: string
   label?: string
   savings_text?: string
   price: number

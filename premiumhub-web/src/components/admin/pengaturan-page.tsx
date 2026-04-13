@@ -1,75 +1,493 @@
 "use client"
 
+import axios from 'axios'
+import { useEffect, useMemo, useState } from 'react'
+
+import {
+  accountTypeService,
+  type AdminAccountTypePayload,
+  type AdminAccountTypeUpdatePayload,
+} from '@/services/accountTypeService'
+import type { AccountType } from '@/types/accountType'
+
+type FormMode = 'create' | 'edit'
+
+type AccountTypeFormState = {
+  code: string
+  label: string
+  description: string
+  sort_order: string
+  badge_bg_color: string
+  badge_text_color: string
+  is_active: boolean
+}
+
+const EMPTY_FORM: AccountTypeFormState = {
+  code: '',
+  label: '',
+  description: '',
+  sort_order: '100',
+  badge_bg_color: '',
+  badge_text_color: '',
+  is_active: true,
+}
+
+function mapErrorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err)) {
+    const message = (err.response?.data as { message?: string } | undefined)?.message
+    if (message) return message
+  }
+
+  return fallback
+}
+
+function normalizeCode(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9_-]/g, '')
+}
+
+function statusLabel(item: AccountType) {
+  if (!item.is_active) return { label: 'Nonaktif', className: 's-gagal' }
+  if (item.is_system) return { label: 'Sistem', className: 's-lunas' }
+  return { label: 'Aktif', className: 's-pending' }
+}
+
 export default function PengaturanPage() {
+  const [items, setItems] = useState<AccountType[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const [formOpen, setFormOpen] = useState(false)
+  const [formMode, setFormMode] = useState<FormMode>('create')
+  const [editingItem, setEditingItem] = useState<AccountType | null>(null)
+  const [form, setForm] = useState<AccountTypeFormState>(EMPTY_FORM)
+
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmTarget, setConfirmTarget] = useState<AccountType | null>(null)
+
+  const sortedItems = useMemo(
+    () =>
+      [...items].sort((left, right) => {
+        if (left.sort_order !== right.sort_order) {
+          return left.sort_order - right.sort_order
+        }
+        return left.code.localeCompare(right.code)
+      }),
+    [items]
+  )
+
+  const loadAccountTypes = async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await accountTypeService.adminList({ include_inactive: true })
+      if (!res.success) {
+        setError(res.message || 'Gagal memuat master tipe akun')
+        return
+      }
+      setItems(res.data || [])
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal memuat master tipe akun'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadAccountTypes()
+  }, [])
+
+  const openCreateForm = () => {
+    setFormMode('create')
+    setEditingItem(null)
+    setForm(EMPTY_FORM)
+    setError('')
+    setFormOpen(true)
+  }
+
+  const openEditForm = (item: AccountType) => {
+    setFormMode('edit')
+    setEditingItem(item)
+    setForm({
+      code: item.code,
+      label: item.label || '',
+      description: item.description || '',
+      sort_order: String(item.sort_order ?? 100),
+      badge_bg_color: item.badge_bg_color || '',
+      badge_text_color: item.badge_text_color || '',
+      is_active: item.is_active,
+    })
+    setError('')
+    setFormOpen(true)
+  }
+
+  const closeForm = () => {
+    if (saving) return
+    setFormOpen(false)
+    setEditingItem(null)
+    setForm(EMPTY_FORM)
+  }
+
+  const submitForm = async () => {
+    const normalizedCode = normalizeCode(form.code)
+    if (!normalizedCode) {
+      setError('Kode tipe akun wajib diisi')
+      return
+    }
+
+    if (!form.label.trim()) {
+      setError('Label tipe akun wajib diisi')
+      return
+    }
+
+    const sortOrder = Number(form.sort_order) || 100
+
+    const payloadBase: AdminAccountTypePayload = {
+      code: normalizedCode,
+      label: form.label.trim(),
+      description: form.description.trim(),
+      sort_order: sortOrder,
+      badge_bg_color: form.badge_bg_color.trim(),
+      badge_text_color: form.badge_text_color.trim(),
+      is_active: form.is_active,
+    }
+
+    setSaving(true)
+    setError('')
+
+    try {
+      if (formMode === 'create') {
+        const res = await accountTypeService.adminCreate(payloadBase)
+        if (!res.success) {
+          setError(res.message || 'Gagal membuat tipe akun')
+          return
+        }
+        setNotice(`Tipe akun "${res.data.label}" berhasil dibuat.`)
+      } else if (editingItem) {
+        const payload: AdminAccountTypeUpdatePayload = {
+          code: normalizedCode,
+          label: payloadBase.label,
+          description: payloadBase.description,
+          sort_order: payloadBase.sort_order,
+          badge_bg_color: payloadBase.badge_bg_color,
+          badge_text_color: payloadBase.badge_text_color,
+          is_active: payloadBase.is_active,
+        }
+
+        const res = await accountTypeService.adminUpdate(editingItem.id, payload)
+        if (!res.success) {
+          setError(res.message || 'Gagal memperbarui tipe akun')
+          return
+        }
+        setNotice(`Tipe akun "${res.data.label}" berhasil diperbarui.`)
+      }
+
+      closeForm()
+      await loadAccountTypes()
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal menyimpan tipe akun'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleActive = async (item: AccountType) => {
+    setSaving(true)
+    setError('')
+
+    try {
+      const res = await accountTypeService.adminUpdate(item.id, { is_active: !item.is_active })
+      if (!res.success) {
+        setError(res.message || 'Gagal mengubah status tipe akun')
+        return
+      }
+
+      setNotice(
+        !item.is_active
+          ? `Tipe akun "${item.label}" diaktifkan.`
+          : `Tipe akun "${item.label}" dinonaktifkan.`
+      )
+      await loadAccountTypes()
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal mengubah status tipe akun'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const requestDelete = (item: AccountType) => {
+    setConfirmTarget(item)
+    setConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!confirmTarget) return
+
+    setSaving(true)
+    setError('')
+    setConfirmOpen(false)
+
+    try {
+      const res = await accountTypeService.adminDelete(confirmTarget.id)
+      if (!res.success) {
+        setError(res.message || 'Gagal menonaktifkan tipe akun')
+        return
+      }
+
+      setNotice(`Tipe akun "${confirmTarget.label}" berhasil dinonaktifkan.`)
+      await loadAccountTypes()
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal menonaktifkan tipe akun'))
+    } finally {
+      setSaving(false)
+      setConfirmTarget(null)
+    }
+  }
+
   return (
     <div className="page">
-      <div className="admin-desktop-only">
-        <div className="grid-2-eq">
-          <div className="card">
-            <div className="card-header"><h2>⚙️ Sistem &amp; Umum</h2></div>
-            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div><label className="form-label">Nama Toko</label><input type="text" className="form-input" defaultValue="DigiMarket" /></div>
-              <div><label className="form-label">Email Admin</label><input type="text" className="form-input" defaultValue="admin@premiumhub.id" /></div>
-              <div><label className="form-label">Durasi Garansi Default</label><select className="form-select" defaultValue="7 Hari"><option>1 x 24 Jam</option><option>3 x 24 Jam</option><option>7 Hari</option><option>30 Hari</option></select></div>
-              <div><label className="form-label">Batas Stok Kritis</label><div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="number" className="form-input" defaultValue={3} style={{ width: 80 }} /><span style={{ fontSize: 13, color: 'var(--muted)' }}>akun tersisa</span></div></div>
-              <button className="topbar-btn primary" style={{ justifyContent: 'center' }}>Simpan Pengaturan</button>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-header"><h2>📧 Template Email</h2></div>
-            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div><label className="form-label">Jenis Template</label><select className="form-select"><option>Email Order Berhasil</option><option>Email Pengiriman Akun</option><option>Email Garansi Disetujui</option></select></div>
-              <div><label className="form-label">Subject</label><input type="text" className="form-input" defaultValue="✅ Order #{{order_id}} Berhasil — DigiMarket" /></div>
-              <div><label className="form-label">Body Email</label><textarea className="form-textarea" rows={5} defaultValue={`Halo {{nama}},\nTerima kasih sudah berbelanja di DigiMarket! 🎉\n\nOrder kamu #{{order_id}} untuk produk {{produk}} telah berhasil.\nAkun akan dikirim dalam 5 menit.\n\nSalam, Tim DigiMarket`} /></div>
-              <button className="topbar-btn primary" style={{ justifyContent: 'center' }}>Simpan Template</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="admin-mobile-only">
-        <div className="mobile-page-head">
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div>
-            <div className="mobile-page-title">Pengaturan</div>
-            <div className="mobile-page-subtitle">Konfigurasi utama & template</div>
+            <h2>Master Tipe Akun</h2>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              Semua paket harga dan stok akun wajib pakai tipe dari master ini.
+            </div>
           </div>
+
+          <button className="topbar-btn primary" type="button" onClick={openCreateForm}>
+            + Tambah Tipe Akun
+          </button>
         </div>
 
-        <div className="mobile-card-list">
-          <article className="mobile-card">
-            <div className="mobile-card-head">
-              <div>
-                <div className="mobile-card-title">⚙️ Sistem & Umum</div>
-                <div className="mobile-card-sub">Identitas toko dan default operasional</div>
+        {(error || notice) && (
+          <div style={{ padding: '0 18px 12px' }}>
+            {error && (
+              <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--red)' }}>
+                {error}
               </div>
-            </div>
+            )}
+            {notice && <div className="alert success">{notice}</div>}
+          </div>
+        )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div><label className="form-label">Nama Toko</label><input type="text" className="form-input" defaultValue="DigiMarket" /></div>
-              <div><label className="form-label">Email Admin</label><input type="text" className="form-input" defaultValue="admin@premiumhub.id" /></div>
-              <div><label className="form-label">Durasi Garansi Default</label><select className="form-select" defaultValue="7 Hari"><option>1 x 24 Jam</option><option>3 x 24 Jam</option><option>7 Hari</option><option>30 Hari</option></select></div>
-              <div><label className="form-label">Batas Stok Kritis</label><input type="number" className="form-input" defaultValue={3} /></div>
-              <button className="mobile-chip-btn primary" style={{ width: '100%', borderRadius: 10, padding: '9px 10px' }}>Simpan Pengaturan</button>
-            </div>
-          </article>
+        <div style={{ padding: '0 18px 18px' }}>
+          {loading ? (
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memuat master tipe akun...</div>
+          ) : sortedItems.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada tipe akun.</div>
+          ) : (
+            <div className="table-wrap" style={{ overflowX: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Kode</th>
+                    <th>Label</th>
+                    <th>Urutan</th>
+                    <th>Badge</th>
+                    <th>Status</th>
+                    <th style={{ width: 200 }}>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedItems.map((item) => {
+                    const status = statusLabel(item)
 
-          <article className="mobile-card">
-            <div className="mobile-card-head">
-              <div>
-                <div className="mobile-card-title">📧 Template Email</div>
-                <div className="mobile-card-sub">Template otomatis untuk notifikasi</div>
-              </div>
+                    return (
+                      <tr key={item.id}>
+                        <td>
+                          <code>{item.code}</code>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{item.label}</div>
+                          {item.description && (
+                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{item.description}</div>
+                          )}
+                        </td>
+                        <td>{item.sort_order}</td>
+                        <td>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '4px 10px',
+                              borderRadius: 999,
+                              border: `1px solid ${item.badge_bg_color || '#D0D5DD'}`,
+                              background: item.badge_bg_color ? `${item.badge_bg_color}1F` : '#F9FAFB',
+                              color: item.badge_text_color || '#475467',
+                              fontSize: 11,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {item.label}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status ${status.className}`}>{status.label}</span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button className="action-btn" type="button" onClick={() => openEditForm(item)}>
+                              Edit
+                            </button>
+                            {!item.is_system && (
+                              <button className="action-btn" type="button" onClick={() => toggleActive(item)}>
+                                {item.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                              </button>
+                            )}
+                            {!item.is_system && (
+                              <button
+                                className="action-btn"
+                                type="button"
+                                style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                                onClick={() => requestDelete(item)}
+                              >
+                                Hapus
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div><label className="form-label">Jenis Template</label><select className="form-select"><option>Email Order Berhasil</option><option>Email Pengiriman Akun</option><option>Email Garansi Disetujui</option></select></div>
-              <div><label className="form-label">Subject</label><input type="text" className="form-input" defaultValue="✅ Order #{{order_id}} Berhasil — DigiMarket" /></div>
-              <div><label className="form-label">Body Email</label><textarea className="form-textarea" rows={6} defaultValue={`Halo {{nama}},\nTerima kasih sudah berbelanja di DigiMarket! 🎉\n\nOrder kamu #{{order_id}} untuk produk {{produk}} telah berhasil.\nAkun akan dikirim dalam 5 menit.\n\nSalam, Tim DigiMarket`} /></div>
-              <button className="mobile-chip-btn primary" style={{ width: '100%', borderRadius: 10, padding: '9px 10px' }}>Simpan Template</button>
-            </div>
-          </article>
+          )}
         </div>
       </div>
+
+      {formOpen && (
+        <div className="modal-overlay" onClick={closeForm}>
+          <div className="modal-card" style={{ width: 'min(620px, 95vw)' }} onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h3>{formMode === 'create' ? 'Tambah Tipe Akun' : 'Edit Tipe Akun'}</h3>
+                <div className="modal-sub">Kode bersifat permanen setelah dibuat.</div>
+              </div>
+              <button className="modal-close" type="button" onClick={closeForm}>×</button>
+            </div>
+
+            <div className="modal-body" style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label className="form-label">Kode</label>
+                  <input
+                    className="form-input"
+                    value={form.code}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        code: normalizeCode(event.target.value),
+                      }))
+                    }
+                    disabled={formMode === 'edit'}
+                    placeholder="contoh: shared"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Urutan</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={form.sort_order}
+                    onChange={(event) => setForm((prev) => ({ ...prev, sort_order: event.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Label</label>
+                <input
+                  className="form-input"
+                  value={form.label}
+                  onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))}
+                  placeholder="Shared · Akun Bersama"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Deskripsi</label>
+                <input
+                  className="form-input"
+                  value={form.description}
+                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                  placeholder="Opsional"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label className="form-label">Warna Badge Background</label>
+                  <input
+                    className="form-input"
+                    value={form.badge_bg_color}
+                    onChange={(event) => setForm((prev) => ({ ...prev, badge_bg_color: event.target.value }))}
+                    placeholder="#ECFDF5"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Warna Badge Text</label>
+                  <input
+                    className="form-input"
+                    value={form.badge_text_color}
+                    onChange={(event) => setForm((prev) => ({ ...prev, badge_text_color: event.target.value }))}
+                    placeholder="#047857"
+                  />
+                </div>
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  disabled={editingItem?.is_system}
+                  onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                />
+                Aktif untuk dipakai pada harga & stok
+              </label>
+            </div>
+
+            <div className="modal-actions">
+              <button className="action-btn" type="button" onClick={closeForm} disabled={saving}>
+                Batal
+              </button>
+              <button className="topbar-btn primary" type="button" onClick={submitForm} disabled={saving}>
+                {saving ? 'Menyimpan...' : formMode === 'create' ? 'Simpan Tipe Akun' : 'Update Tipe Akun'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmOpen && confirmTarget && (
+        <div className="modal-overlay" onClick={() => setConfirmOpen(false)}>
+          <div className="modal-card" style={{ width: 'min(460px, 94vw)' }} onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Nonaktifkan Tipe Akun</h3>
+              <button className="modal-close" type="button" onClick={() => setConfirmOpen(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ fontSize: 13, color: 'var(--text)' }}>
+              Tipe akun <strong>{confirmTarget.label}</strong> akan dinonaktifkan dari input admin.
+            </div>
+            <div className="modal-actions">
+              <button className="action-btn" type="button" onClick={() => setConfirmOpen(false)}>
+                Batal
+              </button>
+              <button className="topbar-btn primary" type="button" onClick={confirmDelete}>
+                Ya, Nonaktifkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

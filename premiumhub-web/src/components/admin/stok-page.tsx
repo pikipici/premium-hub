@@ -2,6 +2,7 @@
 
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { accountTypeService } from '@/services/accountTypeService'
 import { productService } from '@/services/productService'
 import {
   stockService,
@@ -9,6 +10,7 @@ import {
   type AdminStockPayload,
   type AdminStockStatus,
 } from '@/services/stockService'
+import type { AccountType } from '@/types/accountType'
 import type { Product } from '@/types/product'
 import type { Stock } from '@/types/stock'
 
@@ -63,15 +65,16 @@ const EMPTY_BULK_FORM: BulkFormState = {
   rows: '',
 }
 
-const ACCOUNT_TYPE_PRIORITY: Record<string, number> = {
-  shared: 0,
-  private: 1,
-}
-
-const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+const FALLBACK_ACCOUNT_TYPE_LABELS: Record<string, string> = {
   shared: 'Shared · Akun Bersama',
   private: 'Private · Akun Pribadi',
   family: 'Family · Akun Keluarga',
+}
+
+const DEFAULT_BADGE_STYLE = {
+  color: '#475467',
+  borderColor: '#D0D5DD',
+  backgroundColor: '#F9FAFB',
 }
 
 function mapErrorMessage(err: unknown, fallback: string) {
@@ -175,65 +178,59 @@ function normalizeAccountType(value?: string | null) {
   return (value || '').trim().toLowerCase()
 }
 
-function formatAccountTypeLabel(value?: string | null) {
-  const normalized = normalizeAccountType(value)
-  if (!normalized) return '-'
+function accountTypeLabelFromCode(code: string) {
+  const fallback = FALLBACK_ACCOUNT_TYPE_LABELS[code]
+  if (fallback) return fallback
 
-  const directLabel = ACCOUNT_TYPE_LABELS[normalized]
-  if (directLabel) return directLabel
-
-  return normalized
+  return code
     .split(/[-_\s]+/)
     .filter(Boolean)
     .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
     .join(' ')
 }
 
-function sortAccountTypes(types: string[]) {
-  return [...types].sort((a, b) => {
-    const left = ACCOUNT_TYPE_PRIORITY[a] ?? 999
-    const right = ACCOUNT_TYPE_PRIORITY[b] ?? 999
+function formatAccountTypeLabel(value?: string | null, accountTypeMap?: Record<string, AccountType>) {
+  const normalized = normalizeAccountType(value)
+  if (!normalized) return '-'
 
-    if (left !== right) return left - right
-    return a.localeCompare(b, 'id')
+  const configured = accountTypeMap?.[normalized]
+  if (configured?.label?.trim()) {
+    return configured.label.trim()
+  }
+
+  return accountTypeLabelFromCode(normalized)
+}
+
+function sortAccountTypes(types: string[], accountTypeMap?: Record<string, AccountType>) {
+  return [...types].sort((left, right) => {
+    const leftSort = accountTypeMap?.[left]?.sort_order ?? 999
+    const rightSort = accountTypeMap?.[right]?.sort_order ?? 999
+
+    if (leftSort !== rightSort) return leftSort - rightSort
+    return left.localeCompare(right, 'id')
   })
 }
 
-function accountTypeBadgeStyle(value?: string | null) {
+function accountTypeBadgeStyle(value?: string | null, accountTypeMap?: Record<string, AccountType>) {
   const normalized = normalizeAccountType(value)
+  if (!normalized) return DEFAULT_BADGE_STYLE
 
-  if (normalized === 'shared') {
-    return {
-      color: '#047857',
-      borderColor: '#A7F3D0',
-      backgroundColor: '#ECFDF5',
-    }
+  const configured = accountTypeMap?.[normalized]
+  if (!configured) {
+    return DEFAULT_BADGE_STYLE
   }
 
-  if (normalized === 'private') {
-    return {
-      color: '#1D4ED8',
-      borderColor: '#BFDBFE',
-      backgroundColor: '#EFF6FF',
-    }
-  }
-
-  if (normalized === 'family') {
-    return {
-      color: '#7C3AED',
-      borderColor: '#DDD6FE',
-      backgroundColor: '#F5F3FF',
-    }
-  }
+  const bgColor = configured.badge_bg_color?.trim()
+  const textColor = configured.badge_text_color?.trim()
 
   return {
-    color: '#475467',
-    borderColor: '#D0D5DD',
-    backgroundColor: '#F9FAFB',
+    color: textColor || DEFAULT_BADGE_STYLE.color,
+    borderColor: bgColor || DEFAULT_BADGE_STYLE.borderColor,
+    backgroundColor: bgColor ? `${bgColor}1F` : DEFAULT_BADGE_STYLE.backgroundColor,
   }
 }
 
-function extractProductAccountTypes(product?: Product | null) {
+function extractProductAccountTypes(product?: Product | null, accountTypeMap?: Record<string, AccountType>) {
   if (!product) return []
 
   const set = new Set<string>()
@@ -245,12 +242,13 @@ function extractProductAccountTypes(product?: Product | null) {
     }
   })
 
-  return sortAccountTypes(Array.from(set))
+  return sortAccountTypes(Array.from(set), accountTypeMap)
 }
 
 export default function StokPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [stocks, setStocks] = useState<Stock[]>([])
+  const [accountTypes, setAccountTypes] = useState<AccountType[]>([])
 
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -280,12 +278,21 @@ export default function StokPage() {
     }, {})
   }, [products])
 
+  const accountTypeLookup = useMemo(() => {
+    return accountTypes.reduce<Record<string, AccountType>>((acc, item) => {
+      const code = normalizeAccountType(item.code)
+      if (!code) return acc
+      acc[code] = item
+      return acc
+    }, {})
+  }, [accountTypes])
+
   const getProductAccountTypes = useCallback(
     (productID?: string) => {
       if (!productID) return []
-      return extractProductAccountTypes(productLookup[productID])
+      return extractProductAccountTypes(productLookup[productID], accountTypeLookup)
     },
-    [productLookup]
+    [accountTypeLookup, productLookup]
   )
 
   const resolveProduct = useCallback(
@@ -315,6 +322,16 @@ export default function StokPage() {
     },
     [productLookup]
   )
+
+  const loadAccountTypes = useCallback(async () => {
+    try {
+      const res = await accountTypeService.adminList({ include_inactive: true })
+      if (!res.success) return
+      setAccountTypes(res.data || [])
+    } catch {
+      // best effort only for labels + sorting
+    }
+  }, [])
 
   const loadProducts = useCallback(async () => {
     try {
@@ -390,8 +407,8 @@ export default function StokPage() {
   )
 
   useEffect(() => {
-    void loadProducts()
-  }, [loadProducts])
+    void Promise.all([loadProducts(), loadAccountTypes()])
+  }, [loadAccountTypes, loadProducts])
 
   useEffect(() => {
     void loadStocks()
@@ -418,7 +435,7 @@ export default function StokPage() {
         stock.email,
         stock.profile_name || '',
         stock.account_type,
-        formatAccountTypeLabel(stock.account_type),
+        formatAccountTypeLabel(stock.account_type, accountTypeLookup),
         stock.status,
         product.name,
       ]
@@ -427,7 +444,7 @@ export default function StokPage() {
 
       return haystack.includes(keyword)
     })
-  }, [resolveProduct, search, stocks])
+  }, [accountTypeLookup, resolveProduct, search, stocks])
 
   const stockSummary = useMemo<StockSummary[]>(() => {
     const byProduct = new Map<string, StockSummary>()
@@ -958,8 +975,8 @@ export default function StokPage() {
                   filteredStocks.map((stock) => {
                     const product = resolveProduct(stock)
                     const status = stockStatusMeta(stock.status)
-                    const accountTypeLabel = formatAccountTypeLabel(stock.account_type)
-                    const accountTypeStyle = accountTypeBadgeStyle(stock.account_type)
+                    const accountTypeLabel = formatAccountTypeLabel(stock.account_type, accountTypeLookup)
+                    const accountTypeStyle = accountTypeBadgeStyle(stock.account_type, accountTypeLookup)
                     const isUsed = stock.status === 'used'
                     const isDeleting = deletingID === stock.id
 
@@ -1194,8 +1211,8 @@ export default function StokPage() {
               filteredStocks.map((stock) => {
                 const product = resolveProduct(stock)
                 const status = stockStatusMeta(stock.status)
-                const accountTypeLabel = formatAccountTypeLabel(stock.account_type)
-                const accountTypeStyle = accountTypeBadgeStyle(stock.account_type)
+                const accountTypeLabel = formatAccountTypeLabel(stock.account_type, accountTypeLookup)
+                const accountTypeStyle = accountTypeBadgeStyle(stock.account_type, accountTypeLookup)
                 const isUsed = stock.status === 'used'
                 const isDeleting = deletingID === stock.id
 
@@ -1360,7 +1377,7 @@ export default function StokPage() {
                   </option>
                   {formAccountTypeOptions.map((item) => (
                     <option key={item} value={item}>
-                      {formatAccountTypeLabel(item)}
+                      {formatAccountTypeLabel(item, accountTypeLookup)}
                     </option>
                   ))}
                 </select>
@@ -1499,7 +1516,7 @@ export default function StokPage() {
                     </option>
                     {bulkAccountTypeOptions.map((item) => (
                       <option key={item} value={item}>
-                        {formatAccountTypeLabel(item)}
+                        {formatAccountTypeLabel(item, accountTypeLookup)}
                       </option>
                     ))}
                   </select>

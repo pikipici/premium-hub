@@ -14,8 +14,9 @@ import (
 )
 
 type StockService struct {
-	stockRepo   *repository.StockRepo
-	productRepo *repository.ProductRepo
+	stockRepo      *repository.StockRepo
+	productRepo    *repository.ProductRepo
+	accountTypeSvc *AccountTypeService
 }
 
 func NewStockService(stockRepo *repository.StockRepo, productRepos ...*repository.ProductRepo) *StockService {
@@ -27,6 +28,13 @@ func NewStockService(stockRepo *repository.StockRepo, productRepos ...*repositor
 	return &StockService{stockRepo: stockRepo, productRepo: productRepo}
 }
 
+func (s *StockService) SetAccountTypeRepo(repo *repository.AccountTypeRepo) *StockService {
+	if repo != nil {
+		s.accountTypeSvc = NewAccountTypeService(repo)
+	}
+	return s
+}
+
 type CreateStockInput struct {
 	ProductID   string `json:"product_id" binding:"required"`
 	AccountType string `json:"account_type" binding:"required"`
@@ -36,9 +44,17 @@ type CreateStockInput struct {
 }
 
 func (s *StockService) validateAccountType(productID uuid.UUID, accountType string) (string, error) {
-	normalized := strings.ToLower(strings.TrimSpace(accountType))
+	normalized := normalizeAccountType(accountType)
 	if normalized == "" {
 		return "", errors.New("account_type wajib diisi")
+	}
+
+	if s.accountTypeSvc != nil {
+		validated, err := s.accountTypeSvc.ValidateActiveCode(normalized)
+		if err != nil {
+			return "", err
+		}
+		normalized = validated
 	}
 
 	if s.productRepo == nil {
@@ -60,7 +76,7 @@ func (s *StockService) validateAccountType(productID uuid.UUID, accountType stri
 			continue
 		}
 
-		key := strings.ToLower(strings.TrimSpace(price.AccountType))
+		key := normalizeAccountType(price.AccountType)
 		if key == "" {
 			continue
 		}

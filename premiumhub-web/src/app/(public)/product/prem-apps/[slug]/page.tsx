@@ -101,6 +101,31 @@ function getSelectablePrices(product: Product): ProductPrice[] {
   return product.prices || []
 }
 
+function normalizeAccountType(value?: string | null) {
+  return (value || '').trim().toLowerCase()
+}
+
+function formatAccountTypeLabel(value?: string | null) {
+  const normalized = normalizeAccountType(value)
+  if (!normalized) return '-'
+
+  if (normalized === 'shared') return 'Shared'
+  if (normalized === 'private') return 'Private'
+
+  return normalized
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(' ')
+}
+
+function getAccountTypeDescription(value: string, sharedNote: string, privateNote: string) {
+  const normalized = normalizeAccountType(value)
+  if (normalized === 'shared') return sharedNote
+  if (normalized === 'private') return privateNote
+  return 'Tipe akun khusus sesuai paket yang dipilih.'
+}
+
 function normalizeWaNumber(raw?: string) {
   if (!raw) return ''
   return raw.replace(/\D/g, '').slice(0, 20)
@@ -111,7 +136,7 @@ function buildWaLink(product: Product, selectedPrice: ProductPrice | null) {
   if (!waNumber) return ''
 
   const message = selectedPrice
-    ? `Halo admin, saya mau tanya ${product.name} (${selectedPrice.account_type} ${selectedPrice.duration} bulan - ${formatRupiah(selectedPrice.price)}).`
+    ? `Halo admin, saya mau tanya ${product.name} (${formatAccountTypeLabel(selectedPrice.account_type)} ${selectedPrice.duration} bulan - ${formatRupiah(selectedPrice.price)}).`
     : `Halo admin, saya mau tanya produk ${product.name}.`
 
   return `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`
@@ -124,7 +149,7 @@ export default function PremAppsProductDetailPage() {
   const { setItem } = useCartStore()
 
   const [product, setProduct] = useState<Product | null>(null)
-  const [accountType, setAccountType] = useState<'shared' | 'private'>('shared')
+  const [accountType, setAccountType] = useState<string>('')
   const [selectedPrice, setSelectedPrice] = useState<ProductPrice | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -140,10 +165,11 @@ export default function PremAppsProductDetailPage() {
 
         const selectablePrices = getSelectablePrices(res.data)
         const firstPrice =
-          selectablePrices.find((item) => item.account_type === 'shared') || selectablePrices[0]
+          selectablePrices.find((item) => normalizeAccountType(item.account_type) === 'shared') ||
+          selectablePrices[0]
 
         if (firstPrice) {
-          setAccountType(firstPrice.account_type)
+          setAccountType(normalizeAccountType(firstPrice.account_type))
           setSelectedPrice(firstPrice)
         }
       })
@@ -156,9 +182,36 @@ export default function PremAppsProductDetailPage() {
     return getSelectablePrices(product)
   }, [product])
 
+  const accountTypeOptions = useMemo(() => {
+    const set = new Set<string>()
+
+    selectablePrices.forEach((price) => {
+      const code = normalizeAccountType(price.account_type)
+      if (code) set.add(code)
+    })
+
+    return Array.from(set).sort((left, right) => {
+      const leftPriority = left === 'shared' ? 0 : left === 'private' ? 1 : 99
+      const rightPriority = right === 'shared' ? 0 : right === 'private' ? 1 : 99
+      if (leftPriority !== rightPriority) return leftPriority - rightPriority
+      return left.localeCompare(right)
+    })
+  }, [selectablePrices])
+
+  const activeAccountType = useMemo(() => {
+    const normalizedCurrent = normalizeAccountType(accountType)
+    if (normalizedCurrent && accountTypeOptions.includes(normalizedCurrent)) {
+      return normalizedCurrent
+    }
+    return accountTypeOptions[0] || ''
+  }, [accountType, accountTypeOptions])
+
   const filteredPrices = useMemo(
-    () => selectablePrices.filter((item) => item.account_type === accountType),
-    [accountType, selectablePrices]
+    () =>
+      selectablePrices.filter(
+        (item) => normalizeAccountType(item.account_type) === normalizeAccountType(activeAccountType)
+      ),
+    [activeAccountType, selectablePrices]
   )
 
   const trustBadges = useMemo(() => {
@@ -334,21 +387,25 @@ export default function PremAppsProductDetailPage() {
 
           <div className="mb-6">
             <h3 className="text-sm font-bold mb-3">Tipe Akun</h3>
-            <div className="flex gap-3">
-              {(['shared', 'private'] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setAccountType(type)}
-                  className={`flex-1 p-4 rounded-2xl border-2 transition-all text-left ${
-                    accountType === type
-                      ? 'border-[#FF5733] bg-[#FFF3EF]'
-                      : 'border-[#EBEBEB] bg-white hover:border-[#ccc]'
-                  }`}
-                >
-                  <div className="text-sm font-bold capitalize mb-1">{type} Account</div>
-                  <div className="text-xs text-[#888]">{type === 'shared' ? sharedNote : privateNote}</div>
-                </button>
-              ))}
+            <div className="flex gap-3 flex-wrap">
+              {accountTypeOptions.map((type) => {
+                const active = normalizeAccountType(activeAccountType) === type
+
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setAccountType(type)}
+                    className={`flex-1 min-w-[180px] p-4 rounded-2xl border-2 transition-all text-left ${
+                      active
+                        ? 'border-[#FF5733] bg-[#FFF3EF]'
+                        : 'border-[#EBEBEB] bg-white hover:border-[#ccc]'
+                    }`}
+                  >
+                    <div className="text-sm font-bold mb-1">{formatAccountTypeLabel(type)} Account</div>
+                    <div className="text-xs text-[#888]">{getAccountTypeDescription(type, sharedNote, privateNote)}</div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 

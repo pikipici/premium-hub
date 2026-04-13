@@ -5,7 +5,7 @@ interface CartItem {
   productName: string
   priceId: string
   duration: number
-  accountType: 'shared' | 'private'
+  accountType: string
   price: number
 }
 

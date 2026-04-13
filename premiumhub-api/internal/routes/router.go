@@ -28,6 +28,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	// Repositories
 	userRepo := repository.NewUserRepo(db)
+	accountTypeRepo := repository.NewAccountTypeRepo(db)
 	productRepo := repository.NewProductRepo(db)
 	stockRepo := repository.NewStockRepo(db)
 	orderRepo := repository.NewOrderRepo(db)
@@ -40,8 +41,9 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg)
 	notifSvc := service.NewNotificationService(notifRepo)
+	accountTypeSvc := service.NewAccountTypeService(accountTypeRepo)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
-	stockSvc := service.NewStockService(stockRepo, productRepo)
+	stockSvc := service.NewStockService(stockRepo, productRepo).SetAccountTypeRepo(accountTypeRepo)
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
 	paymentSvc := service.NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, nil)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
@@ -61,7 +63,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	if err != nil {
 		panic(fmt.Errorf("gagal inisialisasi product asset storage: %w", err))
 	}
-	productSvc := service.NewProductService(productRepo, stockRepo, productAssetStorage)
+	productSvc := service.NewProductService(productRepo, stockRepo, productAssetStorage).SetAccountTypeRepo(accountTypeRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc, cfg)
@@ -73,6 +75,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage, cfg)
 	claimHandler := handler.NewClaimHandler(claimSvc)
 	stockHandler := handler.NewStockHandler(stockSvc)
+	accountTypeHandler := handler.NewAccountTypeHandler(accountTypeSvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
 
@@ -90,6 +93,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	products.GET("", productHandler.List)
 	products.GET("/:slug", productHandler.GetBySlug)
 	products.GET("/:slug/prices", productHandler.GetPrices)
+
+	api.GET("/account-types", accountTypeHandler.List)
 
 	api.POST("/payment/webhook", paymentHandler.Webhook)
 	api.GET(
@@ -186,6 +191,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/products/:id/prices", productHandler.CreatePrice)
 	admin.PUT("/products/:id/prices/:priceId", productHandler.UpdatePrice)
 	admin.DELETE("/products/:id/prices/:priceId", productHandler.DeletePrice)
+
+	admin.GET("/account-types", accountTypeHandler.List)
+	admin.POST("/account-types", accountTypeHandler.Create)
+	admin.PUT("/account-types/:id", accountTypeHandler.Update)
+	admin.DELETE("/account-types/:id", accountTypeHandler.Delete)
 
 	admin.GET("/stocks", stockHandler.List)
 	admin.POST("/stocks", stockHandler.Create)

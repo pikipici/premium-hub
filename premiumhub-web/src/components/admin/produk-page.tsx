@@ -3,7 +3,9 @@
 import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 
+import { accountTypeService } from '@/services/accountTypeService'
 import { productService } from '@/services/productService'
+import type { AccountType } from '@/types/accountType'
 import type {
   Product,
   ProductFAQItem,
@@ -63,10 +65,7 @@ const CATEGORY_OPTIONS = [
   { value: 'productivity', label: 'Produktivitas' },
 ]
 
-const ACCOUNT_TYPE_OPTIONS: Array<{ value: ProductPrice['account_type']; label: string }> = [
-  { value: 'shared', label: 'Shared' },
-  { value: 'private', label: 'Private' },
-]
+const FALLBACK_ACCOUNT_TYPE_CODES = ['shared', 'private']
 
 const DEFAULT_TRUST_BADGES: ProductTrustBadge[] = [
   { icon: '🛡', text: 'Garansi 30 Hari' },
@@ -241,20 +240,39 @@ function getCategoryLabel(value: string) {
   return CATEGORY_OPTIONS.find((c) => c.value === value)?.label ?? value
 }
 
-function summarizePrices(prices: ProductPrice[]) {
+function normalizeAccountTypeCode(value?: string | null) {
+  return (value || '').trim().toLowerCase()
+}
+
+function accountTypeOptionLabel(item: Pick<AccountType, 'code' | 'label' | 'is_active'>) {
+  const label = item.label?.trim() || item.code
+  return item.is_active ? label : `${label} · (Nonaktif)`
+}
+
+function summarizePrices(prices: ProductPrice[], accountTypeMap?: Record<string, AccountType>) {
   if (!prices || prices.length === 0) return 'Belum ada paket'
 
   const active = prices.filter((p) => p.is_active)
   const source = active.length > 0 ? active : prices
 
   const byType = source.reduce<Record<string, number>>((acc, price) => {
-    acc[price.account_type] = (acc[price.account_type] || 0) + 1
+    const code = normalizeAccountTypeCode(price.account_type)
+    if (!code) return acc
+    acc[code] = (acc[code] || 0) + 1
     return acc
   }, {})
 
   return Object.entries(byType)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([type, total]) => `${type} ${total}`)
+    .sort(([leftCode], [rightCode]) => {
+      const leftOrder = accountTypeMap?.[leftCode]?.sort_order ?? 999
+      const rightOrder = accountTypeMap?.[rightCode]?.sort_order ?? 999
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder
+      return leftCode.localeCompare(rightCode)
+    })
+    .map(([code, total]) => {
+      const label = accountTypeMap?.[code]?.label || code
+      return `${label} ${total}`
+    })
     .join(' · ')
 }
 
@@ -276,6 +294,7 @@ function mapErrorMessage(err: unknown, fallback: string) {
 
 export default function ProdukPage() {
   const [products, setProducts] = useState<Product[]>([])
+  const [accountTypes, setAccountTypes] = useState<AccountType[]>([])
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -301,6 +320,53 @@ export default function ProdukPage() {
   const [confirmDescription, setConfirmDescription] = useState('')
   const [confirmAction, setConfirmAction] = useState<null | { type: 'archive' | 'hard-delete'; product: Product }>(null)
 
+  const accountTypeMap = useMemo(() => {
+    return accountTypes.reduce<Record<string, AccountType>>((acc, item) => {
+      const code = normalizeAccountTypeCode(item.code)
+      if (!code) return acc
+      acc[code] = item
+      return acc
+    }, {})
+  }, [accountTypes])
+
+  const activeAccountTypeOptions = useMemo(() => {
+    const sorted = [...accountTypes]
+      .filter((item) => item.is_active)
+      .sort((left, right) => {
+        if (left.sort_order !== right.sort_order) {
+          return left.sort_order - right.sort_order
+        }
+        return left.code.localeCompare(right.code)
+      })
+      .map((item) => ({ value: normalizeAccountTypeCode(item.code), label: accountTypeOptionLabel(item) }))
+
+    if (sorted.length > 0) {
+      return sorted
+    }
+
+    return FALLBACK_ACCOUNT_TYPE_CODES.map((code) => ({
+      value: code,
+      label: code,
+    }))
+  }, [accountTypes])
+
+  const accountTypeOptionsByValue = useMemo(() => {
+    return activeAccountTypeOptions.reduce<Record<string, { value: string; label: string }>>((acc, option) => {
+      acc[option.value] = option
+      return acc
+    }, {})
+  }, [activeAccountTypeOptions])
+
+  const loadAccountTypes = async () => {
+    try {
+      const res = await accountTypeService.adminList({ include_inactive: true })
+      if (!res.success) return
+      setAccountTypes(res.data || [])
+    } catch {
+      // best effort only; fallback options still available
+    }
+  }
+
   const loadProducts = async () => {
     setLoading(true)
     setError('')
@@ -321,7 +387,7 @@ export default function ProdukPage() {
   }
 
   useEffect(() => {
-    void loadProducts()
+    void Promise.all([loadProducts(), loadAccountTypes()])
   }, [])
 
   const filteredProducts = useMemo(() => {
@@ -353,10 +419,19 @@ export default function ProdukPage() {
     setEditingId(null)
     setSlugTouched(false)
     setForm(createDefaultForm())
-    setPriceDrafts([
-      createPriceDraft({ account_type: 'shared', duration: 1, price: 25000 }),
-      createPriceDraft({ account_type: 'private', duration: 1, price: 50000 }),
-    ])
+
+    const primaryType = activeAccountTypeOptions[0]?.value || 'shared'
+    const secondaryType = activeAccountTypeOptions[1]?.value || primaryType
+
+    const nextDrafts = [
+      createPriceDraft({ account_type: primaryType, duration: 1, price: 25000 }),
+    ]
+
+    if (secondaryType !== primaryType) {
+      nextDrafts.push(createPriceDraft({ account_type: secondaryType, duration: 1, price: 50000 }))
+    }
+
+    setPriceDrafts(nextDrafts)
     setRemovedPriceIds([])
     setFormOpen(true)
   }
@@ -420,12 +495,17 @@ export default function ProdukPage() {
       is_active: product.is_active,
     })
 
+    const primaryType = activeAccountTypeOptions[0]?.value || 'shared'
+    const secondaryType = activeAccountTypeOptions[1]?.value || primaryType
+
     setPriceDrafts(
       product.prices?.length
         ? normalizePriceDrafts(product.prices)
         : [
-            createPriceDraft({ account_type: 'shared', duration: 1, price: 25000 }),
-            createPriceDraft({ account_type: 'private', duration: 1, price: 50000 }),
+            createPriceDraft({ account_type: primaryType, duration: 1, price: 25000 }),
+            ...(secondaryType !== primaryType
+              ? [createPriceDraft({ account_type: secondaryType, duration: 1, price: 50000 })]
+              : []),
           ]
     )
 
@@ -590,12 +670,20 @@ export default function ProdukPage() {
 
     const seen = new Set<string>()
     for (const row of priceDrafts) {
+      const accountTypeCode = normalizeAccountTypeCode(row.account_type)
+      if (!accountTypeCode) {
+        return 'Tipe akun pada paket harga wajib diisi.'
+      }
+      if (!accountTypeOptionsByValue[accountTypeCode]) {
+        return `Tipe akun "${accountTypeCode}" belum aktif di master tipe akun.`
+      }
+
       if (row.duration < 1) return 'Durasi paket harga minimal 1 bulan.'
       if (row.price < 1) return 'Nominal harga paket tidak boleh nol.'
 
-      const signature = `${row.account_type}:${row.duration}`
+      const signature = `${accountTypeCode}:${row.duration}`
       if (seen.has(signature)) {
-        return `Duplikasi paket terdeteksi (${row.account_type} ${row.duration} bulan).`
+        return `Duplikasi paket terdeteksi (${accountTypeCode} ${row.duration} bulan).`
       }
       seen.add(signature)
     }
@@ -676,7 +764,7 @@ export default function ProdukPage() {
       for (const draft of priceDrafts) {
         const pricePayload = {
           duration: draft.duration,
-          account_type: draft.account_type,
+          account_type: normalizeAccountTypeCode(draft.account_type),
           label: normalizePriceLabel(draft.label, draft.duration),
           savings_text: draft.savings_text.trim(),
           price: draft.price,
@@ -972,7 +1060,7 @@ export default function ProdukPage() {
                           <span className="product-pill">{getCategoryLabel(product.category)}</span>
                         </td>
                         <td style={{ fontWeight: 600 }}>{minPrice ? formatRupiah(minPrice) : '-'}</td>
-                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{summarizePrices(product.prices)}</td>
+                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{summarizePrices(product.prices, accountTypeMap)}</td>
                         <td style={{ fontWeight: 600, fontSize: 12 }}>{product.sort_priority || 0}</td>
                         <td>
                           <span className={`status-badge ${product.is_popular ? 's-lunas' : 's-pending'}`}>
@@ -1096,7 +1184,7 @@ export default function ProdukPage() {
                   <div className="mobile-card-row" style={{ alignItems: 'flex-start' }}>
                     <span className="mobile-card-label">Paket</span>
                     <span className="mobile-card-value" style={{ maxWidth: '68%' }}>
-                      {summarizePrices(product.prices)}
+                      {summarizePrices(product.prices, accountTypeMap)}
                     </span>
                   </div>
                   <div className="mobile-card-row">
@@ -1678,17 +1766,21 @@ export default function ProdukPage() {
                       Paket Harga Prem-Apps
                     </label>
                     <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      Kombinasi unik berdasarkan account_type + durasi bulan.
+                      Kombinasi unik berdasarkan account_type + durasi bulan. Kelola master tipe di menu Pengaturan.
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="action-btn" type="button" onClick={() => addPriceRow('shared')}>
-                      + Shared
-                    </button>
-                    <button className="action-btn" type="button" onClick={() => addPriceRow('private')}>
-                      + Private
-                    </button>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {activeAccountTypeOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        className="action-btn"
+                        type="button"
+                        onClick={() => addPriceRow(option.value)}
+                      >
+                        + {option.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -1705,18 +1797,27 @@ export default function ProdukPage() {
                             <label className="form-label">Tipe</label>
                             <select
                               className="form-select"
-                              value={row.account_type}
+                              value={normalizeAccountTypeCode(row.account_type)}
                               onChange={(event) =>
                                 updatePriceRow(row.local_id, {
-                                  account_type: event.target.value as ProductPrice['account_type'],
+                                  account_type: event.target.value,
                                 })
                               }
                             >
-                              {ACCOUNT_TYPE_OPTIONS.map((option) => (
+                              {activeAccountTypeOptions.map((option) => (
                                 <option key={option.value} value={option.value}>
                                   {option.label}
                                 </option>
                               ))}
+                              {(() => {
+                                const normalized = normalizeAccountTypeCode(row.account_type)
+                                if (!normalized || accountTypeOptionsByValue[normalized]) {
+                                  return null
+                                }
+                                return (
+                                  <option value={normalized}>{normalized} · (Legacy)</option>
+                                )
+                              })()}
                             </select>
                           </div>
 
