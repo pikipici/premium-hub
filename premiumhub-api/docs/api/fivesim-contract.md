@@ -106,9 +106,25 @@ Request:
 }
 ```
 
+## Availability Policy (Enterprise)
+
+Catalog harga/operator (`GET /5sim/catalog/prices`) menerapkan policy availability berikut:
+
+- Operator hanya dianggap **buyable** jika stok valid (`count > 0`) dan tidak kena cooldown no-stock.
+- Operator `count=0` atau stok tidak valid dianggap tidak eligible beli.
+- Endpoint buy activation melakukan preflight validasi stok operator sebelum request buy ke provider.
+- Jika provider mengembalikan `no free phones`, operator tersebut masuk cooldown sementara agar tidak langsung ditawarkan lagi.
+
+Field response `prices`:
+
+- `buy_enabled` (`boolean`)
+- `availability_status` (`available|out_of_stock|unknown`)
+- `availability_reason` (`count_zero|count_missing|recent_no_free_phones`)
+
 ## Standard Error Copy
 
 - `"idempotency_key wajib diisi"`
 - `"idempotency_key maksimal 80 karakter"`
 - `"idempotency_key sudah dipakai untuk request berbeda"`
 - `"request pembelian 5sim sedang diproses, coba lagi sebentar"`
+- `"stok nomor operator ini sedang habis, pilih operator lain"`

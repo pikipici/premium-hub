@@ -51,6 +51,7 @@ interface PriceOption {
   operator: string
   walletDebit: number
   providerPrice?: number
+  numberCount?: number
 }
 
 interface SMSState {
@@ -233,6 +234,16 @@ function extractPriceFromNode(node: unknown): number | null {
   return null
 }
 
+function extractCountFromNode(node: unknown): number | null {
+  const rec = asRecord(node)
+  if (!rec) return null
+
+  const count = asNumber(rec.count)
+  if (count === null) return null
+
+  return Math.floor(count)
+}
+
 function parseCatalogPriceRows(payload: FiveSimPricesPayload | undefined): PriceOption[] {
   if (!payload) return []
 
@@ -252,6 +263,15 @@ function parseCatalogPriceRows(payload: FiveSimPricesPayload | undefined): Price
     const walletDebitRaw = asNumber(row.wallet_debit)
     if (!operator || walletDebitRaw === null || walletDebitRaw <= 0) continue
 
+    const numberCount = asNumber(row.number_count)
+    const buyEnabledRaw = row.buy_enabled
+    const buyEnabled = typeof buyEnabledRaw === 'boolean'
+      ? buyEnabledRaw
+      : numberCount === null || numberCount > 0
+
+    if (!buyEnabled) continue
+    if (numberCount !== null && numberCount <= 0) continue
+
     const walletDebit = Math.ceil(walletDebitRaw)
     const normalizedOperator = operator.toLowerCase()
     const existing = map.get(normalizedOperator)
@@ -260,6 +280,7 @@ function parseCatalogPriceRows(payload: FiveSimPricesPayload | undefined): Price
       map.set(normalizedOperator, {
         operator,
         walletDebit,
+        numberCount: numberCount ?? undefined,
       })
     }
   }
@@ -275,7 +296,7 @@ function parseCatalogPriceRows(payload: FiveSimPricesPayload | undefined): Price
 function collectOperatorPrices(source: Record<string, unknown>, multiplier: number, minDebit: number): PriceOption[] {
   const map = new Map<string, PriceOption>()
 
-  const pushPrice = (operator: string, providerPrice: number) => {
+  const pushPrice = (operator: string, providerPrice: number, numberCount?: number) => {
     if (!Number.isFinite(providerPrice) || providerPrice <= 0) return
 
     const walletDebit = calculateWalletDebit(providerPrice, multiplier, minDebit)
@@ -289,6 +310,15 @@ function collectOperatorPrices(source: Record<string, unknown>, multiplier: numb
         operator,
         walletDebit,
         providerPrice,
+        numberCount,
+      })
+      return
+    }
+
+    if (existing.numberCount === undefined && numberCount !== undefined) {
+      map.set(normalizedOperator, {
+        ...existing,
+        numberCount,
       })
     }
   }
@@ -296,7 +326,9 @@ function collectOperatorPrices(source: Record<string, unknown>, multiplier: numb
   for (const [key, value] of Object.entries(source)) {
     const directPrice = extractPriceFromNode(value)
     if (directPrice !== null) {
-      pushPrice(key, directPrice)
+      const directCount = extractCountFromNode(value)
+      if (directCount !== null && directCount <= 0) continue
+      pushPrice(key, directPrice, directCount === null ? undefined : directCount)
       continue
     }
 
@@ -306,7 +338,9 @@ function collectOperatorPrices(source: Record<string, unknown>, multiplier: numb
     for (const [nestedKey, nestedValue] of Object.entries(nested)) {
       const nestedPrice = extractPriceFromNode(nestedValue)
       if (nestedPrice !== null) {
-        pushPrice(nestedKey, nestedPrice)
+        const nestedCount = extractCountFromNode(nestedValue)
+        if (nestedCount !== null && nestedCount <= 0) continue
+        pushPrice(nestedKey, nestedPrice, nestedCount === null ? undefined : nestedCount)
       }
     }
   }
@@ -780,6 +814,24 @@ export default function NomorVirtualPage() {
 
     void loadPrices(selectedCountryKey, selectedProductKey)
   }, [loadPrices, selectedCountryKey, selectedProductKey])
+
+  useEffect(() => {
+    if (priceOptions.length === 0) {
+      setSelectedPrice(null)
+      return
+    }
+
+    setSelectedPrice((prev) => {
+      if (!prev) return priceOptions[0]
+
+      const stillExists = priceOptions.some(
+        (candidate) =>
+          candidate.operator === prev.operator &&
+          candidate.walletDebit === prev.walletDebit
+      )
+      return stillExists ? prev : priceOptions[0]
+    })
+  }, [priceOptions])
 
   useEffect(() => {
     if (mainTab !== 'orders') return
@@ -1301,7 +1353,7 @@ export default function NomorVirtualPage() {
                       <Loader2 className="w-4 h-4 animate-spin" /> Memuat harga...
                     </div>
                   ) : priceOptions.length === 0 ? (
-                    <div className="text-center text-sm text-[#888] py-6">Harga/operator belum tersedia</div>
+                    <div className="text-center text-sm text-[#888] py-6">Operator tersedia sedang habis. Coba ganti negara atau layanan.</div>
                   ) : (
                     priceOptions.map((priceOption, index) => {
                       const active =
@@ -1324,7 +1376,12 @@ export default function NomorVirtualPage() {
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-[#141414] truncate">{toOperatorDisplayName(priceOption.operator)}</span>
+                            <div className="min-w-0">
+                              <span className="text-sm font-semibold text-[#141414] truncate block">{toOperatorDisplayName(priceOption.operator)}</span>
+                              {typeof priceOption.numberCount === 'number' ? (
+                                <span className="text-[11px] text-[#888]">stok {priceOption.numberCount}</span>
+                              ) : null}
+                            </div>
                             <span className="text-sm font-bold text-[#141414] shrink-0">
                               {formatWalletRupiah(priceOption.walletDebit)}
                             </span>
@@ -1366,6 +1423,12 @@ export default function NomorVirtualPage() {
                       Nominal ini yang akan dipotong dari wallet saat pembelian nomor berhasil.
                     </p>
                   </div>
+
+                  {bannerError && activationReady ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">
+                      {bannerError}
+                    </div>
+                  ) : null}
 
                   {(likelyInsufficient || insufficientByServer) && activationReady ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">

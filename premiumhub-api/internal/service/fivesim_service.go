@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"premiumhub-api/config"
@@ -47,7 +48,17 @@ const (
 	fiveSimIdemStatusCompleted  = "completed"
 	fiveSimIdemStatusFailed     = "failed"
 	fiveSimIdemKeyMaxLen        = 80
+
+	fiveSimAvailabilityAvailable  = "available"
+	fiveSimAvailabilityOutOfStock = "out_of_stock"
+	fiveSimAvailabilityUnknown    = "unknown"
+
+	fiveSimAvailabilityReasonCountZero      = "count_zero"
+	fiveSimAvailabilityReasonCountMissing   = "count_missing"
+	fiveSimAvailabilityReasonRecentlyNoFree = "recent_no_free_phones"
 )
+
+const fiveSimOperatorNoStockCooldown = 90 * time.Second
 
 var fiveSimOpenStatuses = map[string]struct{}{
 	fiveSimStatusPending:  {},
@@ -66,6 +77,9 @@ type FiveSimService struct {
 	orderRepo  *repository.FiveSimOrderRepo
 	walletRepo *repository.WalletRepo
 	client     FiveSimClient
+
+	operatorNoStockMu    sync.Mutex
+	operatorNoStockUntil map[string]time.Time
 }
 
 type FiveSimBuyActivationInput struct {
@@ -103,9 +117,12 @@ type FiveSimProviderHistoryInput struct {
 }
 
 type FiveSimCatalogPriceRow struct {
-	Operator    string `json:"operator"`
-	WalletDebit int64  `json:"wallet_debit"`
-	NumberCount *int64 `json:"number_count,omitempty"`
+	Operator           string `json:"operator"`
+	WalletDebit        int64  `json:"wallet_debit"`
+	NumberCount        *int64 `json:"number_count,omitempty"`
+	BuyEnabled         bool   `json:"buy_enabled"`
+	AvailabilityStatus string `json:"availability_status,omitempty"`
+	AvailabilityReason string `json:"availability_reason,omitempty"`
 }
 
 type FiveSimCatalogPricesResponse struct {
@@ -148,11 +165,12 @@ func NewFiveSimService(
 		client = NewFiveSimClient(cfg)
 	}
 	return &FiveSimService{
-		cfg:        cfg,
-		userRepo:   userRepo,
-		orderRepo:  orderRepo,
-		walletRepo: walletRepo,
-		client:     client,
+		cfg:                  cfg,
+		userRepo:             userRepo,
+		orderRepo:            orderRepo,
+		walletRepo:           walletRepo,
+		client:               client,
+		operatorNoStockUntil: map[string]time.Time{},
 	}
 }
 
@@ -210,6 +228,10 @@ func (s *FiveSimService) BuyActivation(ctx context.Context, userID uuid.UUID, in
 		return nil, nil, errors.New("max_price harus lebih dari 0")
 	}
 
+	if err := s.ensureActivationOperatorBuyable(ctx, input.Country, input.Product, input.Operator); err != nil {
+		return nil, nil, err
+	}
+
 	requestHash := buildFiveSimBuyRequestHash(
 		"activation",
 		normalizeFiveSimCatalogKey(input.Country, "any"),
@@ -224,7 +246,7 @@ func (s *FiveSimService) BuyActivation(ctx context.Context, userID uuid.UUID, in
 	)
 
 	return s.buyWithIdempotency(ctx, userID, "activation", input.IdempotencyKey, requestHash, func(runCtx context.Context) (*FiveSimOrderPayload, error) {
-		return s.client.BuyActivation(runCtx, input.Country, input.Operator, input.Product, FiveSimBuyActivationOptions{
+		providerOrder, err := s.client.BuyActivation(runCtx, input.Country, input.Operator, input.Product, FiveSimBuyActivationOptions{
 			Forwarding: input.Forwarding,
 			Number:     input.Number,
 			Reuse:      input.Reuse,
@@ -232,6 +254,13 @@ func (s *FiveSimService) BuyActivation(ctx context.Context, userID uuid.UUID, in
 			Ref:        input.Ref,
 			MaxPrice:   input.MaxPrice,
 		})
+		if err != nil {
+			if isFiveSimNoFreePhonesError(err) {
+				s.markOperatorNoStock(input.Country, input.Product, input.Operator)
+			}
+			return nil, err
+		}
+		return providerOrder, nil
 	})
 }
 
@@ -277,6 +306,90 @@ func (s *FiveSimService) ReuseNumber(ctx context.Context, userID uuid.UUID, inpu
 	return s.buyWithIdempotency(ctx, userID, "reuse", input.IdempotencyKey, requestHash, func(runCtx context.Context) (*FiveSimOrderPayload, error) {
 		return s.client.ReuseNumber(runCtx, input.Product, input.Number)
 	})
+}
+
+func (s *FiveSimService) ensureActivationOperatorBuyable(ctx context.Context, country, product, operator string) error {
+	normalizedOperator := normalizeFiveSimCatalogKey(operator, "any")
+	if normalizedOperator == "any" {
+		return nil
+	}
+
+	if s.isOperatorTemporarilyBlocked(country, product, normalizedOperator) {
+		return errors.New("stok nomor operator ini sedang habis, pilih operator lain")
+	}
+
+	rawPrices, err := s.client.GetPrices(ctx, country, product)
+	if err != nil {
+		return errors.New("gagal validasi stok operator, coba lagi sebentar")
+	}
+
+	eligibleRows := s.sanitizeCatalogPrices(rawPrices, country, product)
+	for _, row := range eligibleRows {
+		if strings.EqualFold(strings.TrimSpace(row.Operator), normalizedOperator) {
+			return nil
+		}
+	}
+
+	return errors.New("stok nomor operator ini sedang habis, pilih operator lain")
+}
+
+func buildFiveSimAvailabilityKey(country, product, operator string) string {
+	normalizedOperator := normalizeFiveSimCatalogKey(operator, "any")
+	if normalizedOperator == "" || normalizedOperator == "any" {
+		return ""
+	}
+	return strings.Join([]string{
+		normalizeFiveSimCatalogKey(country, "any"),
+		normalizeFiveSimCatalogKey(product, ""),
+		normalizedOperator,
+	}, "|")
+}
+
+func (s *FiveSimService) markOperatorNoStock(country, product, operator string) {
+	key := buildFiveSimAvailabilityKey(country, product, operator)
+	if key == "" {
+		return
+	}
+
+	s.operatorNoStockMu.Lock()
+	defer s.operatorNoStockMu.Unlock()
+
+	if s.operatorNoStockUntil == nil {
+		s.operatorNoStockUntil = map[string]time.Time{}
+	}
+	s.operatorNoStockUntil[key] = time.Now().Add(fiveSimOperatorNoStockCooldown)
+}
+
+func (s *FiveSimService) isOperatorTemporarilyBlocked(country, product, operator string) bool {
+	key := buildFiveSimAvailabilityKey(country, product, operator)
+	if key == "" {
+		return false
+	}
+
+	now := time.Now()
+	s.operatorNoStockMu.Lock()
+	defer s.operatorNoStockMu.Unlock()
+
+	until, ok := s.operatorNoStockUntil[key]
+	if !ok {
+		return false
+	}
+	if now.After(until) {
+		delete(s.operatorNoStockUntil, key)
+		return false
+	}
+	return true
+}
+
+func isFiveSimNoFreePhonesError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr *FiveSimAPIError
+	if errors.As(err, &apiErr) {
+		return strings.Contains(strings.ToLower(strings.TrimSpace(apiErr.Message)), "no free phones")
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "no free phones")
 }
 
 func (s *FiveSimService) buyWithIdempotency(
@@ -909,14 +1022,26 @@ func (s *FiveSimService) extractCatalogPriceRow(operator string, node any) (*Fiv
 	}
 
 	row := &FiveSimCatalogPriceRow{
-		Operator:    cleanOperator,
-		WalletDebit: walletDebit,
+		Operator:           cleanOperator,
+		WalletDebit:        walletDebit,
+		BuyEnabled:         false,
+		AvailabilityStatus: fiveSimAvailabilityUnknown,
+		AvailabilityReason: fiveSimAvailabilityReasonCountMissing,
 	}
 
 	if rec, ok := asFiveSimMap(node); ok {
 		if parsedCount, ok := parseFiveSimInt64(rec["count"]); ok && parsedCount >= 0 {
 			count := parsedCount
 			row.NumberCount = &count
+			if count > 0 {
+				row.BuyEnabled = true
+				row.AvailabilityStatus = fiveSimAvailabilityAvailable
+				row.AvailabilityReason = ""
+			} else {
+				row.BuyEnabled = false
+				row.AvailabilityStatus = fiveSimAvailabilityOutOfStock
+				row.AvailabilityReason = fiveSimAvailabilityReasonCountZero
+			}
 		}
 	}
 
@@ -933,12 +1058,24 @@ func (s *FiveSimService) collectCatalogPriceRows(source map[string]any) []FiveSi
 		}
 
 		existing, exists := rowsByOperator[normalized]
-		if !exists || row.WalletDebit < existing.WalletDebit {
+		if !exists {
 			rowsByOperator[normalized] = row
 			return
 		}
 
-		if exists && existing.NumberCount == nil && row.NumberCount != nil {
+		if row.BuyEnabled != existing.BuyEnabled {
+			if row.BuyEnabled {
+				rowsByOperator[normalized] = row
+			}
+			return
+		}
+
+		if row.WalletDebit < existing.WalletDebit {
+			rowsByOperator[normalized] = row
+			return
+		}
+
+		if existing.NumberCount == nil && row.NumberCount != nil {
 			existing.NumberCount = row.NumberCount
 			rowsByOperator[normalized] = existing
 		}
@@ -977,6 +1114,27 @@ func (s *FiveSimService) collectCatalogPriceRows(source map[string]any) []FiveSi
 	return rows
 }
 
+func (s *FiveSimService) applyCatalogAvailabilityGate(country, product string, rows []FiveSimCatalogPriceRow) []FiveSimCatalogPriceRow {
+	if len(rows) == 0 {
+		return rows
+	}
+
+	eligible := make([]FiveSimCatalogPriceRow, 0, len(rows))
+	for _, row := range rows {
+		if row.BuyEnabled && s.isOperatorTemporarilyBlocked(country, product, row.Operator) {
+			row.BuyEnabled = false
+			row.AvailabilityStatus = fiveSimAvailabilityOutOfStock
+			row.AvailabilityReason = fiveSimAvailabilityReasonRecentlyNoFree
+		}
+
+		if row.BuyEnabled {
+			eligible = append(eligible, row)
+		}
+	}
+
+	return eligible
+}
+
 func (s *FiveSimService) sanitizeCatalogPrices(raw map[string]any, country, product string) []FiveSimCatalogPriceRow {
 	if len(raw) == 0 {
 		return []FiveSimCatalogPriceRow{}
@@ -1002,6 +1160,7 @@ func (s *FiveSimService) sanitizeCatalogPrices(raw map[string]any, country, prod
 			continue
 		}
 		rows := s.collectCatalogPriceRows(candidate)
+		rows = s.applyCatalogAvailabilityGate(country, product, rows)
 		if len(rows) > 0 {
 			return rows
 		}
@@ -1803,6 +1962,10 @@ func (s *FiveSimService) normalizeProviderErr(err error) error {
 		msg := strings.TrimSpace(apiErr.Message)
 		if msg == "" {
 			msg = "request ke 5sim gagal"
+		}
+
+		if isFiveSimNoFreePhonesError(apiErr) {
+			return errors.New("stok nomor operator ini sedang habis, pilih operator lain")
 		}
 
 		switch apiErr.StatusCode {
