@@ -283,13 +283,89 @@ func (s *WalletService) ListLedger(userID uuid.UUID, page, limit int) (*WalletLe
 			Amount:        rows[i].Amount,
 			BalanceBefore: rows[i].BalanceBefore,
 			BalanceAfter:  rows[i].BalanceAfter,
-			Reference:     rows[i].Reference,
-			Description:   rows[i].Description,
+			Reference:     buildWalletLedgerPublicReference(rows[i]),
+			Description:   buildWalletLedgerPublicDescription(rows[i]),
 			CreatedAt:     rows[i].CreatedAt,
 		})
 	}
 
 	return &WalletLedgerListResponse{Ledgers: ledgers, Total: total}, nil
+}
+
+func buildWalletLedgerPublicDescription(row model.WalletLedger) string {
+	switch strings.ToLower(strings.TrimSpace(row.Category)) {
+	case "topup":
+		return "Top up saldo"
+	case "5sim_purchase":
+		return "Pembelian nomor OTP"
+	case "5sim_refund":
+		return "Refund nomor OTP"
+	case "manual_adjustment":
+		return "Penyesuaian saldo manual"
+	}
+
+	switch strings.ToLower(strings.TrimSpace(row.Type)) {
+	case "credit":
+		return "Saldo masuk"
+	case "debit":
+		return "Penggunaan saldo"
+	default:
+		return "Transaksi wallet"
+	}
+}
+
+func buildWalletLedgerPublicReference(row model.WalletLedger) string {
+	reference := strings.TrimSpace(row.Reference)
+	if reference == "" {
+		return "-"
+	}
+
+	lowerRef := strings.ToLower(reference)
+	if strings.HasPrefix(lowerRef, "wallet_topup:") {
+		rawID := strings.TrimSpace(reference[len("wallet_topup:"):])
+		if rawID == "" {
+			return "Top up saldo"
+		}
+		return fmt.Sprintf("Top up #%s", shortWalletLedgerRef(rawID))
+	}
+
+	if strings.HasPrefix(lowerRef, "fivesim_order:") {
+		parts := strings.Split(reference, ":")
+		if len(parts) >= 3 {
+			orderID := strings.TrimSpace(parts[1])
+			action := strings.ToLower(strings.TrimSpace(parts[2]))
+			if orderID != "" {
+				switch action {
+				case "charge":
+					return fmt.Sprintf("Pembelian #%s", orderID)
+				case "refund":
+					return fmt.Sprintf("Refund #%s", orderID)
+				default:
+					return fmt.Sprintf("Order #%s", orderID)
+				}
+			}
+		}
+		return "Order nomor OTP"
+	}
+
+	if strings.HasPrefix(lowerRef, "manual_") {
+		return "Penyesuaian manual"
+	}
+
+	return "Riwayat transaksi"
+}
+
+func shortWalletLedgerRef(raw string) string {
+	ref := strings.TrimSpace(raw)
+	if ref == "" {
+		return "-"
+	}
+
+	ref = strings.ReplaceAll(ref, "-", "")
+	if len(ref) > 8 {
+		ref = ref[:8]
+	}
+	return strings.ToUpper(ref)
 }
 
 func (s *WalletService) CheckTopupStatus(ctx context.Context, userID, topupID uuid.UUID) (*WalletTopupResponse, error) {

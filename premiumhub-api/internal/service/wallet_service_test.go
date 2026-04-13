@@ -365,3 +365,116 @@ func TestWalletReconcilePending(t *testing.T) {
 		t.Fatalf("expected wallet balance 15000, got %d", userAfter.WalletBalance)
 	}
 }
+
+func TestWalletListLedgerSanitizesInternalCopy(t *testing.T) {
+	svc, db, _, user := setupWalletService(t)
+
+	topupID := uuid.New()
+	rows := []model.WalletLedger{
+		{
+			ID:            uuid.New(),
+			UserID:        user.ID,
+			TopupID:       &topupID,
+			Type:          "credit",
+			Category:      "topup",
+			Amount:        10000,
+			BalanceBefore: 0,
+			BalanceAfter:  10000,
+			Reference:     "wallet_topup:dea9538f-e42e-4b47-8d46-98dd460f9ef2",
+			Description:   "Topup wallet via Pakasir (WLT-123)",
+		},
+		{
+			ID:            uuid.New(),
+			UserID:        user.ID,
+			Type:          "debit",
+			Category:      "5sim_purchase",
+			Amount:        380,
+			BalanceBefore: 10000,
+			BalanceAfter:  9620,
+			Reference:     "fivesim_order:987393457:charge",
+			Description:   "Pembelian 5sim activation (indonesia/virtual53/michat), provider_price=0.030800, multiplier=18500.000000",
+		},
+		{
+			ID:            uuid.New(),
+			UserID:        user.ID,
+			Type:          "credit",
+			Category:      "5sim_refund",
+			Amount:        380,
+			BalanceBefore: 9620,
+			BalanceAfter:  10000,
+			Reference:     "fivesim_order:987393457:refund",
+			Description:   "Refund otomatis 5sim provider_order_id=987393457 status=CANCELED reason=manual-cancel",
+		},
+		{
+			ID:            uuid.New(),
+			UserID:        user.ID,
+			Type:          "credit",
+			Category:      "manual_adjustment",
+			Amount:        5000,
+			BalanceBefore: 10000,
+			BalanceAfter:  15000,
+			Reference:     "manual_nokos_live_test:20260413054215",
+			Description:   "Topup manual live test nokos",
+		},
+	}
+
+	if err := db.Create(&rows).Error; err != nil {
+		t.Fatalf("seed wallet ledger rows: %v", err)
+	}
+
+	res, err := svc.ListLedger(user.ID, 1, 20)
+	if err != nil {
+		t.Fatalf("list ledger: %v", err)
+	}
+
+	if len(res.Ledgers) < 4 {
+		t.Fatalf("expected at least 4 ledgers, got %d", len(res.Ledgers))
+	}
+
+	byCategory := map[string]WalletLedgerResponse{}
+	for _, ledger := range res.Ledgers {
+		if _, exists := byCategory[ledger.Category]; !exists {
+			byCategory[ledger.Category] = ledger
+		}
+	}
+
+	topupLedger, ok := byCategory["topup"]
+	if !ok {
+		t.Fatalf("expected topup ledger in response")
+	}
+	if topupLedger.Description != "Top up saldo" {
+		t.Fatalf("unexpected topup description: %s", topupLedger.Description)
+	}
+	if !strings.HasPrefix(topupLedger.Reference, "Top up #") {
+		t.Fatalf("unexpected topup reference: %s", topupLedger.Reference)
+	}
+
+	purchaseLedger, ok := byCategory["5sim_purchase"]
+	if !ok {
+		t.Fatalf("expected purchase ledger in response")
+	}
+	if purchaseLedger.Description != "Pembelian nomor OTP" {
+		t.Fatalf("unexpected purchase description: %s", purchaseLedger.Description)
+	}
+	if purchaseLedger.Reference != "Pembelian #987393457" {
+		t.Fatalf("unexpected purchase reference: %s", purchaseLedger.Reference)
+	}
+
+	refundLedger, ok := byCategory["5sim_refund"]
+	if !ok {
+		t.Fatalf("expected refund ledger in response")
+	}
+	if refundLedger.Description != "Refund nomor OTP" {
+		t.Fatalf("unexpected refund description: %s", refundLedger.Description)
+	}
+	if refundLedger.Reference != "Refund #987393457" {
+		t.Fatalf("unexpected refund reference: %s", refundLedger.Reference)
+	}
+
+	for _, ledger := range res.Ledgers {
+		combined := strings.ToLower(ledger.Description + " " + ledger.Reference)
+		if strings.Contains(combined, "pakasir") || strings.Contains(combined, "provider") || strings.Contains(combined, "5sim") {
+			t.Fatalf("internal wording leaked in user ledger response: %q", combined)
+		}
+	}
+}
