@@ -40,6 +40,17 @@ function statusLabel(status: WalletTopup['status']) {
   }
 }
 
+function sanitizeWalletTopupText(value: string | undefined): string {
+  const trimmed = (value || '').trim()
+  if (!trimmed) return ''
+
+  return trimmed
+    .replace(/\bpakasir\b/gi, 'payment gateway')
+    .replace(/\bprovider\b/gi, 'sistem pembayaran')
+    .replace(/provider[_\s-]*order[_\s-]*id/gi, 'ID order')
+    .replace(/\b5sim\b/gi, 'nomor OTP')
+}
+
 function WalletTopupStatusContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -75,7 +86,7 @@ function WalletTopupStatusContent() {
     try {
       const res = await walletService.getTopupByID(topupId)
       if (!res.success) {
-        setError(res.message)
+        setError(sanitizeWalletTopupText(res.message) || 'Gagal memuat status topup')
         return
       }
 
@@ -86,7 +97,7 @@ function WalletTopupStatusContent() {
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const message = (err.response?.data as { message?: string } | undefined)?.message
-        setError(message || 'Gagal memuat status topup')
+        setError(sanitizeWalletTopupText(message) || 'Gagal memuat status topup')
       } else {
         setError('Gagal memuat status topup')
       }
@@ -103,7 +114,7 @@ function WalletTopupStatusContent() {
     try {
       const res = await walletService.checkTopup(topupId)
       if (!res.success) {
-        setError(res.message)
+        setError(sanitizeWalletTopupText(res.message) || 'Gagal sinkron status topup')
         return
       }
 
@@ -115,7 +126,7 @@ function WalletTopupStatusContent() {
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const message = (err.response?.data as { message?: string } | undefined)?.message
-        setError(message || 'Gagal sinkron status topup')
+        setError(sanitizeWalletTopupText(message) || 'Gagal sinkron status topup')
       } else {
         setError('Gagal sinkron status topup')
       }
@@ -224,7 +235,7 @@ function WalletTopupStatusContent() {
 
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm">
             <div className="rounded-xl bg-[#F7F7F5] p-3">
-              <div className="text-xs text-[#888] mb-1">Provider Status</div>
+              <div className="text-xs text-[#888] mb-1">Status Pembayaran</div>
               <div className="font-bold capitalize">{topup.provider_status || topup.status}</div>
             </div>
             <PakasirPaymentDisplay paymentMethod={topup.payment_method} paymentNumber={topup.payment_number} />

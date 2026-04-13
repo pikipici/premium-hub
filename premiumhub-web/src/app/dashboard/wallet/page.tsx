@@ -16,10 +16,10 @@ const NETFLIX_PRICE = 25000
 const QUICK_AMOUNTS = [25000, 50000, 100000, 200000]
 
 const PAYMENT_METHODS = [
-  { key: 'qris', name: 'QRIS', icon: '⬛', fee: 'Dari provider' },
-  { key: 'bri_va', name: 'BRI VA', icon: '🏦', fee: 'Dari provider' },
-  { key: 'bni_va', name: 'BNI VA', icon: '🏦', fee: 'Dari provider' },
-  { key: 'permata_va', name: 'Permata VA', icon: '🏦', fee: 'Dari provider' },
+  { key: 'qris', name: 'QRIS', icon: '⬛', fee: 'Sesuai channel' },
+  { key: 'bri_va', name: 'BRI VA', icon: '🏦', fee: 'Sesuai channel' },
+  { key: 'bni_va', name: 'BNI VA', icon: '🏦', fee: 'Sesuai channel' },
+  { key: 'permata_va', name: 'Permata VA', icon: '🏦', fee: 'Sesuai channel' },
 ] as const
 
 type TxFilter = 'all' | 'topup' | 'purchase' | 'refund'
@@ -74,6 +74,17 @@ function txVisual(group: LedgerGroup) {
     default:
       return { icon: '💳', bg: 'bg-slate-100' }
   }
+}
+
+function sanitizeWalletText(value: string | undefined): string {
+  const trimmed = (value || '').trim()
+  if (!trimmed) return ''
+
+  return trimmed
+    .replace(/\bpakasir\b/gi, 'payment gateway')
+    .replace(/\bprovider\b/gi, 'sistem pembayaran')
+    .replace(/provider[_\s-]*order[_\s-]*id/gi, 'ID order')
+    .replace(/\b5sim\b/gi, 'nomor OTP')
 }
 
 export default function WalletPage() {
@@ -179,7 +190,7 @@ export default function WalletPage() {
       })
 
       if (!res.success) {
-        setError(res.message)
+        setError(sanitizeWalletText(res.message) || 'Gagal membuat invoice topup')
         return
       }
 
@@ -187,7 +198,7 @@ export default function WalletPage() {
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const message = (err.response?.data as { message?: string } | undefined)?.message
-        setError(message || 'Gagal membuat invoice topup')
+        setError(sanitizeWalletText(message) || 'Gagal membuat invoice topup')
       } else {
         setError('Gagal membuat invoice topup')
       }
@@ -346,7 +357,7 @@ export default function WalletPage() {
                 <span className="text-sm font-bold">Saldo setelah top up</span>
                 <span className="text-base font-extrabold">{formatRupiah(estimatedBalance)}</span>
               </div>
-              <p className="text-[11px] text-[#888]">Total bayar final mengikuti response provider (bisa termasuk fee/channel).</p>
+              <p className="text-[11px] text-[#888]">Total bayar final mengikuti invoice pembayaran (bisa termasuk biaya channel).</p>
             </div>
 
             {error ? (
@@ -374,7 +385,7 @@ export default function WalletPage() {
             <div className="text-3xl">⚡</div>
             <div className="flex-1">
               <h3 className="text-sm font-bold mb-1">Wallet topup sudah aktif</h3>
-              <p className="text-xs text-white/60">Checkout pakai saldo wallet lagi disiapkan. Sementara order premium via Pakasir.</p>
+              <p className="text-xs text-white/60">Checkout pakai saldo wallet lagi disiapkan. Sementara order premium via invoice pembayaran.</p>
             </div>
             <Link
               href="/product/prem-apps"
@@ -423,8 +434,8 @@ export default function WalletPage() {
                       <div className="flex items-start gap-3">
                         <div className={`h-10 w-10 rounded-xl ${visual.bg} flex items-center justify-center text-lg shrink-0`}>{visual.icon}</div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold truncate">{ledger.description || ledger.category || 'Transaksi wallet'}</div>
-                          <div className="text-xs text-[#888] mt-0.5 truncate">{formatDate(ledger.created_at)} • {ledger.reference}</div>
+                          <div className="text-sm font-semibold truncate">{sanitizeWalletText(ledger.description) || sanitizeWalletText(ledger.category) || 'Transaksi wallet'}</div>
+                          <div className="text-xs text-[#888] mt-0.5 truncate">{formatDate(ledger.created_at)} • {sanitizeWalletText(ledger.reference) || 'Riwayat transaksi'}</div>
                         </div>
                         <div className="text-right shrink-0">
                           <div className={`text-sm font-extrabold ${credit ? 'text-green-600' : 'text-[#141414]'}`}>
