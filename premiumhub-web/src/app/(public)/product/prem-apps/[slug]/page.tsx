@@ -254,15 +254,18 @@ export default function PremAppsProductDetailPage() {
       <section className="py-12 md:py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div
-            className="rounded-3xl p-8 md:p-10 mb-8 bg-cover bg-center"
+            className="relative overflow-hidden rounded-3xl p-8 md:p-10 mb-8 bg-cover bg-center"
             style={{
               backgroundColor: product.color || '#F7F7F5',
-              backgroundImage: product.hero_bg_url ? `linear-gradient(rgba(255,255,255,0.82), rgba(255,255,255,0.82)), url(${product.hero_bg_url})` : undefined,
+              backgroundImage: product.hero_bg_url ? `url(${product.hero_bg_url})` : undefined,
             }}
           >
-            <div className="flex items-start gap-4">
+            <div className="absolute inset-0 bg-gradient-to-b from-white/92 via-white/85 to-white/93 pointer-events-none" />
+            <div className="relative z-10 flex items-start gap-4">
               {product.icon_image_url ? (
-                <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} className="w-14 h-14 rounded-xl object-cover border border-white/70" />
+                <div className="w-14 h-14 rounded-2xl bg-white/95 border border-white shadow-sm p-1.5">
+                  <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} className="w-full h-full rounded-xl object-contain" />
+                </div>
               ) : (
                 <div className="text-5xl">{product.icon || '📦'}</div>
               )}

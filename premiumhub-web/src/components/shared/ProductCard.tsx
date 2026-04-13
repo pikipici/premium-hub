@@ -13,39 +13,40 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <Link href={`/product/prem-apps/${product.slug}`} className="group block">
       <div
-        className="relative rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-transparent hover:border-[#EBEBEB] bg-cover bg-center"
+        className="relative overflow-hidden rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-transparent hover:border-[#EBEBEB] bg-cover bg-center"
         style={{
           backgroundColor: product.color || '#F7F7F5',
-          backgroundImage: product.hero_bg_url
-            ? `linear-gradient(rgba(255,255,255,0.88), rgba(255,255,255,0.88)), url(${product.hero_bg_url})`
-            : undefined,
+          backgroundImage: product.hero_bg_url ? `url(${product.hero_bg_url})` : undefined,
         }}
       >
+        <div className="absolute inset-0 bg-gradient-to-b from-white/92 via-white/88 to-white/94 pointer-events-none" />
         {product.is_popular && (
-          <div className="absolute top-3 right-3 bg-[#FF5733] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+          <div className="absolute top-3 right-3 z-10 bg-[#FF5733] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
             Popular
           </div>
         )}
 
-        <div className="mb-4">
+        <div className="relative z-10 mb-4">
           {product.icon_image_url ? (
-            <Image src={product.icon_image_url} alt={`${product.name} icon`} width={48} height={48} className="w-12 h-12 rounded-xl object-cover border border-white/70" />
+            <div className="w-12 h-12 rounded-xl bg-white/95 border border-white shadow-sm p-1.5">
+              <Image src={product.icon_image_url} alt={`${product.name} icon`} width={48} height={48} className="w-full h-full rounded-lg object-contain" />
+            </div>
           ) : (
             <div className="text-4xl">{product.icon}</div>
           )}
         </div>
-        <h3 className="text-lg font-bold text-[#141414] mb-1">{product.name}</h3>
-        <p className="text-xs text-[#888] mb-4 capitalize">{product.category}</p>
+        <h3 className="relative z-10 text-lg font-bold text-[#141414] mb-1">{product.name}</h3>
+        <p className="relative z-10 text-xs text-[#888] mb-4 capitalize">{product.category}</p>
 
-        <div className="flex items-baseline gap-1">
+        <div className="relative z-10 flex items-baseline gap-1">
           <span className="text-sm text-[#888]">Mulai dari</span>
         </div>
-        <div className="flex items-baseline gap-1">
+        <div className="relative z-10 flex items-baseline gap-1">
           <span className="text-xl font-extrabold text-[#141414]">{formatRupiah(minPrice)}</span>
           <span className="text-xs text-[#888]">/bulan</span>
         </div>
 
-        <div className="mt-4 flex gap-2">
+        <div className="relative z-10 mt-4 flex gap-2">
           {product.prices?.some(p => p.account_type === 'shared') && (
             <span className="text-[10px] font-medium text-[#141414] bg-white/60 px-2 py-1 rounded-full">Shared</span>
           )}
