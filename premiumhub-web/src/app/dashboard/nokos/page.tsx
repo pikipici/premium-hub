@@ -1407,8 +1407,8 @@ export default function NomorVirtualPage() {
 
               <div className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
                 <header className="border-b border-[#EBEBEB] px-4 py-3">
-                  <h2 className="text-sm font-bold">Checkout Activation</h2>
-                  <p className="text-xs text-[#888] mt-0.5">Flow difokusin ke beli nomor OTP.</p>
+                  <h2 className="text-sm font-bold">Checkout Nomor</h2>
+                  <p className="text-xs text-[#888] mt-0.5">Konfirmasi pembelian nomor untuk OTP kamu.</p>
                 </header>
 
                 <div className="p-4 space-y-3">
