@@ -256,11 +256,13 @@ export default function PremAppsProductDetailPage() {
           <div className="rounded-3xl p-8 md:p-10 mb-8 border border-[#EBEBEB] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
             <div className="flex flex-col items-center text-center">
               {product.icon_image_url ? (
-                <div className="w-14 h-14 rounded-2xl bg-white/95 border border-white shadow-sm p-1.5 mb-3">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.10)] p-1.5 mb-3">
                   <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} unoptimized className="w-full h-full rounded-xl object-contain" />
                 </div>
               ) : (
-                <div className="text-5xl mb-3">{product.icon || '📦'}</div>
+                <div className="w-14 h-14 rounded-2xl bg-white border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.10)] flex items-center justify-center text-4xl mb-3">
+                  {product.icon || '📦'}
+                </div>
               )}
 
               <div className="flex items-center gap-2 flex-wrap justify-center mb-2">
