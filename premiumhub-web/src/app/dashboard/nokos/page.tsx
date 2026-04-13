@@ -1465,8 +1465,8 @@ export default function NomorVirtualPage() {
 
               <div className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
                 <header className="border-b border-[#EBEBEB] px-4 py-3">
-                  <h2 className="text-sm font-bold">Terima OTP Realtime</h2>
-                  <p className="text-xs text-[#888] mt-0.5">Nunggu OTP tetap di tab Beli Nomor. Riwayat ada di tab Riwayat Order.</p>
+                  <h2 className="text-sm font-bold">Terima OTP Disini</h2>
+                  <p className="text-xs text-[#888] mt-0.5">OTP kamu akan dikirim disini, mohon tunggu.</p>
                 </header>
 
                 <div className="p-4 space-y-3">
@@ -1676,7 +1676,7 @@ export default function NomorVirtualPage() {
           </div>
 
           <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-xs text-[#666]">
-            Realtime OTP sekarang ada di tab <span className="font-bold text-[#141414]">Beli Nomor</span> (section Terima OTP Realtime).
+            OTP sekarang ada di tab <span className="font-bold text-[#141414]">Beli Nomor</span> (section Terima OTP Disini).
             Tab ini fokus buat riwayat dan audit order.
           </div>
 
