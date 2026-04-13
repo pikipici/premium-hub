@@ -171,9 +171,21 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/5sim/catalog/prices", fiveSimHandler.GetPrices)
 
 	protected.GET("/5sim/orders", fiveSimHandler.ListOrders)
-	protected.POST("/5sim/orders/activation", fiveSimHandler.BuyActivation)
-	protected.POST("/5sim/orders/hosting", fiveSimHandler.BuyHosting)
-	protected.POST("/5sim/orders/reuse", fiveSimHandler.ReuseNumber)
+	protected.POST(
+		"/5sim/orders/activation",
+		middleware.NewUserRateLimiter(cfg.FiveSimBuyRateLimitMax, cfg.FiveSimBuyRateLimitWindow, "Terlalu banyak request pembelian 5sim. Coba lagi sebentar."),
+		fiveSimHandler.BuyActivation,
+	)
+	protected.POST(
+		"/5sim/orders/hosting",
+		middleware.NewUserRateLimiter(cfg.FiveSimBuyRateLimitMax, cfg.FiveSimBuyRateLimitWindow, "Terlalu banyak request pembelian 5sim. Coba lagi sebentar."),
+		fiveSimHandler.BuyHosting,
+	)
+	protected.POST(
+		"/5sim/orders/reuse",
+		middleware.NewUserRateLimiter(cfg.FiveSimBuyRateLimitMax, cfg.FiveSimBuyRateLimitWindow, "Terlalu banyak request pembelian 5sim. Coba lagi sebentar."),
+		fiveSimHandler.ReuseNumber,
+	)
 	protected.GET("/5sim/orders/:id", fiveSimHandler.CheckOrder)
 	protected.POST("/5sim/orders/:id/finish", fiveSimHandler.FinishOrder)
 	protected.POST("/5sim/orders/:id/cancel", fiveSimHandler.CancelOrder)

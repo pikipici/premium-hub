@@ -431,7 +431,7 @@ func (s *FiveSimService) markBuyIdempotencyFailed(row *model.FiveSimOrderIdempot
 func normalizeFiveSimIdempotencyKey(raw string) (string, error) {
 	normalized := strings.TrimSpace(raw)
 	if normalized == "" {
-		return uuid.NewString(), nil
+		return "", errors.New("idempotency_key wajib diisi")
 	}
 	if len(normalized) > fiveSimIdemKeyMaxLen {
 		return "", fmt.Errorf("idempotency_key maksimal %d karakter", fiveSimIdemKeyMaxLen)

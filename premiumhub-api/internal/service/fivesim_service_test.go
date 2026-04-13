@@ -333,9 +333,10 @@ func TestFiveSimServiceBuyActivationCreatesLocalOrder(t *testing.T) {
 	}
 
 	localOrder, providerOrder, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
-		Country:  "england",
-		Operator: "any",
-		Product:  "telegram",
+		Country:        "england",
+		Operator:       "any",
+		Product:        "telegram",
+		IdempotencyKey: "idem-fivesim-create-local-order",
 	})
 	if err != nil {
 		t.Fatalf("buy activation: %v", err)
@@ -501,6 +502,31 @@ func TestFiveSimServiceBuyActivationIdempotencyRejectsTooLongKey(t *testing.T) {
 	}
 }
 
+func TestFiveSimServiceBuyActivationIdempotencyMissingRejected(t *testing.T) {
+	svc, _, fake, activeUser, _ := setupFiveSimService(t)
+	fake.buyActivationResp = &FiveSimOrderPayload{
+		ID:       991129,
+		Phone:    "+447000001129",
+		Operator: "vodafone",
+		Product:  "telegram",
+		Price:    0.34,
+		Status:   "PENDING",
+		Country:  "england",
+	}
+
+	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
+		Country:  "england",
+		Operator: "any",
+		Product:  "telegram",
+	})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "idempotency_key wajib") {
+		t.Fatalf("expected missing idempotency key error, got: %v", err)
+	}
+	if fake.buyActivationHits != 0 {
+		t.Fatalf("provider buy should not be called when idempotency_key missing")
+	}
+}
+
 func TestFiveSimServiceBuyActivationIdempotencyProcessingBlocksDuplicate(t *testing.T) {
 	svc, db, fake, activeUser, _ := setupFiveSimService(t)
 
@@ -616,9 +642,10 @@ func TestFiveSimServiceBuyActivationTerminalStatusAutoRefundImmediately(t *testi
 	}
 
 	localOrder, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
-		Country:  "england",
-		Operator: "any",
-		Product:  "telegram",
+		Country:        "england",
+		Operator:       "any",
+		Product:        "telegram",
+		IdempotencyKey: "idem-fivesim-terminal-auto-refund",
 	})
 	if err != nil {
 		t.Fatalf("buy activation canceled: %v", err)
@@ -681,8 +708,9 @@ func TestFiveSimServiceMapsProviderRateLimitError(t *testing.T) {
 	fake.buyActivationErr = &FiveSimAPIError{StatusCode: 429, Message: "too many requests", Retryable: true}
 
 	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
-		Country: "england",
-		Product: "telegram",
+		Country:        "england",
+		Product:        "telegram",
+		IdempotencyKey: "idem-fivesim-provider-ratelimit",
 	})
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "limit request") {
 		t.Fatalf("expected mapped rate-limit error, got: %v", err)
@@ -715,9 +743,10 @@ func TestFiveSimServiceBuyActivationInsufficientWalletCancelsProviderOrder(t *te
 	}
 
 	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
-		Country:  "indonesia",
-		Operator: "any",
-		Product:  "telegram",
+		Country:        "indonesia",
+		Operator:       "any",
+		Product:        "telegram",
+		IdempotencyKey: "idem-fivesim-insufficient-cancel",
 	})
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "saldo wallet tidak cukup") {
 		t.Fatalf("expected insufficient wallet error, got: %v", err)
@@ -769,8 +798,9 @@ func TestFiveSimServiceBuyActivationInsufficientWalletCancelFailureEscalates(t *
 	fake.cancelErr = &FiveSimAPIError{StatusCode: 503, Message: "server offline", Retryable: true}
 
 	_, _, err := svc.BuyActivation(context.Background(), activeUser.ID, FiveSimBuyActivationInput{
-		Country: "indonesia",
-		Product: "telegram",
+		Country:        "indonesia",
+		Product:        "telegram",
+		IdempotencyKey: "idem-fivesim-insufficient-cancel-fail",
 	})
 	if err == nil {
 		t.Fatalf("expected error when cancel rollback fails")
