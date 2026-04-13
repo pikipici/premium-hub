@@ -30,7 +30,9 @@ type Product struct {
 	Description        string              `gorm:"type:text" json:"description"`
 	Tagline            string              `gorm:"size:180" json:"tagline"`
 	Icon               string              `gorm:"size:10" json:"icon"`
+	IconImageURL       string              `gorm:"size:500" json:"icon_image_url"`
 	Color              string              `gorm:"size:30" json:"color"`
+	HeroBgURL          string              `gorm:"size:500" json:"hero_bg_url"`
 	BadgePopularText   string              `gorm:"size:120" json:"badge_popular_text"`
 	BadgeGuaranteeText string              `gorm:"size:120" json:"badge_guarantee_text"`
 	SoldText           string              `gorm:"size:120" json:"sold_text"`

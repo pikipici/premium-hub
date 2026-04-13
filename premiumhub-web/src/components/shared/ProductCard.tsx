@@ -1,5 +1,6 @@
 "use client"
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { formatRupiah } from '@/lib/utils'
 import type { Product } from '@/types/product'
@@ -12,8 +13,13 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <Link href={`/product/prem-apps/${product.slug}`} className="group block">
       <div
-        className="relative rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-transparent hover:border-[#EBEBEB]"
-        style={{ backgroundColor: product.color || '#F7F7F5' }}
+        className="relative rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-transparent hover:border-[#EBEBEB] bg-cover bg-center"
+        style={{
+          backgroundColor: product.color || '#F7F7F5',
+          backgroundImage: product.hero_bg_url
+            ? `linear-gradient(rgba(255,255,255,0.88), rgba(255,255,255,0.88)), url(${product.hero_bg_url})`
+            : undefined,
+        }}
       >
         {product.is_popular && (
           <div className="absolute top-3 right-3 bg-[#FF5733] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
@@ -21,7 +27,13 @@ export default function ProductCard({ product }: { product: Product }) {
           </div>
         )}
 
-        <div className="text-4xl mb-4">{product.icon}</div>
+        <div className="mb-4">
+          {product.icon_image_url ? (
+            <Image src={product.icon_image_url} alt={`${product.name} icon`} width={48} height={48} className="w-12 h-12 rounded-xl object-cover border border-white/70" />
+          ) : (
+            <div className="text-4xl">{product.icon}</div>
+          )}
+        </div>
         <h3 className="text-lg font-bold text-[#141414] mb-1">{product.name}</h3>
         <p className="text-xs text-[#888] mb-4 capitalize">{product.category}</p>
 

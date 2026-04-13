@@ -1,24 +1,32 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"mime/multipart"
 	"strconv"
 	"strings"
 
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
+	"premiumhub-api/internal/storage"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type ProductService struct {
-	productRepo *repository.ProductRepo
-	stockRepo   *repository.StockRepo
+	productRepo   *repository.ProductRepo
+	stockRepo     *repository.StockRepo
+	productAssets *storage.ProductAssetStorage
 }
 
-func NewProductService(productRepo *repository.ProductRepo, stockRepo *repository.StockRepo) *ProductService {
-	return &ProductService{productRepo: productRepo, stockRepo: stockRepo}
+func NewProductService(productRepo *repository.ProductRepo, stockRepo *repository.StockRepo, productAssets ...*storage.ProductAssetStorage) *ProductService {
+	var assets *storage.ProductAssetStorage
+	if len(productAssets) > 0 {
+		assets = productAssets[0]
+	}
+	return &ProductService{productRepo: productRepo, stockRepo: stockRepo, productAssets: assets}
 }
 
 func (s *ProductService) List(category string, page, limit int) ([]model.Product, int64, error) {
@@ -42,7 +50,9 @@ type CreateProductInput struct {
 	Description        string                    `json:"description"`
 	Tagline            string                    `json:"tagline"`
 	Icon               string                    `json:"icon"`
+	IconImageURL       string                    `json:"icon_image_url"`
 	Color              string                    `json:"color"`
+	HeroBgURL          string                    `json:"hero_bg_url"`
 	BadgePopularText   string                    `json:"badge_popular_text"`
 	BadgeGuaranteeText string                    `json:"badge_guarantee_text"`
 	SoldText           string                    `json:"sold_text"`
@@ -109,7 +119,9 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 		Description:        strings.TrimSpace(input.Description),
 		Tagline:            strings.TrimSpace(input.Tagline),
 		Icon:               strings.TrimSpace(input.Icon),
+		IconImageURL:       strings.TrimSpace(input.IconImageURL),
 		Color:              strings.TrimSpace(input.Color),
+		HeroBgURL:          strings.TrimSpace(input.HeroBgURL),
 		BadgePopularText:   strings.TrimSpace(input.BadgePopularText),
 		BadgeGuaranteeText: strings.TrimSpace(input.BadgeGuaranteeText),
 		SoldText:           strings.TrimSpace(input.SoldText),
@@ -144,7 +156,9 @@ type UpdateProductInput struct {
 	Description        *string                    `json:"description"`
 	Tagline            *string                    `json:"tagline"`
 	Icon               *string                    `json:"icon"`
+	IconImageURL       *string                    `json:"icon_image_url"`
 	Color              *string                    `json:"color"`
+	HeroBgURL          *string                    `json:"hero_bg_url"`
 	BadgePopularText   *string                    `json:"badge_popular_text"`
 	BadgeGuaranteeText *string                    `json:"badge_guarantee_text"`
 	SoldText           *string                    `json:"sold_text"`
@@ -206,8 +220,14 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 	if input.Icon != nil {
 		product.Icon = strings.TrimSpace(*input.Icon)
 	}
+	if input.IconImageURL != nil {
+		product.IconImageURL = strings.TrimSpace(*input.IconImageURL)
+	}
 	if input.Color != nil {
 		product.Color = strings.TrimSpace(*input.Color)
+	}
+	if input.HeroBgURL != nil {
+		product.HeroBgURL = strings.TrimSpace(*input.HeroBgURL)
 	}
 	if input.BadgePopularText != nil {
 		product.BadgePopularText = strings.TrimSpace(*input.BadgePopularText)
@@ -415,6 +435,37 @@ func (s *ProductService) UpdatePrice(productID, priceID uuid.UUID, input UpdateP
 		return nil, errors.New("gagal memperbarui harga produk")
 	}
 	return price, nil
+}
+
+func (s *ProductService) UploadAsset(productID uuid.UUID, kind string, file *multipart.FileHeader) (string, error) {
+	if s.productAssets == nil {
+		return "", errors.New("storage asset produk belum dikonfigurasi")
+	}
+
+	product, err := s.productRepo.FindByID(productID)
+	if err != nil {
+		return "", errors.New("produk tidak ditemukan")
+	}
+
+	assetURL, err := s.productAssets.Store(context.Background(), productID.String(), kind, file)
+	if err != nil {
+		return "", err
+	}
+
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "icon":
+		product.IconImageURL = assetURL
+	case "hero":
+		product.HeroBgURL = assetURL
+	default:
+		return "", errors.New("kind asset tidak valid")
+	}
+
+	if err := s.productRepo.Update(product); err != nil {
+		return "", errors.New("gagal menyimpan asset produk")
+	}
+
+	return assetURL, nil
 }
 
 func (s *ProductService) DeletePrice(productID, priceID uuid.UUID) error {

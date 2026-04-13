@@ -3,6 +3,7 @@ package handler
 import (
 	"math"
 	"strconv"
+	"strings"
 
 	"premiumhub-api/internal/service"
 	"premiumhub-api/pkg/response"
@@ -103,6 +104,29 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		return
 	}
 	response.Success(c, "Produk diperbarui", product)
+}
+
+func (h *ProductHandler) UploadAsset(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+
+	kind := strings.TrimSpace(c.PostForm("kind"))
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.BadRequest(c, "file asset wajib diisi")
+		return
+	}
+
+	assetURL, err := h.productSvc.UploadAsset(id, kind, file)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Asset produk berhasil diupload", gin.H{"url": assetURL})
 }
 
 func (h *ProductHandler) Delete(c *gin.Context) {

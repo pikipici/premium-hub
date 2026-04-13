@@ -19,7 +19,9 @@ type FormState = {
   description: string
   tagline: string
   icon: string
+  icon_image_url: string
   color: string
+  hero_bg_url: string
   badge_popular_text: string
   badge_guarantee_text: string
   sold_text: string
@@ -99,7 +101,9 @@ function createDefaultForm(): FormState {
     description: '',
     tagline: '',
     icon: '📦',
+    icon_image_url: '',
     color: '#FDDAC8',
+    hero_bg_url: '',
     badge_popular_text: '🔥 Terlaris',
     badge_guarantee_text: '🛡 Garansi 30 Hari',
     sold_text: '',
@@ -291,6 +295,7 @@ export default function ProdukPage() {
 
   const [priceDrafts, setPriceDrafts] = useState<ProductPriceDraft[]>([])
   const [removedPriceIds, setRemovedPriceIds] = useState<string[]>([])
+  const [uploadingAssetKind, setUploadingAssetKind] = useState<null | 'icon' | 'hero'>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmTitle, setConfirmTitle] = useState('')
   const [confirmDescription, setConfirmDescription] = useState('')
@@ -378,7 +383,9 @@ export default function ProdukPage() {
       description: product.description ?? '',
       tagline: product.tagline ?? '',
       icon: product.icon || '📦',
+      icon_image_url: product.icon_image_url || '',
       color: product.color || '#FDDAC8',
+      hero_bg_url: product.hero_bg_url || '',
       badge_popular_text: product.badge_popular_text || '🔥 Terlaris',
       badge_guarantee_text: product.badge_guarantee_text || '🛡 Garansi 30 Hari',
       sold_text: product.sold_text || '',
@@ -620,7 +627,9 @@ export default function ProdukPage() {
       description: form.description.trim(),
       tagline: form.tagline.trim(),
       icon: form.icon.trim() || '📦',
+      icon_image_url: form.icon_image_url.trim(),
       color: form.color.trim() || '#FDDAC8',
+      hero_bg_url: form.hero_bg_url.trim(),
       badge_popular_text: form.badge_popular_text.trim(),
       badge_guarantee_text: form.badge_guarantee_text.trim(),
       sold_text: form.sold_text.trim(),
@@ -780,6 +789,37 @@ export default function ProdukPage() {
     }
 
     await doHardDeleteProduct(confirmAction.product)
+  }
+
+  const handleUploadAsset = async (kind: 'icon' | 'hero', file?: File) => {
+    if (!file) return
+    if (!editingId || formMode !== 'edit') {
+      setError('Upload gambar hanya bisa setelah produk dibuat (mode edit).')
+      return
+    }
+
+    try {
+      setUploadingAssetKind(kind)
+      setError('')
+
+      const res = await productService.adminUploadAsset(editingId, kind, file)
+      if (!res.success) {
+        setError(res.message || 'Gagal upload gambar produk')
+        return
+      }
+
+      const nextUrl = res.data?.url || ''
+      setForm((prev) => ({
+        ...prev,
+        icon_image_url: kind === 'icon' ? nextUrl : prev.icon_image_url,
+        hero_bg_url: kind === 'hero' ? nextUrl : prev.hero_bg_url,
+      }))
+      setNotice(kind === 'icon' ? 'Icon image berhasil diupload ke R2.' : 'Background hero berhasil diupload ke R2.')
+    } catch {
+      setError('Gagal upload gambar produk')
+    } finally {
+      setUploadingAssetKind(null)
+    }
   }
 
   return (
@@ -1169,7 +1209,7 @@ export default function ProdukPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label className="form-label">Icon</label>
+                  <label className="form-label">Icon Emoji (fallback)</label>
                   <input
                     className="form-input"
                     value={form.icon}
@@ -1184,6 +1224,42 @@ export default function ProdukPage() {
                     value={form.color}
                     onChange={(event) => setForm((prev) => ({ ...prev, color: event.target.value }))}
                     placeholder="#FDDAC8"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="form-label">Icon Image URL (R2)</label>
+                  <input
+                    className="form-input"
+                    value={form.icon_image_url}
+                    onChange={(event) => setForm((prev) => ({ ...prev, icon_image_url: event.target.value }))}
+                    placeholder="https://.../products/{id}/icon/..."
+                  />
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => void handleUploadAsset('icon', event.target.files?.[0])}
+                    disabled={uploadingAssetKind === 'icon' || formMode !== 'edit'}
+                    style={{ marginTop: 8, fontSize: 12 }}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Hero Background URL (R2)</label>
+                  <input
+                    className="form-input"
+                    value={form.hero_bg_url}
+                    onChange={(event) => setForm((prev) => ({ ...prev, hero_bg_url: event.target.value }))}
+                    placeholder="https://.../products/{id}/hero/..."
+                  />
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => void handleUploadAsset('hero', event.target.files?.[0])}
+                    disabled={uploadingAssetKind === 'hero' || formMode !== 'edit'}
+                    style={{ marginTop: 8, fontSize: 12 }}
                   />
                 </div>
               </div>

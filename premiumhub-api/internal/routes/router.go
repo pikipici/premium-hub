@@ -39,7 +39,6 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg)
-	productSvc := service.NewProductService(productRepo, stockRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
 	stockSvc := service.NewStockService(stockRepo)
@@ -57,6 +56,12 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	if err != nil {
 		panic(fmt.Errorf("gagal inisialisasi convert proof storage: %w", err))
 	}
+
+	productAssetStorage, err := storage.NewProductAssetStorage(cfg)
+	if err != nil {
+		panic(fmt.Errorf("gagal inisialisasi product asset storage: %w", err))
+	}
+	productSvc := service.NewProductService(productRepo, stockRepo, productAssetStorage)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc, cfg)
@@ -175,6 +180,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.GET("/products", productHandler.AdminList)
 	admin.POST("/products", productHandler.Create)
 	admin.PUT("/products/:id", productHandler.Update)
+	admin.POST("/products/:id/assets", productHandler.UploadAsset)
 	admin.DELETE("/products/:id", productHandler.Delete)
 	admin.DELETE("/products/:id/permanent", productHandler.DeletePermanent)
 	admin.POST("/products/:id/prices", productHandler.CreatePrice)
