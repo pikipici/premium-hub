@@ -254,42 +254,41 @@ export default function PremAppsProductDetailPage() {
       <section className="py-12 md:py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="rounded-3xl p-8 md:p-10 mb-8 border border-[#EBEBEB] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col items-center text-center">
               {product.icon_image_url ? (
-                <div className="w-14 h-14 rounded-2xl bg-white/95 border border-white shadow-sm p-1.5">
+                <div className="w-14 h-14 rounded-2xl bg-white/95 border border-white shadow-sm p-1.5 mb-3">
                   <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} unoptimized className="w-full h-full rounded-xl object-contain" />
                 </div>
               ) : (
-                <div className="text-5xl">{product.icon || '📦'}</div>
+                <div className="text-5xl mb-3">{product.icon || '📦'}</div>
               )}
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  {product.is_popular && (
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#141414] text-white">
-                      {popularBadge}
-                    </span>
-                  )}
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#F3F4F6] text-[#1F2937]">
-                    {guaranteeBadge}
-                  </span>
-                </div>
 
-                <h1 className="text-2xl md:text-3xl font-extrabold mb-1">{product.name}</h1>
-                <p className="text-sm text-[#888]">
-                  {product.tagline?.trim() || `Kategori ${product.category}`}
-                </p>
+              <div className="flex items-center gap-2 flex-wrap justify-center mb-2">
+                {product.is_popular && (
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#141414] text-white">
+                    {popularBadge}
+                  </span>
+                )}
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#F3F4F6] text-[#1F2937]">
+                  {guaranteeBadge}
+                </span>
               </div>
+
+              <h1 className="text-2xl md:text-3xl font-extrabold mb-1">{product.name}</h1>
+              <p className="text-sm text-[#888]">
+                {product.tagline?.trim() || `Kategori ${product.category}`}
+              </p>
             </div>
 
-            <p className="mt-4 text-sm text-[#666] leading-relaxed">{product.description}</p>
+            <p className="mt-4 text-sm text-[#666] leading-relaxed text-center max-w-2xl mx-auto">{product.description}</p>
 
             {!!product.sold_text?.trim() && (
-              <div className="mt-4 text-xs font-semibold text-[#2F3A4A] bg-[#F8FAFC] border border-[#E5E7EB] rounded-full inline-flex px-3 py-1.5">
+              <div className="mt-4 text-xs font-semibold text-[#2F3A4A] bg-[#F8FAFC] border border-[#E5E7EB] rounded-full inline-flex px-3 py-1.5 mx-auto">
                 {product.sold_text}
               </div>
             )}
 
-            <div className="flex gap-3 mt-6 flex-wrap">
+            <div className="flex gap-3 mt-6 flex-wrap justify-center">
               {trustBadges.map((item, index) => {
                 const iconNode =
                   index % 3 === 0 ? (
