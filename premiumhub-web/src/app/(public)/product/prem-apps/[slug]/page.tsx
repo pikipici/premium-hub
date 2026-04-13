@@ -247,11 +247,6 @@ export default function PremAppsProductDetailPage() {
   const showWaButton = product.show_whatsapp_button !== false
   const waLink = buildWaLink(product, effectiveSelectedPrice)
 
-  const hasHeroBackground = Boolean(product.hero_bg_url?.trim())
-  const heroOverlayBackground = hasHeroBackground
-    ? 'linear-gradient(180deg, rgba(255,255,255,0.90) 0%, rgba(255,255,255,0.82) 45%, rgba(255,255,255,0.92) 100%)'
-    : 'linear-gradient(180deg, rgba(255,255,255,0.74) 0%, rgba(255,255,255,0.68) 45%, rgba(255,255,255,0.80) 100%)'
-
   return (
     <>
       <Navbar />
@@ -265,46 +260,43 @@ export default function PremAppsProductDetailPage() {
               backgroundImage: product.hero_bg_url ? `url(${product.hero_bg_url})` : undefined,
             }}
           >
-            <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: heroOverlayBackground }} />
-
-            <div className="relative z-10 max-w-3xl rounded-2xl border border-white/80 bg-white/72 backdrop-blur-sm shadow-sm p-4 md:p-5">
-              <div className="flex items-start gap-4">
-                {product.icon_image_url ? (
-                  <div className="w-14 h-14 rounded-2xl bg-white/95 border border-white shadow-sm p-1.5">
-                    <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} unoptimized className="w-full h-full rounded-xl object-contain" />
-                  </div>
-                ) : (
-                  <div className="text-5xl">{product.icon || '📦'}</div>
-                )}
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap mb-2">
-                    {product.is_popular && (
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#141414] text-white">
-                        {popularBadge}
-                      </span>
-                    )}
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/80 text-[#1F2937]">
-                      {guaranteeBadge}
-                    </span>
-                  </div>
-
-                  <h1 className="text-2xl md:text-3xl font-extrabold mb-1">{product.name}</h1>
-                  <p className="text-sm text-[#4B5563]">
-                    {product.tagline?.trim() || `Kategori ${product.category}`}
-                  </p>
+            <div className="absolute inset-0 bg-gradient-to-b from-white/92 via-white/85 to-white/93 pointer-events-none" />
+            <div className="relative z-10 flex items-start gap-4">
+              {product.icon_image_url ? (
+                <div className="w-14 h-14 rounded-2xl bg-white/95 border border-white shadow-sm p-1.5">
+                  <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} unoptimized className="w-full h-full rounded-xl object-contain" />
                 </div>
-              </div>
-
-              <p className="mt-3 text-sm text-[#374151] leading-relaxed">{product.description}</p>
-
-              {!!product.sold_text?.trim() && (
-                <div className="mt-4 text-xs font-semibold text-[#2F3A4A] bg-white/80 rounded-full inline-flex px-3 py-1.5">
-                  {product.sold_text}
-                </div>
+              ) : (
+                <div className="text-5xl">{product.icon || '📦'}</div>
               )}
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  {product.is_popular && (
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#141414] text-white">
+                      {popularBadge}
+                    </span>
+                  )}
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/80 text-[#1F2937]">
+                    {guaranteeBadge}
+                  </span>
+                </div>
+
+                <h1 className="text-2xl md:text-3xl font-extrabold mb-1">{product.name}</h1>
+                <p className="text-sm text-[#888]">
+                  {product.tagline?.trim() || `Kategori ${product.category}`}
+                </p>
+              </div>
             </div>
 
-            <div className="relative z-10 flex gap-3 mt-5 flex-wrap">
+            <p className="mt-4 text-sm text-[#666] leading-relaxed">{product.description}</p>
+
+            {!!product.sold_text?.trim() && (
+              <div className="mt-4 text-xs font-semibold text-[#2F3A4A] bg-white/70 rounded-full inline-flex px-3 py-1.5">
+                {product.sold_text}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-6 flex-wrap">
               {trustBadges.map((item, index) => {
                 const iconNode =
                   index % 3 === 0 ? (
@@ -318,7 +310,7 @@ export default function PremAppsProductDetailPage() {
                 return (
                   <div
                     key={`${item.text}-${index}`}
-                    className="flex items-center gap-1.5 text-xs font-medium text-[#141414] bg-white/75 px-3 py-1.5 rounded-full border border-white/70"
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#141414] bg-white/60 px-3 py-1.5 rounded-full"
                   >
                     <span>{item.icon}</span>
                     {iconNode}
