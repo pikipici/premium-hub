@@ -291,6 +291,10 @@ export default function ProdukPage() {
 
   const [priceDrafts, setPriceDrafts] = useState<ProductPriceDraft[]>([])
   const [removedPriceIds, setRemovedPriceIds] = useState<string[]>([])
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmTitle, setConfirmTitle] = useState('')
+  const [confirmDescription, setConfirmDescription] = useState('')
+  const [confirmAction, setConfirmAction] = useState<null | { type: 'archive' | 'hard-delete'; product: Product }>(null)
 
   const loadProducts = async () => {
     setLoading(true)
@@ -719,10 +723,7 @@ export default function ProdukPage() {
     }
   }
 
-  const archiveProduct = async (product: Product) => {
-    const ok = window.confirm(`Arsipkan produk "${product.name}"? Produk akan jadi nonaktif.`)
-    if (!ok) return
-
+  const doArchiveProduct = async (product: Product) => {
     try {
       const res = await productService.adminDelete(product.id)
       if (!res.success) {
@@ -737,12 +738,7 @@ export default function ProdukPage() {
     }
   }
 
-  const hardDeleteProduct = async (product: Product) => {
-    const ok = window.confirm(
-      `Hapus permanen produk "${product.name}"?\n\nData produk, stok, dan paket harga akan dihapus.\nRiwayat order tetap aman (produk dengan order tidak bisa dihapus permanen).`
-    )
-    if (!ok) return
-
+  const doHardDeleteProduct = async (product: Product) => {
     try {
       const res = await productService.adminDeletePermanent(product.id)
       if (!res.success) {
@@ -755,6 +751,35 @@ export default function ProdukPage() {
     } catch (err) {
       setError(mapErrorMessage(err, 'Gagal menghapus permanen produk'))
     }
+  }
+
+  const archiveProduct = async (product: Product) => {
+    setConfirmTitle('Arsipkan Produk')
+    setConfirmDescription(`Arsipkan produk "${product.name}"? Produk akan jadi nonaktif.`)
+    setConfirmAction({ type: 'archive', product })
+    setConfirmOpen(true)
+  }
+
+  const hardDeleteProduct = async (product: Product) => {
+    setConfirmTitle('Hapus Permanen Produk')
+    setConfirmDescription(
+      `Hapus permanen produk "${product.name}"? Data produk, stok, dan paket harga akan dihapus. Riwayat order tetap aman (produk dengan order tidak bisa dihapus permanen).`
+    )
+    setConfirmAction({ type: 'hard-delete', product })
+    setConfirmOpen(true)
+  }
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return
+
+    setConfirmOpen(false)
+
+    if (confirmAction.type === 'archive') {
+      await doArchiveProduct(confirmAction.product)
+      return
+    }
+
+    await doHardDeleteProduct(confirmAction.product)
   }
 
   return (
@@ -774,6 +799,49 @@ export default function ProdukPage() {
           style={{ marginBottom: 12, background: '#FEF2F2', borderColor: '#FECACA', color: '#991B1B' }}
         >
           ⚠️ <strong>{error}</strong>
+        </div>
+      )}
+
+      {confirmOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={confirmTitle}
+          onClick={() => setConfirmOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 460,
+              background: '#fff',
+              borderRadius: 14,
+              border: '1px solid var(--border)',
+              boxShadow: '0 24px 60px rgba(0,0,0,.25)',
+              padding: 16,
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>{confirmTitle}</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 14 }}>{confirmDescription}</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="topbar-btn" onClick={() => setConfirmOpen(false)}>
+                Batal
+              </button>
+              <button className="topbar-btn primary" onClick={handleConfirmAction}>
+                Lanjut
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
