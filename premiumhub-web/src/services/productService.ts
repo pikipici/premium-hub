@@ -117,9 +117,7 @@ export const productService = {
     formData.append('kind', kind)
     formData.append('file', file)
 
-    const res = await api.post<ApiResponse<{ url: string }>>(`/admin/products/${productId}/assets`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await api.post<ApiResponse<{ url: string }>>(`/admin/products/${productId}/assets`, formData)
     return res.data
   },
 }
