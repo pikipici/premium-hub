@@ -13,10 +13,13 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <Link href={`/product/prem-apps/${product.slug}`} className="group block">
       <div
-        className="relative overflow-hidden rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-transparent hover:border-[#EBEBEB] bg-cover bg-center"
+        className="relative overflow-hidden rounded-2xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-transparent hover:border-[#EBEBEB]"
         style={{
           backgroundColor: product.color || '#F7F7F5',
           backgroundImage: product.hero_bg_url ? `url(${product.hero_bg_url})` : undefined,
+          backgroundPosition: 'center',
+          backgroundSize: 'contain',
+          backgroundRepeat: 'no-repeat',
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-white/92 via-white/88 to-white/94 pointer-events-none" />
@@ -29,7 +32,7 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className="relative z-10 mb-4">
           {product.icon_image_url ? (
             <div className="w-12 h-12 rounded-xl bg-white/95 border border-white shadow-sm p-1.5">
-              <Image src={product.icon_image_url} alt={`${product.name} icon`} width={48} height={48} className="w-full h-full rounded-lg object-contain" />
+              <Image src={product.icon_image_url} alt={`${product.name} icon`} width={48} height={48} unoptimized className="w-full h-full rounded-lg object-contain" />
             </div>
           ) : (
             <div className="text-4xl">{product.icon}</div>

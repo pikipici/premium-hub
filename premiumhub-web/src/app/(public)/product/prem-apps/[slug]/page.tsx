@@ -264,7 +264,7 @@ export default function PremAppsProductDetailPage() {
             <div className="relative z-10 flex items-start gap-4">
               {product.icon_image_url ? (
                 <div className="w-14 h-14 rounded-2xl bg-white/95 border border-white shadow-sm p-1.5">
-                  <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} className="w-full h-full rounded-xl object-contain" />
+                  <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} unoptimized className="w-full h-full rounded-xl object-contain" />
                 </div>
               ) : (
                 <div className="text-5xl">{product.icon || '📦'}</div>
