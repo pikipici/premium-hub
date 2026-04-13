@@ -76,9 +76,9 @@ function PremAppsContent() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-52 bg-white/50 rounded-2xl animate-pulse" />
+                <div key={i} className="h-44 sm:h-52 bg-white/50 rounded-2xl animate-pulse" />
               ))}
             </div>
           ) : products.length === 0 ? (
@@ -88,7 +88,7 @@ function PremAppsContent() {
               <p className="text-sm text-[#888]">Coba kategori lain</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
               {products.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
