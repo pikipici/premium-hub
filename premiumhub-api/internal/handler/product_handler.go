@@ -115,7 +115,20 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	response.Success(c, "Produk dihapus", nil)
+	response.Success(c, "Produk diarsipkan", nil)
+}
+
+func (h *ProductHandler) DeletePermanent(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+	if err := h.productSvc.DeletePermanent(id); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "Produk dihapus permanen", nil)
 }
 
 func (h *ProductHandler) CreatePrice(c *gin.Context) {

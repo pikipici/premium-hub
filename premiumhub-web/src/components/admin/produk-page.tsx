@@ -737,6 +737,35 @@ export default function ProdukPage() {
     }
   }
 
+  const hardDeleteProduct = async (product: Product) => {
+    const ok = window.confirm(
+      `Hapus permanen produk "${product.name}"? Data produk, stok, dan paket harga akan dihapus.`
+    )
+    if (!ok) return
+
+    const confirmText = window.prompt(
+      `Konfirmasi terakhir untuk hapus permanen "${product.name}". Ketik HAPUS lalu OK:`
+    )
+
+    if (confirmText?.trim().toUpperCase() !== 'HAPUS') {
+      setError('Konfirmasi hapus permanen dibatalkan. Ketik HAPUS kalau mau lanjut.')
+      return
+    }
+
+    try {
+      const res = await productService.adminDeletePermanent(product.id)
+      if (!res.success) {
+        setError(res.message || 'Gagal menghapus permanen produk')
+        return
+      }
+
+      setNotice(`Produk "${product.name}" berhasil dihapus permanen.`)
+      await loadProducts()
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal menghapus permanen produk'))
+    }
+  }
+
   return (
     <div className="page">
       {!!notice && (
@@ -871,6 +900,13 @@ export default function ProdukPage() {
                             >
                               Arsipkan
                             </button>
+                            <button
+                              className="action-btn"
+                              style={{ color: '#991B1B', borderColor: '#FCA5A5', background: '#FEF2F2' }}
+                              onClick={() => hardDeleteProduct(product)}
+                            >
+                              Hapus Permanen
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -986,6 +1022,13 @@ export default function ProdukPage() {
                       onClick={() => archiveProduct(product)}
                     >
                       Arsip
+                    </button>
+                    <button
+                      className="action-btn"
+                      style={{ color: '#991B1B', borderColor: '#FCA5A5', background: '#FEF2F2' }}
+                      onClick={() => hardDeleteProduct(product)}
+                    >
+                      Hapus
                     </button>
                   </div>
                 </article>

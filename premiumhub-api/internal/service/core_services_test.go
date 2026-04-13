@@ -503,6 +503,50 @@ func TestProductService_AllBranches(t *testing.T) {
 		t.Fatalf("deleted product should be inactive")
 	}
 
+	if err := svc.DeletePermanent(uuid.New()); err == nil || !strings.Contains(err.Error(), "produk tidak ditemukan") {
+		t.Fatalf("expected not found on permanent delete, got: %v", err)
+	}
+
+	permanentProduct, _ := seedProductAndPrice(t, db, "Delete Me", "streaming", "shared", 22000, 1)
+	seedStock(t, db, permanentProduct.ID, "shared", "available")
+	seedStock(t, db, permanentProduct.ID, "private", "used")
+	if err := svc.DeletePermanent(permanentProduct.ID); err != nil {
+		t.Fatalf("permanent delete should succeed: %v", err)
+	}
+	if _, err := productRepo.FindByID(permanentProduct.ID); err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("permanently deleted product should not exist, got: %v", err)
+	}
+	var leftStock int64
+	if err := db.Model(&model.Stock{}).Where("product_id = ?", permanentProduct.ID).Count(&leftStock).Error; err != nil {
+		t.Fatalf("count leftover stock: %v", err)
+	}
+	if leftStock != 0 {
+		t.Fatalf("all stock rows should be removed on permanent delete")
+	}
+	var leftPrice int64
+	if err := db.Model(&model.ProductPrice{}).Where("product_id = ?", permanentProduct.ID).Count(&leftPrice).Error; err != nil {
+		t.Fatalf("count leftover price: %v", err)
+	}
+	if leftPrice != 0 {
+		t.Fatalf("all price rows should be removed on permanent delete")
+	}
+
+	protectedProduct, protectedPrice := seedProductAndPrice(t, db, "Protected Product", "streaming", "shared", 33000, 1)
+	orderingUser := seedUser(t, db, "order-protected@example.com", true)
+	protectedOrder := &model.Order{
+		UserID:        orderingUser.ID,
+		PriceID:       protectedPrice.ID,
+		TotalPrice:    protectedPrice.Price,
+		PaymentStatus: "paid",
+		OrderStatus:   "done",
+	}
+	if err := db.Create(protectedOrder).Error; err != nil {
+		t.Fatalf("create protected order: %v", err)
+	}
+	if err := svc.DeletePermanent(protectedProduct.ID); err == nil || !strings.Contains(err.Error(), "riwayat order") {
+		t.Fatalf("expected permanent delete blocked by order history, got: %v", err)
+	}
+
 	adminList, _, err := svc.AdminList(0, 0)
 	if err != nil {
 		t.Fatalf("admin list: %v", err)

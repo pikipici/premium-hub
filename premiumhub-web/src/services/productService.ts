@@ -83,6 +83,11 @@ export const productService = {
     return res.data
   },
 
+  adminDeletePermanent: async (id: string) => {
+    const res = await api.delete<ApiResponse<null>>(`/admin/products/${id}/permanent`)
+    return res.data
+  },
+
   adminCreatePrice: async (productId: string, data: AdminProductPricePayload) => {
     const res = await api.post<ApiResponse<ProductPrice>>(`/admin/products/${productId}/prices`, data)
     return res.data

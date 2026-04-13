@@ -441,6 +441,29 @@ func (s *ProductService) Delete(id uuid.UUID) error {
 	return s.productRepo.Delete(id)
 }
 
+func (s *ProductService) DeletePermanent(id uuid.UUID) error {
+	if _, err := s.productRepo.FindByID(id); err != nil {
+		return errors.New("produk tidak ditemukan")
+	}
+
+	orderCount, err := s.productRepo.CountOrdersByProduct(id)
+	if err != nil {
+		return errors.New("gagal memeriksa riwayat order produk")
+	}
+	if orderCount > 0 {
+		return errors.New("produk tidak bisa dihapus permanen karena sudah punya riwayat order")
+	}
+
+	if err := s.productRepo.DeletePermanent(id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("produk tidak ditemukan")
+		}
+		return errors.New("gagal menghapus permanen produk")
+	}
+
+	return nil
+}
+
 func (s *ProductService) AdminList(page, limit int) ([]model.Product, int64, error) {
 	if page < 1 {
 		page = 1

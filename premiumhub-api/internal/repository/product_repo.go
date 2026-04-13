@@ -54,6 +54,35 @@ func (r *ProductRepo) Delete(id uuid.UUID) error {
 	return r.db.Model(&model.Product{}).Where("id = ?", id).Update("is_active", false).Error
 }
 
+func (r *ProductRepo) CountOrdersByProduct(id uuid.UUID) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.Order{}).
+		Joins("JOIN product_prices ON product_prices.id = orders.price_id").
+		Where("product_prices.product_id = ?", id).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *ProductRepo) DeletePermanent(id uuid.UUID) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("product_id = ?", id).Delete(&model.Stock{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("product_id = ?", id).Delete(&model.ProductPrice{}).Error; err != nil {
+			return err
+		}
+
+		result := tx.Delete(&model.Product{}, "id = ?", id)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+}
+
 func (r *ProductRepo) AdminList(page, limit int) ([]model.Product, int64, error) {
 	var products []model.Product
 	var total int64

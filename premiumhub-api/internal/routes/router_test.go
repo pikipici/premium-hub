@@ -51,6 +51,9 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "PUT", "/api/v1/admin/products/:id/prices/:priceId") {
 		t.Fatalf("admin product update price route should exist")
 	}
+	if !hasRoute(routes, "DELETE", "/api/v1/admin/products/:id/permanent") {
+		t.Fatalf("admin product permanent delete route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/payment/webhook") {
 		t.Fatalf("payment webhook route should exist")
 	}
