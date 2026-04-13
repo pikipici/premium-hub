@@ -285,12 +285,12 @@ export default function LandingPage() {
                 desc: 'Buat akun gratis dan isi saldo wallet via transfer bank, e-wallet, QRIS, atau pulsa.',
               },
               {
-                title: 'Pilih Negara & Platform',
-                desc: 'Tentukan negara asal nomor dan platform yang ingin diverifikasi, lalu pilih tipe nomor.',
+                title: 'Pilih Layanan di Dashboard',
+                desc: 'Masuk ke dashboard Nokos, lalu pilih negara, operator, dan layanan OTP yang kamu butuhkan.',
               },
               {
-                title: 'Gunakan Nomor',
-                desc: 'Nomor aktif langsung muncul di dashboard. Gunakan untuk mendaftar atau verifikasi akunmu.',
+                title: 'Nomor Aktif Otomatis',
+                desc: 'Setelah pembelian sukses, nomor langsung aktif dan status order bisa kamu pantau dari dashboard.',
               },
               {
                 title: 'Terima OTP Instan',
