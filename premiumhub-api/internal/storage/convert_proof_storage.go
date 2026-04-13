@@ -235,7 +235,7 @@ func (s *ConvertProofStorage) storeR2(ctx context.Context, reader io.Reader, saf
 		if isR2UploadTimeoutError(err) {
 			return "", fmt.Errorf("upload bukti timeout, coba ulang")
 		}
-		return "", fmt.Errorf("gagal upload bukti ke R2")
+		return "", fmt.Errorf("gagal upload bukti ke R2: %v", err)
 	}
 
 	if s.r2PublicBase != "" {
