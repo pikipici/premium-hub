@@ -253,82 +253,71 @@ export default function PremAppsProductDetailPage() {
 
       <section className="py-12 md:py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-8 space-y-4">
-            <div
-              className="relative overflow-hidden rounded-3xl h-40 sm:h-52 md:h-60 border border-[#E5E7EB]"
-              style={{ backgroundColor: product.color || '#F7F7F5' }}
-            >
-              {product.hero_bg_url && (
-                <div
-                  className="absolute inset-0 bg-center bg-cover scale-105"
-                  style={{
-                    backgroundImage: `url(${product.hero_bg_url})`,
-                    filter: 'blur(8px)',
-                  }}
-                />
+          <div
+            className="relative overflow-hidden rounded-3xl p-8 md:p-10 mb-8 bg-cover bg-center"
+            style={{
+              backgroundColor: product.color || '#F7F7F5',
+              backgroundImage: product.hero_bg_url ? `url(${product.hero_bg_url})` : undefined,
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-white/92 via-white/85 to-white/93 pointer-events-none" />
+            <div className="relative z-10 flex items-start gap-4">
+              {product.icon_image_url ? (
+                <div className="w-14 h-14 rounded-2xl bg-white/95 border border-white shadow-sm p-1.5">
+                  <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} unoptimized className="w-full h-full rounded-xl object-contain" />
+                </div>
+              ) : (
+                <div className="text-5xl">{product.icon || '📦'}</div>
               )}
-              <div className="absolute inset-0 bg-gradient-to-b from-white/55 via-white/45 to-white/60" />
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  {product.is_popular && (
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#141414] text-white">
+                      {popularBadge}
+                    </span>
+                  )}
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/80 text-[#1F2937]">
+                    {guaranteeBadge}
+                  </span>
+                </div>
+
+                <h1 className="text-2xl md:text-3xl font-extrabold mb-1">{product.name}</h1>
+                <p className="text-sm text-[#888]">
+                  {product.tagline?.trim() || `Kategori ${product.category}`}
+                </p>
+              </div>
             </div>
 
-            <div className="rounded-3xl border border-[#EBEBEB] bg-white p-5 md:p-8">
-              <div className="flex items-start gap-4">
-                {product.icon_image_url ? (
-                  <div className="w-14 h-14 rounded-2xl bg-[#F8FAFC] border border-[#E5E7EB] shadow-sm p-1.5 shrink-0">
-                    <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} unoptimized className="w-full h-full rounded-xl object-contain" />
-                  </div>
-                ) : (
-                  <div className="text-5xl shrink-0">{product.icon || '📦'}</div>
-                )}
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap mb-2">
-                    {product.is_popular && (
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#141414] text-white">
-                        {popularBadge}
-                      </span>
-                    )}
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#F3F4F6] text-[#1F2937]">
-                      {guaranteeBadge}
-                    </span>
-                  </div>
+            <p className="mt-4 text-sm text-[#666] leading-relaxed">{product.description}</p>
 
-                  <h1 className="text-2xl md:text-3xl font-extrabold mb-1">{product.name}</h1>
-                  <p className="text-sm text-[#4B5563]">
-                    {product.tagline?.trim() || `Kategori ${product.category}`}
-                  </p>
-                </div>
+            {!!product.sold_text?.trim() && (
+              <div className="mt-4 text-xs font-semibold text-[#2F3A4A] bg-white/70 rounded-full inline-flex px-3 py-1.5">
+                {product.sold_text}
               </div>
+            )}
 
-              <p className="mt-4 text-sm text-[#374151] leading-relaxed">{product.description}</p>
-
-              {!!product.sold_text?.trim() && (
-                <div className="mt-4 text-xs font-semibold text-[#2F3A4A] bg-[#F8FAFC] rounded-full inline-flex px-3 py-1.5 border border-[#E5E7EB]">
-                  {product.sold_text}
-                </div>
-              )}
-
-              <div className="flex gap-3 mt-6 flex-wrap">
-                {trustBadges.map((item, index) => {
-                  const iconNode =
-                    index % 3 === 0 ? (
-                      <ShieldCheck className="w-4 h-4" />
-                    ) : index % 3 === 1 ? (
-                      <Zap className="w-4 h-4" />
-                    ) : (
-                      <Clock className="w-4 h-4" />
-                    )
-
-                  return (
-                    <div
-                      key={`${item.text}-${index}`}
-                      className="flex items-center gap-1.5 text-xs font-medium text-[#141414] bg-[#F8FAFC] px-3 py-1.5 rounded-full border border-[#E5E7EB]"
-                    >
-                      <span>{item.icon}</span>
-                      {iconNode}
-                      <span>{item.text}</span>
-                    </div>
+            <div className="flex gap-3 mt-6 flex-wrap">
+              {trustBadges.map((item, index) => {
+                const iconNode =
+                  index % 3 === 0 ? (
+                    <ShieldCheck className="w-4 h-4" />
+                  ) : index % 3 === 1 ? (
+                    <Zap className="w-4 h-4" />
+                  ) : (
+                    <Clock className="w-4 h-4" />
                   )
-                })}
-              </div>
+
+                return (
+                  <div
+                    key={`${item.text}-${index}`}
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#141414] bg-white/60 px-3 py-1.5 rounded-full"
+                  >
+                    <span>{item.icon}</span>
+                    {iconNode}
+                    <span>{item.text}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
