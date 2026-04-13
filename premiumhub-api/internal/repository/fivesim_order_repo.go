@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type FiveSimOrderRepo struct {
@@ -65,4 +66,34 @@ func (r *FiveSimOrderRepo) ListOpenForReconcile(statuses []string, syncedBefore 
 
 	err := q.Order("created_at ASC").Find(&rows).Error
 	return rows, err
+}
+
+func (r *FiveSimOrderRepo) FindIdempotencyByKey(userID uuid.UUID, orderType, key string) (*model.FiveSimOrderIdempotency, error) {
+	var row model.FiveSimOrderIdempotency
+	err := r.db.Where("user_id = ? AND order_type = ? AND idempotency_key = ?", userID, orderType, key).First(&row).Error
+	return &row, err
+}
+
+func (r *FiveSimOrderRepo) FindIdempotencyByKeyForUpdateTx(tx *gorm.DB, userID uuid.UUID, orderType, key string) (*model.FiveSimOrderIdempotency, error) {
+	var row model.FiveSimOrderIdempotency
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("user_id = ? AND order_type = ? AND idempotency_key = ?", userID, orderType, key).
+		First(&row).Error
+	return &row, err
+}
+
+func (r *FiveSimOrderRepo) CreateIdempotencyTx(tx *gorm.DB, row *model.FiveSimOrderIdempotency) error {
+	return tx.Create(row).Error
+}
+
+func (r *FiveSimOrderRepo) SaveIdempotencyTx(tx *gorm.DB, row *model.FiveSimOrderIdempotency) error {
+	return tx.Save(row).Error
+}
+
+func (r *FiveSimOrderRepo) SaveIdempotency(row *model.FiveSimOrderIdempotency) error {
+	return r.db.Save(row).Error
+}
+
+func (r *FiveSimOrderRepo) Transaction(fn func(tx *gorm.DB) error) error {
+	return r.db.Transaction(fn)
 }

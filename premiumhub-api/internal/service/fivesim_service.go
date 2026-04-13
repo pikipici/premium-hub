@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,6 +42,11 @@ const (
 	fiveSimSyncErrRateLimit     = "RATE_LIMIT"
 	fiveSimSyncErrProvider      = "PROVIDER_ERROR"
 	fiveSimSyncErrUnknown       = "UNKNOWN"
+
+	fiveSimIdemStatusProcessing = "processing"
+	fiveSimIdemStatusCompleted  = "completed"
+	fiveSimIdemStatusFailed     = "failed"
+	fiveSimIdemKeyMaxLen        = 80
 )
 
 var fiveSimOpenStatuses = map[string]struct{}{
@@ -62,26 +69,29 @@ type FiveSimService struct {
 }
 
 type FiveSimBuyActivationInput struct {
-	Country    string   `json:"country" binding:"required"`
-	Operator   string   `json:"operator"`
-	Product    string   `json:"product" binding:"required"`
-	Forwarding *bool    `json:"forwarding"`
-	Number     string   `json:"number"`
-	Reuse      bool     `json:"reuse"`
-	Voice      bool     `json:"voice"`
-	Ref        string   `json:"ref"`
-	MaxPrice   *float64 `json:"max_price"`
+	Country        string   `json:"country" binding:"required"`
+	Operator       string   `json:"operator"`
+	Product        string   `json:"product" binding:"required"`
+	Forwarding     *bool    `json:"forwarding"`
+	Number         string   `json:"number"`
+	Reuse          bool     `json:"reuse"`
+	Voice          bool     `json:"voice"`
+	Ref            string   `json:"ref"`
+	MaxPrice       *float64 `json:"max_price"`
+	IdempotencyKey string   `json:"idempotency_key"`
 }
 
 type FiveSimBuyHostingInput struct {
-	Country  string `json:"country" binding:"required"`
-	Operator string `json:"operator"`
-	Product  string `json:"product" binding:"required"`
+	Country        string `json:"country" binding:"required"`
+	Operator       string `json:"operator"`
+	Product        string `json:"product" binding:"required"`
+	IdempotencyKey string `json:"idempotency_key"`
 }
 
 type FiveSimReuseInput struct {
-	Product string `json:"product" binding:"required"`
-	Number  string `json:"number" binding:"required"`
+	Product        string `json:"product" binding:"required"`
+	Number         string `json:"number" binding:"required"`
+	IdempotencyKey string `json:"idempotency_key"`
 }
 
 type FiveSimProviderHistoryInput struct {
@@ -200,23 +210,29 @@ func (s *FiveSimService) BuyActivation(ctx context.Context, userID uuid.UUID, in
 		return nil, nil, errors.New("max_price harus lebih dari 0")
 	}
 
-	providerOrder, err := s.client.BuyActivation(ctx, input.Country, input.Operator, input.Product, FiveSimBuyActivationOptions{
-		Forwarding: input.Forwarding,
-		Number:     input.Number,
-		Reuse:      input.Reuse,
-		Voice:      input.Voice,
-		Ref:        input.Ref,
-		MaxPrice:   input.MaxPrice,
-	})
-	if err != nil {
-		return nil, nil, s.normalizeProviderErr(err)
-	}
+	requestHash := buildFiveSimBuyRequestHash(
+		"activation",
+		normalizeFiveSimCatalogKey(input.Country, "any"),
+		normalizeFiveSimCatalogKey(input.Operator, "any"),
+		normalizeFiveSimCatalogKey(input.Product, ""),
+		normalizeFiveSimBoolPtr(input.Forwarding),
+		strings.TrimSpace(input.Number),
+		strconv.FormatBool(input.Reuse),
+		strconv.FormatBool(input.Voice),
+		strings.TrimSpace(input.Ref),
+		normalizeFiveSimMaxPrice(input.MaxPrice),
+	)
 
-	localOrder, err := s.finalizePurchasedOrder(ctx, userID, "activation", providerOrder)
-	if err != nil {
-		return nil, nil, err
-	}
-	return localOrder, providerOrder, nil
+	return s.buyWithIdempotency(ctx, userID, "activation", input.IdempotencyKey, requestHash, func(runCtx context.Context) (*FiveSimOrderPayload, error) {
+		return s.client.BuyActivation(runCtx, input.Country, input.Operator, input.Product, FiveSimBuyActivationOptions{
+			Forwarding: input.Forwarding,
+			Number:     input.Number,
+			Reuse:      input.Reuse,
+			Voice:      input.Voice,
+			Ref:        input.Ref,
+			MaxPrice:   input.MaxPrice,
+		})
+	})
 }
 
 func (s *FiveSimService) BuyHosting(ctx context.Context, userID uuid.UUID, input FiveSimBuyHostingInput) (*model.FiveSimOrder, *FiveSimOrderPayload, error) {
@@ -228,16 +244,16 @@ func (s *FiveSimService) BuyHosting(ctx context.Context, userID uuid.UUID, input
 		return nil, nil, errors.New("product wajib diisi")
 	}
 
-	providerOrder, err := s.client.BuyHosting(ctx, input.Country, input.Operator, input.Product)
-	if err != nil {
-		return nil, nil, s.normalizeProviderErr(err)
-	}
+	requestHash := buildFiveSimBuyRequestHash(
+		"hosting",
+		normalizeFiveSimCatalogKey(input.Country, "any"),
+		normalizeFiveSimCatalogKey(input.Operator, "any"),
+		normalizeFiveSimCatalogKey(input.Product, ""),
+	)
 
-	localOrder, err := s.finalizePurchasedOrder(ctx, userID, "hosting", providerOrder)
-	if err != nil {
-		return nil, nil, err
-	}
-	return localOrder, providerOrder, nil
+	return s.buyWithIdempotency(ctx, userID, "hosting", input.IdempotencyKey, requestHash, func(runCtx context.Context) (*FiveSimOrderPayload, error) {
+		return s.client.BuyHosting(runCtx, input.Country, input.Operator, input.Product)
+	})
 }
 
 func (s *FiveSimService) ReuseNumber(ctx context.Context, userID uuid.UUID, input FiveSimReuseInput) (*model.FiveSimOrder, *FiveSimOrderPayload, error) {
@@ -252,16 +268,251 @@ func (s *FiveSimService) ReuseNumber(ctx context.Context, userID uuid.UUID, inpu
 		return nil, nil, errors.New("number wajib diisi")
 	}
 
-	providerOrder, err := s.client.ReuseNumber(ctx, input.Product, input.Number)
-	if err != nil {
-		return nil, nil, s.normalizeProviderErr(err)
-	}
+	requestHash := buildFiveSimBuyRequestHash(
+		"reuse",
+		normalizeFiveSimCatalogKey(input.Product, ""),
+		strings.TrimSpace(input.Number),
+	)
 
-	localOrder, err := s.finalizePurchasedOrder(ctx, userID, "reuse", providerOrder)
+	return s.buyWithIdempotency(ctx, userID, "reuse", input.IdempotencyKey, requestHash, func(runCtx context.Context) (*FiveSimOrderPayload, error) {
+		return s.client.ReuseNumber(runCtx, input.Product, input.Number)
+	})
+}
+
+func (s *FiveSimService) buyWithIdempotency(
+	ctx context.Context,
+	userID uuid.UUID,
+	orderType string,
+	rawIdempotencyKey string,
+	requestHash string,
+	providerFn func(runCtx context.Context) (*FiveSimOrderPayload, error),
+) (*model.FiveSimOrder, *FiveSimOrderPayload, error) {
+	idempotencyKey, err := normalizeFiveSimIdempotencyKey(rawIdempotencyKey)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	idemRow, replayOrder, replayProviderOrder, err := s.acquireBuyIdempotency(userID, orderType, idempotencyKey, requestHash)
+	if err != nil {
+		return nil, nil, err
+	}
+	if replayOrder != nil {
+		return replayOrder, replayProviderOrder, nil
+	}
+
+	providerOrder, err := providerFn(ctx)
+	if err != nil {
+		normalizedErr := s.normalizeProviderErr(err)
+		_ = s.markBuyIdempotencyFailed(idemRow, 0, normalizedErr.Error())
+		return nil, nil, normalizedErr
+	}
+
+	localOrder, finalizeErr := s.finalizePurchasedOrder(ctx, userID, orderType, providerOrder)
+	if finalizeErr != nil {
+		providerOrderID := int64(0)
+		if providerOrder != nil {
+			providerOrderID = providerOrder.ID
+		}
+		_ = s.markBuyIdempotencyFailed(idemRow, providerOrderID, finalizeErr.Error())
+		return nil, nil, finalizeErr
+	}
+
+	if err := s.markBuyIdempotencyCompleted(idemRow, localOrder.ProviderOrderID); err != nil {
+		return nil, nil, errors.New("order 5sim berhasil dibuat, tapi pencatatan idempotency gagal, hubungi admin")
+	}
+
 	return localOrder, providerOrder, nil
+}
+
+func (s *FiveSimService) acquireBuyIdempotency(
+	userID uuid.UUID,
+	orderType string,
+	idempotencyKey string,
+	requestHash string,
+) (*model.FiveSimOrderIdempotency, *model.FiveSimOrder, *FiveSimOrderPayload, error) {
+	if s.orderRepo == nil {
+		return nil, nil, nil, errors.New("konfigurasi order 5sim belum siap")
+	}
+	if strings.TrimSpace(requestHash) == "" {
+		return nil, nil, nil, errors.New("request hash 5sim tidak valid")
+	}
+
+	var (
+		idemRow       *model.FiveSimOrderIdempotency
+		replayOrder   *model.FiveSimOrder
+		replayPayload *FiveSimOrderPayload
+	)
+
+	err := s.orderRepo.Transaction(func(tx *gorm.DB) error {
+		existing, findErr := s.orderRepo.FindIdempotencyByKeyForUpdateTx(tx, userID, orderType, idempotencyKey)
+		if findErr != nil {
+			if !errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return errors.New("gagal cek idempotency order 5sim")
+			}
+
+			newRow := &model.FiveSimOrderIdempotency{
+				UserID:          userID,
+				OrderType:       orderType,
+				IdempotencyKey:  idempotencyKey,
+				RequestHash:     requestHash,
+				Status:          fiveSimIdemStatusProcessing,
+				ProviderOrderID: 0,
+			}
+			if createErr := s.orderRepo.CreateIdempotencyTx(tx, newRow); createErr != nil {
+				return errors.New("gagal menyimpan idempotency order 5sim")
+			}
+			idemRow = newRow
+			return nil
+		}
+
+		if strings.TrimSpace(existing.RequestHash) != strings.TrimSpace(requestHash) {
+			return errors.New("idempotency_key sudah dipakai untuk request berbeda")
+		}
+
+		switch strings.ToLower(strings.TrimSpace(existing.Status)) {
+		case fiveSimIdemStatusCompleted:
+			if existing.ProviderOrderID <= 0 {
+				return errors.New("idempotency order 5sim tidak konsisten, hubungi admin")
+			}
+
+			order, orderErr := s.orderRepo.FindByProviderOrderIDAndUser(existing.ProviderOrderID, userID)
+			if orderErr != nil {
+				if errors.Is(orderErr, gorm.ErrRecordNotFound) {
+					return errors.New("order idempotency 5sim tidak ditemukan, hubungi admin")
+				}
+				return errors.New("gagal memuat order idempotency 5sim")
+			}
+			replayOrder = order
+			replayPayload = buildFiveSimProviderPayloadFromLocalOrder(order)
+			idemRow = existing
+			return nil
+		case fiveSimIdemStatusProcessing:
+			return errors.New("request pembelian 5sim sedang diproses, coba lagi sebentar")
+		case fiveSimIdemStatusFailed:
+			existing.Status = fiveSimIdemStatusProcessing
+			existing.ErrorMessage = ""
+			existing.ProviderOrderID = 0
+			if saveErr := s.orderRepo.SaveIdempotencyTx(tx, existing); saveErr != nil {
+				return errors.New("gagal reset idempotency order 5sim")
+			}
+			idemRow = existing
+			return nil
+		default:
+			return errors.New("status idempotency order 5sim tidak dikenal")
+		}
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return idemRow, replayOrder, replayPayload, nil
+}
+
+func (s *FiveSimService) markBuyIdempotencyCompleted(row *model.FiveSimOrderIdempotency, providerOrderID int64) error {
+	if row == nil {
+		return nil
+	}
+	row.Status = fiveSimIdemStatusCompleted
+	row.ProviderOrderID = providerOrderID
+	row.ErrorMessage = ""
+	return s.orderRepo.SaveIdempotency(row)
+}
+
+func (s *FiveSimService) markBuyIdempotencyFailed(row *model.FiveSimOrderIdempotency, providerOrderID int64, reason string) error {
+	if row == nil {
+		return nil
+	}
+	row.Status = fiveSimIdemStatusFailed
+	row.ProviderOrderID = providerOrderID
+	row.ErrorMessage = truncateFiveSimErrorMessage(reason, 255)
+	return s.orderRepo.SaveIdempotency(row)
+}
+
+func normalizeFiveSimIdempotencyKey(raw string) (string, error) {
+	normalized := strings.TrimSpace(raw)
+	if normalized == "" {
+		return uuid.NewString(), nil
+	}
+	if len(normalized) > fiveSimIdemKeyMaxLen {
+		return "", fmt.Errorf("idempotency_key maksimal %d karakter", fiveSimIdemKeyMaxLen)
+	}
+	return normalized, nil
+}
+
+func buildFiveSimBuyRequestHash(parts ...string) string {
+	normalizedParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		normalizedParts = append(normalizedParts, strings.TrimSpace(part))
+	}
+	raw := strings.Join(normalizedParts, "|")
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
+
+func normalizeFiveSimBoolPtr(value *bool) string {
+	if value == nil {
+		return "null"
+	}
+	return strconv.FormatBool(*value)
+}
+
+func normalizeFiveSimMaxPrice(value *float64) string {
+	if value == nil {
+		return "null"
+	}
+	return strconv.FormatFloat(*value, 'f', 6, 64)
+}
+
+func buildFiveSimProviderPayloadFromLocalOrder(row *model.FiveSimOrder) *FiveSimOrderPayload {
+	if row == nil {
+		return nil
+	}
+
+	if trimmed := strings.TrimSpace(row.RawPayload); trimmed != "" {
+		var payload FiveSimOrderPayload
+		if err := json.Unmarshal([]byte(trimmed), &payload); err == nil {
+			if payload.ID <= 0 {
+				payload.ID = row.ProviderOrderID
+			}
+			if strings.TrimSpace(payload.Status) == "" {
+				payload.Status = row.ProviderStatus
+			}
+			if strings.TrimSpace(payload.Country) == "" {
+				payload.Country = row.Country
+			}
+			if strings.TrimSpace(payload.Operator) == "" {
+				payload.Operator = row.Operator
+			}
+			if strings.TrimSpace(payload.Product) == "" {
+				payload.Product = row.Product
+			}
+			if strings.TrimSpace(payload.Phone) == "" {
+				payload.Phone = row.Phone
+			}
+			if payload.Price <= 0 {
+				payload.Price = row.ProviderPrice
+			}
+			return &payload
+		}
+	}
+
+	return &FiveSimOrderPayload{
+		ID:       row.ProviderOrderID,
+		Phone:    row.Phone,
+		Operator: row.Operator,
+		Product:  row.Product,
+		Price:    row.ProviderPrice,
+		Status:   row.ProviderStatus,
+		Country:  row.Country,
+	}
+}
+
+func truncateFiveSimErrorMessage(input string, maxLen int) string {
+	trimmed := strings.TrimSpace(input)
+	if maxLen <= 0 || len(trimmed) <= maxLen {
+		return trimmed
+	}
+	return trimmed[:maxLen]
 }
 
 func (s *FiveSimService) finalizePurchasedOrder(ctx context.Context, userID uuid.UUID, orderType string, providerOrder *FiveSimOrderPayload) (*model.FiveSimOrder, error) {
