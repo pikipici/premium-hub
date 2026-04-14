@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"strings"
+
 	"premiumhub-api/internal/model"
 
 	"github.com/google/uuid"
@@ -41,10 +43,35 @@ func (r *UserRepo) Update(user *model.User) error {
 	return r.db.Save(user).Error
 }
 
-func (r *UserRepo) List(page, limit int) ([]model.User, int64, error) {
+func (r *UserRepo) List(page, limit int, search, status string) ([]model.User, int64, error) {
 	var users []model.User
 	var total int64
-	r.db.Model(&model.User{}).Count(&total)
-	err := r.db.Offset((page - 1) * limit).Limit(limit).Order("created_at DESC").Find(&users).Error
+
+	query := r.db.Model(&model.User{})
+
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "active":
+		query = query.Where("is_active = ?", true)
+	case "inactive", "blocked":
+		query = query.Where("is_active = ?", false)
+	}
+
+	if keyword := strings.TrimSpace(search); keyword != "" {
+		like := "%" + strings.ToLower(keyword) + "%"
+		query = query.Where(
+			"LOWER(name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(COALESCE(phone, '')) LIKE ?",
+			like,
+			like,
+			like,
+		)
+	}
+
+	query.Count(&total)
+	err := query.
+		Order("created_at DESC").
+		Offset((page - 1) * limit).
+		Limit(limit).
+		Find(&users).Error
+
 	return users, total, err
 }

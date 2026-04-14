@@ -3,6 +3,8 @@ package handler
 import (
 	"math"
 	"strconv"
+	"strings"
+	"time"
 
 	"premiumhub-api/internal/repository"
 	"premiumhub-api/internal/service"
@@ -17,6 +19,23 @@ type AdminHandler struct {
 	claimRepo *repository.ClaimRepo
 	userRepo  *repository.UserRepo
 	notifSvc  *service.NotificationService
+}
+
+type AdminUserListItem struct {
+	ID            uuid.UUID  `json:"id"`
+	Name          string     `json:"name"`
+	Email         string     `json:"email"`
+	Phone         string     `json:"phone"`
+	Role          string     `json:"role"`
+	IsActive      bool       `json:"is_active"`
+	WalletBalance int64      `json:"wallet_balance"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	TotalOrders   int64      `json:"total_orders"`
+	PaidOrders    int64      `json:"paid_orders"`
+	TotalSpent    int64      `json:"total_spent"`
+	ActiveOrders  int64      `json:"active_orders"`
+	LastOrderAt   *time.Time `json:"last_order_at"`
 }
 
 func NewAdminHandler(orderRepo *repository.OrderRepo, claimRepo *repository.ClaimRepo, userRepo *repository.UserRepo, notifSvc *service.NotificationService) *AdminHandler {
@@ -42,15 +61,55 @@ func (h *AdminHandler) Dashboard(c *gin.Context) {
 func (h *AdminHandler) ListUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	search := strings.TrimSpace(c.Query("search"))
+	status := strings.TrimSpace(c.Query("status"))
+
 	if page < 1 {
 		page = 1
 	}
-	users, total, err := h.userRepo.List(page, limit)
+	if limit < 1 {
+		limit = 20
+	}
+
+	users, total, err := h.userRepo.List(page, limit, search, status)
 	if err != nil {
 		response.InternalError(c)
 		return
 	}
-	response.SuccessWithMeta(c, "OK", users, response.Meta{
+
+	userIDs := make([]uuid.UUID, 0, len(users))
+	for _, user := range users {
+		userIDs = append(userIDs, user.ID)
+	}
+
+	statsByUserID, err := h.orderRepo.StatsByUserIDs(userIDs)
+	if err != nil {
+		response.InternalError(c)
+		return
+	}
+
+	payload := make([]AdminUserListItem, 0, len(users))
+	for _, user := range users {
+		stats := statsByUserID[user.ID]
+		payload = append(payload, AdminUserListItem{
+			ID:            user.ID,
+			Name:          user.Name,
+			Email:         user.Email,
+			Phone:         user.Phone,
+			Role:          user.Role,
+			IsActive:      user.IsActive,
+			WalletBalance: user.WalletBalance,
+			CreatedAt:     user.CreatedAt,
+			UpdatedAt:     user.UpdatedAt,
+			TotalOrders:   stats.TotalOrders,
+			PaidOrders:    stats.PaidOrders,
+			TotalSpent:    stats.TotalSpent,
+			ActiveOrders:  stats.ActiveOrders,
+			LastOrderAt:   stats.LastOrderAt,
+		})
+	}
+
+	response.SuccessWithMeta(c, "OK", payload, response.Meta{
 		Page: page, Limit: limit, Total: total,
 		TotalPages: int(math.Ceil(float64(total) / float64(limit))),
 	})
