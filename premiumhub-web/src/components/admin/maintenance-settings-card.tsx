@@ -12,6 +12,16 @@ import type { MaintenanceRule, MaintenanceTargetType } from '@/types/maintenance
 
 type FormMode = 'create' | 'edit'
 
+type MaintenancePreset = {
+  key: 'product' | 'convert' | 'global'
+  buttonLabel: string
+  name: string
+  target_type: MaintenanceTargetType
+  target_path: string
+  title: string
+  message: string
+}
+
 type MaintenanceFormState = {
   name: string
   target_type: MaintenanceTargetType
@@ -41,6 +51,36 @@ const EMPTY_FORM: MaintenanceFormState = {
   starts_at: '',
   ends_at: '',
 }
+
+const MAINTENANCE_PRESETS: MaintenancePreset[] = [
+  {
+    key: 'product',
+    buttonLabel: 'Maintenance Produk',
+    name: 'Preset • Maintenance Produk',
+    target_type: 'prefix',
+    target_path: '/product/prem-apps',
+    title: 'Halaman Produk Sedang Maintenance',
+    message: 'Halaman produk lagi kami update sebentar. Coba lagi beberapa saat ya.',
+  },
+  {
+    key: 'convert',
+    buttonLabel: 'Maintenance Convert',
+    name: 'Preset • Maintenance Convert',
+    target_type: 'prefix',
+    target_path: '/product/convert',
+    title: 'Halaman Convert Sedang Maintenance',
+    message: 'Fitur convert lagi maintenance sebentar. Coba lagi beberapa saat ya.',
+  },
+  {
+    key: 'global',
+    buttonLabel: 'Maintenance Semua Halaman',
+    name: 'Preset • Maintenance Semua Halaman',
+    target_type: 'global',
+    target_path: '/',
+    title: 'Website Sedang Maintenance',
+    message: 'Kami sedang maintenance sistem untuk peningkatan layanan. Mohon coba lagi sebentar.',
+  },
+]
 
 const MODAL_OVERLAY_STYLE = {
   position: 'fixed' as const,
@@ -191,6 +231,7 @@ export default function MaintenanceSettingsCard() {
   const [form, setForm] = useState<MaintenanceFormState>(EMPTY_FORM)
 
   const [deleteTarget, setDeleteTarget] = useState<MaintenanceRule | null>(null)
+  const [presetLoadingKey, setPresetLoadingKey] = useState<MaintenancePreset['key'] | null>(null)
 
   const sortedRules = useMemo(() => {
     return [...rules].sort((left, right) => {
@@ -395,6 +436,63 @@ export default function MaintenanceSettingsCard() {
     }
   }
 
+  const applyPreset = async (preset: MaintenancePreset) => {
+    if (presetLoadingKey) return
+
+    setPresetLoadingKey(preset.key)
+    setError('')
+
+    try {
+      const existing = rules.find((rule) => rule.name.trim().toLowerCase() === preset.name.trim().toLowerCase())
+
+      if (!existing) {
+        const payload: AdminMaintenanceRulePayload = {
+          name: preset.name,
+          target_type: preset.target_type,
+          target_path: preset.target_path,
+          title: preset.title,
+          message: preset.message,
+          is_active: true,
+          allow_admin_bypass: true,
+        }
+
+        const res = await maintenanceService.adminCreate(payload)
+        if (!res.success) {
+          setError(res.message || 'Gagal menerapkan preset maintenance')
+          return
+        }
+
+        setNotice(`Preset "${preset.buttonLabel}" berhasil diaktifkan.`)
+      } else {
+        const payload: AdminMaintenanceRuleUpdatePayload = {
+          name: preset.name,
+          target_type: preset.target_type,
+          target_path: preset.target_path,
+          title: preset.title,
+          message: preset.message,
+          is_active: true,
+          allow_admin_bypass: true,
+          clear_starts_at: !!existing.starts_at,
+          clear_ends_at: !!existing.ends_at,
+        }
+
+        const res = await maintenanceService.adminUpdate(existing.id, payload)
+        if (!res.success) {
+          setError(res.message || 'Gagal menerapkan preset maintenance')
+          return
+        }
+
+        setNotice(`Preset "${preset.buttonLabel}" berhasil diperbarui & diaktifkan.`)
+      }
+
+      await loadRules()
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal menerapkan preset maintenance'))
+    } finally {
+      setPresetLoadingKey(null)
+    }
+  }
+
   return (
     <div className="card" style={{ marginBottom: 12 }}>
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -408,6 +506,34 @@ export default function MaintenanceSettingsCard() {
         <button className="topbar-btn primary" type="button" onClick={openCreate}>
           + Tambah Rule Maintenance
         </button>
+      </div>
+
+      <div style={{ padding: '0 18px 12px' }}>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
+          Preset Cepat (1 klik)
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {MAINTENANCE_PRESETS.map((preset) => (
+            <button
+              key={preset.key}
+              className="action-btn"
+              type="button"
+              disabled={!!presetLoadingKey}
+              onClick={() => applyPreset(preset)}
+              style={{
+                borderColor: '#FED7AA',
+                background: '#FFF7ED',
+                color: '#9A3412',
+                fontWeight: 600,
+              }}
+            >
+              {presetLoadingKey === preset.key ? 'Memproses...' : preset.buttonLabel}
+            </button>
+          ))}
+        </div>
+        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
+          Preset otomatis aktif, tanpa jadwal, dan admin bypass tetap ON.
+        </div>
       </div>
 
       {(error || notice) && (
