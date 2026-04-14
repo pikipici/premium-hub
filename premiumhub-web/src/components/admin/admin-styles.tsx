@@ -47,6 +47,7 @@ export default function AdminStyles() {
       .nav-text { min-width: 0; }
       .nav-badge { margin-left: auto; font-size: 10px; font-weight: 700; background: var(--orange); color: #fff; padding: 2px 7px; border-radius: 100px; min-width: 20px; text-align: center; }
       .nav-badge.yellow { background: var(--yellow); }
+      .nav-badge.red { background: var(--red); }
       .sidebar-bottom { margin-top: auto; padding: 12px 12px 0; border-top: 1px solid rgba(255,255,255,.07); }
       .admin-profile { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; cursor: pointer; transition: background .15s; }
       .admin-profile:hover { background: rgba(255,255,255,.07); }
@@ -235,6 +236,19 @@ export default function AdminStyles() {
         background: rgba(255,255,255,.12);
         color: #fff;
       }
+      .admin-mobile-drawer-item-badge {
+        margin-left: auto;
+        font-size: 10px;
+        font-weight: 700;
+        background: var(--orange);
+        color: #fff;
+        min-width: 20px;
+        text-align: center;
+        border-radius: 999px;
+        padding: 2px 7px;
+      }
+      .admin-mobile-drawer-item-badge.yellow { background: var(--yellow); }
+      .admin-mobile-drawer-item-badge.red { background: var(--red); }
       .admin-mobile-drawer-icon {
         width: 18px;
         text-align: center;

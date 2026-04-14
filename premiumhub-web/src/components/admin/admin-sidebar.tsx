@@ -7,8 +7,6 @@ type NavItem = {
   href: string
   label: string
   icon: string
-  badge?: string
-  badgeClassName?: string
 }
 
 type NavSection = {
@@ -27,15 +25,15 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Katalog',
     items: [
       { href: '/admin/produk', label: 'Produk', icon: '◈' },
-      { href: '/admin/stok', label: 'Stok Akun', icon: '◧', badge: '3', badgeClassName: ' yellow' },
+      { href: '/admin/stok', label: 'Stok Akun', icon: '◧' },
     ],
   },
   {
     label: 'Transaksi',
     items: [
-      { href: '/admin/order', label: 'Order', icon: '◉', badge: '5' },
-      { href: '/admin/convert', label: 'Control Convert', icon: '⇄', badge: '14', badgeClassName: ' yellow' },
-      { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌', badge: '2' },
+      { href: '/admin/order', label: 'Order', icon: '◉' },
+      { href: '/admin/convert', label: 'Control Convert', icon: '⇄' },
+      { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌' },
     ],
   },
   {
@@ -52,11 +50,34 @@ function isNavActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-type AdminSidebarProps = {
-  collapsed?: boolean
+export type AdminSidebarBadgeCounts = {
+  orderPending: number
+  stockCritical: number
+  claimPending: number
 }
 
-export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
+type AdminSidebarProps = {
+  collapsed?: boolean
+  badges?: AdminSidebarBadgeCounts
+  loadingBadges?: boolean
+}
+
+function badgeValueForHref(href: string, badges?: AdminSidebarBadgeCounts) {
+  if (!badges) return 0
+
+  if (href === '/admin/order') return badges.orderPending
+  if (href === '/admin/stok') return badges.stockCritical
+  if (href === '/admin/garansi') return badges.claimPending
+  return 0
+}
+
+function badgeClassNameForHref(href: string) {
+  if (href === '/admin/stok') return ' yellow'
+  if (href === '/admin/garansi') return ' red'
+  return ''
+}
+
+export default function AdminSidebar({ collapsed = false, badges, loadingBadges = false }: AdminSidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -80,6 +101,11 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
 
           {section.items.map((item) => {
             const active = isNavActive(pathname, item.href)
+            const badgeValue = badgeValueForHref(item.href, badges)
+            const showBadge = loadingBadges
+              ? ['/admin/order', '/admin/stok', '/admin/garansi'].includes(item.href)
+              : badgeValue > 0
+
             return (
               <Link
                 key={item.href}
@@ -90,7 +116,11 @@ export default function AdminSidebar({ collapsed = false }: AdminSidebarProps) {
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-text">{item.label}</span>
-                {item.badge ? <span className={`nav-badge${item.badgeClassName ?? ''}`}>{item.badge}</span> : null}
+                {showBadge ? (
+                  <span className={`nav-badge${badgeClassNameForHref(item.href)}`}>
+                    {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
+                  </span>
+                ) : null}
               </Link>
             )
           })}

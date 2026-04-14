@@ -1,16 +1,21 @@
 "use client"
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
 import AdminMobileDrawer from '@/components/admin/admin-mobile-drawer'
-import AdminSidebar from '@/components/admin/admin-sidebar'
+import AdminSidebar, { type AdminSidebarBadgeCounts } from '@/components/admin/admin-sidebar'
 import AdminTopbar from '@/components/admin/admin-topbar'
+import { adminDashboardService } from '@/services/adminDashboardService'
+import { stockService } from '@/services/stockService'
 
 type PageMeta = {
   title: string
   sub: string
 }
+
+const STOCK_PAGE_LIMIT = 200
+const MAX_STOCK_PAGES = 15
 
 function resolveCorePageMeta(pathname: string): PageMeta {
   if (pathname === '/admin') {
@@ -44,6 +49,45 @@ function resolveCorePageMeta(pathname: string): PageMeta {
   return { title: 'Admin', sub: 'Panel administrasi' }
 }
 
+async function countCriticalStockProducts() {
+  const productAvailableCounts = new Map<string, number>()
+
+  let page = 1
+  let totalPages = 1
+
+  while (page <= totalPages && page <= MAX_STOCK_PAGES) {
+    const res = await stockService.adminList({
+      page,
+      limit: STOCK_PAGE_LIMIT,
+      status: 'available',
+    })
+
+    if (!res.success) break
+    if (res.data.length === 0) break
+
+    res.data.forEach((stock) => {
+      const productID = stock.product_id || stock.product?.id
+      if (!productID) return
+
+      const existing = productAvailableCounts.get(productID) || 0
+      productAvailableCounts.set(productID, existing + 1)
+    })
+
+    totalPages = res.meta?.total_pages ?? 1
+    if (page >= totalPages) break
+    page += 1
+  }
+
+  let criticalCount = 0
+  productAvailableCounts.forEach((available) => {
+    if (available <= 3) {
+      criticalCount += 1
+    }
+  })
+
+  return criticalCount
+}
+
 export default function AdminCoreLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -56,6 +100,59 @@ export default function AdminCoreLayout({ children }: { children: React.ReactNod
       return false
     }
   })
+
+  const [sidebarBadges, setSidebarBadges] = useState<AdminSidebarBadgeCounts>({
+    orderPending: 0,
+    stockCritical: 0,
+    claimPending: 0,
+  })
+  const [sidebarBadgesLoading, setSidebarBadgesLoading] = useState(true)
+
+  const loadSidebarBadges = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
+
+    if (!silent) {
+      setSidebarBadgesLoading(true)
+    }
+
+    try {
+      const [summaryRes, criticalStockCount] = await Promise.all([
+        adminDashboardService.summary(),
+        countCriticalStockProducts(),
+      ])
+
+      if (!summaryRes.success) {
+        if (!silent) {
+          setSidebarBadgesLoading(false)
+        }
+        return
+      }
+
+      setSidebarBadges({
+        orderPending: summaryRes.data.pending_orders || 0,
+        claimPending: summaryRes.data.pending_claims || 0,
+        stockCritical: criticalStockCount || 0,
+      })
+    } catch {
+      // fail-open: keep last known badges
+    } finally {
+      if (!silent) {
+        setSidebarBadgesLoading(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadSidebarBadges()
+  }, [loadSidebarBadges, pathname])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadSidebarBadges({ silent: true })
+    }, 60000)
+
+    return () => window.clearInterval(timer)
+  }, [loadSidebarBadges])
 
   const openMobileMenu = useCallback(() => {
     setMobileMenuOpen(true)
@@ -82,7 +179,11 @@ export default function AdminCoreLayout({ children }: { children: React.ReactNod
   return (
     <>
       <div className={`admin-page-wrapper${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-        <AdminSidebar collapsed={sidebarCollapsed} />
+        <AdminSidebar
+          collapsed={sidebarCollapsed}
+          badges={sidebarBadges}
+          loadingBadges={sidebarBadgesLoading}
+        />
 
         <div className="admin-main">
           <AdminTopbar
@@ -96,7 +197,12 @@ export default function AdminCoreLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      <AdminMobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu} />
+      <AdminMobileDrawer
+        open={mobileMenuOpen}
+        onClose={closeMobileMenu}
+        badges={sidebarBadges}
+        loadingBadges={sidebarBadgesLoading}
+      />
     </>
   )
 }
