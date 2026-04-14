@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
-import { LayoutDashboard, ShoppingBag, History, ShieldCheck, Bell, UserCircle, LogOut, Wallet, Smartphone, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, History, ShieldCheck, Bell, LogOut, Wallet, Smartphone, RefreshCw } from 'lucide-react'
 
 const MENU = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -14,7 +14,6 @@ const MENU = [
   { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order' },
   { href: '/dashboard/klaim-garansi', icon: ShieldCheck, label: 'Klaim Garansi' },
   { href: '/dashboard/notifikasi', icon: Bell, label: 'Notifikasi' },
-  { href: '/dashboard/profil', icon: UserCircle, label: 'Profil' },
 ]
 
 export default function DashboardSidebar() {
