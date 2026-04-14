@@ -12,6 +12,7 @@ import {
   Shield,
   ShoppingBag,
   Smartphone,
+  UserCircle,
   Wallet,
   X,
 } from 'lucide-react'
@@ -64,6 +65,12 @@ export default function Navbar() {
 
   const showAuthenticated = hasHydrated && isAuthenticated
   const isAdminUser = showAuthenticated && user?.role === 'admin'
+  const isDashboardSurface =
+    pathname === '/dashboard' ||
+    pathname.startsWith('/dashboard/') ||
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/')
+  const showDesktopPublicNav = !(showAuthenticated && isDashboardSurface)
 
   const getInitialMobileSections = (): MobileSectionState => ({
     nav: true,
@@ -180,24 +187,26 @@ export default function Navbar() {
             </Link>
 
             <div className="hidden min-w-0 items-center justify-center md:flex">
-              <div className="flex h-11 items-center gap-1">
-                {PUBLIC_NAV_ITEMS.map((item) => {
-                  const active = isActivePath(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`inline-flex h-11 items-center whitespace-nowrap border-b-2 px-3 text-sm font-semibold transition-colors ${
-                        active
-                          ? 'border-[#FF5733] text-[#141414]'
-                          : 'border-transparent text-[#888] hover:text-[#141414]'
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  )
-                })}
-              </div>
+              {showDesktopPublicNav ? (
+                <div className="flex h-11 items-center gap-1">
+                  {PUBLIC_NAV_ITEMS.map((item) => {
+                    const active = isActivePath(pathname, item.href)
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`inline-flex h-11 items-center whitespace-nowrap border-b-2 px-3 text-sm font-semibold transition-colors ${
+                          active
+                            ? 'border-[#FF5733] text-[#141414]'
+                            : 'border-transparent text-[#888] hover:text-[#141414]'
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
 
             <div className="flex items-center justify-end gap-2">
@@ -242,32 +251,20 @@ export default function Navbar() {
                           </div>
 
                           <div className="p-1.5">
-                            <Link
-                              href="/dashboard"
-                              className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#333] hover:bg-[#F7F7F5]"
-                            >
-                              <LayoutDashboard className="h-3.5 w-3.5" /> Dashboard
-                            </Link>
+                            {!isDashboardSurface ? (
+                              <Link
+                                href="/dashboard"
+                                className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#333] hover:bg-[#F7F7F5]"
+                              >
+                                <LayoutDashboard className="h-3.5 w-3.5" /> Dashboard
+                              </Link>
+                            ) : null}
 
                             <Link
-                              href="/dashboard/wallet"
+                              href="/dashboard/profil"
                               className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#333] hover:bg-[#F7F7F5]"
                             >
-                              <Wallet className="h-3.5 w-3.5" /> Wallet
-                            </Link>
-
-                            <Link
-                              href="/dashboard/convert/orders"
-                              className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#333] hover:bg-[#F7F7F5]"
-                            >
-                              <RefreshCw className="h-3.5 w-3.5" /> Riwayat Convert
-                            </Link>
-
-                            <Link
-                              href="/dashboard/nokos"
-                              className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#333] hover:bg-[#F7F7F5]"
-                            >
-                              <Smartphone className="h-3.5 w-3.5" /> Nomor Virtual
+                              <UserCircle className="h-3.5 w-3.5" /> Profil
                             </Link>
                           </div>
 
