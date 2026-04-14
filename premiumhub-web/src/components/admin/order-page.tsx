@@ -2,8 +2,10 @@
 
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { accountTypeService } from '@/services/accountTypeService'
 import { orderService, type AdminOrderStatus } from '@/services/orderService'
 import { productService } from '@/services/productService'
+import type { AccountType } from '@/types/accountType'
 import type { Order } from '@/types/order'
 
 type OrderFilter = 'all' | AdminOrderStatus
@@ -11,6 +13,11 @@ type OrderFilter = 'all' | AdminOrderStatus
 type ProductLookup = Record<string, { name: string; icon: string }>
 
 const PAGE_LIMIT = 20
+
+const FALLBACK_ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  shared: 'Shared · Akun Bersama',
+  private: 'Private · Akun Pribadi',
+}
 
 const STATUS_FILTERS: { value: OrderFilter; label: string }[] = [
   { value: 'all', label: 'Semua Status' },
@@ -98,20 +105,65 @@ function escapeCsvValue(value: string) {
   return value
 }
 
-function accountPackage(order: Order) {
-  const duration = order.price?.duration
-  const accountType = order.price?.account_type
+function normalizeAccountTypeCode(value?: string | null) {
+  return (value || '').trim().toLowerCase()
+}
 
-  if (!duration && !accountType) return '-'
-  if (!duration) return accountType || '-'
-  if (!accountType) return `${duration} Bulan`
+function formatAccountTypeLabel(code?: string | null, accountTypeLookup?: Record<string, AccountType>) {
+  const normalized = normalizeAccountTypeCode(code)
+  if (!normalized) return '-'
+
+  const configured = accountTypeLookup?.[normalized]
+  if (configured?.label?.trim()) {
+    return configured.label.trim()
+  }
+
+  const fallback = FALLBACK_ACCOUNT_TYPE_LABELS[normalized]
+  if (fallback) return fallback
+
+  return normalized
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(' ')
+}
+
+function accountPackage(order: Order, accountTypeLookup?: Record<string, AccountType>) {
+  const duration = order.price?.duration
+  const accountType = formatAccountTypeLabel(order.price?.account_type, accountTypeLookup)
+
+  if (!duration && accountType === '-') return '-'
+  if (!duration) return accountType
+  if (accountType === '-') return `${duration} Bulan`
 
   return `${duration} Bulan · ${accountType}`
+}
+
+const MODAL_OVERLAY_STYLE = {
+  position: 'fixed' as const,
+  inset: 0,
+  background: 'rgba(15, 23, 42, 0.48)',
+  backdropFilter: 'blur(2px)',
+  zIndex: 9999,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 12,
+}
+
+const MODAL_CARD_STYLE = {
+  width: '100%',
+  maxWidth: 560,
+  maxHeight: '90vh',
+  overflow: 'auto' as const,
+  borderRadius: 16,
+  boxShadow: '0 24px 60px rgba(15, 23, 42, 0.28)',
 }
 
 export default function OrderPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [productsByID, setProductsByID] = useState<ProductLookup>({})
+  const [accountTypes, setAccountTypes] = useState<AccountType[]>([])
 
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -127,6 +179,15 @@ export default function OrderPage() {
   const [totalPages, setTotalPages] = useState(1)
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+
+  const accountTypeLookup = useMemo(() => {
+    return accountTypes.reduce<Record<string, AccountType>>((acc, item) => {
+      const code = normalizeAccountTypeCode(item.code)
+      if (!code) return acc
+      acc[code] = item
+      return acc
+    }, {})
+  }, [accountTypes])
 
   const resolveProduct = useCallback(
     (order: Order) => {
@@ -180,6 +241,16 @@ export default function OrderPage() {
     }
   }, [])
 
+  const loadAccountTypes = useCallback(async () => {
+    try {
+      const res = await accountTypeService.adminList({ include_inactive: true })
+      if (!res.success) return
+      setAccountTypes(res.data || [])
+    } catch {
+      // best effort only; fallback labels still work
+    }
+  }, [])
+
   const loadOrders = useCallback(
     async (opts?: { silent?: boolean }) => {
       const silent = opts?.silent === true
@@ -226,12 +297,32 @@ export default function OrderPage() {
   )
 
   useEffect(() => {
-    void loadProductLookup()
-  }, [loadProductLookup])
+    void Promise.all([loadProductLookup(), loadAccountTypes()])
+  }, [loadAccountTypes, loadProductLookup])
 
   useEffect(() => {
     void loadOrders()
   }, [loadOrders])
+
+  useEffect(() => {
+    if (!selectedOrder) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedOrder(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [selectedOrder])
 
   const filteredOrders = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -247,13 +338,14 @@ export default function OrderPage() {
         getBuyerEmail(order),
         product.name,
         order.price?.account_type || '',
+        formatAccountTypeLabel(order.price?.account_type, accountTypeLookup),
       ]
         .join(' ')
         .toLowerCase()
 
       return haystack.includes(keyword)
     })
-  }, [orders, resolveProduct, search])
+  }, [accountTypeLookup, orders, resolveProduct, search])
 
   const refreshOrders = async () => {
     await loadOrders({ silent: true })
@@ -313,7 +405,7 @@ export default function OrderPage() {
         getBuyerName(order),
         getBuyerEmail(order),
         product.name,
-        accountPackage(order),
+        accountPackage(order, accountTypeLookup),
         String(order.total_price || 0),
         paymentStatusLabel(order.payment_status),
         orderStatusLabel(order.order_status),
@@ -490,7 +582,7 @@ export default function OrderPage() {
                             {product.icon} {product.name}
                           </span>
                         </td>
-                        <td>{accountPackage(order)}</td>
+                        <td>{accountPackage(order, accountTypeLookup)}</td>
                         <td style={{ fontWeight: 600 }}>{formatRupiah(order.total_price || 0)}</td>
                         <td style={{ color: 'var(--muted)', fontSize: 12 }}>{formatDate(order.created_at)}</td>
                         <td>
@@ -651,7 +743,7 @@ export default function OrderPage() {
                   </div>
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Paket</span>
-                    <span className="mobile-card-value">{accountPackage(order)}</span>
+                    <span className="mobile-card-value">{accountPackage(order, accountTypeLookup)}</span>
                   </div>
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Tanggal</span>
@@ -734,27 +826,8 @@ export default function OrderPage() {
       </div>
 
       {selectedOrder && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(20,20,20,.35)',
-            zIndex: 120,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 12,
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: 560,
-              maxHeight: '90vh',
-              overflow: 'auto',
-            }}
-          >
+        <div style={MODAL_OVERLAY_STYLE} onClick={() => setSelectedOrder(null)}>
+          <div className="card" style={MODAL_CARD_STYLE} onClick={(event) => event.stopPropagation()}>
             <div className="card-header">
               <h2>Detail Order {shortOrderCode(selectedOrder.id)}</h2>
               <button className="action-btn" onClick={() => setSelectedOrder(null)}>
@@ -782,7 +855,7 @@ export default function OrderPage() {
 
               <div className="mobile-card-row">
                 <span className="mobile-card-label">Paket</span>
-                <span className="mobile-card-value">{accountPackage(selectedOrder)}</span>
+                <span className="mobile-card-value">{accountPackage(selectedOrder, accountTypeLookup)}</span>
               </div>
 
               <div className="mobile-card-row">
