@@ -32,6 +32,66 @@ const EMPTY_FORM: AccountTypeFormState = {
   is_active: true,
 }
 
+const MODAL_OVERLAY_STYLE = {
+  position: 'fixed' as const,
+  inset: 0,
+  background: 'rgba(15, 23, 42, 0.48)',
+  backdropFilter: 'blur(2px)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '20px 14px',
+  zIndex: 9999,
+}
+
+const MODAL_CARD_BASE_STYLE = {
+  background: 'var(--card, #fff)',
+  border: '1px solid var(--line, #E5E7EB)',
+  borderRadius: 16,
+  boxShadow: '0 24px 60px rgba(15, 23, 42, 0.28)',
+  maxHeight: 'calc(100vh - 40px)',
+  overflow: 'auto' as const,
+}
+
+const MODAL_HEAD_STYLE = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 12,
+  padding: '16px 18px 10px',
+  borderBottom: '1px solid var(--line, #E5E7EB)',
+}
+
+const MODAL_SUB_STYLE = {
+  fontSize: 12,
+  color: 'var(--muted)',
+}
+
+const MODAL_CLOSE_STYLE = {
+  width: 30,
+  height: 30,
+  borderRadius: 8,
+  border: '1px solid var(--line, #E5E7EB)',
+  background: '#fff',
+  cursor: 'pointer',
+  fontSize: 18,
+  lineHeight: 1,
+}
+
+const MODAL_BODY_STYLE = {
+  display: 'grid',
+  gap: 10,
+  padding: '14px 18px',
+}
+
+const MODAL_ACTIONS_STYLE = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 8,
+  padding: '12px 18px 16px',
+  borderTop: '1px solid var(--line, #E5E7EB)',
+}
+
 function mapErrorMessage(err: unknown, fallback: string) {
   if (axios.isAxiosError(err)) {
     const message = (err.response?.data as { message?: string } | undefined)?.message
@@ -102,6 +162,17 @@ export default function PengaturanPage() {
   useEffect(() => {
     void loadAccountTypes()
   }, [])
+
+  useEffect(() => {
+    if (!formOpen && !confirmOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [confirmOpen, formOpen])
 
   const openCreateForm = () => {
     setFormMode('create')
@@ -364,17 +435,21 @@ export default function PengaturanPage() {
       </div>
 
       {formOpen && (
-        <div className="modal-overlay" onClick={closeForm}>
-          <div className="modal-card" style={{ width: 'min(620px, 95vw)' }} onClick={(event) => event.stopPropagation()}>
-            <div className="modal-head">
+        <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={closeForm}>
+          <div
+            className="modal-card"
+            style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(620px, 95vw)' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head" style={MODAL_HEAD_STYLE}>
               <div>
                 <h3>{formMode === 'create' ? 'Tambah Tipe Akun' : 'Edit Tipe Akun'}</h3>
-                <div className="modal-sub">Kode bersifat permanen setelah dibuat.</div>
+                <div className="modal-sub" style={MODAL_SUB_STYLE}>Kode bersifat permanen setelah dibuat.</div>
               </div>
-              <button className="modal-close" type="button" onClick={closeForm}>×</button>
+              <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={closeForm}>×</button>
             </div>
 
-            <div className="modal-body" style={{ display: 'grid', gap: 10 }}>
+            <div className="modal-body" style={MODAL_BODY_STYLE}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <div>
                   <label className="form-label">Kode</label>
@@ -455,7 +530,7 @@ export default function PengaturanPage() {
               </label>
             </div>
 
-            <div className="modal-actions">
+            <div className="modal-actions" style={MODAL_ACTIONS_STYLE}>
               <button className="action-btn" type="button" onClick={closeForm} disabled={saving}>
                 Batal
               </button>
@@ -468,16 +543,20 @@ export default function PengaturanPage() {
       )}
 
       {confirmOpen && confirmTarget && (
-        <div className="modal-overlay" onClick={() => setConfirmOpen(false)}>
-          <div className="modal-card" style={{ width: 'min(460px, 94vw)' }} onClick={(event) => event.stopPropagation()}>
-            <div className="modal-head">
+        <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={() => setConfirmOpen(false)}>
+          <div
+            className="modal-card"
+            style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(460px, 94vw)' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head" style={MODAL_HEAD_STYLE}>
               <h3>Nonaktifkan Tipe Akun</h3>
-              <button className="modal-close" type="button" onClick={() => setConfirmOpen(false)}>×</button>
+              <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={() => setConfirmOpen(false)}>×</button>
             </div>
-            <div className="modal-body" style={{ fontSize: 13, color: 'var(--text)' }}>
+            <div className="modal-body" style={{ ...MODAL_BODY_STYLE, fontSize: 13, color: 'var(--text)' }}>
               Tipe akun <strong>{confirmTarget.label}</strong> akan dinonaktifkan dari input admin.
             </div>
-            <div className="modal-actions">
+            <div className="modal-actions" style={MODAL_ACTIONS_STYLE}>
               <button className="action-btn" type="button" onClick={() => setConfirmOpen(false)}>
                 Batal
               </button>
