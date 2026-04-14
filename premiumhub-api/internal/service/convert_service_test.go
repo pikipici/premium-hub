@@ -337,6 +337,25 @@ func TestConvertServiceDailyLimitValidation(t *testing.T) {
 	}
 }
 
+func TestConvertDayRangeReturnsUTCBoundariesForTimezone(t *testing.T) {
+	now := time.Date(2026, time.April, 13, 23, 58, 26, 0, time.UTC)
+
+	start, end := convertDayRange(now, "Asia/Jakarta")
+
+	expectedStart := time.Date(2026, time.April, 13, 17, 0, 0, 0, time.UTC)
+	expectedEnd := expectedStart.Add(24 * time.Hour)
+
+	if !start.Equal(expectedStart) {
+		t.Fatalf("unexpected start boundary: got %s want %s", start, expectedStart)
+	}
+	if !end.Equal(expectedEnd) {
+		t.Fatalf("unexpected end boundary: got %s want %s", end, expectedEnd)
+	}
+	if start.Location() != time.UTC || end.Location() != time.UTC {
+		t.Fatalf("boundaries should be normalized to UTC, got %s and %s", start.Location(), end.Location())
+	}
+}
+
 func TestConvertServiceUploadProofRejectedWhenOrderFinal(t *testing.T) {
 	svc, _, member, admin := setupConvertService(t)
 

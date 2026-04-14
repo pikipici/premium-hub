@@ -1535,9 +1535,12 @@ func convertDayRange(now time.Time, tz string) (time.Time, time.Time) {
 	}
 
 	inLoc := now.In(loc)
-	start := time.Date(inLoc.Year(), inLoc.Month(), inLoc.Day(), 0, 0, 0, 0, loc)
-	end := start.Add(24 * time.Hour)
-	return start, end
+	startLocal := time.Date(inLoc.Year(), inLoc.Month(), inLoc.Day(), 0, 0, 0, 0, loc)
+	endLocal := startLocal.Add(24 * time.Hour)
+
+	// Normalisasi ke UTC supaya konsisten lintas DB driver (sqlite/postgres)
+	// saat dipakai sebagai boundary query created_at.
+	return startLocal.UTC(), endLocal.UTC()
 }
 
 func mapConvertOrderSummary(row model.ConvertOrder, trackingToken string, includeUser bool) ConvertOrderSummaryResponse {
