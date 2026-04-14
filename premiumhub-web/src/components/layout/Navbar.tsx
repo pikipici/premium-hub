@@ -63,6 +63,7 @@ export default function Navbar() {
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
 
   const showAuthenticated = hasHydrated && isAuthenticated
+  const isAdminUser = showAuthenticated && user?.role === 'admin'
 
   const getInitialMobileSections = (): MobileSectionState => ({
     nav: true,
@@ -96,11 +97,13 @@ export default function Navbar() {
   useEffect(() => {
     if (!open) return
 
-    const originalOverflow = document.body.style.overflow
-    const originalPaddingRight = document.body.style.paddingRight
+    const originalBodyOverflow = document.body.style.overflow
+    const originalBodyPaddingRight = document.body.style.paddingRight
+    const originalHtmlOverflow = document.documentElement.style.overflow
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
 
     document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
     if (scrollbarWidth > 0) {
       document.body.style.paddingRight = `${scrollbarWidth}px`
     }
@@ -115,8 +118,9 @@ export default function Navbar() {
 
     return () => {
       window.removeEventListener('keydown', handleEsc)
-      document.body.style.overflow = originalOverflow
-      document.body.style.paddingRight = originalPaddingRight
+      document.body.style.overflow = originalBodyOverflow
+      document.body.style.paddingRight = originalBodyPaddingRight
+      document.documentElement.style.overflow = originalHtmlOverflow
     }
   }, [open])
 
@@ -320,7 +324,7 @@ export default function Navbar() {
             className="absolute inset-0 bg-black/35"
           />
 
-          <div className="relative ml-auto flex h-full w-full flex-col bg-white">
+          <div className="relative ml-auto flex h-full w-full min-h-0 flex-col overflow-hidden bg-white">
             <div className="flex items-center justify-between border-b border-[#EBEBEB] px-4 py-3">
               <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FF5733]">
@@ -341,22 +345,47 @@ export default function Navbar() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
               <div className="space-y-3 pb-6">
-                <section>
-                  <button
-                    type="button"
-                    onClick={() => toggleMobileSection('nav')}
-                    aria-expanded={mobileSectionsOpen.nav}
-                    className="flex w-full items-center justify-between rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5"
-                  >
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Navigasi</span>
-                    <ChevronDown
-                      className={`h-4 w-4 text-[#888] transition-transform ${mobileSectionsOpen.nav ? 'rotate-180' : ''}`}
-                    />
-                  </button>
+                {isAdminUser ? (
+                  <section>
+                    <button
+                      type="button"
+                      onClick={() => toggleMobileSection('nav')}
+                      aria-expanded={mobileSectionsOpen.nav}
+                      className="flex w-full items-center justify-between rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5"
+                    >
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Navigasi</span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-[#888] transition-transform ${mobileSectionsOpen.nav ? 'rotate-180' : ''}`}
+                      />
+                    </button>
 
-                  {mobileSectionsOpen.nav ? (
+                    {mobileSectionsOpen.nav ? (
+                      <div className="mt-2 space-y-2">
+                        {PUBLIC_NAV_ITEMS.map((item) => {
+                          const active = isActivePath(pathname, item.href)
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                                active
+                                  ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
+                                  : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
+                              }`}
+                              onClick={() => setOpen(false)}
+                            >
+                              <span>{item.label}</span>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                  </section>
+                ) : (
+                  <section>
+                    <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-[#666]">Navigasi</p>
                     <div className="mt-2 space-y-2">
                       {PUBLIC_NAV_ITEMS.map((item) => {
                         const active = isActivePath(pathname, item.href)
@@ -376,27 +405,87 @@ export default function Navbar() {
                         )
                       })}
                     </div>
-                  ) : null}
-                </section>
+                  </section>
+                )}
 
                 {showAuthenticated ? (
-                  <section>
-                    <button
-                      type="button"
-                      onClick={() => toggleMobileSection('account')}
-                      aria-expanded={mobileSectionsOpen.account}
-                      className="flex w-full items-center justify-between rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5"
-                    >
-                      <div className="text-left">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Akun</p>
-                        <p className="max-w-[210px] truncate text-xs font-semibold text-[#333]">{firstName(user?.name)}</p>
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 text-[#888] transition-transform ${mobileSectionsOpen.account ? 'rotate-180' : ''}`}
-                      />
-                    </button>
+                  isAdminUser ? (
+                    <section>
+                      <button
+                        type="button"
+                        onClick={() => toggleMobileSection('account')}
+                        aria-expanded={mobileSectionsOpen.account}
+                        className="flex w-full items-center justify-between rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5"
+                      >
+                        <div className="text-left">
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Akun</p>
+                          <p className="max-w-[210px] truncate text-xs font-semibold text-[#333]">{firstName(user?.name)}</p>
+                        </div>
+                        <ChevronDown
+                          className={`h-4 w-4 text-[#888] transition-transform ${mobileSectionsOpen.account ? 'rotate-180' : ''}`}
+                        />
+                      </button>
 
-                    {mobileSectionsOpen.account ? (
+                      {mobileSectionsOpen.account ? (
+                        <div className="mt-2 space-y-2">
+                          <div className="rounded-xl border border-[#EBEBEB] bg-[#F7F7F5] px-3 py-2.5">
+                            <p className="truncate text-sm font-semibold text-[#141414]">{user?.name || 'User'}</p>
+                            <p className="truncate text-xs text-[#888]">{user?.email || '-'}</p>
+                          </div>
+
+                          <Link
+                            href="/dashboard"
+                            className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
+                              isActivePath(pathname, '/dashboard')
+                                ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
+                                : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
+                            }`}
+                            onClick={() => setOpen(false)}
+                          >
+                            <LayoutDashboard className="h-4 w-4" /> Dashboard
+                          </Link>
+
+                          <Link
+                            href="/dashboard/wallet"
+                            className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
+                              isActivePath(pathname, '/dashboard/wallet')
+                                ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
+                                : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
+                            }`}
+                            onClick={() => setOpen(false)}
+                          >
+                            <Wallet className="h-4 w-4" /> Wallet
+                          </Link>
+
+                          <Link
+                            href="/dashboard/convert/orders"
+                            className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
+                              isActivePath(pathname, '/dashboard/convert')
+                                ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
+                                : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
+                            }`}
+                            onClick={() => setOpen(false)}
+                          >
+                            <RefreshCw className="h-4 w-4" /> Riwayat Convert
+                          </Link>
+
+                          <Link
+                            href="/dashboard/nokos"
+                            className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
+                              isActivePath(pathname, '/dashboard/nokos')
+                                ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
+                                : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
+                            }`}
+                            onClick={() => setOpen(false)}
+                          >
+                            <Smartphone className="h-4 w-4" /> Nomor Virtual
+                          </Link>
+                        </div>
+                      ) : null}
+                    </section>
+                  ) : (
+                    <section>
+                      <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-[#666]">Akun</p>
                       <div className="mt-2 space-y-2">
                         <div className="rounded-xl border border-[#EBEBEB] bg-[#F7F7F5] px-3 py-2.5">
                           <p className="truncate text-sm font-semibold text-[#141414]">{user?.name || 'User'}</p>
@@ -451,11 +540,11 @@ export default function Navbar() {
                           <Smartphone className="h-4 w-4" /> Nomor Virtual
                         </Link>
                       </div>
-                    ) : null}
-                  </section>
+                    </section>
+                  )
                 ) : null}
 
-                {showAuthenticated && user?.role === 'admin' ? (
+                {isAdminUser ? (
                   <section>
                     <button
                       type="button"
