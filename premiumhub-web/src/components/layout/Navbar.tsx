@@ -164,18 +164,39 @@ export default function Navbar() {
   return (
     <>
       <nav className="sticky top-0 z-50 border-b border-[#EBEBEB] bg-white/85 backdrop-blur-lg">
-        <div className="border-b border-[#F1F1EE]">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex h-14 items-center justify-between">
-              <Link href="/" className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FF5733]">
-                  <ShoppingBag className="h-4 w-4 text-white" />
-                </div>
-                <span className="text-xl font-extrabold">
-                  Digi<span className="text-[#FF5733]">Market</span>
-                </span>
-              </Link>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid h-14 grid-cols-[auto_1fr_auto] items-center gap-3">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FF5733]">
+                <ShoppingBag className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xl font-extrabold">
+                Digi<span className="text-[#FF5733]">Market</span>
+              </span>
+            </Link>
 
+            <div className="hidden min-w-0 items-center justify-center md:flex">
+              <div className="flex h-11 items-center gap-1">
+                {PUBLIC_NAV_ITEMS.map((item) => {
+                  const active = isActivePath(pathname, item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`inline-flex h-11 items-center whitespace-nowrap border-b-2 px-3 text-sm font-semibold transition-colors ${
+                        active
+                          ? 'border-[#FF5733] text-[#141414]'
+                          : 'border-transparent text-[#888] hover:text-[#141414]'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
               <div className="hidden items-center gap-2 md:flex">
                 {showAuthenticated ? (
                   <>
@@ -285,29 +306,6 @@ export default function Navbar() {
               >
                 {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="hidden md:block">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex h-11 items-center gap-1">
-              {PUBLIC_NAV_ITEMS.map((item) => {
-                const active = isActivePath(pathname, item.href)
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`inline-flex h-11 items-center border-b-2 px-3 text-sm font-semibold transition-colors ${
-                      active
-                        ? 'border-[#FF5733] text-[#141414]'
-                        : 'border-transparent text-[#888] hover:text-[#141414]'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                )
-              })}
             </div>
           </div>
         </div>
