@@ -522,7 +522,7 @@ export default function WalletPage() {
             <div className="text-3xl">⚡</div>
             <div className="flex-1">
               <h3 className="text-sm font-bold mb-1">Saldo Wallet Siap Dipakai</h3>
-              <p className="text-xs text-white/60">Saldo wallet kamu bisa dipakai untuk beli nomor OTP di Dashboard Nokos. Untuk produk premium, pembayaran masih via invoice.</p>
+              <p className="text-xs text-white/60">Saldo wallet kamu bisa dipakai untuk beli nomor OTP di Dashboard Nokos.</p>
             </div>
             <Link
               href="/dashboard/nokos"
