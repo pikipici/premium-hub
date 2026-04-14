@@ -521,14 +521,14 @@ export default function WalletPage() {
           <section className="rounded-2xl bg-gradient-to-br from-[#141414] to-[#2A2A2A] p-5 text-white flex flex-col md:flex-row md:items-center gap-3">
             <div className="text-3xl">⚡</div>
             <div className="flex-1">
-              <h3 className="text-sm font-bold mb-1">Wallet topup sudah aktif</h3>
-              <p className="text-xs text-white/60">Checkout pakai saldo wallet lagi disiapkan. Sementara order premium via invoice pembayaran.</p>
+              <h3 className="text-sm font-bold mb-1">Saldo Wallet Siap Dipakai</h3>
+              <p className="text-xs text-white/60">Saldo wallet kamu bisa dipakai untuk beli nomor OTP di Dashboard Nokos. Untuk produk premium, pembayaran masih via invoice.</p>
             </div>
             <Link
-              href="/product/prem-apps"
+              href="/dashboard/nokos"
               className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#141414] hover:opacity-90"
             >
-              Lihat Produk
+              Buka Nokos
             </Link>
           </section>
 
