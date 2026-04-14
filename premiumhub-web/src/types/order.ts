@@ -59,11 +59,17 @@ export interface Order {
 
 export interface Claim {
   id: string
+  user_id: string
   order_id: string
-  reason: 'login' | 'password' | 'kicked' | 'profile' | 'quality' | 'other'
+  reason: 'login' | 'password' | 'kicked' | 'profile' | 'quality' | 'other' | string
   description: string
   screenshot_url?: string
   status: 'pending' | 'approved' | 'rejected'
   admin_note?: string
+  new_stock_id?: string | null
+  resolved_at?: string | null
+  user?: OrderUser
+  order?: Order
   created_at: string
+  updated_at?: string
 }
