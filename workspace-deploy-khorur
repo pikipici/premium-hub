@@ -1,0 +1,399 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# =============================================================
+# Khorur Workspace Deploy Script (isolated)
+# - Targets ONLY workspace-khorur services
+# - Uses dedicated ports/db:
+#   FE : 3006
+#   API: 18083
+#   DB : postgresql:5435 / khorur
+# - Can optionally run seed command
+# =============================================================
+
+if [[ -t 1 ]]; then
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  BLUE='\033[0;34m'
+  NC='\033[0m'
+else
+  RED=''
+  GREEN=''
+  YELLOW=''
+  BLUE=''
+  NC=''
+fi
+
+log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+log_ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
+log_err()  { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+
+format_duration() {
+  local s="${1:-0}"
+  local h=$((s / 3600))
+  local m=$(((s % 3600) / 60))
+  local r=$((s % 60))
+  if ((h > 0)); then
+    printf '%dh %dm %02ds' "$h" "$m" "$r"
+  elif ((m > 0)); then
+    printf '%dm %02ds' "$m" "$r"
+  else
+    printf '%ds' "$r"
+  fi
+}
+
+DEPLOY_START_TS="$(date +%s)"
+CURRENT_STEP_NAME=""
+CURRENT_STEP_START_TS=0
+
+step_start() {
+  CURRENT_STEP_NAME="$1"
+  CURRENT_STEP_START_TS="$(date +%s)"
+  log_info "===== ${CURRENT_STEP_NAME}: START ====="
+}
+
+step_done() {
+  local step_name="${1:-${CURRENT_STEP_NAME}}"
+  local elapsed=$(( $(date +%s) - CURRENT_STEP_START_TS ))
+  log_ok "===== ${step_name}: DONE ($(format_duration "$elapsed")) ====="
+  CURRENT_STEP_NAME=""
+  CURRENT_STEP_START_TS=0
+}
+
+on_error() {
+  local line="$1"
+  local cmd="$2"
+  local code="$3"
+  local total=$(( $(date +%s) - DEPLOY_START_TS ))
+  log_err "Deploy gagal di line ${line} (exit ${code})"
+  log_err "Command: ${cmd}"
+  log_err "Elapsed: $(format_duration "$total")"
+  exit "${code}"
+}
+trap 'on_error "$LINENO" "$BASH_COMMAND" "$?"' ERR
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    log_err "Command tidak ditemukan: $1"
+    exit 1
+  }
+}
+
+wait_http() {
+  local url="$1"
+  local label="$2"
+  local max_try="${3:-25}"
+  local sleep_s="${4:-1}"
+  local i
+
+  for ((i=1; i<=max_try; i++)); do
+    if curl -fsS "$url" >/dev/null; then
+      log_ok "$label healthy ($url)"
+      return 0
+    fi
+    log_warn "$label belum ready (attempt ${i}/${max_try})"
+    sleep "$sleep_s"
+  done
+
+  log_err "$label gagal healthy: $url"
+  return 1
+}
+
+find_backend_entry() {
+  if [[ -f "${BACKEND_DIR}/cmd/main.go" ]]; then
+    echo "cmd/main.go"
+    return 0
+  fi
+  if [[ -f "${BACKEND_DIR}/main.go" ]]; then
+    echo "main.go"
+    return 0
+  fi
+  return 1
+}
+
+run_npm_ci_with_retry() {
+  local attempt
+  for ((attempt=1; attempt<=NPM_CI_RETRIES; attempt++)); do
+    log_info "npm ci attempt ${attempt}/${NPM_CI_RETRIES}"
+    if npm ci ${NPM_FLAGS}; then
+      return 0
+    fi
+    if (( attempt < NPM_CI_RETRIES )); then
+      log_warn "npm ci gagal, retry..."
+      sleep 2
+    fi
+  done
+  return 1
+}
+
+ensure_frontend_toolchain() {
+  cd "${FRONTEND_DIR}"
+
+  if [[ "${FORCE_NPM_CI}" == "1" || ! -d node_modules ]]; then
+    run_npm_ci_with_retry || {
+      log_warn "npm ci gagal. Coba fallback node_modules mirror jika tersedia..."
+    }
+  else
+    log_info "Skip npm ci (node_modules sudah ada, FORCE_NPM_CI=0)"
+  fi
+
+  if [[ ! -x node_modules/.bin/next ]]; then
+    if [[ -d "${SOURCE_NODE_MODULES}" ]]; then
+      log_warn "next binary belum tersedia, restore node_modules dari SOURCE_NODE_MODULES"
+      rm -rf node_modules
+      mkdir -p node_modules
+      ( cd "${SOURCE_NODE_MODULES}" && tar -cf - . ) | ( cd node_modules && tar -xf - )
+    fi
+  fi
+
+  [[ -x node_modules/.bin/next ]] || {
+    log_err "next binary tetap tidak ditemukan (node_modules/.bin/next)"
+    exit 1
+  }
+}
+
+build_frontend_with_retry() {
+  cd "${FRONTEND_DIR}"
+  rm -rf .next
+
+  local attempt
+  for ((attempt=1; attempt<=BUILD_RETRIES; attempt++)); do
+    log_info "Frontend build attempt ${attempt}/${BUILD_RETRIES}"
+    if NEXT_PUBLIC_API_URL=/api/v1 NEXT_INTERNAL_API_BASE_URL="http://127.0.0.1:${API_PORT}" npm run build; then
+      return 0
+    fi
+
+    if (( attempt < BUILD_RETRIES )); then
+      log_warn "Build FE gagal, retry setelah 3 detik..."
+      sleep 3
+      # jika korup setelah failed build, pastikan next binary tetap ada
+      if [[ ! -x node_modules/.bin/next && -d "${SOURCE_NODE_MODULES}" ]]; then
+        log_warn "next binary hilang setelah build gagal, restore node_modules dari source"
+        rm -rf node_modules
+        mkdir -p node_modules
+        ( cd "${SOURCE_NODE_MODULES}" && tar -cf - . ) | ( cd node_modules && tar -xf - )
+      fi
+    fi
+  done
+
+  return 1
+}
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-${SCRIPT_ROOT}}"
+BRANCH="${BRANCH:-main}"
+PULL_LATEST="${PULL_LATEST:-1}"
+
+FRONTEND_DIR="${PROJECT_ROOT}/premiumhub-web"
+BACKEND_DIR="${PROJECT_ROOT}/premiumhub-api"
+
+API_SERVICE_NAME="workspace-khorur-premiumhub-api.service"
+WEB_SERVICE_NAME="workspace-khorur-premiumhub-web.service"
+
+API_PORT="${API_PORT:-18083}"
+WEB_PORT="${WEB_PORT:-3006}"
+FE_HEALTH_URL="${FE_HEALTH_URL:-http://127.0.0.1:${WEB_PORT}/}"
+BE_HEALTH_URL="${BE_HEALTH_URL:-http://127.0.0.1:${API_PORT}/healthz}"
+
+DB_HOST="${DB_HOST:-127.0.0.1}"
+DB_PORT="${DB_PORT:-5435}"
+DB_USER="${DB_USER:-khorur}"
+DB_NAME="${DB_NAME:-khorur}"
+DB_PASSWORD="${DB_PASSWORD:-123987}"
+
+RUN_SEED="${RUN_SEED:-1}"
+FORCE_NPM_CI="${FORCE_NPM_CI:-0}"
+BUILD_RETRIES="${BUILD_RETRIES:-3}"
+NPM_CI_RETRIES="${NPM_CI_RETRIES:-2}"
+NPM_FLAGS="${NPM_FLAGS:---include=dev --no-audit --no-fund}"
+
+ENV_FILE="${ENV_FILE:-${HOME}/.config/workspace-khorur-premiumhub-api.env}"
+SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
+SOURCE_NODE_MODULES="${SOURCE_NODE_MODULES:-/home/ubuntu/openclaw-vcp/profiles/openai-codex/shared/workspace/premium-hub/premiumhub-web/node_modules}"
+
+API_SERVICE_FILE="${SYSTEMD_USER_DIR}/${API_SERVICE_NAME}"
+WEB_SERVICE_FILE="${SYSTEMD_USER_DIR}/${WEB_SERVICE_NAME}"
+
+step_start "PRECHECK"
+require_cmd git
+require_cmd npm
+require_cmd go
+require_cmd curl
+require_cmd systemctl
+require_cmd psql
+require_cmd python3
+
+[[ -d "${PROJECT_ROOT}" ]] || { log_err "PROJECT_ROOT tidak ada: ${PROJECT_ROOT}"; exit 1; }
+[[ -d "${FRONTEND_DIR}" ]] || { log_err "Frontend dir tidak ada: ${FRONTEND_DIR}"; exit 1; }
+[[ -d "${BACKEND_DIR}" ]] || { log_err "Backend dir tidak ada: ${BACKEND_DIR}"; exit 1; }
+
+BACKEND_ENTRY="$(find_backend_entry)" || { log_err "Backend entry tidak ditemukan"; exit 1; }
+log_info "Project root : ${PROJECT_ROOT}"
+log_info "Branch       : ${BRANCH}"
+log_info "Services     : ${API_SERVICE_NAME}, ${WEB_SERVICE_NAME}"
+log_info "Ports        : FE ${WEB_PORT}, API ${API_PORT}"
+log_info "Database     : ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+step_done "PRECHECK"
+
+if [[ "${PULL_LATEST}" == "1" ]]; then
+  step_start "GIT UPDATE"
+  cd "${PROJECT_ROOT}"
+  git fetch origin "${BRANCH}"
+  git checkout "${BRANCH}"
+  git pull --ff-only origin "${BRANCH}"
+  log_info "HEAD: $(git rev-parse --short HEAD)"
+  step_done "GIT UPDATE"
+fi
+
+step_start "DB + ENV PREP"
+if sudo -u postgres psql -p "${DB_PORT}" -tAc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1; then
+  sudo -u postgres psql -p "${DB_PORT}" -v ON_ERROR_STOP=1 -c "ALTER ROLE ${DB_USER} WITH LOGIN PASSWORD '${DB_PASSWORD}';"
+else
+  sudo -u postgres psql -p "${DB_PORT}" -v ON_ERROR_STOP=1 -c "CREATE ROLE ${DB_USER} WITH LOGIN PASSWORD '${DB_PASSWORD}';"
+fi
+
+if ! sudo -u postgres psql -p "${DB_PORT}" -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+  sudo -u postgres psql -p "${DB_PORT}" -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};"
+fi
+
+sudo -u postgres psql -p "${DB_PORT}" -v ON_ERROR_STOP=1 -d "${DB_NAME}" -c "ALTER SCHEMA public OWNER TO ${DB_USER}; GRANT ALL ON SCHEMA public TO ${DB_USER};"
+
+mkdir -p "$(dirname "${ENV_FILE}")"
+python3 - <<'PY'
+from pathlib import Path
+p = Path('/home/ubuntu/.config/workspace-khorur-premiumhub-api.env')
+if not p.exists():
+    p.write_text('')
+lines = p.read_text().splitlines()
+kv = {}
+order = []
+for ln in lines:
+    if not ln or ln.lstrip().startswith('#') or '=' not in ln:
+        order.append((None, ln))
+        continue
+    k, v = ln.split('=', 1)
+    k = k.strip()
+    kv[k] = v
+    order.append((k, None))
+
+updates = {
+    'APP_PORT': '18083',
+    'APP_ENV': kv.get('APP_ENV', 'development') or 'development',
+    'DB_HOST': '127.0.0.1',
+    'DB_PORT': '5435',
+    'DB_USER': 'khorur',
+    'DB_PASSWORD': '123987',
+    'DB_NAME': 'khorur',
+    'DATABASE_URL': 'postgres://khorur:123987@127.0.0.1:5435/khorur?sslmode=disable',
+    'FRONTEND_URL': 'http://127.0.0.1:3006',
+}
+for k, v in updates.items():
+    kv[k] = v
+
+seen = set()
+out = []
+for k, raw in order:
+    if k is None:
+        out.append(raw)
+        continue
+    if k in seen:
+        continue
+    seen.add(k)
+    out.append(f'{k}={kv[k]}')
+for k, v in updates.items():
+    if k not in seen:
+        out.append(f'{k}={v}')
+
+p.write_text('\n'.join(out).rstrip() + '\n')
+PY
+chmod 600 "${ENV_FILE}"
+step_done "DB + ENV PREP"
+
+step_start "BUILD BACKEND"
+cd "${BACKEND_DIR}"
+go mod download
+go build -o bin/workspace-khorur-premiumhub-api "${BACKEND_ENTRY}"
+step_done "BUILD BACKEND"
+
+step_start "BUILD FRONTEND"
+ensure_frontend_toolchain
+build_frontend_with_retry
+step_done "BUILD FRONTEND"
+
+step_start "WRITE SYSTEMD UNITS"
+mkdir -p "${SYSTEMD_USER_DIR}"
+cat > "${API_SERVICE_FILE}" <<EOF
+[Unit]
+Description=workspace-khorur PremiumHub API (Go)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${BACKEND_DIR}
+EnvironmentFile=${ENV_FILE}
+Environment=GIN_MODE=release
+ExecStart=${BACKEND_DIR}/bin/workspace-khorur-premiumhub-api
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+EOF
+
+cat > "${WEB_SERVICE_FILE}" <<EOF
+[Unit]
+Description=workspace-khorur PremiumHub Web (Next.js)
+After=network-online.target ${API_SERVICE_NAME}
+Wants=network-online.target ${API_SERVICE_NAME}
+
+[Service]
+Type=simple
+WorkingDirectory=${FRONTEND_DIR}
+Environment=NODE_ENV=production
+Environment=PORT=${WEB_PORT}
+Environment=NEXT_PUBLIC_API_URL=/api/v1
+Environment=NEXT_INTERNAL_API_BASE_URL=http://127.0.0.1:${API_PORT}
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+EOF
+step_done "WRITE SYSTEMD UNITS"
+
+step_start "RESTART SERVICES"
+systemctl --user daemon-reload
+systemctl --user enable --now "${API_SERVICE_NAME}"
+systemctl --user enable --now "${WEB_SERVICE_NAME}"
+systemctl --user restart "${API_SERVICE_NAME}" "${WEB_SERVICE_NAME}"
+systemctl --user is-active --quiet "${API_SERVICE_NAME}"
+systemctl --user is-active --quiet "${WEB_SERVICE_NAME}"
+step_done "RESTART SERVICES"
+
+step_start "POST-RESTART HEALTHCHECK"
+wait_http "${BE_HEALTH_URL}" "Khorur API" 30 1
+wait_http "${FE_HEALTH_URL}" "Khorur Web" 30 1
+step_done "POST-RESTART HEALTHCHECK"
+
+if [[ "${RUN_SEED}" == "1" ]]; then
+  step_start "RUN SEED"
+  cd "${BACKEND_DIR}"
+  set -a
+  source "${ENV_FILE}"
+  set +a
+  go run ./cmd/seed/main.go
+
+  psql "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable" -Atc \
+    "select 'users='||count(*) from users; select 'products='||count(*) from products; select 'stocks='||count(*) from stocks;"
+  step_done "RUN SEED"
+fi
+
+TOTAL_SEC=$(( $(date +%s) - DEPLOY_START_TS ))
+log_ok "KHORUR WORKSPACE DEPLOY COMPLETED ✅"
+log_info "Total duration: $(format_duration "$TOTAL_SEC")"
+log_info "API : ${BE_HEALTH_URL}"
+log_info "WEB : ${FE_HEALTH_URL}"
