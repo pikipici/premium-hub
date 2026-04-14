@@ -282,7 +282,7 @@ export default function LandingPage() {
             {[
               {
                 title: 'Daftar & Isi Saldo',
-                desc: 'Buat akun gratis dan isi saldo wallet via transfer bank, e-wallet, QRIS, atau pulsa.',
+                desc: 'Buat akun gratis dan isi saldo wallet via transfer bank, e-wallet, atau QRIS.',
               },
               {
                 title: 'Pilih Layanan di Dashboard',
