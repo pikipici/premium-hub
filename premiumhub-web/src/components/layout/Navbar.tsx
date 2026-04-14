@@ -25,6 +25,10 @@ type PublicNavItem = {
   label: string
 }
 
+type MobileSectionKey = 'nav' | 'account' | 'admin'
+
+type MobileSectionState = Record<MobileSectionKey, boolean>
+
 const PUBLIC_NAV_ITEMS: PublicNavItem[] = [
   { href: '/product/prem-apps', label: 'Apps' },
   { href: '/product/convert', label: 'Convert Aset' },
@@ -50,10 +54,39 @@ export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [logouting, setLogouting] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const [mobileSectionsOpen, setMobileSectionsOpen] = useState<MobileSectionState>({
+    nav: true,
+    account: false,
+    admin: false,
+  })
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
 
   const showAuthenticated = hasHydrated && isAuthenticated
+
+  const getInitialMobileSections = (): MobileSectionState => ({
+    nav: true,
+    account: isActivePath(pathname, '/dashboard'),
+    admin: user?.role === 'admin' ? isActivePath(pathname, '/admin') : false,
+  })
+
+  const toggleMobileSection = (section: MobileSectionKey) => {
+    setMobileSectionsOpen((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
+  }
+
+  const handleToggleMobileMenu = () => {
+    if (open) {
+      setOpen(false)
+      return
+    }
+
+    setMobileSectionsOpen(getInitialMobileSections())
+    setOpen(true)
+    setAccountMenuOpen(false)
+  }
 
   useEffect(() => {
     setOpen(false)
@@ -245,7 +278,7 @@ export default function Navbar() {
               </div>
 
               <button
-                onClick={() => setOpen((prev) => !prev)}
+                onClick={handleToggleMobileMenu}
                 className="p-2 md:hidden"
                 aria-label="Toggle menu"
                 aria-expanded={open}
@@ -311,40 +344,67 @@ export default function Navbar() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4">
-              <div className="space-y-5 pb-6">
+              <div className="space-y-3 pb-6">
                 <section>
-                  <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-[#999]">Navigasi</p>
-                  <div className="mt-2 space-y-2">
-                    {PUBLIC_NAV_ITEMS.map((item) => {
-                      const active = isActivePath(pathname, item.href)
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
-                            active
-                              ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
-                              : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
-                          }`}
-                          onClick={() => setOpen(false)}
-                        >
-                          <span>{item.label}</span>
-                        </Link>
-                      )
-                    })}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleMobileSection('nav')}
+                    aria-expanded={mobileSectionsOpen.nav}
+                    className="flex w-full items-center justify-between rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5"
+                  >
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Navigasi</span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-[#888] transition-transform ${mobileSectionsOpen.nav ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {mobileSectionsOpen.nav ? (
+                    <div className="mt-2 space-y-2">
+                      {PUBLIC_NAV_ITEMS.map((item) => {
+                        const active = isActivePath(pathname, item.href)
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                              active
+                                ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
+                                : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
+                            }`}
+                            onClick={() => setOpen(false)}
+                          >
+                            <span>{item.label}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  ) : null}
                 </section>
 
                 {showAuthenticated ? (
-                  <>
-                    <section>
-                      <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-[#999]">Akun</p>
-                      <div className="mt-2 rounded-xl border border-[#EBEBEB] bg-[#F7F7F5] px-3 py-2.5">
-                        <p className="truncate text-sm font-semibold text-[#141414]">{user?.name || 'User'}</p>
-                        <p className="truncate text-xs text-[#888]">{user?.email || '-'}</p>
+                  <section>
+                    <button
+                      type="button"
+                      onClick={() => toggleMobileSection('account')}
+                      aria-expanded={mobileSectionsOpen.account}
+                      className="flex w-full items-center justify-between rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5"
+                    >
+                      <div className="text-left">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Akun</p>
+                        <p className="max-w-[210px] truncate text-xs font-semibold text-[#333]">{firstName(user?.name)}</p>
                       </div>
+                      <ChevronDown
+                        className={`h-4 w-4 text-[#888] transition-transform ${mobileSectionsOpen.account ? 'rotate-180' : ''}`}
+                      />
+                    </button>
 
+                    {mobileSectionsOpen.account ? (
                       <div className="mt-2 space-y-2">
+                        <div className="rounded-xl border border-[#EBEBEB] bg-[#F7F7F5] px-3 py-2.5">
+                          <p className="truncate text-sm font-semibold text-[#141414]">{user?.name || 'User'}</p>
+                          <p className="truncate text-xs text-[#888]">{user?.email || '-'}</p>
+                        </div>
+
                         <Link
                           href="/dashboard"
                           className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
@@ -393,27 +453,40 @@ export default function Navbar() {
                           <Smartphone className="h-4 w-4" /> Nomor Virtual
                         </Link>
                       </div>
-                    </section>
-
-                    {user?.role === 'admin' ? (
-                      <section>
-                        <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-[#999]">Admin</p>
-                        <div className="mt-2">
-                          <Link
-                            href="/admin"
-                            className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
-                              isActivePath(pathname, '/admin')
-                                ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
-                                : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
-                            }`}
-                            onClick={() => setOpen(false)}
-                          >
-                            <Shield className="h-4 w-4" /> Admin Mode
-                          </Link>
-                        </div>
-                      </section>
                     ) : null}
-                  </>
+                  </section>
+                ) : null}
+
+                {showAuthenticated && user?.role === 'admin' ? (
+                  <section>
+                    <button
+                      type="button"
+                      onClick={() => toggleMobileSection('admin')}
+                      aria-expanded={mobileSectionsOpen.admin}
+                      className="flex w-full items-center justify-between rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5"
+                    >
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Admin</span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-[#888] transition-transform ${mobileSectionsOpen.admin ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+
+                    {mobileSectionsOpen.admin ? (
+                      <div className="mt-2">
+                        <Link
+                          href="/admin"
+                          className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
+                            isActivePath(pathname, '/admin')
+                              ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
+                              : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
+                          }`}
+                          onClick={() => setOpen(false)}
+                        >
+                          <Shield className="h-4 w-4" /> Admin Mode
+                        </Link>
+                      </div>
+                    ) : null}
+                  </section>
                 ) : null}
               </div>
             </div>
