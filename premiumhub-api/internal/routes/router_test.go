@@ -57,6 +57,9 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "GET", "/api/v1/account-types") {
 		t.Fatalf("account type public list route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/maintenance/evaluate") {
+		t.Fatalf("maintenance evaluate route should exist")
+	}
 	if !hasRoute(routes, "GET", "/api/v1/admin/account-types") {
 		t.Fatalf("admin account type list route should exist")
 	}
@@ -68,6 +71,18 @@ func TestSetupProductionRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "DELETE", "/api/v1/admin/account-types/:id") {
 		t.Fatalf("admin account type delete route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/admin/maintenance/rules") {
+		t.Fatalf("admin maintenance list route should exist")
+	}
+	if !hasRoute(routes, "POST", "/api/v1/admin/maintenance/rules") {
+		t.Fatalf("admin maintenance create route should exist")
+	}
+	if !hasRoute(routes, "PUT", "/api/v1/admin/maintenance/rules/:id") {
+		t.Fatalf("admin maintenance update route should exist")
+	}
+	if !hasRoute(routes, "DELETE", "/api/v1/admin/maintenance/rules/:id") {
+		t.Fatalf("admin maintenance delete route should exist")
 	}
 	if !hasRoute(routes, "DELETE", "/api/v1/admin/products/:id/permanent") {
 		t.Fatalf("admin product permanent delete route should exist")

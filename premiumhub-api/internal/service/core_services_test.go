@@ -34,6 +34,7 @@ func setupCoreDB(t *testing.T) *gorm.DB {
 	err = db.AutoMigrate(
 		&model.User{},
 		&model.AccountType{},
+		&model.MaintenanceRule{},
 		&model.Product{},
 		&model.ProductPrice{},
 		&model.Stock{},

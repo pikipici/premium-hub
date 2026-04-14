@@ -37,6 +37,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	walletRepo := repository.NewWalletRepo(db)
 	fiveSimOrderRepo := repository.NewFiveSimOrderRepo(db)
 	convertRepo := repository.NewConvertRepo(db)
+	maintenanceRuleRepo := repository.NewMaintenanceRuleRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg)
@@ -50,6 +51,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	pakasirWebhookSvc := service.NewPakasirWebhookService(orderRepo, walletRepo, paymentSvc, walletSvc)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
+	maintenanceSvc := service.NewMaintenanceService(maintenanceRuleRepo)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
 	service.StartWalletTopupReconcileWorker(cfg, walletSvc)
@@ -76,6 +78,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	claimHandler := handler.NewClaimHandler(claimSvc)
 	stockHandler := handler.NewStockHandler(stockSvc)
 	accountTypeHandler := handler.NewAccountTypeHandler(accountTypeSvc)
+	maintenanceHandler := handler.NewMaintenanceHandler(maintenanceSvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
 
@@ -95,6 +98,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	products.GET("/:slug/prices", productHandler.GetPrices)
 
 	api.GET("/account-types", accountTypeHandler.List)
+	api.GET("/maintenance/evaluate", maintenanceHandler.Evaluate)
 
 	api.POST("/payment/webhook", paymentHandler.Webhook)
 	api.GET(
@@ -196,6 +200,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/account-types", accountTypeHandler.Create)
 	admin.PUT("/account-types/:id", accountTypeHandler.Update)
 	admin.DELETE("/account-types/:id", accountTypeHandler.Delete)
+
+	admin.GET("/maintenance/rules", maintenanceHandler.AdminList)
+	admin.POST("/maintenance/rules", maintenanceHandler.AdminCreate)
+	admin.PUT("/maintenance/rules/:id", maintenanceHandler.AdminUpdate)
+	admin.DELETE("/maintenance/rules/:id", maintenanceHandler.AdminDelete)
 
 	admin.GET("/stocks", stockHandler.List)
 	admin.POST("/stocks", stockHandler.Create)

@@ -3,6 +3,7 @@
 import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 
+import MaintenanceSettingsCard from '@/components/admin/maintenance-settings-card'
 import {
   accountTypeService,
   type AdminAccountTypePayload,
@@ -433,6 +434,8 @@ export default function PengaturanPage() {
           )}
         </div>
       </div>
+
+      <MaintenanceSettingsCard />
 
       {formOpen && (
         <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={closeForm}>
