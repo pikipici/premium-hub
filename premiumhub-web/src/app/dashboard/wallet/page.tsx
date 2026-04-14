@@ -12,7 +12,6 @@ import { useAuthStore } from '@/store/authStore'
 import type { WalletLedger, WalletTopup } from '@/types/wallet'
 
 const MIN_TOPUP = 10000
-const NETFLIX_PRICE = 25000
 const QUICK_AMOUNTS = [25000, 50000, 100000, 200000]
 
 const PAYMENT_METHODS = [
@@ -160,7 +159,12 @@ export default function WalletPage() {
     [paymentMethod]
   )
 
-  const affordabilityCount = useMemo(() => Math.floor(balance / NETFLIX_PRICE), [balance])
+  const walletBalanceHint = useMemo(() => {
+    if (balance > 0) {
+      return 'Saldo siap dipakai untuk produk yang mendukung pembayaran wallet.'
+    }
+    return 'Isi saldo dulu untuk mulai transaksi di produk yang mendukung pembayaran wallet.'
+  }, [balance])
 
   const totalBalanceIn = useMemo(() => {
     return ledgers
@@ -368,11 +372,7 @@ export default function WalletPage() {
             <div className="text-3xl md:text-4xl font-extrabold tracking-tight">
               {loading ? 'Memuat saldo...' : formatRupiah(balance)}
             </div>
-            <div className="text-sm text-white/45 mt-2">
-              {affordabilityCount >= 1
-                ? `Cukup untuk ${affordabilityCount}× pembelian Netflix`
-                : 'Saldo belum cukup untuk pembelian berikutnya'}
-            </div>
+            <div className="text-sm text-white/45 mt-2">{walletBalanceHint}</div>
           </div>
 
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">
