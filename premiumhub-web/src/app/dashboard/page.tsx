@@ -1,31 +1,61 @@
 "use client"
 
-import { useAuthStore } from '@/store/authStore'
-import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, CheckCircle, Clock, ShoppingBag } from 'lucide-react'
+
+import WalletCard from '@/components/shared/WalletCard'
+import { formatRupiah } from '@/lib/utils'
+import { activityService } from '@/services/activityService'
 import { orderService } from '@/services/orderService'
 import { walletService } from '@/services/walletService'
-import { formatRupiah } from '@/lib/utils'
+import { useAuthStore } from '@/store/authStore'
+import type { ActivityHistoryItem } from '@/types/activity'
 import type { Order } from '@/types/order'
-import Link from 'next/link'
-import WalletCard from '@/components/shared/WalletCard'
-import { ShoppingBag, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
+
+function activityAmountText(item: ActivityHistoryItem) {
+  const amount = formatRupiah(item.amount)
+  return item.direction === 'credit' ? `+${amount}` : `-${amount}`
+}
+
+function activityAmountClass(item: ActivityHistoryItem) {
+  return item.direction === 'credit' ? 'text-green-600' : 'text-[#141414]'
+}
 
 export default function DashboardPage() {
   const router = useRouter()
   const { user, setWalletBalance } = useAuthStore()
+
   const [orders, setOrders] = useState<Order[]>([])
+  const [recentActivities, setRecentActivities] = useState<ActivityHistoryItem[]>([])
+  const [activityLoading, setActivityLoading] = useState(true)
+
   const [wallet, setWallet] = useState({ balance: 0, totalTopup: 0, totalSpent: 0 })
   const [walletLoading, setWalletLoading] = useState(true)
 
   useEffect(() => {
-    orderService.list({ limit: 5 }).then(res => {
-      if (res.success) setOrders(res.data)
-    }).catch(() => {})
+    orderService
+      .list({ limit: 20 })
+      .then((res) => {
+        if (res.success) setOrders(res.data)
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
-    walletService.getWallet()
+    activityService
+      .listHistory({ page: 1, limit: 5 })
+      .then((res) => {
+        if (res.success) setRecentActivities(res.data)
+      })
+      .catch(() => {})
+      .finally(() => setActivityLoading(false))
+  }, [])
+
+  useEffect(() => {
+    walletService
+      .getWallet()
       .then((res) => {
         setWallet({
           balance: res.balance,
@@ -38,12 +68,12 @@ export default function DashboardPage() {
       .finally(() => setWalletLoading(false))
   }, [setWalletBalance])
 
-  const activeOrders = orders.filter(o => o.order_status === 'active')
-  const pendingOrders = orders.filter(o => o.payment_status === 'pending')
+  const activeOrders = orders.filter((o) => o.order_status === 'active')
+  const pendingOrders = orders.filter((o) => o.payment_status === 'pending')
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold mb-6">Halo, {user?.name}! 👋</h1>
+      <h1 className="mb-6 text-2xl font-extrabold">Halo, {user?.name}! 👋</h1>
 
       <WalletCard
         balance={wallet.balance}
@@ -53,58 +83,64 @@ export default function DashboardPage() {
         onTopUp={() => router.push('/dashboard/wallet')}
       />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
           { icon: ShoppingBag, label: 'Akun Aktif', value: activeOrders.length, color: '#C5EFD8', iconColor: '#22c55e' },
           { icon: Clock, label: 'Pending', value: pendingOrders.length, color: '#FAE88A', iconColor: '#eab308' },
           { icon: CheckCircle, label: 'Total Order', value: orders.length, color: '#C8E6F5', iconColor: '#3b82f6' },
         ].map((s, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-[#EBEBEB] p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: s.color }}>
-                <s.icon className="w-5 h-5" style={{ color: s.iconColor }} />
+          <div key={i} className="rounded-2xl border border-[#EBEBEB] bg-white p-5">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: s.color }}>
+                <s.icon className="h-5 w-5" style={{ color: s.iconColor }} />
               </div>
-              <span className="text-sm text-[#888] font-medium">{s.label}</span>
+              <span className="text-sm font-medium text-[#888]">{s.label}</span>
             </div>
             <div className="text-2xl font-extrabold">{s.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Recent Orders */}
-      <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-sm font-bold">Order Terbaru</h3>
-          <Link href="/dashboard/riwayat-order" className="text-xs text-[#FF5733] font-medium hover:underline">Lihat Semua</Link>
+      <div className="rounded-2xl border border-[#EBEBEB] bg-white p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-sm font-bold">Aktivitas Terbaru</h3>
+          <Link href="/dashboard/riwayat-order" className="text-xs font-medium text-[#FF5733] hover:underline">
+            Lihat Semua
+          </Link>
         </div>
-        {orders.length === 0 ? (
-          <div className="text-center py-10">
-            <AlertTriangle className="w-10 h-10 text-[#EBEBEB] mx-auto mb-3" />
-            <p className="text-sm text-[#888]">Belum ada order</p>
-            <Link href="/product/prem-apps" className="text-sm text-[#FF5733] font-medium mt-2 inline-block hover:underline">Belanja Sekarang →</Link>
+
+        {activityLoading ? (
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-16 animate-pulse rounded-xl bg-[#F4F4F2]" />
+            ))}
+          </div>
+        ) : recentActivities.length === 0 ? (
+          <div className="py-10 text-center">
+            <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-[#EBEBEB]" />
+            <p className="text-sm text-[#888]">Belum ada aktivitas</p>
+            <Link href="/product/prem-apps" className="mt-2 inline-block text-sm font-medium text-[#FF5733] hover:underline">
+              Belanja Sekarang →
+            </Link>
           </div>
         ) : (
           <div className="space-y-3">
-            {orders.slice(0, 5).map(order => (
-              <Link key={order.id} href={`/dashboard/riwayat-order`}
-                className="flex items-center justify-between p-3 rounded-xl hover:bg-[#F7F7F5] transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl">{order.product?.icon || '📦'}</div>
-                  <div>
-                    <div className="text-sm font-semibold">{order.product?.name || 'Produk'}</div>
-                    <div className="text-xs text-[#888]">{new Date(order.created_at).toLocaleDateString('id-ID')}</div>
+            {recentActivities.map((activity) => (
+              <Link
+                key={activity.id}
+                href="/dashboard/riwayat-order"
+                className="flex items-center justify-between rounded-xl p-3 transition-colors hover:bg-[#F7F7F5]"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="text-2xl">{activity.icon || '📦'}</div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{activity.title}</div>
+                    <div className="truncate text-xs text-[#888]">{new Date(activity.occurred_at).toLocaleDateString('id-ID')} • {activity.source_label}</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold">{formatRupiah(order.total_price)}</div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    order.order_status === 'active' ? 'bg-green-100 text-green-600' :
-                    order.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
-                    'bg-gray-100 text-gray-600'
-                  }`}>
-                    {order.order_status === 'active' ? 'Aktif' : order.payment_status === 'pending' ? 'Pending' : order.order_status}
-                  </span>
+
+                <div className="ml-3 shrink-0 text-right">
+                  <div className={`text-sm font-bold ${activityAmountClass(activity)}`}>{activityAmountText(activity)}</div>
                 </div>
               </Link>
             ))}

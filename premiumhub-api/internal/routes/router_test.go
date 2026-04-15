@@ -132,6 +132,9 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "GET", "/api/v1/convert/proofs/:proofId/view") {
 		t.Fatalf("convert proof proxy route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/activities/history") {
+		t.Fatalf("activity history route should exist")
+	}
 }
 
 func TestSetupDevelopmentPaymentRoutes(t *testing.T) {

@@ -39,6 +39,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	nokosLandingRepo := repository.NewNokosLandingSummaryRepo(db)
 	convertRepo := repository.NewConvertRepo(db)
 	maintenanceRuleRepo := repository.NewMaintenanceRuleRepo(db)
+	activityRepo := repository.NewActivityRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg)
@@ -54,6 +55,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	nokosLandingSvc := service.NewNokosLandingSummaryService(cfg, nokosLandingRepo, nil, nil)
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
 	maintenanceSvc := service.NewMaintenanceService(maintenanceRuleRepo)
+	activitySvc := service.NewActivityService(activityRepo)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
 	service.StartWalletTopupReconcileWorker(cfg, walletSvc)
@@ -83,6 +85,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	stockHandler := handler.NewStockHandler(stockSvc)
 	accountTypeHandler := handler.NewAccountTypeHandler(accountTypeSvc)
 	maintenanceHandler := handler.NewMaintenanceHandler(maintenanceSvc)
+	activityHandler := handler.NewActivityHandler(activitySvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
 
@@ -142,6 +145,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/orders", orderHandler.List)
 	protected.GET("/orders/:id", orderHandler.GetByID)
 	protected.DELETE("/orders/:id", orderHandler.Cancel)
+	protected.GET("/activities/history", activityHandler.List)
 
 	protected.POST("/payment/create", paymentHandler.Create)
 	protected.GET("/payment/status/:orderId", paymentHandler.GetStatus)
