@@ -23,19 +23,16 @@ const PAYMENT_METHODS = [
 
 type TxFilter = 'all' | 'topup' | 'purchase' | 'refund'
 type LedgerGroup = 'topup' | 'purchase' | 'refund' | 'other'
-type MutationGroup = LedgerGroup | 'canceled_refunded'
 
 type WalletMutationRow = {
   id: string
-  group: MutationGroup
+  group: LedgerGroup
   amount: number
   balanceAfter: number
   createdAt: string
   description: string
   reference: string
   credit: boolean
-  purchaseAmount?: number
-  refundAmount?: number
 }
 
 function formatCompactAmount(value: number) {
@@ -76,7 +73,7 @@ function topupStatusClass(status: string) {
   }
 }
 
-function txVisual(group: MutationGroup) {
+function txVisual(group: LedgerGroup) {
   switch (group) {
     case 'topup':
       return { icon: '⬆️', bg: 'bg-green-100' }
@@ -84,8 +81,6 @@ function txVisual(group: MutationGroup) {
       return { icon: '🛍️', bg: 'bg-amber-100' }
     case 'refund':
       return { icon: '↩️', bg: 'bg-blue-100' }
-    case 'canceled_refunded':
-      return { icon: '🔄', bg: 'bg-violet-100' }
     default:
       return { icon: '💳', bg: 'bg-slate-100' }
   }
@@ -100,34 +95,6 @@ function sanitizeWalletText(value: string | undefined): string {
     .replace(/\bprovider\b/gi, 'sistem pembayaran')
     .replace(/provider[_\s-]*order[_\s-]*id/gi, 'ID order')
     .replace(/\b5sim\b/gi, 'nomor OTP')
-}
-
-function parseWalletOrderRef(reference: string | undefined): { orderKey: string; action: 'purchase' | 'refund' | '' } {
-  const raw = (reference || '').trim()
-  if (!raw) return { orderKey: '', action: '' }
-
-  const internalMatch = raw.match(/^fivesim_order:(\d+):(charge|refund)$/i)
-  if (internalMatch) {
-    return {
-      orderKey: internalMatch[1],
-      action: internalMatch[2].toLowerCase() === 'charge' ? 'purchase' : 'refund',
-    }
-  }
-
-  const publicMatch = raw.match(/^(Pembelian|Refund|Order)\s*#\s*([A-Za-z0-9_-]+)$/i)
-  if (!publicMatch) {
-    return { orderKey: '', action: '' }
-  }
-
-  const label = publicMatch[1].toLowerCase()
-  let action: 'purchase' | 'refund' | '' = ''
-  if (label === 'pembelian') action = 'purchase'
-  if (label === 'refund') action = 'refund'
-
-  return {
-    orderKey: publicMatch[2],
-    action,
-  }
 }
 
 export default function WalletPage() {
@@ -206,50 +173,10 @@ export default function WalletPage() {
   )
 
   const mutationRows = useMemo<WalletMutationRow[]>(() => {
-    const purchaseByOrder = new Map<string, WalletLedger>()
-    for (const ledger of ledgers) {
+    return ledgers.map((ledger) => {
       const group = normalizeLedgerGroup(ledger)
-      if (group !== 'purchase') continue
 
-      const parsed = parseWalletOrderRef(ledger.reference)
-      if (!parsed.orderKey) continue
-      purchaseByOrder.set(parsed.orderKey, ledger)
-    }
-
-    const mergedOrderKeys = new Set<string>()
-    const rows: WalletMutationRow[] = []
-
-    for (const ledger of ledgers) {
-      const group = normalizeLedgerGroup(ledger)
-      const parsed = parseWalletOrderRef(ledger.reference)
-
-      if (group === 'refund' && parsed.orderKey) {
-        const purchaseLedger = purchaseByOrder.get(parsed.orderKey)
-        if (purchaseLedger) {
-          if (!mergedOrderKeys.has(parsed.orderKey)) {
-            mergedOrderKeys.add(parsed.orderKey)
-            rows.push({
-              id: `canceled-refunded-${parsed.orderKey}`,
-              group: 'canceled_refunded',
-              amount: 0,
-              balanceAfter: ledger.balance_after,
-              createdAt: ledger.created_at,
-              description: 'Dibatalkan (Refunded)',
-              reference: `Order #${parsed.orderKey}`,
-              credit: false,
-              purchaseAmount: purchaseLedger.amount,
-              refundAmount: ledger.amount,
-            })
-          }
-          continue
-        }
-      }
-
-      if (group === 'purchase' && parsed.orderKey && mergedOrderKeys.has(parsed.orderKey)) {
-        continue
-      }
-
-      rows.push({
+      return {
         id: ledger.id,
         group,
         amount: ledger.amount,
@@ -258,17 +185,15 @@ export default function WalletPage() {
         description: sanitizeWalletText(ledger.description) || sanitizeWalletText(ledger.category) || 'Transaksi wallet',
         reference: sanitizeWalletText(ledger.reference) || 'Riwayat transaksi',
         credit: isCreditLedger(ledger),
-      })
-    }
-
-    return rows
+      }
+    })
   }, [ledgers])
 
   const filteredMutationRows = useMemo(() => {
     if (txFilter === 'all') return mutationRows
     if (txFilter === 'topup') return mutationRows.filter((row) => row.group === 'topup')
-    if (txFilter === 'purchase') return mutationRows.filter((row) => row.group === 'purchase' || row.group === 'canceled_refunded')
-    if (txFilter === 'refund') return mutationRows.filter((row) => row.group === 'refund' || row.group === 'canceled_refunded')
+    if (txFilter === 'purchase') return mutationRows.filter((row) => row.group === 'purchase')
+    if (txFilter === 'refund') return mutationRows.filter((row) => row.group === 'refund')
     return mutationRows
   }, [mutationRows, txFilter])
 
@@ -563,7 +488,6 @@ export default function WalletPage() {
               ) : (
                 filteredMutationRows.slice(0, 8).map((row) => {
                   const visual = txVisual(row.group)
-                  const isCanceledRefunded = row.group === 'canceled_refunded'
 
                   return (
                     <div key={row.id} className="px-5 py-3 hover:bg-[#FAFAF8] transition-colors">
@@ -574,14 +498,10 @@ export default function WalletPage() {
                           <div className="text-xs text-[#888] mt-0.5 truncate">{formatDate(row.createdAt)} • {row.reference}</div>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className={`text-sm font-extrabold ${isCanceledRefunded ? 'text-violet-700' : row.credit ? 'text-green-600' : 'text-[#141414]'}`}>
-                            {isCanceledRefunded ? `±${formatRupiah(0)}` : `${row.credit ? '+' : '-'}${formatRupiah(row.amount)}`}
+                          <div className={`text-sm font-extrabold ${row.credit ? 'text-green-600' : 'text-[#141414]'}`}>
+                            {`${row.credit ? '+' : '-'}${formatRupiah(row.amount)}`}
                           </div>
-                          <div className="text-[11px] text-[#888] mt-0.5">
-                            {isCanceledRefunded
-                              ? `Debit ${formatRupiah(row.purchaseAmount || row.refundAmount || 0)} sudah direfund.`
-                              : `Saldo: ${formatRupiah(row.balanceAfter)}`}
-                          </div>
+                          <div className="text-[11px] text-[#888] mt-0.5">Saldo: {formatRupiah(row.balanceAfter)}</div>
                         </div>
                       </div>
                     </div>
