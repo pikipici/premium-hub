@@ -1165,8 +1165,8 @@ export default function NomorVirtualPage() {
       </div>
 
       {mainTab === 'catalog' ? (
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-[#EBEBEB] bg-white p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
+          <div className="grid grid-cols-1 gap-3 border-b border-[#EBEBEB] bg-[#FAFAF8] p-4 md:grid-cols-3">
             <div className="flex items-center gap-3">
               <div
                 className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
@@ -1212,7 +1212,8 @@ export default function NomorVirtualPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+          <div className="p-3">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
             <section className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden flex flex-col xl:h-full xl:min-h-0">
               <header className="border-b border-[#EBEBEB] px-4 py-3">
                 <h2 className="text-sm font-bold">Pilih Negara</h2>
@@ -1641,6 +1642,7 @@ export default function NomorVirtualPage() {
             </section>
           </div>
         </div>
+      </div>
       ) : (
         <div className="space-y-3">
           <div className="rounded-2xl border border-[#EBEBEB] bg-white p-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
