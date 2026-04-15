@@ -39,6 +39,28 @@ func (s *ProductService) SetAccountTypeRepo(repo *repository.AccountTypeRepo) *P
 	return s
 }
 
+func (s *ProductService) attachAvailableStock(products []model.Product) error {
+	if len(products) == 0 {
+		return nil
+	}
+
+	ids := make([]uuid.UUID, 0, len(products))
+	for _, product := range products {
+		ids = append(ids, product.ID)
+	}
+
+	counts, err := s.stockRepo.CountAvailableByProductIDs(ids)
+	if err != nil {
+		return err
+	}
+
+	for index := range products {
+		products[index].AvailableStock = counts[products[index].ID]
+	}
+
+	return nil
+}
+
 func (s *ProductService) List(category string, page, limit int) ([]model.Product, int64, error) {
 	if page < 1 {
 		page = 1
@@ -46,11 +68,32 @@ func (s *ProductService) List(category string, page, limit int) ([]model.Product
 	if limit < 1 || limit > 50 {
 		limit = 12
 	}
-	return s.productRepo.List(category, page, limit)
+
+	products, total, err := s.productRepo.List(category, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if err := s.attachAvailableStock(products); err != nil {
+		return nil, 0, err
+	}
+
+	return products, total, nil
 }
 
 func (s *ProductService) GetBySlug(slug string) (*model.Product, error) {
-	return s.productRepo.FindBySlug(slug)
+	product, err := s.productRepo.FindBySlug(slug)
+	if err != nil {
+		return nil, err
+	}
+
+	counts, err := s.stockRepo.CountAvailableByProductIDs([]uuid.UUID{product.ID})
+	if err != nil {
+		return nil, err
+	}
+	product.AvailableStock = counts[product.ID]
+
+	return product, nil
 }
 
 type CreateProductInput struct {

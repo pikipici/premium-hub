@@ -53,6 +53,7 @@ type Product struct {
 	SortPriority       int                 `gorm:"default:0" json:"sort_priority"`
 	IsPopular          bool                `gorm:"default:false" json:"is_popular"`
 	IsActive           bool                `gorm:"default:true" json:"is_active"`
+	AvailableStock     int64               `gorm:"-" json:"available_stock"`
 	Prices             []ProductPrice      `gorm:"foreignKey:ProductID" json:"prices,omitempty"`
 	CreatedAt          time.Time           `json:"created_at"`
 	UpdatedAt          time.Time           `json:"updated_at"`

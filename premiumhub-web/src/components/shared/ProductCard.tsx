@@ -7,8 +7,12 @@ import type { Product } from '@/types/product'
 
 export default function ProductCard({ product }: { product: Product }) {
   const minPrice = product.prices?.length
-    ? Math.min(...product.prices.map(p => p.price))
+    ? Math.min(...product.prices.map((p) => p.price))
     : 0
+
+  const availableStock = typeof product.available_stock === 'number'
+    ? Math.max(0, product.available_stock)
+    : null
 
   return (
     <Link href={`/product/prem-apps/${product.slug}`} className="group block">
@@ -50,10 +54,22 @@ export default function ProductCard({ product }: { product: Product }) {
         </div>
 
         <div className="relative z-10 mt-2 sm:mt-4 flex gap-1.5 sm:gap-2 flex-wrap">
-          {product.prices?.some(p => p.account_type === 'shared') && (
+          {availableStock !== null && (
+            <span
+              className={`text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full border ${
+                availableStock > 0
+                  ? 'bg-[#ECFDF3] text-[#166534] border-[#BBF7D0]'
+                  : 'bg-[#FEF2F2] text-[#B91C1C] border-[#FECACA]'
+              }`}
+            >
+              {availableStock > 0 ? `Stok ${availableStock} tersedia` : 'Stok habis'}
+            </span>
+          )}
+
+          {product.prices?.some((p) => p.account_type === 'shared') && (
             <span className="text-[9px] sm:text-[10px] font-medium text-[#141414] bg-white/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">Shared</span>
           )}
-          {product.prices?.some(p => p.account_type === 'private') && (
+          {product.prices?.some((p) => p.account_type === 'private') && (
             <span className="text-[9px] sm:text-[10px] font-medium text-[#141414] bg-white/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">Private</span>
           )}
         </div>

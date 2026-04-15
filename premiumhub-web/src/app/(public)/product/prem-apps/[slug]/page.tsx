@@ -299,6 +299,7 @@ export default function PremAppsProductDetailPage() {
 
   const showWaButton = product.show_whatsapp_button !== false
   const waLink = buildWaLink(product, effectiveSelectedPrice)
+  const availableStock = typeof product.available_stock === 'number' ? Math.max(0, product.available_stock) : null
 
   return (
     <>
@@ -337,9 +338,15 @@ export default function PremAppsProductDetailPage() {
 
             <p className="mt-4 text-sm text-[#666] leading-relaxed text-center max-w-2xl mx-auto">{product.description}</p>
 
-            {!!product.sold_text?.trim() && (
-              <div className="mt-4 text-xs font-semibold text-[#2F3A4A] bg-[#F8FAFC] border border-[#E5E7EB] rounded-full inline-flex px-3 py-1.5 mx-auto">
-                {product.sold_text}
+            {availableStock !== null && (
+              <div
+                className={`mt-4 text-xs font-semibold border rounded-full inline-flex px-3 py-1.5 mx-auto ${
+                  availableStock > 0
+                    ? 'text-[#166534] bg-[#ECFDF3] border-[#BBF7D0]'
+                    : 'text-[#B91C1C] bg-[#FEF2F2] border-[#FECACA]'
+                }`}
+              >
+                {availableStock > 0 ? `Stok tersedia: ${availableStock} akun` : 'Stok saat ini habis'}
               </div>
             )}
 

@@ -44,6 +44,7 @@ export interface Product {
   sort_priority?: number
   is_popular: boolean
   is_active: boolean
+  available_stock?: number
   prices: ProductPrice[]
 }
 

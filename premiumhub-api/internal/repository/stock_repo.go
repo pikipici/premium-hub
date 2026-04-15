@@ -69,3 +69,31 @@ func (r *StockRepo) CountByProduct(productID uuid.UUID, accountType string) (int
 		Count(&count).Error
 	return count, err
 }
+
+func (r *StockRepo) CountAvailableByProductIDs(productIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	counts := make(map[uuid.UUID]int64)
+	if len(productIDs) == 0 {
+		return counts, nil
+	}
+
+	type row struct {
+		ProductID uuid.UUID
+		Total     int64
+	}
+
+	var rows []row
+	err := r.db.Model(&model.Stock{}).
+		Select("product_id, COUNT(*) as total").
+		Where("status = ? AND product_id IN ?", "available", productIDs).
+		Group("product_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range rows {
+		counts[item.ProductID] = item.Total
+	}
+
+	return counts, nil
+}
