@@ -1675,11 +1675,6 @@ export default function NomorVirtualPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-xs text-[#666]">
-            OTP sekarang ada di tab <span className="font-bold text-[#141414]">Beli Nomor</span> (section Terima OTP Disini).
-            Tab ini fokus buat riwayat dan audit order.
-          </div>
-
           {ordersLoading ? (
             <div className="rounded-2xl border border-[#EBEBEB] bg-white p-10 text-center text-sm text-[#888] inline-flex items-center justify-center gap-2 w-full">
               <Loader2 className="w-4 h-4 animate-spin" /> Memuat order...
