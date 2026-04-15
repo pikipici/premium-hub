@@ -1165,59 +1165,21 @@ export default function NomorVirtualPage() {
       </div>
 
       {mainTab === 'catalog' ? (
-        <div className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
-          <div className="grid grid-cols-1 gap-3 border-b border-[#EBEBEB] bg-[#FAFAF8] p-4 md:grid-cols-3">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
-                  step1Done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-[#D8D8D5] text-[#888]'
-                }`}
-              >
-                {step1Done ? '✓' : '1'}
-              </div>
-              <div>
-                <p className="text-[11px] text-[#888] uppercase tracking-wide">Negara</p>
-                <p className="text-sm font-semibold text-[#141414]">{selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : 'Pilih negara'}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
-                  step2Done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-[#D8D8D5] text-[#888]'
-                }`}
-              >
-                {step2Done ? '✓' : '2'}
-              </div>
-              <div>
-                <p className="text-[11px] text-[#888] uppercase tracking-wide">Layanan</p>
-                <p className="text-sm font-semibold text-[#141414]">{selectedProduct?.name || 'Pilih layanan'}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
-                  step3Done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-[#D8D8D5] text-[#888]'
-                }`}
-              >
-                {step3Done ? '✓' : '3'}
-              </div>
-              <div>
-                <p className="text-[11px] text-[#888] uppercase tracking-wide">Operator/Harga</p>
-                <p className="text-sm font-semibold text-[#141414]">
-                  {selectedPrice ? `${toOperatorDisplayName(selectedPrice.operator)} · ${formatWalletRupiah(estimatedDebit)}` : 'Pilih harga'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3">
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-[#EBEBEB] bg-white p-3">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
             <section className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden flex flex-col xl:h-full xl:min-h-0">
               <header className="border-b border-[#EBEBEB] px-4 py-3">
-                <h2 className="text-sm font-bold">Pilih Negara</h2>
-                <p className="text-xs text-[#888] mt-0.5">{countries.length} negara tersedia</p>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-[11px] font-bold ${
+                      step1Done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-[#D8D8D5] text-[#888]'
+                    }`}
+                  >
+                    {step1Done ? '✓' : '1'}
+                  </div>
+                  <h2 className="text-sm font-bold">Pilih Negara</h2>
+                </div>
+                <p className="mt-0.5 text-xs text-[#888]">{countries.length} negara tersedia</p>
               </header>
 
               <div className="p-3 border-b border-[#EBEBEB]">
@@ -1283,8 +1245,17 @@ export default function NomorVirtualPage() {
 
             <section className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden flex flex-col xl:h-full xl:min-h-0">
               <header className="border-b border-[#EBEBEB] px-4 py-3">
-                <h2 className="text-sm font-bold">Pilih Layanan</h2>
-                <p className="text-xs text-[#888] mt-0.5">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-[11px] font-bold ${
+                      step2Done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-[#D8D8D5] text-[#888]'
+                    }`}
+                  >
+                    {step2Done ? '✓' : '2'}
+                  </div>
+                  <h2 className="text-sm font-bold">Pilih Layanan</h2>
+                </div>
+                <p className="mt-0.5 text-xs text-[#888]">
                   {selectedCountry ? `Negara: ${selectedCountry.name}` : 'Pilih negara terlebih dulu'}
                 </p>
               </header>
@@ -1352,8 +1323,17 @@ export default function NomorVirtualPage() {
             <section className="flex flex-col gap-3">
               <div className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
                 <header className="border-b border-[#EBEBEB] px-4 py-3">
-                  <h2 className="text-sm font-bold">Pilih Operator / Harga</h2>
-                  <p className="text-xs text-[#888] mt-0.5">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-[11px] font-bold ${
+                        step3Done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-[#D8D8D5] text-[#888]'
+                      }`}
+                    >
+                      {step3Done ? '✓' : '3'}
+                    </div>
+                    <h2 className="text-sm font-bold">Pilih Operator / Harga</h2>
+                  </div>
+                  <p className="mt-0.5 text-xs text-[#888]">
                     {selectedProduct ? `Layanan: ${selectedProduct.name}` : 'Pilih layanan terlebih dulu'}
                   </p>
                 </header>
@@ -1642,7 +1622,6 @@ export default function NomorVirtualPage() {
             </section>
           </div>
         </div>
-      </div>
       ) : (
         <div className="space-y-3">
           <div className="rounded-2xl border border-[#EBEBEB] bg-white p-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
