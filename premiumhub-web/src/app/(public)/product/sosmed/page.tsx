@@ -1,10 +1,33 @@
+"use client"
+
 import Link from 'next/link'
-import { ArrowRight, BarChart3, Heart, MessageCircle, PlayCircle, Share2, Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ArrowRight,
+  BarChart3,
+  Heart,
+  MessageCircle,
+  PlayCircle,
+  Share2,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
+import { productCategoryService } from '@/services/productCategoryService'
+import type { ProductCategory } from '@/types/productCategory'
 
-const SERVICES = [
+type SosmedServiceCard = {
+  key: string
+  title: string
+  icon: LucideIcon
+  desc: string
+  badge: string
+  tone: string
+}
+
+const FALLBACK_SERVICES: SosmedServiceCard[] = [
   {
     key: 'followers',
     title: 'Followers Growth',
@@ -53,9 +76,87 @@ const SERVICES = [
     badge: 'Best for Brand',
     tone: 'from-[#FFF4EC] to-[#FFE8D8]',
   },
-] as const
+]
+
+const SOSMED_PRESET_BY_CODE: Record<string, Omit<SosmedServiceCard, 'key' | 'title'>> = {
+  followers: {
+    icon: Users,
+    desc: 'Tambah followers tertarget buat ningkatin trust akun brand atau personal.',
+    badge: 'Instagram • TikTok • X',
+    tone: 'from-[#EEF8FF] to-[#DCEFFF]',
+  },
+  likes: {
+    icon: Heart,
+    desc: 'Boost engagement post biar social proof konten lu langsung kebaca.',
+    badge: 'Realtime Delivery',
+    tone: 'from-[#FFF1F3] to-[#FFE1E7]',
+  },
+  views: {
+    icon: PlayCircle,
+    desc: 'Dorong performa konten video dengan paket view yang stabil.',
+    badge: 'Reels • Shorts • TikTok',
+    tone: 'from-[#FFFBEA] to-[#FFF3C9]',
+  },
+  comments: {
+    icon: MessageCircle,
+    desc: 'Aktifkan social signal lewat komentar agar post terlihat lebih hidup.',
+    badge: 'Custom / Random',
+    tone: 'from-[#F4F0FF] to-[#E8DEFF]',
+  },
+  shares: {
+    icon: Share2,
+    desc: 'Tambahin sinyal distribusi konten supaya jangkauan organik makin kebuka.',
+    badge: 'Boost Discovery',
+    tone: 'from-[#ECFFFA] to-[#D6FFF2]',
+  },
+}
+
+function mapCategoriesToCards(categories: ProductCategory[]): SosmedServiceCard[] {
+  if (!categories.length) return FALLBACK_SERVICES
+
+  return categories.map((category, index) => {
+    const preset = SOSMED_PRESET_BY_CODE[category.code]
+    const fallback = FALLBACK_SERVICES[index % FALLBACK_SERVICES.length]
+    const title = category.label?.trim() || fallback.title
+
+    return {
+      key: category.id || category.code,
+      title,
+      icon: preset?.icon || fallback.icon,
+      desc:
+        category.description?.trim() ||
+        preset?.desc ||
+        fallback.desc ||
+        `Paket kebutuhan ${title} untuk campaign social media.`,
+      badge: preset?.badge || fallback.badge || 'SMM Package',
+      tone: preset?.tone || fallback.tone || 'from-[#F4F4F2] to-[#ECECEA]',
+    }
+  })
+}
 
 export default function ProductSosmedLandingPage() {
+  const [categories, setCategories] = useState<ProductCategory[]>([])
+
+  useEffect(() => {
+    let alive = true
+
+    productCategoryService
+      .list({ scope: 'sosmed' })
+      .then((res) => {
+        if (!alive || !res.success) return
+        setCategories(res.data || [])
+      })
+      .catch(() => {
+        // fail-open: fallback cards still shown
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const services = useMemo(() => mapCategoriesToCards(categories), [categories])
+
   return (
     <>
       <Navbar />
@@ -70,7 +171,7 @@ export default function ProductSosmedLandingPage() {
           </header>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {SERVICES.map((service) => (
+            {services.map((service) => (
               <article
                 key={service.key}
                 className="rounded-2xl border border-[#EBEBEB] bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-lg"

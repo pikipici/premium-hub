@@ -17,7 +17,7 @@ export interface Product {
   id: string
   name: string
   slug: string
-  category: 'streaming' | 'music' | 'gaming' | 'design' | 'productivity'
+  category: string
   description: string
   tagline?: string
   icon: string

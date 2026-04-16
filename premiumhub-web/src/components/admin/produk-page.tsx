@@ -4,8 +4,10 @@ import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 
 import { accountTypeService } from '@/services/accountTypeService'
+import { productCategoryService } from '@/services/productCategoryService'
 import { productService } from '@/services/productService'
 import type { AccountType } from '@/types/accountType'
+import type { ProductCategory } from '@/types/productCategory'
 import type {
   Product,
   ProductFAQItem,
@@ -57,12 +59,18 @@ type ProductPriceDraft = {
   is_active: boolean
 }
 
-const CATEGORY_OPTIONS = [
-  { value: 'streaming', label: 'Streaming' },
-  { value: 'music', label: 'Musik' },
-  { value: 'gaming', label: 'Gaming' },
-  { value: 'design', label: 'Desain' },
-  { value: 'productivity', label: 'Produktivitas' },
+type CategoryOption = {
+  value: string
+  label: string
+  is_active?: boolean
+}
+
+const DEFAULT_PREM_APPS_CATEGORY_OPTIONS: CategoryOption[] = [
+  { value: 'streaming', label: 'Streaming', is_active: true },
+  { value: 'music', label: 'Musik', is_active: true },
+  { value: 'gaming', label: 'Gaming', is_active: true },
+  { value: 'design', label: 'Desain', is_active: true },
+  { value: 'productivity', label: 'Produktivitas', is_active: true },
 ]
 
 const FALLBACK_ACCOUNT_TYPE_CODES = ['shared', 'private']
@@ -236,8 +244,18 @@ function formatRupiah(value: number) {
   }).format(value)
 }
 
-function getCategoryLabel(value: string) {
-  return CATEGORY_OPTIONS.find((c) => c.value === value)?.label ?? value
+function getCategoryLabel(value: string, options: CategoryOption[]) {
+  return options.find((c) => c.value === value)?.label ?? value
+}
+
+function toCategoryOptions(items: ProductCategory[]): CategoryOption[] {
+  if (!items.length) return DEFAULT_PREM_APPS_CATEGORY_OPTIONS
+
+  return items.map((item) => ({
+    value: item.code,
+    label: item.label || item.code,
+    is_active: item.is_active,
+  }))
 }
 
 function normalizeAccountTypeCode(value?: string | null) {
@@ -295,6 +313,7 @@ function mapErrorMessage(err: unknown, fallback: string) {
 export default function ProdukPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [accountTypes, setAccountTypes] = useState<AccountType[]>([])
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>(DEFAULT_PREM_APPS_CATEGORY_OPTIONS)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -357,11 +376,47 @@ export default function ProdukPage() {
     }, {})
   }, [activeAccountTypeOptions])
 
+  const activePremAppsCategoryOptions = useMemo(() => {
+    const active = categoryOptions.filter((item) => item.is_active !== false)
+    if (active.length > 0) return active
+    return categoryOptions
+  }, [categoryOptions])
+
+  const formCategoryOptions = useMemo(() => {
+    if (!form.category) return activePremAppsCategoryOptions
+
+    const exists = activePremAppsCategoryOptions.some((item) => item.value === form.category)
+    if (exists) return activePremAppsCategoryOptions
+
+    return [
+      ...activePremAppsCategoryOptions,
+      {
+        value: form.category,
+        label: `${getCategoryLabel(form.category, categoryOptions)} (legacy)`,
+        is_active: false,
+      },
+    ]
+  }, [activePremAppsCategoryOptions, categoryOptions, form.category])
+
   const loadAccountTypes = async () => {
     try {
       const res = await accountTypeService.adminList({ include_inactive: true })
       if (!res.success) return
       setAccountTypes(res.data || [])
+    } catch {
+      // best effort only; fallback options still available
+    }
+  }
+
+  const loadCategoryOptions = async () => {
+    try {
+      const res = await productCategoryService.adminList({ scope: 'prem_apps', include_inactive: true })
+      if (!res.success) return
+
+      const options = toCategoryOptions(res.data || [])
+      if (options.length > 0) {
+        setCategoryOptions(options)
+      }
     } catch {
       // best effort only; fallback options still available
     }
@@ -387,8 +442,17 @@ export default function ProdukPage() {
   }
 
   useEffect(() => {
-    void Promise.all([loadProducts(), loadAccountTypes()])
+    void Promise.all([loadProducts(), loadAccountTypes(), loadCategoryOptions()])
   }, [])
+
+  useEffect(() => {
+    if (categoryFilter === 'all') return
+
+    const exists = categoryOptions.some((item) => item.value === categoryFilter)
+    if (!exists) {
+      setCategoryFilter('all')
+    }
+  }, [categoryFilter, categoryOptions])
 
   const filteredProducts = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -418,7 +482,17 @@ export default function ProdukPage() {
     setFormMode('create')
     setEditingId(null)
     setSlugTouched(false)
-    setForm(createDefaultForm())
+
+    const defaultCategory =
+      activePremAppsCategoryOptions[0]?.value ||
+      categoryOptions[0]?.value ||
+      DEFAULT_PREM_APPS_CATEGORY_OPTIONS[0]?.value ||
+      'streaming'
+
+    setForm({
+      ...createDefaultForm(),
+      category: defaultCategory,
+    })
 
     const primaryType = activeAccountTypeOptions[0]?.value || 'shared'
     const secondaryType = activeAccountTypeOptions[1]?.value || primaryType
@@ -990,7 +1064,7 @@ export default function ProdukPage() {
               style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none' }}
             >
               <option value="all">Semua Kategori</option>
-              {CATEGORY_OPTIONS.map((option) => (
+              {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -1057,7 +1131,7 @@ export default function ProdukPage() {
                           </div>
                         </td>
                         <td>
-                          <span className="product-pill">{getCategoryLabel(product.category)}</span>
+                          <span className="product-pill">{getCategoryLabel(product.category, categoryOptions)}</span>
                         </td>
                         <td style={{ fontWeight: 600 }}>{minPrice ? formatRupiah(minPrice) : '-'}</td>
                         <td style={{ fontSize: 12, color: 'var(--muted)' }}>{summarizePrices(product.prices, accountTypeMap)}</td>
@@ -1130,7 +1204,7 @@ export default function ProdukPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
               <select className="form-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
                 <option value="all">Semua Kategori</option>
-                {CATEGORY_OPTIONS.map((option) => (
+                {categoryOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -1175,7 +1249,7 @@ export default function ProdukPage() {
 
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Kategori</span>
-                    <span className="mobile-card-value">{getCategoryLabel(product.category)}</span>
+                    <span className="mobile-card-value">{getCategoryLabel(product.category, categoryOptions)}</span>
                   </div>
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Harga mulai</span>
@@ -1286,7 +1360,7 @@ export default function ProdukPage() {
                     value={form.category}
                     onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
                   >
-                    {CATEGORY_OPTIONS.map((option) => (
+                    {formCategoryOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>

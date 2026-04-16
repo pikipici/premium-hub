@@ -1,38 +1,45 @@
 "use client"
 
 import axios from 'axios'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import MaintenanceSettingsCard from '@/components/admin/maintenance-settings-card'
-import ProductCategorySettingsCard from '@/components/admin/product-category-settings-card'
 import {
-  accountTypeService,
-  type AdminAccountTypePayload,
-  type AdminAccountTypeUpdatePayload,
-} from '@/services/accountTypeService'
-import type { AccountType } from '@/types/accountType'
+  productCategoryService,
+  type AdminProductCategoryPayload,
+  type AdminProductCategoryUpdatePayload,
+} from '@/services/productCategoryService'
+import type { ProductCategory, ProductCategoryScope } from '@/types/productCategory'
 
 type FormMode = 'create' | 'edit'
 
-type AccountTypeFormState = {
+type CategoryFormState = {
   code: string
   label: string
   description: string
   sort_order: string
-  badge_bg_color: string
-  badge_text_color: string
   is_active: boolean
 }
 
-const EMPTY_FORM: AccountTypeFormState = {
+const EMPTY_FORM: CategoryFormState = {
   code: '',
   label: '',
   description: '',
   sort_order: '100',
-  badge_bg_color: '',
-  badge_text_color: '',
   is_active: true,
 }
+
+const SCOPE_OPTIONS: Array<{ value: ProductCategoryScope; label: string; desc: string }> = [
+  {
+    value: 'prem_apps',
+    label: 'Product Apps',
+    desc: 'Kategori untuk katalog /product/prem-apps',
+  },
+  {
+    value: 'sosmed',
+    label: 'Sosmed SMM',
+    desc: 'Kategori untuk katalog /product/sosmed',
+  },
+]
 
 const MODAL_OVERLAY_STYLE = {
   position: 'fixed' as const,
@@ -111,14 +118,14 @@ function normalizeCode(value: string) {
     .replace(/[^a-z0-9_-]/g, '')
 }
 
-function statusLabel(item: AccountType) {
+function statusLabel(item: ProductCategory) {
   if (!item.is_active) return { label: 'Nonaktif', className: 's-gagal' }
-  if (item.is_system) return { label: 'Sistem', className: 's-lunas' }
-  return { label: 'Aktif', className: 's-pending' }
+  return { label: 'Aktif', className: 's-lunas' }
 }
 
-export default function PengaturanPage() {
-  const [items, setItems] = useState<AccountType[]>([])
+export default function ProductCategorySettingsCard() {
+  const [scope, setScope] = useState<ProductCategoryScope>('prem_apps')
+  const [items, setItems] = useState<ProductCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -126,11 +133,11 @@ export default function PengaturanPage() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [formMode, setFormMode] = useState<FormMode>('create')
-  const [editingItem, setEditingItem] = useState<AccountType | null>(null)
-  const [form, setForm] = useState<AccountTypeFormState>(EMPTY_FORM)
+  const [editingItem, setEditingItem] = useState<ProductCategory | null>(null)
+  const [form, setForm] = useState<CategoryFormState>(EMPTY_FORM)
 
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [confirmTarget, setConfirmTarget] = useState<AccountType | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<ProductCategory | null>(null)
 
   const sortedItems = useMemo(
     () =>
@@ -143,27 +150,37 @@ export default function PengaturanPage() {
     [items]
   )
 
-  const loadAccountTypes = async () => {
+  const activeScopeMeta = useMemo(
+    () => SCOPE_OPTIONS.find((item) => item.value === scope) || SCOPE_OPTIONS[0],
+    [scope]
+  )
+
+  const loadCategories = useCallback(async () => {
     setLoading(true)
     setError('')
 
     try {
-      const res = await accountTypeService.adminList({ include_inactive: true })
+      const res = await productCategoryService.adminList({
+        scope,
+        include_inactive: true,
+      })
+
       if (!res.success) {
-        setError(res.message || 'Gagal memuat master tipe akun')
+        setError(res.message || 'Gagal memuat master kategori')
         return
       }
+
       setItems(res.data || [])
     } catch (err) {
-      setError(mapErrorMessage(err, 'Gagal memuat master tipe akun'))
+      setError(mapErrorMessage(err, 'Gagal memuat master kategori'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [scope])
 
   useEffect(() => {
-    void loadAccountTypes()
-  }, [])
+    void loadCategories()
+  }, [loadCategories])
 
   useEffect(() => {
     if (!formOpen && !confirmOpen) return
@@ -184,7 +201,7 @@ export default function PengaturanPage() {
     setFormOpen(true)
   }
 
-  const openEditForm = (item: AccountType) => {
+  const openEditForm = (item: ProductCategory) => {
     setFormMode('edit')
     setEditingItem(item)
     setForm({
@@ -192,8 +209,6 @@ export default function PengaturanPage() {
       label: item.label || '',
       description: item.description || '',
       sort_order: String(item.sort_order ?? 100),
-      badge_bg_color: item.badge_bg_color || '',
-      badge_text_color: item.badge_text_color || '',
       is_active: item.is_active,
     })
     setError('')
@@ -210,24 +225,23 @@ export default function PengaturanPage() {
   const submitForm = async () => {
     const normalizedCode = normalizeCode(form.code)
     if (!normalizedCode) {
-      setError('Kode tipe akun wajib diisi')
+      setError('Kode kategori wajib diisi')
       return
     }
 
     if (!form.label.trim()) {
-      setError('Label tipe akun wajib diisi')
+      setError('Label kategori wajib diisi')
       return
     }
 
     const sortOrder = Number(form.sort_order) || 100
 
-    const payloadBase: AdminAccountTypePayload = {
+    const payloadBase: AdminProductCategoryPayload = {
+      scope,
       code: normalizedCode,
       label: form.label.trim(),
       description: form.description.trim(),
       sort_order: sortOrder,
-      badge_bg_color: form.badge_bg_color.trim(),
-      badge_text_color: form.badge_text_color.trim(),
       is_active: form.is_active,
     }
 
@@ -236,65 +250,65 @@ export default function PengaturanPage() {
 
     try {
       if (formMode === 'create') {
-        const res = await accountTypeService.adminCreate(payloadBase)
+        const res = await productCategoryService.adminCreate(payloadBase)
         if (!res.success) {
-          setError(res.message || 'Gagal membuat tipe akun')
+          setError(res.message || 'Gagal membuat kategori')
           return
         }
-        setNotice(`Tipe akun "${res.data.label}" berhasil dibuat.`)
+
+        setNotice(`Kategori "${res.data.label}" berhasil dibuat.`)
       } else if (editingItem) {
-        const payload: AdminAccountTypeUpdatePayload = {
+        const payload: AdminProductCategoryUpdatePayload = {
           code: normalizedCode,
           label: payloadBase.label,
           description: payloadBase.description,
           sort_order: payloadBase.sort_order,
-          badge_bg_color: payloadBase.badge_bg_color,
-          badge_text_color: payloadBase.badge_text_color,
           is_active: payloadBase.is_active,
         }
 
-        const res = await accountTypeService.adminUpdate(editingItem.id, payload)
+        const res = await productCategoryService.adminUpdate(editingItem.id, payload)
         if (!res.success) {
-          setError(res.message || 'Gagal memperbarui tipe akun')
+          setError(res.message || 'Gagal memperbarui kategori')
           return
         }
-        setNotice(`Tipe akun "${res.data.label}" berhasil diperbarui.`)
+
+        setNotice(`Kategori "${res.data.label}" berhasil diperbarui.`)
       }
 
       closeForm()
-      await loadAccountTypes()
+      await loadCategories()
     } catch (err) {
-      setError(mapErrorMessage(err, 'Gagal menyimpan tipe akun'))
+      setError(mapErrorMessage(err, 'Gagal menyimpan kategori'))
     } finally {
       setSaving(false)
     }
   }
 
-  const toggleActive = async (item: AccountType) => {
+  const toggleActive = async (item: ProductCategory) => {
     setSaving(true)
     setError('')
 
     try {
-      const res = await accountTypeService.adminUpdate(item.id, { is_active: !item.is_active })
+      const res = await productCategoryService.adminUpdate(item.id, { is_active: !item.is_active })
       if (!res.success) {
-        setError(res.message || 'Gagal mengubah status tipe akun')
+        setError(res.message || 'Gagal mengubah status kategori')
         return
       }
 
       setNotice(
         !item.is_active
-          ? `Tipe akun "${item.label}" diaktifkan.`
-          : `Tipe akun "${item.label}" dinonaktifkan.`
+          ? `Kategori "${item.label}" diaktifkan.`
+          : `Kategori "${item.label}" dinonaktifkan.`
       )
-      await loadAccountTypes()
+      await loadCategories()
     } catch (err) {
-      setError(mapErrorMessage(err, 'Gagal mengubah status tipe akun'))
+      setError(mapErrorMessage(err, 'Gagal mengubah status kategori'))
     } finally {
       setSaving(false)
     }
   }
 
-  const requestDelete = (item: AccountType) => {
+  const requestDelete = (item: ProductCategory) => {
     setConfirmTarget(item)
     setConfirmOpen(true)
   }
@@ -307,16 +321,16 @@ export default function PengaturanPage() {
     setConfirmOpen(false)
 
     try {
-      const res = await accountTypeService.adminDelete(confirmTarget.id)
+      const res = await productCategoryService.adminDelete(confirmTarget.id)
       if (!res.success) {
-        setError(res.message || 'Gagal menonaktifkan tipe akun')
+        setError(res.message || 'Gagal menonaktifkan kategori')
         return
       }
 
-      setNotice(`Tipe akun "${confirmTarget.label}" berhasil dinonaktifkan.`)
-      await loadAccountTypes()
+      setNotice(`Kategori "${confirmTarget.label}" berhasil dinonaktifkan.`)
+      await loadCategories()
     } catch (err) {
-      setError(mapErrorMessage(err, 'Gagal menonaktifkan tipe akun'))
+      setError(mapErrorMessage(err, 'Gagal menonaktifkan kategori'))
     } finally {
       setSaving(false)
       setConfirmTarget(null)
@@ -324,19 +338,45 @@ export default function PengaturanPage() {
   }
 
   return (
-    <div className="page">
+    <>
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div>
-            <h2>Master Tipe Akun</h2>
+            <h2>Master Kategori Product & Sosmed</h2>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Semua paket harga dan stok akun wajib pakai tipe dari master ini.
+              Kategori bisa lu tambah/edit/nonaktifkan untuk prem-apps dan sosmed dari satu tempat.
             </div>
           </div>
 
           <button className="topbar-btn primary" type="button" onClick={openCreateForm}>
-            + Tambah Tipe Akun
+            + Tambah Kategori
           </button>
+        </div>
+
+        <div style={{ padding: '0 18px 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {SCOPE_OPTIONS.map((item) => {
+            const active = scope === item.value
+            return (
+              <button
+                key={item.value}
+                type="button"
+                className="action-btn"
+                style={
+                  active
+                    ? {
+                        background: '#141414',
+                        borderColor: '#141414',
+                        color: '#fff',
+                      }
+                    : undefined
+                }
+                onClick={() => setScope(item.value)}
+              >
+                {item.label}
+              </button>
+            )
+          })}
+          <span style={{ alignSelf: 'center', fontSize: 12, color: 'var(--muted)' }}>{activeScopeMeta.desc}</span>
         </div>
 
         {(error || notice) && (
@@ -352,9 +392,9 @@ export default function PengaturanPage() {
 
         <div style={{ padding: '0 18px 18px' }}>
           {loading ? (
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memuat master tipe akun...</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memuat master kategori...</div>
           ) : sortedItems.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada tipe akun.</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada kategori.</div>
           ) : (
             <div className="table-wrap" style={{ overflowX: 'auto' }}>
               <table>
@@ -363,9 +403,8 @@ export default function PengaturanPage() {
                     <th>Kode</th>
                     <th>Label</th>
                     <th>Urutan</th>
-                    <th>Badge</th>
                     <th>Status</th>
-                    <th style={{ width: 200 }}>Aksi</th>
+                    <th style={{ width: 220 }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -385,23 +424,6 @@ export default function PengaturanPage() {
                         </td>
                         <td>{item.sort_order}</td>
                         <td>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '4px 10px',
-                              borderRadius: 999,
-                              border: `1px solid ${item.badge_bg_color || '#D0D5DD'}`,
-                              background: item.badge_bg_color ? `${item.badge_bg_color}1F` : '#F9FAFB',
-                              color: item.badge_text_color || '#475467',
-                              fontSize: 11,
-                              fontWeight: 600,
-                            }}
-                          >
-                            {item.label}
-                          </span>
-                        </td>
-                        <td>
                           <span className={`status ${status.className}`}>{status.label}</span>
                         </td>
                         <td>
@@ -409,21 +431,17 @@ export default function PengaturanPage() {
                             <button className="action-btn" type="button" onClick={() => openEditForm(item)}>
                               Edit
                             </button>
-                            {!item.is_system && (
-                              <button className="action-btn" type="button" onClick={() => toggleActive(item)}>
-                                {item.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-                              </button>
-                            )}
-                            {!item.is_system && (
-                              <button
-                                className="action-btn"
-                                type="button"
-                                style={{ color: 'var(--red)', borderColor: '#FECACA' }}
-                                onClick={() => requestDelete(item)}
-                              >
-                                Hapus
-                              </button>
-                            )}
+                            <button className="action-btn" type="button" onClick={() => toggleActive(item)}>
+                              {item.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                            </button>
+                            <button
+                              className="action-btn"
+                              type="button"
+                              style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                              onClick={() => requestDelete(item)}
+                            >
+                              Hapus
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -436,9 +454,6 @@ export default function PengaturanPage() {
         </div>
       </div>
 
-      <ProductCategorySettingsCard />
-      <MaintenanceSettingsCard />
-
       {formOpen && (
         <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={closeForm}>
           <div
@@ -448,8 +463,8 @@ export default function PengaturanPage() {
           >
             <div className="modal-head" style={MODAL_HEAD_STYLE}>
               <div>
-                <h3>{formMode === 'create' ? 'Tambah Tipe Akun' : 'Edit Tipe Akun'}</h3>
-                <div className="modal-sub" style={MODAL_SUB_STYLE}>Kode bersifat permanen setelah dibuat.</div>
+                <h3>{formMode === 'create' ? 'Tambah Kategori' : 'Edit Kategori'}</h3>
+                <div className="modal-sub" style={MODAL_SUB_STYLE}>Scope aktif: {activeScopeMeta.label}. Kode permanen setelah dibuat.</div>
               </div>
               <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={closeForm}>×</button>
             </div>
@@ -468,7 +483,7 @@ export default function PengaturanPage() {
                       }))
                     }
                     disabled={formMode === 'edit'}
-                    placeholder="contoh: shared"
+                    placeholder="contoh: streaming"
                   />
                 </div>
 
@@ -489,7 +504,7 @@ export default function PengaturanPage() {
                   className="form-input"
                   value={form.label}
                   onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))}
-                  placeholder="Shared · Akun Bersama"
+                  placeholder="Contoh: Streaming"
                 />
               </div>
 
@@ -503,35 +518,13 @@ export default function PengaturanPage() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <div>
-                  <label className="form-label">Warna Badge Background</label>
-                  <input
-                    className="form-input"
-                    value={form.badge_bg_color}
-                    onChange={(event) => setForm((prev) => ({ ...prev, badge_bg_color: event.target.value }))}
-                    placeholder="#ECFDF5"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Warna Badge Text</label>
-                  <input
-                    className="form-input"
-                    value={form.badge_text_color}
-                    onChange={(event) => setForm((prev) => ({ ...prev, badge_text_color: event.target.value }))}
-                    placeholder="#047857"
-                  />
-                </div>
-              </div>
-
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                 <input
                   type="checkbox"
                   checked={form.is_active}
-                  disabled={editingItem?.is_system}
                   onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
                 />
-                Aktif untuk dipakai pada harga & stok
+                Aktif untuk dipakai di katalog
               </label>
             </div>
 
@@ -540,7 +533,7 @@ export default function PengaturanPage() {
                 Batal
               </button>
               <button className="topbar-btn primary" type="button" onClick={submitForm} disabled={saving}>
-                {saving ? 'Menyimpan...' : formMode === 'create' ? 'Simpan Tipe Akun' : 'Update Tipe Akun'}
+                {saving ? 'Menyimpan...' : formMode === 'create' ? 'Simpan Kategori' : 'Update Kategori'}
               </button>
             </div>
           </div>
@@ -555,11 +548,11 @@ export default function PengaturanPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-head" style={MODAL_HEAD_STYLE}>
-              <h3>Nonaktifkan Tipe Akun</h3>
+              <h3>Nonaktifkan Kategori</h3>
               <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={() => setConfirmOpen(false)}>×</button>
             </div>
             <div className="modal-body" style={{ ...MODAL_BODY_STYLE, fontSize: 13, color: 'var(--text)' }}>
-              Tipe akun <strong>{confirmTarget.label}</strong> akan dinonaktifkan dari input admin.
+              Kategori <strong>{confirmTarget.label}</strong> akan dinonaktifkan dari input admin.
             </div>
             <div className="modal-actions" style={MODAL_ACTIONS_STYLE}>
               <button className="action-btn" type="button" onClick={() => setConfirmOpen(false)}>
@@ -572,6 +565,6 @@ export default function PengaturanPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

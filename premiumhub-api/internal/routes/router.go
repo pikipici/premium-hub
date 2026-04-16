@@ -30,6 +30,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	userRepo := repository.NewUserRepo(db)
 	accountTypeRepo := repository.NewAccountTypeRepo(db)
 	productRepo := repository.NewProductRepo(db)
+	productCategoryRepo := repository.NewProductCategoryRepo(db)
 	stockRepo := repository.NewStockRepo(db)
 	orderRepo := repository.NewOrderRepo(db)
 	claimRepo := repository.NewClaimRepo(db)
@@ -45,6 +46,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	authSvc := service.NewAuthService(userRepo, cfg)
 	notifSvc := service.NewNotificationService(notifRepo)
 	accountTypeSvc := service.NewAccountTypeService(accountTypeRepo)
+	productCategorySvc := service.NewProductCategoryService(productCategoryRepo)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
 	stockSvc := service.NewStockService(stockRepo, productRepo).SetAccountTypeRepo(accountTypeRepo)
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
@@ -70,7 +72,9 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	if err != nil {
 		panic(fmt.Errorf("gagal inisialisasi product asset storage: %w", err))
 	}
-	productSvc := service.NewProductService(productRepo, stockRepo, productAssetStorage).SetAccountTypeRepo(accountTypeRepo)
+	productSvc := service.NewProductService(productRepo, stockRepo, productAssetStorage).
+		SetAccountTypeRepo(accountTypeRepo).
+		SetProductCategoryRepo(productCategoryRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc, cfg)
@@ -84,6 +88,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	claimHandler := handler.NewClaimHandler(claimSvc)
 	stockHandler := handler.NewStockHandler(stockSvc)
 	accountTypeHandler := handler.NewAccountTypeHandler(accountTypeSvc)
+	productCategoryHandler := handler.NewProductCategoryHandler(productCategorySvc)
 	maintenanceHandler := handler.NewMaintenanceHandler(maintenanceSvc)
 	activityHandler := handler.NewActivityHandler(activitySvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
@@ -105,6 +110,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	products.GET("/:slug/prices", productHandler.GetPrices)
 
 	api.GET("/account-types", accountTypeHandler.List)
+	api.GET("/product-categories", productCategoryHandler.List)
 	api.GET("/maintenance/evaluate", maintenanceHandler.Evaluate)
 
 	api.POST("/payment/webhook", paymentHandler.Webhook)
@@ -222,6 +228,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/account-types", accountTypeHandler.Create)
 	admin.PUT("/account-types/:id", accountTypeHandler.Update)
 	admin.DELETE("/account-types/:id", accountTypeHandler.Delete)
+
+	admin.GET("/product-categories", productCategoryHandler.List)
+	admin.POST("/product-categories", productCategoryHandler.Create)
+	admin.PUT("/product-categories/:id", productCategoryHandler.Update)
+	admin.DELETE("/product-categories/:id", productCategoryHandler.Delete)
 
 	admin.GET("/maintenance/rules", maintenanceHandler.AdminList)
 	admin.POST("/maintenance/rules", maintenanceHandler.AdminCreate)

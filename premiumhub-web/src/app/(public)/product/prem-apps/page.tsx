@@ -6,10 +6,16 @@ import ProductCard from '@/components/shared/ProductCard'
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { productService } from '@/services/productService'
+import { productCategoryService } from '@/services/productCategoryService'
 import type { Product } from '@/types/product'
 import { Search, SlidersHorizontal } from 'lucide-react'
 
-const CATEGORIES = [
+type CategoryOption = {
+  value: string
+  label: string
+}
+
+const FALLBACK_CATEGORIES: CategoryOption[] = [
   { value: '', label: 'Semua' },
   { value: 'streaming', label: '🎬 Streaming' },
   { value: 'music', label: '🎵 Musik' },
@@ -17,6 +23,32 @@ const CATEGORIES = [
   { value: 'design', label: '🎨 Desain' },
   { value: 'productivity', label: '⚡ Produktivitas' },
 ]
+
+const PREM_APPS_EMOJI_BY_CODE: Record<string, string> = {
+  streaming: '🎬',
+  music: '🎵',
+  gaming: '🎮',
+  design: '🎨',
+  productivity: '⚡',
+}
+
+function toPremAppsCategoryOptions(items: Array<{ code: string; label: string }>): CategoryOption[] {
+  if (!items.length) return FALLBACK_CATEGORIES
+
+  const mapped: CategoryOption[] = [
+    { value: '', label: 'Semua' },
+    ...items.map((item) => {
+      const emoji = PREM_APPS_EMOJI_BY_CODE[item.code]
+      const normalizedLabel = item.label?.trim() || item.code
+      return {
+        value: item.code,
+        label: emoji ? `${emoji} ${normalizedLabel}` : normalizedLabel,
+      }
+    }),
+  ]
+
+  return mapped
+}
 
 export default function PremAppsPage() {
   return (
@@ -29,20 +61,45 @@ export default function PremAppsPage() {
 function PremAppsContent() {
   const searchParams = useSearchParams()
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<CategoryOption[]>(FALLBACK_CATEGORIES)
   const [category, setCategory] = useState(searchParams.get('category') || '')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    productService.list({ category: category || undefined, limit: 50 })
+    let alive = true
+
+    productCategoryService
+      .list({ scope: 'prem_apps' })
+      .then((res) => {
+        if (!alive || !res.success) return
+
+        const options = toPremAppsCategoryOptions(
+          (res.data || []).map((item) => ({ code: item.code, label: item.label }))
+        )
+        setCategories(options)
+      })
+      .catch(() => {
+        // keep fallback categories
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const effectiveCategory = categories.some((item) => item.value === category) ? category : ''
+
+  useEffect(() => {
+    productService.list({ category: effectiveCategory || undefined, limit: 50 })
       .then((res) => {
         if (res.success) setProducts(res.data)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [category])
+  }, [effectiveCategory])
 
   const handleCategoryChange = (nextCategory: string) => {
-    if (nextCategory === category) return
+    if (nextCategory === effectiveCategory) return
     setLoading(true)
     setCategory(nextCategory)
   }
@@ -60,12 +117,12 @@ function PremAppsContent() {
 
           <div className="flex flex-wrap items-center gap-3 mb-8 justify-center">
             <SlidersHorizontal className="w-4 h-4 text-[#888]" />
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <button
-                key={cat.value}
+                key={cat.value || 'all'}
                 onClick={() => handleCategoryChange(cat.value)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  category === cat.value
+                  effectiveCategory === cat.value
                     ? 'bg-[#141414] text-white'
                     : 'bg-white text-[#888] hover:bg-[#EBEBEB] border border-[#EBEBEB]'
                 }`}

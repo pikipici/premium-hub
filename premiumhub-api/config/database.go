@@ -23,6 +23,7 @@ func InitDB(cfg *Config) *gorm.DB {
 	if err := db.AutoMigrate(
 		&model.User{},
 		&model.AccountType{},
+		&model.ProductCategory{},
 		&model.MaintenanceRule{},
 		&model.Product{},
 		&model.ProductPrice{},
@@ -47,6 +48,10 @@ func InitDB(cfg *Config) *gorm.DB {
 
 	if err := ensureDefaultAccountTypes(db); err != nil {
 		log.Fatal("DB account type defaults:", err)
+	}
+
+	if err := ensureDefaultProductCategories(db); err != nil {
+		log.Fatal("DB product category defaults:", err)
 	}
 
 	if err := applyPaymentSchemaCleanup(db); err != nil {
@@ -114,6 +119,53 @@ func ensureDefaultAccountTypes(db *gorm.DB) error {
 			updates["is_system"] = true
 		}
 
+		if len(updates) > 0 {
+			if updateErr := db.Model(&existing).Updates(updates).Error; updateErr != nil {
+				return updateErr
+			}
+		}
+	}
+
+	return nil
+}
+
+func ensureDefaultProductCategories(db *gorm.DB) error {
+	defaults := []model.ProductCategory{
+		{Scope: model.ProductCategoryScopePremApps, Code: "streaming", Label: "Streaming", Description: "Kategori layanan streaming premium.", SortOrder: 10, IsActive: true},
+		{Scope: model.ProductCategoryScopePremApps, Code: "music", Label: "Musik", Description: "Kategori layanan musik premium.", SortOrder: 20, IsActive: true},
+		{Scope: model.ProductCategoryScopePremApps, Code: "gaming", Label: "Gaming", Description: "Kategori layanan gaming premium.", SortOrder: 30, IsActive: true},
+		{Scope: model.ProductCategoryScopePremApps, Code: "design", Label: "Desain", Description: "Kategori tools desain dan kreatif.", SortOrder: 40, IsActive: true},
+		{Scope: model.ProductCategoryScopePremApps, Code: "productivity", Label: "Produktivitas", Description: "Kategori tools produktivitas kerja.", SortOrder: 50, IsActive: true},
+		{Scope: model.ProductCategoryScopeSosmed, Code: "followers", Label: "Followers", Description: "Paket pertumbuhan followers akun sosial media.", SortOrder: 10, IsActive: true},
+		{Scope: model.ProductCategoryScopeSosmed, Code: "likes", Label: "Likes", Description: "Paket likes/favorite untuk social proof.", SortOrder: 20, IsActive: true},
+		{Scope: model.ProductCategoryScopeSosmed, Code: "views", Label: "Views", Description: "Paket views/watchtime untuk konten video.", SortOrder: 30, IsActive: true},
+		{Scope: model.ProductCategoryScopeSosmed, Code: "comments", Label: "Komentar", Description: "Paket komentar aktif untuk engagement.", SortOrder: 40, IsActive: true},
+		{Scope: model.ProductCategoryScopeSosmed, Code: "shares", Label: "Share", Description: "Paket share dan save untuk distribusi konten.", SortOrder: 50, IsActive: true},
+	}
+
+	for _, item := range defaults {
+		var existing model.ProductCategory
+		err := db.Where("scope = ? AND code = ?", item.Scope, item.Code).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if createErr := db.Create(&item).Error; createErr != nil {
+				return createErr
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		updates := map[string]interface{}{}
+		if strings.TrimSpace(existing.Label) == "" {
+			updates["label"] = item.Label
+		}
+		if strings.TrimSpace(existing.Description) == "" {
+			updates["description"] = item.Description
+		}
+		if existing.SortOrder == 0 {
+			updates["sort_order"] = item.SortOrder
+		}
 		if len(updates) > 0 {
 			if updateErr := db.Model(&existing).Updates(updates).Error; updateErr != nil {
 				return updateErr

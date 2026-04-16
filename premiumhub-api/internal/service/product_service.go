@@ -16,11 +16,12 @@ import (
 )
 
 type ProductService struct {
-	productRepo     *repository.ProductRepo
-	stockRepo       *repository.StockRepo
-	productAssets   *storage.ProductAssetStorage
-	accountTypeRepo *repository.AccountTypeRepo
-	accountTypeSvc  *AccountTypeService
+	productRepo        *repository.ProductRepo
+	stockRepo          *repository.StockRepo
+	productAssets      *storage.ProductAssetStorage
+	accountTypeRepo    *repository.AccountTypeRepo
+	accountTypeSvc     *AccountTypeService
+	productCategorySvc *ProductCategoryService
 }
 
 func NewProductService(productRepo *repository.ProductRepo, stockRepo *repository.StockRepo, productAssets ...*storage.ProductAssetStorage) *ProductService {
@@ -35,6 +36,13 @@ func (s *ProductService) SetAccountTypeRepo(repo *repository.AccountTypeRepo) *P
 	s.accountTypeRepo = repo
 	if repo != nil {
 		s.accountTypeSvc = NewAccountTypeService(repo)
+	}
+	return s
+}
+
+func (s *ProductService) SetProductCategoryRepo(repo *repository.ProductCategoryRepo) *ProductService {
+	if repo != nil {
+		s.productCategorySvc = NewProductCategoryService(repo)
 	}
 	return s
 }
@@ -137,6 +145,13 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 	category := strings.TrimSpace(input.Category)
 	if category == "" {
 		return nil, errors.New("kategori produk wajib diisi")
+	}
+	if s.productCategorySvc != nil {
+		normalizedCategory, err := s.productCategorySvc.ValidateActiveCode(model.ProductCategoryScopePremApps, category)
+		if err != nil {
+			return nil, err
+		}
+		category = normalizedCategory
 	}
 
 	slug := sanitizeSlug(input.Slug, name)
@@ -260,6 +275,13 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 		category := strings.TrimSpace(*input.Category)
 		if category == "" {
 			return nil, errors.New("kategori produk wajib diisi")
+		}
+		if s.productCategorySvc != nil {
+			normalizedCategory, err := s.productCategorySvc.ValidateActiveCode(model.ProductCategoryScopePremApps, category)
+			if err != nil {
+				return nil, err
+			}
+			category = normalizedCategory
 		}
 		product.Category = category
 	}
