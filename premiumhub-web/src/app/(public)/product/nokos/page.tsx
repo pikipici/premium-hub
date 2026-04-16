@@ -69,6 +69,34 @@ const otpCards: OtpCard[] = [
   },
 ]
 
+function OtpPreviewCard({ card }: { card: OtpCard }) {
+  return (
+    <article className="rounded-2xl border border-[#f5f5f5] bg-white p-4 shadow-[0_8px_32px_rgba(20,20,20,0.10)] transition hover:-translate-y-0.5">
+      <div className="flex items-start gap-3">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${card.iconClassName}`}>
+          <Image
+            src={card.iconSrc}
+            alt={`${card.app} logo`}
+            width={18}
+            height={18}
+            className="h-[18px] w-[18px] brightness-0 invert"
+          />
+        </div>
+        <div>
+          <h3 className="mb-1 text-sm font-extrabold text-[#141414]">{card.app}</h3>
+          <p className="text-xs leading-relaxed text-[#888]">
+            {card.before}{' '}
+            <span className="rounded bg-[#FFF0ED] px-1.5 py-0.5 text-[11px] font-extrabold text-[#FF5733]">
+              {card.code}
+            </span>{' '}
+            {card.after}
+          </p>
+        </div>
+      </div>
+    </article>
+  )
+}
+
 const formatCompact = (value: number) =>
   new Intl.NumberFormat('id-ID', {
     notation: 'compact',
@@ -225,35 +253,24 @@ export default function LandingPage() {
 
           <div className="relative">
             <div className="absolute -right-16 inset-y-0 hidden rounded-l-[40px] bg-gradient-to-br from-[#FFE8E0] via-[#FFCDB8] to-[#FFE5D5] md:block" />
-            <div className="relative z-10 grid gap-3 sm:grid-cols-2 md:flex md:flex-col md:overflow-visible md:pb-0">
-              {otpCards.map((card) => (
-                <article
-                  key={card.app}
-                  className="rounded-2xl border border-[#f5f5f5] bg-white p-4 shadow-[0_8px_32px_rgba(20,20,20,0.10)] transition hover:-translate-y-0.5"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${card.iconClassName}`}>
-                      <Image
-                        src={card.iconSrc}
-                        alt={`${card.app} logo`}
-                        width={18}
-                        height={18}
-                        className="h-[18px] w-[18px] brightness-0 invert"
-                      />
+            <div className="relative z-10">
+              <div className="grid gap-3 sm:grid-cols-2 md:hidden">
+                {otpCards.map((card) => (
+                  <OtpPreviewCard key={`mobile-${card.app}`} card={card} />
+                ))}
+              </div>
+
+              <div className="otp-escalator-mask hidden md:block">
+                <div className="otp-escalator-track">
+                  {[0, 1].map((loop) => (
+                    <div key={`loop-${loop}`} className="grid gap-3 pb-3">
+                      {otpCards.map((card) => (
+                        <OtpPreviewCard key={`desktop-${loop}-${card.app}`} card={card} />
+                      ))}
                     </div>
-                    <div>
-                      <h3 className="mb-1 text-sm font-extrabold text-[#141414]">{card.app}</h3>
-                      <p className="text-xs leading-relaxed text-[#888]">
-                        {card.before}{' '}
-                        <span className="rounded bg-[#FFF0ED] px-1.5 py-0.5 text-[11px] font-extrabold text-[#FF5733]">
-                          {card.code}
-                        </span>{' '}
-                        {card.after}
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              ))}
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -328,6 +345,40 @@ export default function LandingPage() {
           </div>
         </section>
       </main>
+
+      <style jsx>{`
+        .otp-escalator-mask {
+          max-height: 460px;
+          overflow: hidden;
+          -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
+        }
+
+        .otp-escalator-track {
+          will-change: transform;
+          animation: otp-escalator 18s linear infinite;
+        }
+
+        .otp-escalator-mask:hover .otp-escalator-track {
+          animation-play-state: paused;
+        }
+
+        @keyframes otp-escalator {
+          from {
+            transform: translateY(0);
+          }
+
+          to {
+            transform: translateY(-50%);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .otp-escalator-track {
+            animation: none;
+          }
+        }
+      `}</style>
 
       <Footer />
     </>
