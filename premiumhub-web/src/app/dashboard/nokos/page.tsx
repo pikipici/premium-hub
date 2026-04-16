@@ -653,7 +653,6 @@ export default function NomorVirtualPage() {
   }, [liveOrderId, orders])
 
   const liveOrderStatus = normalizeOrderStatus(liveOrder?.provider_status)
-  const liveOrderMeta = orderStatusMeta(liveOrder?.provider_status)
   const liveSMSState = liveOrder ? smsStateByOrder[liveOrder.provider_order_id] : undefined
   const liveCheckActionKey = liveOrder ? `check:${liveOrder.provider_order_id}` : ''
 
@@ -677,6 +676,30 @@ export default function NomorVirtualPage() {
   const liveSMSItems = liveSMSState?.items || []
   const livePrimarySMS = pickPrimarySMS(liveSMSState?.items)
   const livePrimaryCode = (livePrimarySMS?.code || '').trim()
+  const liveOrderMeta = useMemo(() => {
+    if (liveOrderStatus !== 'RECEIVED') {
+      return orderStatusMeta(liveOrder?.provider_status)
+    }
+
+    if (livePrimaryCode) {
+      return {
+        label: 'OTP Masuk',
+        className: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      }
+    }
+
+    if (liveSMSItems.length > 0) {
+      return {
+        label: 'SMS Masuk',
+        className: 'bg-blue-100 text-blue-700 border-blue-200',
+      }
+    }
+
+    return {
+      label: 'Menunggu OTP',
+      className: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    }
+  }, [liveOrder?.provider_status, liveOrderStatus, livePrimaryCode, liveSMSItems.length])
   const liveSLAExpired = liveRemainingMs !== null && liveRemainingMs <= 0
   const liveIsOpenStatus = isOpenOrderStatus(liveOrderStatus)
 
