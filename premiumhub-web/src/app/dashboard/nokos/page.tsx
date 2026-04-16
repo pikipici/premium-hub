@@ -1166,11 +1166,11 @@ export default function NomorVirtualPage() {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-[#EBEBEB] bg-white p-2 inline-flex gap-2">
+      <div className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-[#EBEBEB] bg-white p-2">
         <button
           type="button"
           onClick={() => setMainTab('catalog')}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+          className={`inline-flex w-full items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
             mainTab === 'catalog' ? 'bg-[#141414] text-white' : 'text-[#666] hover:bg-[#F7F7F5]'
           }`}
         >
@@ -1179,7 +1179,7 @@ export default function NomorVirtualPage() {
         <button
           type="button"
           onClick={() => setMainTab('orders')}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors inline-flex items-center gap-2 ${
+          className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
             mainTab === 'orders' ? 'bg-[#141414] text-white' : 'text-[#666] hover:bg-[#F7F7F5]'
           }`}
         >
