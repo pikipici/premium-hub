@@ -1968,6 +1968,18 @@ func (s *FiveSimService) normalizeProviderErr(err error) error {
 			return errors.New("stok nomor operator ini sedang habis, pilih operator lain")
 		}
 
+		lowerMsg := strings.ToLower(msg)
+		switch {
+		case strings.Contains(lowerMsg, "order has sms"):
+			return errors.New("order sudah menerima SMS. Gunakan finish untuk menyelesaikan order")
+		case strings.Contains(lowerMsg, "order expired"):
+			return errors.New("order sudah kedaluwarsa")
+		case strings.Contains(lowerMsg, "hosting order"):
+			return errors.New("aksi ini hanya berlaku untuk order activation")
+		case strings.Contains(lowerMsg, "order not found"):
+			return errors.New("order 5sim tidak ditemukan")
+		}
+
 		switch apiErr.StatusCode {
 		case 401, 403:
 			return errors.New("autentikasi 5sim gagal, cek API key")

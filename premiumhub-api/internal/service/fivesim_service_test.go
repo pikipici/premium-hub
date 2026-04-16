@@ -977,6 +977,128 @@ func TestFiveSimServiceCancelOrderAllowedWhenUnbilled(t *testing.T) {
 	}
 }
 
+func TestFiveSimServiceFinishOrderUpdatesStatusAndKeepsWalletDebited(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	seedFiveSimOrderWithCharge(t, db, activeUser.ID, 550004, "RECEIVED", 1_000, time.Now().Add(-2*time.Minute))
+
+	fake.finishResp = &FiveSimOrderPayload{
+		ID:       550004,
+		Status:   "FINISHED",
+		Phone:    "+628123400004",
+		Country:  "indonesia",
+		Operator: "any",
+		Product:  "telegram",
+		Price:    0.5,
+		SMS: []FiveSimSMS{{
+			Code: "445566",
+			Text: "otp 445566",
+		}},
+	}
+
+	localOrder, providerOrder, err := svc.FinishOrder(context.Background(), activeUser.ID, 550004)
+	if err != nil {
+		t.Fatalf("finish order should succeed: %v", err)
+	}
+	if providerOrder == nil || providerOrder.Status != "FINISHED" {
+		t.Fatalf("expected provider status FINISHED, got %#v", providerOrder)
+	}
+	if localOrder.ProviderStatus != "FINISHED" {
+		t.Fatalf("expected local status FINISHED, got %s", localOrder.ProviderStatus)
+	}
+
+	var persisted model.FiveSimOrder
+	if err := db.First(&persisted, "provider_order_id = ?", 550004).Error; err != nil {
+		t.Fatalf("load persisted order: %v", err)
+	}
+	if persisted.ProviderStatus != "FINISHED" {
+		t.Fatalf("expected persisted status FINISHED, got %s", persisted.ProviderStatus)
+	}
+
+	var userAfter model.User
+	if err := db.First(&userAfter, "id = ?", activeUser.ID).Error; err != nil {
+		t.Fatalf("load user after finish: %v", err)
+	}
+	if userAfter.WalletBalance != 49_000 {
+		t.Fatalf("wallet must stay debited after finish, got %d", userAfter.WalletBalance)
+	}
+
+	var refundCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", "fivesim_order:550004:refund").Count(&refundCount).Error; err != nil {
+		t.Fatalf("count finish refund ledger: %v", err)
+	}
+	if refundCount != 0 {
+		t.Fatalf("expected no refund ledger for finished order, got %d", refundCount)
+	}
+}
+
+func TestFiveSimServiceCancelOrderWithSMSReturnsGuidanceMessage(t *testing.T) {
+	svc, db, fake, activeUser, _ := setupFiveSimService(t)
+	seedFiveSimOrderWithCharge(t, db, activeUser.ID, 550005, "RECEIVED", 1_000, time.Now().Add(-2*time.Minute))
+
+	fake.cancelErrByID = map[int64]error{
+		550005: &FiveSimAPIError{StatusCode: 400, Message: "order has sms"},
+	}
+
+	_, _, err := svc.CancelOrder(context.Background(), activeUser.ID, 550005)
+	if err == nil {
+		t.Fatalf("cancel with sms should fail")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "gunakan finish") {
+		t.Fatalf("expected finish guidance message, got: %v", err)
+	}
+
+	var persisted model.FiveSimOrder
+	if err := db.First(&persisted, "provider_order_id = ?", 550005).Error; err != nil {
+		t.Fatalf("load persisted order: %v", err)
+	}
+	if persisted.ProviderStatus != "RECEIVED" {
+		t.Fatalf("status should stay RECEIVED when cancel fails, got %s", persisted.ProviderStatus)
+	}
+}
+
+func TestFiveSimServiceNormalizeProviderErrOrderActionMessages(t *testing.T) {
+	svc, _, _, _, _ := setupFiveSimService(t)
+
+	tests := []struct {
+		name string
+		err  *FiveSimAPIError
+		want string
+	}{
+		{
+			name: "order expired",
+			err:  &FiveSimAPIError{StatusCode: 400, Message: "order expired"},
+			want: "order sudah kedaluwarsa",
+		},
+		{
+			name: "hosting order",
+			err:  &FiveSimAPIError{StatusCode: 400, Message: "hosting order"},
+			want: "hanya berlaku untuk order activation",
+		},
+		{
+			name: "order not found from 400",
+			err:  &FiveSimAPIError{StatusCode: 400, Message: "order not found"},
+			want: "order 5sim tidak ditemukan",
+		},
+		{
+			name: "order not found from 404",
+			err:  &FiveSimAPIError{StatusCode: 404, Message: "order not found"},
+			want: "order 5sim tidak ditemukan",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := svc.normalizeProviderErr(tc.err)
+			if err == nil {
+				t.Fatalf("expected normalized error")
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tc.want)) {
+				t.Fatalf("unexpected normalized error: got=%q want contains=%q", err.Error(), tc.want)
+			}
+		})
+	}
+}
+
 func TestFiveSimServiceCheckOrderPersistsStatusAndSnapshot(t *testing.T) {
 	svc, db, fake, activeUser, _ := setupFiveSimService(t)
 

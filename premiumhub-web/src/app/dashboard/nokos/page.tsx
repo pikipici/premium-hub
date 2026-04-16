@@ -655,6 +655,8 @@ export default function NomorVirtualPage() {
   const liveOrderStatus = normalizeOrderStatus(liveOrder?.provider_status)
   const liveSMSState = liveOrder ? smsStateByOrder[liveOrder.provider_order_id] : undefined
   const liveCheckActionKey = liveOrder ? `check:${liveOrder.provider_order_id}` : ''
+  const liveFinishActionKey = liveOrder ? `finish:${liveOrder.provider_order_id}` : ''
+  const liveCancelActionKey = liveOrder ? `cancel:${liveOrder.provider_order_id}` : ''
 
   const liveOrderCreatedAtMs = useMemo(() => {
     if (!liveOrder?.created_at) return null
@@ -709,6 +711,8 @@ export default function NomorVirtualPage() {
   }, [liveOrder?.provider_status, liveOrderStatus, livePrimaryCode, liveSMSItems.length])
   const liveSLAExpired = liveRemainingMs !== null && liveRemainingMs <= 0
   const liveIsOpenStatus = isOpenOrderStatus(liveOrderStatus)
+  const liveCanFinish = liveIsOpenStatus
+  const liveCanCancel = liveIsOpenStatus && liveSMSItems.length === 0
 
   const refreshWalletBalance = useCallback(async () => {
     setWalletLoading(true)
@@ -1593,6 +1597,31 @@ export default function NomorVirtualPage() {
                           Saya Sudah Request OTP
                         </button>
 
+                        {liveCanFinish ? (
+                          <button
+                            type="button"
+                            onClick={() => runOrderAction(liveOrder, 'finish')}
+                            disabled={Boolean(actionLoading[liveFinishActionKey])}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                          >
+                            {actionLoading[liveFinishActionKey] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            Finish
+                          </button>
+                        ) : null}
+
+                        {liveIsOpenStatus ? (
+                          <button
+                            type="button"
+                            onClick={() => runOrderAction(liveOrder, 'cancel')}
+                            disabled={!liveCanCancel || Boolean(actionLoading[liveCancelActionKey])}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                            title={liveCanCancel ? 'Batalkan order ini' : 'Cancel dinonaktifkan setelah SMS masuk. Gunakan Finish.'}
+                          >
+                            {actionLoading[liveCancelActionKey] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                            {liveCanCancel ? 'Cancel' : 'Cancel Terkunci'}
+                          </button>
+                        ) : null}
+
                         <button
                           type="button"
                           onClick={() => void toggleSMSInbox(liveOrder)}
@@ -1604,7 +1633,12 @@ export default function NomorVirtualPage() {
                       </div>
 
                       {liveIsOpenStatus ? (
-                        <p className="text-[11px] text-[#888] -mt-1">Klik tombol “Saya Sudah Request OTP” setelah kamu request kode di {liveServiceDisplay}.</p>
+                        <div className="space-y-0.5 -mt-1">
+                          <p className="text-[11px] text-[#888]">Klik tombol “Saya Sudah Request OTP” setelah kamu request kode di {liveServiceDisplay}.</p>
+                          {!liveCanCancel ? (
+                            <p className="text-[11px] text-[#888]">Cancel dikunci karena SMS sudah masuk. Kalau OTP valid, lanjut klik Finish.</p>
+                          ) : null}
+                        </div>
                       ) : null}
 
                       {liveSMSState?.open ? (
