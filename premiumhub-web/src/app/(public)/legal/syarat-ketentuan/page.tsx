@@ -4,7 +4,7 @@ import Navbar from '@/components/layout/Navbar'
 const sections = [
   {
     title: '1. Ketentuan Umum',
-    body: 'Dengan menggunakan layanan PremiumHub, kamu menyetujui seluruh syarat yang berlaku pada halaman ini.',
+    body: 'Dengan menggunakan layanan DigiMarket, kamu menyetujui seluruh syarat yang berlaku pada halaman ini.',
   },
   {
     title: '2. Akun & Keamanan',
@@ -28,11 +28,11 @@ const sections = [
   },
   {
     title: '7. Perubahan Syarat',
-    body: 'PremiumHub berhak memperbarui syarat layanan. Versi terbaru akan dipublikasikan di halaman ini.',
+    body: 'DigiMarket berhak memperbarui syarat layanan. Versi terbaru akan dipublikasikan di halaman ini.',
   },
   {
     title: '8. Kontak',
-    body: 'Untuk pertanyaan terkait syarat layanan, silakan hubungi tim support melalui channel resmi PremiumHub.',
+    body: 'Untuk pertanyaan terkait syarat layanan, silakan hubungi tim support melalui channel resmi DigiMarket.',
   },
 ]
 

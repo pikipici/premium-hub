@@ -4,7 +4,7 @@ import Navbar from '@/components/layout/Navbar'
 const sections = [
   {
     title: '1. Data yang Dikumpulkan',
-    body: 'PremiumHub dapat mengumpulkan data akun (nama, email), data transaksi, dan data teknis dasar (misalnya device/session) untuk operasional layanan.',
+    body: 'DigiMarket dapat mengumpulkan data akun (nama, email), data transaksi, dan data teknis dasar (misalnya device/session) untuk operasional layanan.',
   },
   {
     title: '2. Tujuan Penggunaan Data',
@@ -32,7 +32,7 @@ const sections = [
   },
   {
     title: '8. Kontak Privasi',
-    body: 'Jika ada pertanyaan terkait privasi data, hubungi support PremiumHub melalui channel resmi.',
+    body: 'Jika ada pertanyaan terkait privasi data, hubungi support DigiMarket melalui channel resmi.',
   },
 ]
 
