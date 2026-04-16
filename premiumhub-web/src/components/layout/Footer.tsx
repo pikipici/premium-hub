@@ -21,11 +21,10 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-sm">Produk</h4>
             <div className="space-y-2">
+              <Link href="/product/prem-apps" className="block text-sm text-gray-400 hover:text-white transition-colors">Apps Premium</Link>
+              <Link href="/product/nokos" className="block text-sm text-gray-400 hover:text-white transition-colors">Nomor Virtual OTP</Link>
               <Link href="/product/sosmed" className="block text-sm text-gray-400 hover:text-white transition-colors">Sosmed SMM</Link>
-              <Link href="/product/prem-apps?category=streaming" className="block text-sm text-gray-400 hover:text-white transition-colors">Streaming</Link>
-              <Link href="/product/prem-apps?category=music" className="block text-sm text-gray-400 hover:text-white transition-colors">Musik</Link>
-              <Link href="/product/prem-apps?category=gaming" className="block text-sm text-gray-400 hover:text-white transition-colors">Gaming</Link>
-              <Link href="/product/prem-apps?category=design" className="block text-sm text-gray-400 hover:text-white transition-colors">Desain</Link>
+              <Link href="/product/convert" className="block text-sm text-gray-400 hover:text-white transition-colors">Convert Aset</Link>
             </div>
           </div>
 
