@@ -32,8 +32,9 @@ export default function Footer() {
             <h4 className="font-semibold mb-4 text-sm">Bantuan</h4>
             <div className="space-y-2">
               <Link href="/faq" className="block text-sm text-gray-400 hover:text-white transition-colors">FAQ</Link>
-              <Link href="/product/convert" className="block text-sm text-gray-400 hover:text-white transition-colors">Convert Aset</Link>
-              <Link href="/faq" className="block text-sm text-gray-400 hover:text-white transition-colors">Kontak</Link>
+              <Link href="/lupa-password" className="block text-sm text-gray-400 hover:text-white transition-colors">Lupa Password</Link>
+              <Link href="/login" className="block text-sm text-gray-400 hover:text-white transition-colors">Masuk Akun</Link>
+              <Link href="/register" className="block text-sm text-gray-400 hover:text-white transition-colors">Daftar Akun</Link>
             </div>
           </div>
 
