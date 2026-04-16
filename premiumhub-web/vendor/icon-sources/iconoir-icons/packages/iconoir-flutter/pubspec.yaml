@@ -1,0 +1,20 @@
+name: iconoir_flutter
+description: Flutter library for Iconoir, the biggest open source icon library with tons of free icons.
+version: 7.11.0
+homepage: https://iconoir.com
+repository: https://github.com/iconoir-icons/iconoir
+funding:
+  - https://opencollective.com/iconoir
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_svg: ^2.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

@@ -1,0 +1,51 @@
+{
+  "name": "iconoir-react-native",
+  "version": "7.11.0",
+  "description": "React Native library for Iconoir, the biggest open source icon library with tons of free icons.",
+  "license": "MIT",
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/iconoir"
+  },
+  "homepage": "https://iconoir.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iconoir-icons/iconoir.git",
+    "directory": "packages/iconoir-react-native"
+  },
+  "keywords": [
+    "icons",
+    "svg",
+    "library",
+    "react-native"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./regular": {
+      "import": "./dist/esm/regular/index.mjs",
+      "require": "./dist/regular/index.js"
+    },
+    "./solid": {
+      "import": "./dist/esm/solid/index.mjs",
+      "require": "./dist/solid/index.js"
+    }
+  },
+  "main": "dist/index.js",
+  "module": "dist/esm/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "react": "19",
+    "react-native": ">=0.78.0",
+    "react-native-svg": "^15.12.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8"
+  }
+}

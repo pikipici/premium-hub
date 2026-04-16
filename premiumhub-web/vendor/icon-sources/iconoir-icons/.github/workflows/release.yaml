@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # We have to checkout main or PNPM fails. Tag should be on main anyway.
+          ref: main
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          node-registry: https://registry.npmjs.org
+
+      - name: Generate changelog file
+        uses: rhysd/changelog-from-release/action@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          file: packages/iconoir-flutter/CHANGELOG.md
+          commit: false
+          args: -d=false
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Prepare packages
+        run: pnpm run prepublish-all
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+
+      - name: Commit release
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: Release Version ${{ github.ref_name }}
+          branch: main
+
+      - name: Update tag
+        run: |
+          git -c user.email="actions@github.com" -c user.name="GitHub Actions" tag -fa ${{ github.ref_name }} -m "${{ github.ref_name }}"
+          git push -f origin ${{ github.ref_name }}
+
+      - name: Publish packages
+        run: pnpm -r publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Publish Flutter
+        uses: k-paxian/dart-package-publisher@v1.6
+        with:
+          credentialJson: ${{ secrets.PUB_CREDENTIAL_JSON }}
+          relativePath: ./packages/iconoir-flutter

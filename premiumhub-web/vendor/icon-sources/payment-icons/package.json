@@ -1,0 +1,41 @@
+{
+  "name": "payment-icons",
+  "version": "1.2.1",
+  "description": "payment icon svgs",
+  "scripts": {
+    "clean": "rimraf min/**/*.svg build/",
+    "sprite": "svg-sprite -C ./svg-sprite.json 'min/./**/*.svg'",
+    "minify": "svgo -f svg/flat/ -o min/flat --disable=removeViewBox && svgo -f svg/mono/ -o min/mono --disable=removeViewBox && svgo -f svg/outline -o min/outline --disable=removeViewBox && svgo -f svg/single -o min/single --disable=removeViewBox",
+    "publish": "yarn build && yarn sprite && gh-pages -d build/css --repo 'git@github.com:muffinresearch/payment-icons.git'  --message 'updating example'",
+    "build": "yarn run clean && yarn run minify",
+    "test": "jest tests --watch",
+    "test-ci": "jest tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muffinresearch/payment-icons.git"
+  },
+  "keywords": [
+    "icons",
+    "payments",
+    "font",
+    "credit cards"
+  ],
+  "author": "Stuart Colville",
+  "license": "MPL-2.0",
+  "bugs": {
+    "url": "https://github.com/muffinresearch/payment-icons/issues"
+  },
+  "homepage": "https://github.com/muffinresearch/payment-icons#readme",
+  "devDependencies": {
+    "babel-core": "6.26.3",
+    "babel-jest": "26.6.3",
+    "babel-preset-env": "1.7.0",
+    "cheerio": "1.0.0-rc.6",
+    "gh-pages": "3.1.0",
+    "glob": "7.1.6",
+    "jest": "26.6.3",
+    "svg-sprite": "1.5.0",
+    "svgo": "2.3.0"
+  }
+}
