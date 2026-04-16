@@ -41,8 +41,8 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-sm">Legal</h4>
             <div className="space-y-2">
-              <span className="block text-sm text-gray-400">Syarat & Ketentuan</span>
-              <span className="block text-sm text-gray-400">Kebijakan Privasi</span>
+              <Link href="/legal/syarat-ketentuan" className="block text-sm text-gray-400 hover:text-white transition-colors">Syarat & Ketentuan</Link>
+              <Link href="/legal/kebijakan-privasi" className="block text-sm text-gray-400 hover:text-white transition-colors">Kebijakan Privasi</Link>
             </div>
           </div>
         </div>
