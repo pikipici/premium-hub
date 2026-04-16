@@ -676,6 +676,13 @@ export default function NomorVirtualPage() {
   const liveSMSItems = liveSMSState?.items || []
   const livePrimarySMS = pickPrimarySMS(liveSMSState?.items)
   const livePrimaryCode = (livePrimarySMS?.code || '').trim()
+  const liveServiceDisplay = useMemo(() => {
+    const normalized = toTitleCase(liveOrder?.product || '')
+    if (!normalized || normalized.toLowerCase() === 'unknown') {
+      return 'layanan tujuan'
+    }
+    return normalized
+  }, [liveOrder?.product])
   const liveOrderMeta = useMemo(() => {
     if (liveOrderStatus !== 'RECEIVED') {
       return orderStatusMeta(liveOrder?.provider_status)
@@ -1470,13 +1477,13 @@ export default function NomorVirtualPage() {
               <div className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
                 <header className="border-b border-[#EBEBEB] px-4 py-3">
                   <h2 className="text-sm font-bold">Terima OTP Disini</h2>
-                  <p className="text-xs text-[#888] mt-0.5">OTP kamu akan dikirim disini, mohon tunggu.</p>
+                  <p className="text-xs text-[#888] mt-0.5">Masukkan nomor ini di layanan tujuan lalu request OTP. Kodenya akan muncul otomatis di sini.</p>
                 </header>
 
                 <div className="p-4 space-y-3">
                   {!liveOrder ? (
                     <div className="rounded-xl border border-dashed border-[#D8D8D5] bg-[#FAFAF8] px-3 py-3 text-xs text-[#666]">
-                      Belum ada order aktif. Pilih negara, layanan, operator, lalu klik beli untuk mulai terima OTP di sini.
+                      Belum ada order aktif. Pilih negara, layanan, operator, lalu klik Beli. Setelah nomor keluar, pakai nomor itu di layanan tujuan dan request OTP.
                     </div>
                   ) : (
                     <>
@@ -1498,9 +1505,13 @@ export default function NomorVirtualPage() {
                           </div>
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[#888]">Layanan</span>
-                            <span className="font-semibold text-[#141414] text-right">{toTitleCase(liveOrder.product || 'unknown')}</span>
+                            <span className="font-semibold text-[#141414] text-right">{liveServiceDisplay}</span>
                           </div>
                         </div>
+
+                        <p className="text-[11px] text-[#666]">
+                          Lanjut di {liveServiceDisplay}: masukkan nomor di atas, lalu tekan Kirim Kode / Send OTP.
+                        </p>
 
                         {liveIsOpenStatus ? (
                           <div className="space-y-1.5 pt-1 border-t border-[#EBEBEB]">
@@ -1518,19 +1529,19 @@ export default function NomorVirtualPage() {
                             </div>
                             <p className="text-[11px] text-[#888]">
                               {liveSLAExpired
-                                ? 'Melewati 15 menit. Sistem akan auto-handle sesuai status order.'
-                                : 'Auto-cancel + refund jalan otomatis kalau sampai 15 menit belum ada SMS.'}
+                                ? 'Sudah lewat 15 menit. Sistem lanjut auto-handle sesuai status order.'
+                                : `Kalau OTP belum masuk, pastikan kamu sudah request kode di ${liveServiceDisplay}. Auto-cancel + refund jalan otomatis jika 15 menit tanpa SMS.`}
                             </p>
                           </div>
                         ) : (
                           <p className="text-[11px] text-[#888] pt-1 border-t border-[#EBEBEB]">
-                            Order sudah final. Realtime monitor berhenti otomatis.
+                            Order ini sudah final. Monitor realtime dihentikan otomatis.
                           </p>
                         )}
                       </div>
 
                       <div className="rounded-xl border border-[#EBEBEB] bg-white p-3">
-                        <p className="text-[11px] uppercase tracking-wide text-[#888] mb-1.5">OTP Masuk</p>
+                        <p className="text-[11px] uppercase tracking-wide text-[#888] mb-1.5">Inbox OTP</p>
 
                         {livePrimaryCode ? (
                           <div className="space-y-2">
@@ -1552,14 +1563,21 @@ export default function NomorVirtualPage() {
                           </div>
                         ) : liveSMSItems.length > 0 ? (
                           <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5 text-xs text-[#666] space-y-1">
-                            <p className="font-semibold text-[#141414]">SMS masuk, tapi belum ada kode OTP eksplisit.</p>
+                            <p className="font-semibold text-[#141414]">SMS sudah masuk, tapi kode OTP belum terdeteksi.</p>
+                            <p className="text-[11px] text-[#666]">Cek isi SMS di bawah, atau request ulang kode di {liveServiceDisplay}.</p>
                             <p className="break-words">{liveSMSItems[0]?.text || '-'}</p>
                           </div>
                         ) : (
                           <div className="rounded-xl border border-dashed border-[#D8D8D5] bg-[#FAFAF8] px-3 py-3 text-xs text-[#666]">
-                            {liveIsOpenStatus
-                              ? 'Belum ada SMS OTP. Sistem auto-check status berkala, kamu juga bisa klik Check kapan aja.'
-                              : 'Belum ada SMS OTP tercatat untuk order ini.'}
+                            {liveIsOpenStatus ? (
+                              <div className="space-y-1">
+                                <p>Belum ada OTP masuk dari {liveServiceDisplay}.</p>
+                                <p>Lanjut di {liveServiceDisplay}: masukkan nomor di atas lalu tekan Kirim Kode / Send OTP.</p>
+                                <p>Setelah request, OTP akan muncul otomatis di sini. Kalau belum muncul, klik “Saya Sudah Request OTP”.</p>
+                              </div>
+                            ) : (
+                              'Belum ada SMS OTP tercatat untuk order ini.'
+                            )}
                           </div>
                         )}
                       </div>
@@ -1572,7 +1590,7 @@ export default function NomorVirtualPage() {
                           className="inline-flex items-center gap-1.5 rounded-lg bg-[#141414] text-white px-3 py-2 text-xs font-bold disabled:opacity-60"
                         >
                           {actionLoading[liveCheckActionKey] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
-                          Check Status
+                          Saya Sudah Request OTP
                         </button>
 
                         <button
@@ -1585,6 +1603,10 @@ export default function NomorVirtualPage() {
                         </button>
                       </div>
 
+                      {liveIsOpenStatus ? (
+                        <p className="text-[11px] text-[#888] -mt-1">Klik tombol “Saya Sudah Request OTP” setelah kamu request kode di {liveServiceDisplay}.</p>
+                      ) : null}
+
                       {liveSMSState?.open ? (
                         <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-3">
                           {liveSMSState.loading ? (
@@ -1596,7 +1618,7 @@ export default function NomorVirtualPage() {
                               <CircleAlert className="w-3.5 h-3.5" /> {liveSMSState.error}
                             </div>
                           ) : liveSMSItems.length === 0 ? (
-                            <div className="text-xs text-[#777]">Belum ada SMS masuk. Klik Check secara berkala.</div>
+                            <div className="text-xs text-[#777]">Belum ada SMS masuk. Setelah request OTP di {liveServiceDisplay}, klik “Saya Sudah Request OTP” untuk refresh manual.</div>
                           ) : (
                             <div className="space-y-2">
                               {liveSMSItems.map((sms, index) => (
