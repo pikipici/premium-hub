@@ -34,6 +34,7 @@ const PUBLIC_NAV_ITEMS: PublicNavItem[] = [
   { href: '/product/prem-apps', label: 'Apps' },
   { href: '/product/convert', label: 'Convert Aset' },
   { href: '/product/nokos', label: 'Nomor Virtual' },
+  { href: '/product/sosmed', label: 'Sosmed' },
   { href: '/faq', label: 'FAQ' },
 ]
 
