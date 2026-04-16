@@ -1,5 +1,6 @@
 "use client"
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import {
@@ -19,7 +20,7 @@ import type { NokosLandingSummary } from '@/types/nokos'
 
 type OtpCard = {
   app: string
-  icon: string
+  iconSrc: string
   iconClassName: string
   before: string
   code: string
@@ -29,7 +30,7 @@ type OtpCard = {
 const otpCards: OtpCard[] = [
   {
     app: 'Instagram',
-    icon: 'IG',
+    iconSrc: '/icons/apps/instagram.svg',
     iconClassName: 'bg-gradient-to-br from-orange-400 via-rose-500 to-fuchsia-600 text-white',
     before: 'Use',
     code: '645 829',
@@ -37,7 +38,7 @@ const otpCards: OtpCard[] = [
   },
   {
     app: 'WhatsApp',
-    icon: 'WA',
+    iconSrc: '/icons/apps/whatsapp.svg',
     iconClassName: 'bg-[#25D366] text-white',
     before: 'Your WhatsApp code is',
     code: '392-847',
@@ -45,14 +46,14 @@ const otpCards: OtpCard[] = [
   },
   {
     app: 'Netflix',
-    icon: 'N',
+    iconSrc: '/icons/apps/netflix.svg',
     iconClassName: 'bg-[#E50914] text-white',
     before: 'Your Netflix verification code is',
     code: '295206',
   },
   {
     app: 'Telegram',
-    icon: 'TG',
+    iconSrc: '/icons/apps/telegram.svg',
     iconClassName: 'bg-[#229ED9] text-white',
     before: 'Login code:',
     code: '71849',
@@ -60,7 +61,7 @@ const otpCards: OtpCard[] = [
   },
   {
     app: 'PayPal',
-    icon: 'PP',
+    iconSrc: '/icons/apps/paypal.svg',
     iconClassName: 'bg-[#003087] text-white',
     before: 'Your PayPal security code is',
     code: '481726',
@@ -231,8 +232,14 @@ export default function LandingPage() {
                   className="rounded-2xl border border-[#f5f5f5] bg-white p-4 shadow-[0_8px_32px_rgba(20,20,20,0.10)] transition hover:-translate-y-0.5"
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${card.iconClassName}`}>
-                      {card.icon}
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${card.iconClassName}`}>
+                      <Image
+                        src={card.iconSrc}
+                        alt={`${card.app} logo`}
+                        width={18}
+                        height={18}
+                        className="h-[18px] w-[18px] brightness-0 invert"
+                      />
                     </div>
                     <div>
                       <h3 className="mb-1 text-sm font-extrabold text-[#141414]">{card.app}</h3>
