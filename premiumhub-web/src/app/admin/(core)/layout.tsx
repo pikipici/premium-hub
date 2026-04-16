@@ -30,6 +30,10 @@ function resolveCorePageMeta(pathname: string): PageMeta {
     return { title: 'Stok Akun', sub: 'Monitor dan tambah stok' }
   }
 
+  if (pathname.startsWith('/admin/sosmed')) {
+    return { title: 'Layanan Sosmed', sub: 'Kelola card katalog /product/sosmed' }
+  }
+
   if (pathname.startsWith('/admin/order')) {
     return { title: 'Order', sub: 'Semua transaksi' }
   }

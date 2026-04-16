@@ -11,6 +11,7 @@ type MobileItem = {
 const MOBILE_ITEMS: MobileItem[] = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/produk', label: 'Produk' },
+  { href: '/admin/sosmed', label: 'Sosmed' },
   { href: '/admin/stok', label: 'Stok' },
   { href: '/admin/order', label: 'Order' },
   { href: '/admin/garansi', label: 'Garansi' },

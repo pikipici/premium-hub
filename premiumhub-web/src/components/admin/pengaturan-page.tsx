@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react'
 
 import MaintenanceSettingsCard from '@/components/admin/maintenance-settings-card'
 import ProductCategorySettingsCard from '@/components/admin/product-category-settings-card'
-import SosmedServiceSettingsCard from '@/components/admin/sosmed-service-settings-card'
 import {
   accountTypeService,
   type AdminAccountTypePayload,
@@ -438,7 +437,6 @@ export default function PengaturanPage() {
       </div>
 
       <ProductCategorySettingsCard />
-      <SosmedServiceSettingsCard />
       <MaintenanceSettingsCard />
 
       {formOpen && (
