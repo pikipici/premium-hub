@@ -1,13 +1,36 @@
 "use client"
 
-import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, History, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useState, type SVGProps } from 'react'
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 
 import { formatRupiah } from '@/lib/utils'
 import { activityService } from '@/services/activityService'
 import type { ActivityHistoryItem } from '@/types/activity'
 
 const PAGE_LIMIT = 20
+
+function TransactionDollarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M20.8 13a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
+      <path d="M18 11v10" />
+      <path d="M3 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+      <path d="M15 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+      <path d="M7 5h8" />
+      <path d="M7 5v8a3 3 0 0 0 3 3h1" />
+    </svg>
+  )
+}
 
 function formatActivityDate(value: string) {
   return new Date(value).toLocaleDateString('id-ID', {
@@ -68,7 +91,7 @@ export default function RiwayatOrderPage() {
   return (
     <div>
       <h1 className="mb-2 flex items-center gap-2 text-2xl font-extrabold">
-        <History className="h-6 w-6" /> Riwayat Order
+        <TransactionDollarIcon className="h-6 w-6" /> Riwayat Order
       </h1>
       <p className="mb-6 text-sm text-[#888]">Aktivitas gabungan semua produk, diurutkan dari yang paling baru.</p>
 
