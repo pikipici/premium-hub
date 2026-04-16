@@ -87,6 +87,18 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "DELETE", "/api/v1/admin/product-categories/:id") {
 		t.Fatalf("admin product category delete route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/services") {
+		t.Fatalf("admin sosmed service list route should exist")
+	}
+	if !hasRoute(routes, "POST", "/api/v1/admin/sosmed/services") {
+		t.Fatalf("admin sosmed service create route should exist")
+	}
+	if !hasRoute(routes, "PUT", "/api/v1/admin/sosmed/services/:id") {
+		t.Fatalf("admin sosmed service update route should exist")
+	}
+	if !hasRoute(routes, "DELETE", "/api/v1/admin/sosmed/services/:id") {
+		t.Fatalf("admin sosmed service delete route should exist")
+	}
 	if !hasRoute(routes, "GET", "/api/v1/admin/maintenance/rules") {
 		t.Fatalf("admin maintenance list route should exist")
 	}
@@ -110,6 +122,9 @@ func TestSetupProductionRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "GET", "/api/v1/public/nokos/countries") {
 		t.Fatalf("public nokos countries route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/services") {
+		t.Fatalf("public sosmed services route should exist")
 	}
 	if !hasRoute(routes, "POST", "/api/v1/admin/wallet/topups/:id/recheck") {
 		t.Fatalf("admin recheck route should exist")
@@ -174,5 +189,8 @@ func TestSetupDevelopmentPaymentRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "GET", "/api/v1/public/nokos/countries") {
 		t.Fatalf("public nokos countries route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/services") {
+		t.Fatalf("public sosmed services route should exist")
 	}
 }

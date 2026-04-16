@@ -31,6 +31,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	accountTypeRepo := repository.NewAccountTypeRepo(db)
 	productRepo := repository.NewProductRepo(db)
 	productCategoryRepo := repository.NewProductCategoryRepo(db)
+	sosmedServiceRepo := repository.NewSosmedServiceRepo(db)
 	stockRepo := repository.NewStockRepo(db)
 	orderRepo := repository.NewOrderRepo(db)
 	claimRepo := repository.NewClaimRepo(db)
@@ -47,6 +48,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	notifSvc := service.NewNotificationService(notifRepo)
 	accountTypeSvc := service.NewAccountTypeService(accountTypeRepo)
 	productCategorySvc := service.NewProductCategoryService(productCategoryRepo)
+	sosmedServiceSvc := service.NewSosmedServiceService(sosmedServiceRepo, productCategoryRepo)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
 	stockSvc := service.NewStockService(stockRepo, productRepo).SetAccountTypeRepo(accountTypeRepo)
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
@@ -89,6 +91,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	stockHandler := handler.NewStockHandler(stockSvc)
 	accountTypeHandler := handler.NewAccountTypeHandler(accountTypeSvc)
 	productCategoryHandler := handler.NewProductCategoryHandler(productCategorySvc)
+	sosmedServiceHandler := handler.NewSosmedServiceHandler(sosmedServiceSvc)
 	maintenanceHandler := handler.NewMaintenanceHandler(maintenanceSvc)
 	activityHandler := handler.NewActivityHandler(activitySvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
@@ -116,6 +119,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.POST("/payment/webhook", paymentHandler.Webhook)
 	api.GET("/public/nokos/landing-summary", nokosPublicHandler.GetLandingSummary)
 	api.GET("/public/nokos/countries", nokosPublicHandler.GetCountries)
+	api.GET("/public/sosmed/services", sosmedServiceHandler.PublicList)
 	api.GET(
 		"/convert/track/:token",
 		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request tracking convert. Coba lagi sebentar."),
@@ -233,6 +237,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/product-categories", productCategoryHandler.Create)
 	admin.PUT("/product-categories/:id", productCategoryHandler.Update)
 	admin.DELETE("/product-categories/:id", productCategoryHandler.Delete)
+
+	admin.GET("/sosmed/services", sosmedServiceHandler.AdminList)
+	admin.POST("/sosmed/services", sosmedServiceHandler.Create)
+	admin.PUT("/sosmed/services/:id", sosmedServiceHandler.Update)
+	admin.DELETE("/sosmed/services/:id", sosmedServiceHandler.Delete)
 
 	admin.GET("/maintenance/rules", maintenanceHandler.AdminList)
 	admin.POST("/maintenance/rules", maintenanceHandler.AdminCreate)

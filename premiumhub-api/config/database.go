@@ -26,6 +26,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.ProductCategory{},
 		&model.MaintenanceRule{},
 		&model.Product{},
+		&model.SosmedService{},
 		&model.ProductPrice{},
 		&model.Stock{},
 		&model.Order{},
@@ -52,6 +53,10 @@ func InitDB(cfg *Config) *gorm.DB {
 
 	if err := ensureDefaultProductCategories(db); err != nil {
 		log.Fatal("DB product category defaults:", err)
+	}
+
+	if err := ensureDefaultSosmedServices(db); err != nil {
+		log.Fatal("DB sosmed service defaults:", err)
 	}
 
 	if err := applyPaymentSchemaCleanup(db); err != nil {
@@ -165,6 +170,166 @@ func ensureDefaultProductCategories(db *gorm.DB) error {
 		}
 		if existing.SortOrder == 0 {
 			updates["sort_order"] = item.SortOrder
+		}
+		if len(updates) > 0 {
+			if updateErr := db.Model(&existing).Updates(updates).Error; updateErr != nil {
+				return updateErr
+			}
+		}
+	}
+
+	return nil
+}
+
+func ensureDefaultSosmedServices(db *gorm.DB) error {
+	defaults := []model.SosmedService{
+		{
+			CategoryCode:  "followers",
+			Code:          "ig-followers-id",
+			Title:         "IG Followers Indonesia Aktif",
+			Summary:       "Followers bertahap untuk ningkatin trust profile dan social proof akun bisnis.",
+			PlatformLabel: "Instagram",
+			BadgeText:     "Best Seller",
+			Theme:         "blue",
+			MinOrder:      "100",
+			StartTime:     "5-15 menit",
+			Refill:        "30 hari",
+			ETA:           "2-12 jam",
+			PriceStart:    "Rp 28.000",
+			PricePer1K:    "≈ Rp 28 / 1K",
+			TrustBadges:   []string{"No Password", "Gradual Delivery", "Refill 30 Hari"},
+			SortOrder:     10,
+			IsActive:      true,
+		},
+		{
+			CategoryCode:  "likes",
+			Code:          "ig-likes-premium",
+			Title:         "IG Likes Premium",
+			Summary:       "Boost likes untuk naikin engagement rate dan bantu post kelihatan lebih kredibel.",
+			PlatformLabel: "Instagram",
+			BadgeText:     "Fast Start",
+			Theme:         "pink",
+			MinOrder:      "50",
+			StartTime:     "Instan",
+			Refill:        "Opsional",
+			ETA:           "< 6 jam",
+			PriceStart:    "Rp 16.000",
+			PricePer1K:    "≈ Rp 16 / 1K",
+			TrustBadges:   []string{"No Password", "Real Interaction", "High Retention"},
+			SortOrder:     20,
+			IsActive:      true,
+		},
+		{
+			CategoryCode:  "views",
+			Code:          "tiktok-reels-views",
+			Title:         "TikTok/Reels Views",
+			Summary:       "Paket views untuk dorong momentum konten video baru atau campaign musiman.",
+			PlatformLabel: "TikTok • Instagram Reels",
+			BadgeText:     "Trending Boost",
+			Theme:         "yellow",
+			MinOrder:      "1.000",
+			StartTime:     "10-30 menit",
+			Refill:        "N/A",
+			ETA:           "6-24 jam",
+			PriceStart:    "Rp 22.000",
+			PricePer1K:    "≈ Rp 22 / 1K",
+			TrustBadges:   []string{"No Password", "Stable Delivery", "Campaign Friendly"},
+			SortOrder:     30,
+			IsActive:      true,
+		},
+		{
+			CategoryCode:  "comments",
+			Code:          "komentar-aktif-id",
+			Title:         "Komentar Aktif Indonesia",
+			Summary:       "Komentar random/custom untuk ngasih sinyal diskusi aktif di post lu.",
+			PlatformLabel: "Instagram • TikTok",
+			BadgeText:     "Custom Text",
+			Theme:         "purple",
+			MinOrder:      "10",
+			StartTime:     "30-90 menit",
+			Refill:        "Opsional",
+			ETA:           "6-24 jam",
+			PriceStart:    "Rp 35.000",
+			PricePer1K:    "≈ Rp 350 / 10",
+			TrustBadges:   []string{"No Password", "Natural Pattern", "Flexible Campaign"},
+			SortOrder:     40,
+			IsActive:      true,
+		},
+		{
+			CategoryCode:  "shares",
+			Code:          "share-save-booster",
+			Title:         "Share & Save Booster",
+			Summary:       "Tambahan sinyal distribusi biar algoritma baca konten lu punya potensi sebar tinggi.",
+			PlatformLabel: "Instagram • TikTok",
+			BadgeText:     "Discovery Push",
+			Theme:         "mint",
+			MinOrder:      "25",
+			StartTime:     "15-45 menit",
+			Refill:        "N/A",
+			ETA:           "< 12 jam",
+			PriceStart:    "Rp 19.000",
+			PricePer1K:    "≈ Rp 19 / 1K",
+			TrustBadges:   []string{"No Password", "Gradual Delivery", "Algorithm Friendly"},
+			SortOrder:     50,
+			IsActive:      true,
+		},
+	}
+
+	for _, item := range defaults {
+		var existing model.SosmedService
+		err := db.Where("code = ?", item.Code).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if createErr := db.Create(&item).Error; createErr != nil {
+				return createErr
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		updates := map[string]interface{}{}
+		if strings.TrimSpace(existing.Title) == "" {
+			updates["title"] = item.Title
+		}
+		if strings.TrimSpace(existing.Summary) == "" {
+			updates["summary"] = item.Summary
+		}
+		if strings.TrimSpace(existing.PlatformLabel) == "" {
+			updates["platform_label"] = item.PlatformLabel
+		}
+		if strings.TrimSpace(existing.BadgeText) == "" {
+			updates["badge_text"] = item.BadgeText
+		}
+		if strings.TrimSpace(existing.Theme) == "" {
+			updates["theme"] = item.Theme
+		}
+		if strings.TrimSpace(existing.MinOrder) == "" {
+			updates["min_order"] = item.MinOrder
+		}
+		if strings.TrimSpace(existing.StartTime) == "" {
+			updates["start_time"] = item.StartTime
+		}
+		if strings.TrimSpace(existing.Refill) == "" {
+			updates["refill"] = item.Refill
+		}
+		if strings.TrimSpace(existing.ETA) == "" {
+			updates["eta"] = item.ETA
+		}
+		if strings.TrimSpace(existing.PriceStart) == "" {
+			updates["price_start"] = item.PriceStart
+		}
+		if strings.TrimSpace(existing.PricePer1K) == "" {
+			updates["price_per1_k"] = item.PricePer1K
+		}
+		if existing.SortOrder == 0 {
+			updates["sort_order"] = item.SortOrder
+		}
+		if len(existing.TrustBadges) == 0 {
+			updates["trust_badges"] = item.TrustBadges
+		}
+		if strings.TrimSpace(existing.CategoryCode) == "" {
+			updates["category_code"] = item.CategoryCode
 		}
 		if len(updates) > 0 {
 			if updateErr := db.Model(&existing).Updates(updates).Error; updateErr != nil {

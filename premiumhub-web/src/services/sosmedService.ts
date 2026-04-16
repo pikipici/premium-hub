@@ -1,0 +1,68 @@
+import api from '@/lib/api'
+import type { ApiResponse } from '@/types/api'
+import type { SosmedService } from '@/types/sosmedService'
+
+export interface AdminSosmedServicePayload {
+  category_code: string
+  code: string
+  title: string
+  summary?: string
+  platform_label?: string
+  badge_text?: string
+  theme?: string
+  min_order?: string
+  start_time?: string
+  refill?: string
+  eta?: string
+  price_start?: string
+  price_per_1k?: string
+  trust_badges?: string[]
+  sort_order?: number
+  is_active?: boolean
+}
+
+export interface AdminSosmedServiceUpdatePayload {
+  category_code?: string
+  code?: string
+  title?: string
+  summary?: string
+  platform_label?: string
+  badge_text?: string
+  theme?: string
+  min_order?: string
+  start_time?: string
+  refill?: string
+  eta?: string
+  price_start?: string
+  price_per_1k?: string
+  trust_badges?: string[]
+  sort_order?: number
+  is_active?: boolean
+}
+
+export const sosmedService = {
+  list: async () => {
+    const res = await api.get<ApiResponse<SosmedService[]>>('/public/sosmed/services')
+    return res.data
+  },
+
+  adminList: async (params?: { include_inactive?: boolean }) => {
+    const res = await api.get<ApiResponse<SosmedService[]>>('/admin/sosmed/services', { params })
+    return res.data
+  },
+
+  adminCreate: async (data: AdminSosmedServicePayload) => {
+    const res = await api.post<ApiResponse<SosmedService>>('/admin/sosmed/services', data)
+    return res.data
+  },
+
+  adminUpdate: async (id: string, data: AdminSosmedServiceUpdatePayload) => {
+    const res = await api.put<ApiResponse<SosmedService>>(`/admin/sosmed/services/${id}`, data)
+    return res.data
+  },
+
+  adminDelete: async (id: string) => {
+    const res = await api.delete<ApiResponse<null>>(`/admin/sosmed/services/${id}`)
+    return res.data
+  },
+}

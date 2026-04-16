@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
-  BarChart3,
   Clock3,
   Heart,
   MessageCircle,
@@ -18,8 +17,8 @@ import {
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
-import { productCategoryService } from '@/services/productCategoryService'
-import type { ProductCategory } from '@/types/productCategory'
+import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
+import type { SosmedService } from '@/types/sosmedService'
 
 type SosmedServiceCard = {
   key: string
@@ -39,14 +38,11 @@ type SosmedServiceCard = {
   trustBadges: string[]
 }
 
-type SosmedServicePreset = Partial<Omit<SosmedServiceCard, 'key' | 'title' | 'code'>> & {
-  recommendedTitle?: string
-}
+type SosmedServicePreset = Omit<SosmedServiceCard, 'key'>
 
-const FALLBACK_SERVICES: SosmedServiceCard[] = [
+const FALLBACK_SERVICES: SosmedServicePreset[] = [
   {
-    key: 'followers',
-    code: 'followers',
+    code: 'ig-followers-id',
     title: 'IG Followers Indonesia Aktif',
     icon: Users,
     summary: 'Followers bertahap untuk ningkatin trust profile dan social proof akun bisnis.',
@@ -62,8 +58,7 @@ const FALLBACK_SERVICES: SosmedServiceCard[] = [
     trustBadges: ['No Password', 'Gradual Delivery', 'Refill 30 Hari'],
   },
   {
-    key: 'likes',
-    code: 'likes',
+    code: 'ig-likes-premium',
     title: 'IG Likes Premium',
     icon: Heart,
     summary: 'Boost likes untuk naikin engagement rate dan bantu post kelihatan lebih kredibel.',
@@ -79,8 +74,7 @@ const FALLBACK_SERVICES: SosmedServiceCard[] = [
     trustBadges: ['No Password', 'Real Interaction', 'High Retention'],
   },
   {
-    key: 'views',
-    code: 'views',
+    code: 'tiktok-reels-views',
     title: 'TikTok/Reels Views',
     icon: PlayCircle,
     summary: 'Paket views untuk dorong momentum konten video baru atau campaign musiman.',
@@ -96,8 +90,7 @@ const FALLBACK_SERVICES: SosmedServiceCard[] = [
     trustBadges: ['No Password', 'Stable Delivery', 'Campaign Friendly'],
   },
   {
-    key: 'comments',
-    code: 'comments',
+    code: 'komentar-aktif-id',
     title: 'Komentar Aktif Indonesia',
     icon: MessageCircle,
     summary: 'Komentar random/custom untuk ngasih sinyal diskusi aktif di post lu.',
@@ -113,8 +106,7 @@ const FALLBACK_SERVICES: SosmedServiceCard[] = [
     trustBadges: ['No Password', 'Natural Pattern', 'Flexible Campaign'],
   },
   {
-    key: 'shares',
-    code: 'shares',
+    code: 'share-save-booster',
     title: 'Share & Save Booster',
     icon: Share2,
     summary: 'Tambahan sinyal distribusi biar algoritma baca konten lu punya potensi sebar tinggi.',
@@ -129,187 +121,88 @@ const FALLBACK_SERVICES: SosmedServiceCard[] = [
     pricePer1k: '≈ Rp 19 / 1K',
     trustBadges: ['No Password', 'Gradual Delivery', 'Algorithm Friendly'],
   },
-  {
-    key: 'analytics',
-    code: 'analytics',
-    title: 'Campaign Scale Pack',
-    icon: BarChart3,
-    summary: 'Bundling multi-metrik untuk launching campaign brand atau seasonal campaign.',
-    platform: 'Multi Platform',
-    badge: 'For Agency',
-    tone: 'from-[#FFF4EC] to-[#FFE8D8]',
-    minOrder: 'Bundle',
-    startTime: 'By Queue',
-    refill: 'By Package',
-    eta: 'By Scope',
-    priceStart: 'Rp 125.000',
-    pricePer1k: 'Paket custom campaign',
-    trustBadges: ['No Password', 'Custom KPI', 'Priority Support'],
-  },
 ]
 
-const SOSMED_PRESET_BY_CODE: Record<string, SosmedServicePreset> = {
-  followers: {
-    icon: Users,
-    recommendedTitle: 'IG Followers Indonesia Aktif',
-    platform: 'Instagram',
-    badge: 'Best Seller',
-    tone: 'from-[#EEF8FF] to-[#DCEFFF]',
-    minOrder: '100',
-    startTime: '5-15 menit',
-    refill: '30 hari',
-    eta: '2-12 jam',
-    priceStart: 'Rp 28.000',
-    pricePer1k: '≈ Rp 28 / 1K',
-    trustBadges: ['No Password', 'Gradual Delivery', 'Refill 30 Hari'],
-  },
-  likes: {
-    icon: Heart,
-    recommendedTitle: 'IG Likes Premium',
-    platform: 'Instagram',
-    badge: 'Fast Start',
-    tone: 'from-[#FFF1F3] to-[#FFE1E7]',
-    minOrder: '50',
-    startTime: 'Instan',
-    refill: 'Opsional',
-    eta: '< 6 jam',
-    priceStart: 'Rp 16.000',
-    pricePer1k: '≈ Rp 16 / 1K',
-    trustBadges: ['No Password', 'Real Interaction', 'High Retention'],
-  },
-  views: {
-    icon: PlayCircle,
-    recommendedTitle: 'TikTok/Reels Views',
-    platform: 'TikTok • Instagram Reels',
-    badge: 'Trending Boost',
-    tone: 'from-[#FFFBEA] to-[#FFF3C9]',
-    minOrder: '1.000',
-    startTime: '10-30 menit',
-    refill: 'N/A',
-    eta: '6-24 jam',
-    priceStart: 'Rp 22.000',
-    pricePer1k: '≈ Rp 22 / 1K',
-    trustBadges: ['No Password', 'Stable Delivery', 'Campaign Friendly'],
-  },
-  comments: {
-    icon: MessageCircle,
-    recommendedTitle: 'Komentar Aktif Indonesia',
-    platform: 'Instagram • TikTok',
-    badge: 'Custom Text',
-    tone: 'from-[#F4F0FF] to-[#E8DEFF]',
-    minOrder: '10',
-    startTime: '30-90 menit',
-    refill: 'Opsional',
-    eta: '6-24 jam',
-    priceStart: 'Rp 35.000',
-    pricePer1k: '≈ Rp 350 / 10',
-    trustBadges: ['No Password', 'Natural Pattern', 'Flexible Campaign'],
-  },
-  shares: {
-    icon: Share2,
-    recommendedTitle: 'Share & Save Booster',
-    platform: 'Instagram • TikTok',
-    badge: 'Discovery Push',
-    tone: 'from-[#ECFFFA] to-[#D6FFF2]',
-    minOrder: '25',
-    startTime: '15-45 menit',
-    refill: 'N/A',
-    eta: '< 12 jam',
-    priceStart: 'Rp 19.000',
-    pricePer1k: '≈ Rp 19 / 1K',
-    trustBadges: ['No Password', 'Gradual Delivery', 'Algorithm Friendly'],
-  },
-  analytics: {
-    icon: BarChart3,
-    recommendedTitle: 'Campaign Scale Pack',
-    platform: 'Multi Platform',
-    badge: 'For Agency',
-    tone: 'from-[#FFF4EC] to-[#FFE8D8]',
-    minOrder: 'Bundle',
-    startTime: 'By Queue',
-    refill: 'By Package',
-    eta: 'By Scope',
-    priceStart: 'Rp 125.000',
-    pricePer1k: 'Paket custom campaign',
-    trustBadges: ['No Password', 'Custom KPI', 'Priority Support'],
-  },
+const ICON_BY_CATEGORY_CODE: Record<string, LucideIcon> = {
+  followers: Users,
+  likes: Heart,
+  views: PlayCircle,
+  comments: MessageCircle,
+  shares: Share2,
 }
 
-const GENERIC_TITLES_BY_CODE: Record<string, string[]> = {
-  followers: ['followers', 'follower', 'followers growth'],
-  likes: ['likes', 'like', 'likes & favorite'],
-  views: ['views', 'view', 'views / watchtime'],
-  comments: ['comments', 'comment', 'komentar', 'komentar aktif'],
-  shares: ['shares', 'share', 'share & save'],
-  analytics: ['analytics', 'campaign scale pack'],
+const THEME_TO_TONE: Record<string, string> = {
+  blue: 'from-[#EEF8FF] to-[#DCEFFF]',
+  pink: 'from-[#FFF1F3] to-[#FFE1E7]',
+  yellow: 'from-[#FFFBEA] to-[#FFF3C9]',
+  purple: 'from-[#F4F0FF] to-[#E8DEFF]',
+  mint: 'from-[#ECFFFA] to-[#D6FFF2]',
+  orange: 'from-[#FFF4EC] to-[#FFE8D8]',
+  gray: 'from-[#F4F4F2] to-[#ECECEA]',
 }
 
-function resolveServiceTitle(code: string, rawTitle: string, fallbackTitle: string, recommendedTitle?: string) {
-  const trimmed = rawTitle.trim()
-  if (!trimmed) return recommendedTitle || fallbackTitle
+function cleanValue(value: string | null | undefined, fallback: string) {
+  const trimmed = (value || '').trim()
+  return trimmed || fallback
+}
 
-  const normalized = trimmed.toLowerCase()
-  const genericTitles = GENERIC_TITLES_BY_CODE[code] || []
+function normalizeTrustBadges(items: string[] | null | undefined, fallback: string[]) {
+  const cleaned = (items || []).map((item) => item.trim()).filter(Boolean)
+  if (cleaned.length > 0) return cleaned.slice(0, 8)
+  return fallback
+}
 
-  if (recommendedTitle && (genericTitles.includes(normalized) || normalized === code.toLowerCase())) {
-    return recommendedTitle
+function mapSosmedServicesToCards(items: SosmedService[]): SosmedServiceCard[] {
+  if (!items.length) {
+    return FALLBACK_SERVICES.map((service, index) => ({
+      key: `${service.code}-${index}`,
+      ...service,
+    }))
   }
 
-  return trimmed
-}
-
-function mapCategoriesToCards(categories: ProductCategory[]): SosmedServiceCard[] {
-  if (!categories.length) return FALLBACK_SERVICES
-
-  const sortedCategories = [...categories].sort((left, right) => {
+  const sorted = [...items].sort((left, right) => {
     const leftSort = left.sort_order ?? 100
     const rightSort = right.sort_order ?? 100
     if (leftSort !== rightSort) return leftSort - rightSort
-    return left.code.localeCompare(right.code)
+    return (left.code || '').localeCompare(right.code || '')
   })
 
-  return sortedCategories.map((category, index) => {
-    const preset = SOSMED_PRESET_BY_CODE[category.code]
+  return sorted.map((item, index) => {
     const fallback = FALLBACK_SERVICES[index % FALLBACK_SERVICES.length]
-
-    const rawTitle = category.label?.trim() || fallback.title
-    const title = resolveServiceTitle(category.code, rawTitle, fallback.title, preset?.recommendedTitle)
+    const icon = ICON_BY_CATEGORY_CODE[item.category_code || ''] || fallback.icon
+    const tone = THEME_TO_TONE[(item.theme || '').toLowerCase()] || fallback.tone
 
     return {
-      key: category.id || category.code,
-      code: category.code || fallback.code,
-      title,
-      icon: preset?.icon || fallback.icon,
-      summary:
-        category.description?.trim() ||
-        preset?.summary ||
-        fallback.summary ||
-        `Paket kebutuhan ${title} untuk campaign social media.`,
-      platform: preset?.platform || fallback.platform,
-      badge: preset?.badge || fallback.badge,
-      tone: preset?.tone || fallback.tone,
-      minOrder: preset?.minOrder || fallback.minOrder,
-      startTime: preset?.startTime || fallback.startTime,
-      refill: preset?.refill || fallback.refill,
-      eta: preset?.eta || fallback.eta,
-      priceStart: preset?.priceStart || fallback.priceStart,
-      pricePer1k: preset?.pricePer1k || fallback.pricePer1k,
-      trustBadges: preset?.trustBadges || fallback.trustBadges,
+      key: item.id || item.code || `${fallback.code}-${index}`,
+      code: cleanValue(item.code, fallback.code),
+      title: cleanValue(item.title, fallback.title),
+      icon,
+      summary: cleanValue(item.summary, fallback.summary),
+      platform: cleanValue(item.platform_label, fallback.platform),
+      badge: cleanValue(item.badge_text, fallback.badge),
+      tone,
+      minOrder: cleanValue(item.min_order, fallback.minOrder),
+      startTime: cleanValue(item.start_time, fallback.startTime),
+      refill: cleanValue(item.refill, fallback.refill),
+      eta: cleanValue(item.eta, fallback.eta),
+      priceStart: cleanValue(item.price_start, fallback.priceStart),
+      pricePer1k: cleanValue(item.price_per_1k, fallback.pricePer1k),
+      trustBadges: normalizeTrustBadges(item.trust_badges, fallback.trustBadges),
     }
   })
 }
 
 export default function ProductSosmedLandingPage() {
-  const [categories, setCategories] = useState<ProductCategory[]>([])
+  const [services, setServices] = useState<SosmedService[]>([])
 
   useEffect(() => {
     let alive = true
 
-    productCategoryService
-      .list({ scope: 'sosmed' })
+    sosmedServiceApi
+      .list()
       .then((res) => {
         if (!alive || !res.success) return
-        setCategories(res.data || [])
+        setServices(res.data || [])
       })
       .catch(() => {
         // fail-open: fallback cards still shown
@@ -320,7 +213,7 @@ export default function ProductSosmedLandingPage() {
     }
   }, [])
 
-  const services = useMemo(() => mapCategoriesToCards(categories), [categories])
+  const cards = useMemo(() => mapSosmedServicesToCards(services), [services])
 
   return (
     <>
@@ -348,7 +241,7 @@ export default function ProductSosmedLandingPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {services.map((service) => {
+            {cards.map((service) => {
               const nextTarget = encodeURIComponent(`/product/sosmed?service=${service.code}`)
 
               return (
