@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { ShoppingBag } from 'lucide-react'
 
 export default function Footer() {
+  const currentYear = new Date().getFullYear()
+
   return (
     <footer className="bg-[#141414] text-white mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -48,7 +50,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-gray-500">© 2026 DigiMarket. All rights reserved.</p>
+          <p className="text-sm text-gray-500">© {currentYear} DigiMarket. All rights reserved.</p>
           <div className="flex gap-6">
             <span className="text-sm text-gray-500">🇮🇩 Indonesia</span>
           </div>
