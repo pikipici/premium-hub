@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"io"
 	"strconv"
 
 	"premiumhub-api/internal/service"
@@ -82,6 +84,22 @@ func (h *SosmedServiceHandler) Update(c *gin.Context) {
 	}
 
 	response.Success(c, "Layanan sosmed diperbarui", item)
+}
+
+func (h *SosmedServiceHandler) RepriceReseller(c *gin.Context) {
+	var input service.RepriceSosmedResellerInput
+	if err := c.ShouldBindJSON(&input); err != nil && !errors.Is(err, io.EOF) {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	res, err := h.svc.RepriceResellerToIDR(c.Request.Context(), input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Sinkronisasi harga reseller selesai", res)
 }
 
 func (h *SosmedServiceHandler) Delete(c *gin.Context) {

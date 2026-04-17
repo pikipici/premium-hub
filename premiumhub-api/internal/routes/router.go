@@ -49,7 +49,13 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	notifSvc := service.NewNotificationService(notifRepo)
 	accountTypeSvc := service.NewAccountTypeService(accountTypeRepo)
 	productCategorySvc := service.NewProductCategoryService(productCategoryRepo)
-	sosmedServiceSvc := service.NewSosmedServiceService(sosmedServiceRepo, productCategoryRepo)
+	sosmedServiceSvc := service.NewSosmedServiceService(sosmedServiceRepo, productCategoryRepo).
+		SetResellerFXConfig(service.NewSosmedResellerFXConfig(
+			cfg.SosmedResellerFXMode,
+			cfg.SosmedResellerFXFixedRate,
+			cfg.SosmedResellerFXLiveURL,
+			cfg.SosmedResellerFXLiveTimeout,
+		))
 	sosmedOrderSvc := service.NewSosmedOrderService(sosmedOrderRepo, sosmedServiceRepo, notifRepo)
 	sosmedPaymentSvc := service.NewSosmedPaymentServiceWithGateway(cfg, sosmedOrderRepo, sosmedOrderSvc, nil)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
@@ -253,6 +259,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	admin.GET("/sosmed/services", sosmedServiceHandler.AdminList)
 	admin.POST("/sosmed/services", sosmedServiceHandler.Create)
+	admin.POST("/sosmed/services/reprice-reseller", sosmedServiceHandler.RepriceReseller)
 	admin.PUT("/sosmed/services/:id", sosmedServiceHandler.Update)
 	admin.DELETE("/sosmed/services/:id", sosmedServiceHandler.Delete)
 

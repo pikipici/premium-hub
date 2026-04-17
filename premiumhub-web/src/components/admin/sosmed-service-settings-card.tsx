@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { productCategoryService } from '@/services/productCategoryService'
 import {
   sosmedService,
+  type AdminSosmedResellerRepricePayload,
   type AdminSosmedServicePayload,
   type AdminSosmedServiceUpdatePayload,
 } from '@/services/sosmedService'
@@ -13,6 +14,7 @@ import type { ProductCategory } from '@/types/productCategory'
 import type { SosmedService } from '@/types/sosmedService'
 
 type FormMode = 'create' | 'edit'
+type ResellerFXMode = 'fixed' | 'live'
 
 type SosmedServiceFormState = {
   category_code: string
@@ -164,6 +166,9 @@ export default function SosmedServiceSettingsCard() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
+  const [resellerFXMode, setResellerFXMode] = useState<ResellerFXMode>('live')
+  const [resellerFXRate, setResellerFXRate] = useState('17000')
 
   const [formOpen, setFormOpen] = useState(false)
   const [formMode, setFormMode] = useState<FormMode>('create')
@@ -432,6 +437,50 @@ export default function SosmedServiceSettingsCard() {
     }
   }
 
+  const repriceResellerToIDR = async () => {
+    setSaving(true)
+    setError('')
+
+    try {
+      const payload: AdminSosmedResellerRepricePayload = {
+        mode: resellerFXMode,
+        include_inactive: true,
+        code_prefix: 'jap-',
+      }
+
+      if (resellerFXMode === 'fixed') {
+        const fixedRate = Number(resellerFXRate)
+        if (!Number.isFinite(fixedRate) || fixedRate <= 0) {
+          setError('Kurs fixed wajib angka valid (> 0)')
+          return
+        }
+        payload.fixed_rate = fixedRate
+      }
+
+      const res = await sosmedService.adminRepriceReseller(payload)
+      if (!res.success) {
+        setError(res.message || 'Gagal sinkronisasi harga reseller')
+        return
+      }
+
+      const data = res.data
+      const rateLabel = Number.isFinite(data.rate_used)
+        ? data.rate_used.toLocaleString('id-ID', { maximumFractionDigits: 2 })
+        : String(data.rate_used)
+
+      const warningText = data.warning ? ` • ${data.warning}` : ''
+      setNotice(
+        `Sync reseller selesai (${data.mode}/${data.rate_source}). Kurs ${rateLabel}. Update ${data.updated}/${data.eligible}.${warningText}`
+      )
+
+      await loadData()
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal sinkronisasi harga reseller'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <>
       <div className="card" style={{ marginBottom: 12 }}>
@@ -443,9 +492,44 @@ export default function SosmedServiceSettingsCard() {
             </div>
           </div>
 
-          <button className="topbar-btn primary" type="button" onClick={openCreateForm}>
-            + Tambah Layanan
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <select
+                className="form-select"
+                style={{ minWidth: 120 }}
+                value={resellerFXMode}
+                onChange={(event) => setResellerFXMode(event.target.value as ResellerFXMode)}
+                disabled={saving || loading}
+              >
+                <option value="live">Kurs Live</option>
+                <option value="fixed">Kurs Fixed</option>
+              </select>
+
+              {resellerFXMode === 'fixed' && (
+                <input
+                  className="form-input"
+                  style={{ width: 130 }}
+                  value={resellerFXRate}
+                  onChange={(event) => setResellerFXRate(event.target.value)}
+                  placeholder="17000"
+                  disabled={saving || loading}
+                />
+              )}
+
+              <button
+                className="topbar-btn"
+                type="button"
+                onClick={repriceResellerToIDR}
+                disabled={saving || loading}
+              >
+                Sync Reseller → Rupiah
+              </button>
+            </div>
+
+            <button className="topbar-btn primary" type="button" onClick={openCreateForm} disabled={saving}>
+              + Tambah Layanan
+            </button>
+          </div>
         </div>
 
         {(error || notice) && (

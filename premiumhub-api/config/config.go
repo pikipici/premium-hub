@@ -42,6 +42,8 @@ type Config struct {
 	ConvertProofR2AccessKeyID, ConvertProofR2SecretAccessKey                    string
 	ConvertProofR2PublicBaseURL, ConvertProofR2Prefix                           string
 	ConvertProofR2UploadTimeout                                                 string
+	SosmedResellerFXMode, SosmedResellerFXFixedRate                             string
+	SosmedResellerFXLiveURL, SosmedResellerFXLiveTimeout                        string
 }
 
 func Load() *Config {
@@ -123,6 +125,10 @@ func Load() *Config {
 		ConvertProofR2PublicBaseURL:          e("CONVERT_PROOF_R2_PUBLIC_BASE_URL", ""),
 		ConvertProofR2Prefix:                 e("CONVERT_PROOF_R2_PREFIX", "convert-proofs"),
 		ConvertProofR2UploadTimeout:          e("CONVERT_PROOF_R2_UPLOAD_TIMEOUT", "45s"),
+		SosmedResellerFXMode:                 e("SOSMED_RESELLER_FX_MODE", "fixed"),
+		SosmedResellerFXFixedRate:            e("SOSMED_RESELLER_FX_FIXED_RATE", "17000"),
+		SosmedResellerFXLiveURL:              e("SOSMED_RESELLER_FX_LIVE_URL", "https://open.er-api.com/v6/latest/USD"),
+		SosmedResellerFXLiveTimeout:          e("SOSMED_RESELLER_FX_LIVE_TIMEOUT", "8s"),
 	}
 }
 

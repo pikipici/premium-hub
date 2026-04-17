@@ -93,6 +93,9 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "POST", "/api/v1/admin/sosmed/services") {
 		t.Fatalf("admin sosmed service create route should exist")
 	}
+	if !hasRoute(routes, "POST", "/api/v1/admin/sosmed/services/reprice-reseller") {
+		t.Fatalf("admin sosmed reseller reprice route should exist")
+	}
 	if !hasRoute(routes, "PUT", "/api/v1/admin/sosmed/services/:id") {
 		t.Fatalf("admin sosmed service update route should exist")
 	}

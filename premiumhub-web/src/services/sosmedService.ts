@@ -42,6 +42,28 @@ export interface AdminSosmedServiceUpdatePayload {
   is_active?: boolean
 }
 
+export interface AdminSosmedResellerRepricePayload {
+  mode?: 'fixed' | 'live'
+  fixed_rate?: number
+  include_inactive?: boolean
+  code_prefix?: string
+  dry_run?: boolean
+}
+
+export interface AdminSosmedResellerRepriceResult {
+  mode: 'fixed' | 'live' | string
+  rate_source: string
+  rate_used: number
+  warning?: string
+  code_prefix: string
+  include_inactive: boolean
+  dry_run: boolean
+  total: number
+  eligible: number
+  updated: number
+  skipped: number
+}
+
 export const sosmedService = {
   list: async () => {
     const res = await api.get<ApiResponse<SosmedService[]>>('/public/sosmed/services')
@@ -65,6 +87,14 @@ export const sosmedService = {
 
   adminDelete: async (id: string) => {
     const res = await api.delete<ApiResponse<null>>(`/admin/sosmed/services/${id}`)
+    return res.data
+  },
+
+  adminRepriceReseller: async (data: AdminSosmedResellerRepricePayload) => {
+    const res = await api.post<ApiResponse<AdminSosmedResellerRepriceResult>>(
+      '/admin/sosmed/services/reprice-reseller',
+      data
+    )
     return res.data
   },
 }

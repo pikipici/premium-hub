@@ -2,9 +2,11 @@ package service
 
 import (
 	"errors"
+	"net/http"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
@@ -26,18 +28,29 @@ var sosmedServiceAllowedThemes = map[string]struct{}{
 }
 
 type SosmedServiceService struct {
-	repo               *repository.SosmedServiceRepo
-	productCategorySvc *ProductCategoryService
+	repo                 *repository.SosmedServiceRepo
+	productCategorySvc   *ProductCategoryService
+	resellerFXConfig     SosmedResellerFXConfig
+	resellerFXHTTPClient *http.Client
 }
 
 func NewSosmedServiceService(
 	repo *repository.SosmedServiceRepo,
 	productCategoryRepo *repository.ProductCategoryRepo,
 ) *SosmedServiceService {
-	svc := &SosmedServiceService{repo: repo}
+	svc := &SosmedServiceService{
+		repo: repo,
+		resellerFXConfig: SosmedResellerFXConfig{
+			Mode:        defaultSosmedResellerFXMode,
+			FixedRate:   defaultSosmedResellerFXRate,
+			LiveURL:     defaultSosmedResellerFXLiveURL,
+			LiveTimeout: 8 * time.Second,
+		},
+	}
 	if productCategoryRepo != nil {
 		svc.productCategorySvc = NewProductCategoryService(productCategoryRepo)
 	}
+	svc.resellerFXHTTPClient = &http.Client{Timeout: svc.resellerFXConfig.LiveTimeout}
 	return svc
 }
 

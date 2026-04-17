@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -149,5 +150,109 @@ func TestSosmedService_UpdateAndDelete(t *testing.T) {
 	}
 	if stored.IsActive {
 		t.Fatalf("expected sosmed service to be inactive after delete")
+	}
+}
+
+func TestSosmedService_RepriceResellerToIDR_FixedMode(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(&model.ProductCategory{}, &model.SosmedService{}); err != nil {
+		t.Fatalf("migrate sosmed models: %v", err)
+	}
+
+	categoryRepo := repository.NewProductCategoryRepo(db)
+	seedSosmedCategory(t, categoryRepo, "followers", "Followers", 10)
+
+	repo := repository.NewSosmedServiceRepo(db)
+	svc := NewSosmedServiceService(repo, categoryRepo).SetResellerFXConfig(SosmedResellerFXConfig{
+		Mode:      "fixed",
+		FixedRate: 17000,
+	})
+
+	item, err := svc.Create(CreateSosmedServiceInput{
+		CategoryCode: "followers",
+		Code:         "jap-tt-views-auto30d-10164",
+		Title:        "TikTok Views",
+		Summary:      "Harga reseller USD 0.0563/1K",
+		PriceStart:   "Reseller USD 0.0563/1K",
+		PricePer1K:   "Reseller USD 0.0563 per 1K • JAP#10164",
+		IsActive:     boolPtr(false),
+	})
+	if err != nil {
+		t.Fatalf("create sosmed service: %v", err)
+	}
+
+	fixedRate := 18000.0
+	res, err := svc.RepriceResellerToIDR(context.Background(), RepriceSosmedResellerInput{
+		Mode:            "fixed",
+		FixedRate:       &fixedRate,
+		IncludeInactive: boolPtr(true),
+	})
+	if err != nil {
+		t.Fatalf("reprice reseller: %v", err)
+	}
+
+	if res.Mode != "fixed" {
+		t.Fatalf("expected mode fixed, got %s", res.Mode)
+	}
+	if res.Updated != 1 {
+		t.Fatalf("expected updated=1, got %d", res.Updated)
+	}
+
+	stored, err := repo.FindByID(item.ID)
+	if err != nil {
+		t.Fatalf("find sosmed service: %v", err)
+	}
+	if stored.PriceStart != "Reseller Rp 1.013/1K" {
+		t.Fatalf("unexpected price_start: %s", stored.PriceStart)
+	}
+	if !strings.Contains(stored.PricePer1K, "USD 0.0563") {
+		t.Fatalf("expected USD marker in price_per_1k, got %s", stored.PricePer1K)
+	}
+}
+
+func TestSosmedService_RepriceResellerToIDR_DryRun(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(&model.ProductCategory{}, &model.SosmedService{}); err != nil {
+		t.Fatalf("migrate sosmed models: %v", err)
+	}
+
+	categoryRepo := repository.NewProductCategoryRepo(db)
+	seedSosmedCategory(t, categoryRepo, "followers", "Followers", 10)
+
+	repo := repository.NewSosmedServiceRepo(db)
+	svc := NewSosmedServiceService(repo, categoryRepo).SetResellerFXConfig(SosmedResellerFXConfig{
+		Mode:      "fixed",
+		FixedRate: 17000,
+	})
+
+	item, err := svc.Create(CreateSosmedServiceInput{
+		CategoryCode: "followers",
+		Code:         "jap-test-9999",
+		Title:        "Test Service",
+		Summary:      "Harga reseller USD 1.25/1K",
+		PriceStart:   "Reseller USD 1.25/1K",
+		PricePer1K:   "Reseller USD 1.25 per 1K",
+	})
+	if err != nil {
+		t.Fatalf("create sosmed service: %v", err)
+	}
+
+	res, err := svc.RepriceResellerToIDR(context.Background(), RepriceSosmedResellerInput{DryRun: true})
+	if err != nil {
+		t.Fatalf("reprice reseller dry run: %v", err)
+	}
+	if !res.DryRun {
+		t.Fatalf("expected dry run true")
+	}
+	if res.Updated != 1 {
+		t.Fatalf("expected dry run counted update=1, got %d", res.Updated)
+	}
+
+	stored, err := repo.FindByID(item.ID)
+	if err != nil {
+		t.Fatalf("find sosmed service: %v", err)
+	}
+	if stored.PriceStart != "Reseller USD 1.25/1K" {
+		t.Fatalf("dry run should not mutate price_start, got %s", stored.PriceStart)
 	}
 }
