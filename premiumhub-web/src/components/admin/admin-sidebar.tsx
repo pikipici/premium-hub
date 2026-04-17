@@ -33,6 +33,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Transaksi',
     items: [
       { href: '/admin/order', label: 'Order', icon: '◉' },
+      { href: '/admin/sosmed/orders', label: 'Order Sosmed', icon: '◎' },
       { href: '/admin/convert', label: 'Control Convert', icon: '⇄' },
       { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌' },
     ],
@@ -48,6 +49,7 @@ const NAV_SECTIONS: NavSection[] = [
 
 function isNavActive(pathname: string, href: string) {
   if (href === '/admin') return pathname === '/admin'
+  if (href === '/admin/sosmed') return pathname === '/admin/sosmed'
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 

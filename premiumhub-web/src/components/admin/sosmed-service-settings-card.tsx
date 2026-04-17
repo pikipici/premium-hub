@@ -28,6 +28,7 @@ type SosmedServiceFormState = {
   eta: string
   price_start: string
   price_per_1k: string
+  checkout_price: string
   trust_badges_text: string
   sort_order: string
   is_active: boolean
@@ -149,6 +150,7 @@ function createEmptyForm(categoryCode: string): SosmedServiceFormState {
     eta: '',
     price_start: '',
     price_per_1k: '',
+    checkout_price: '0',
     trust_badges_text: '',
     sort_order: '100',
     is_active: true,
@@ -267,6 +269,7 @@ export default function SosmedServiceSettingsCard() {
       eta: item.eta || '',
       price_start: item.price_start || '',
       price_per_1k: item.price_per_1k || '',
+      checkout_price: String(item.checkout_price ?? 0),
       trust_badges_text: (item.trust_badges || []).join(', '),
       sort_order: String(item.sort_order ?? 100),
       is_active: item.is_active,
@@ -298,6 +301,11 @@ export default function SosmedServiceSettingsCard() {
     }
 
     const sortOrder = Number(form.sort_order) || 100
+    const checkoutPrice = Math.max(0, Number(form.checkout_price) || 0)
+    if (checkoutPrice <= 0) {
+      setError('Checkout price wajib lebih dari 0')
+      return
+    }
     const trustBadges = parseTrustBadges(form.trust_badges_text)
 
     const payloadBase: AdminSosmedServicePayload = {
@@ -314,6 +322,7 @@ export default function SosmedServiceSettingsCard() {
       eta: form.eta.trim(),
       price_start: form.price_start.trim(),
       price_per_1k: form.price_per_1k.trim(),
+      checkout_price: checkoutPrice,
       trust_badges: trustBadges,
       sort_order: sortOrder,
       is_active: form.is_active,
@@ -346,6 +355,7 @@ export default function SosmedServiceSettingsCard() {
           eta: payloadBase.eta,
           price_start: payloadBase.price_start,
           price_per_1k: payloadBase.price_per_1k,
+          checkout_price: payloadBase.checkout_price,
           trust_badges: payloadBase.trust_badges,
           sort_order: payloadBase.sort_order,
           is_active: payloadBase.is_active,
@@ -484,7 +494,12 @@ export default function SosmedServiceSettingsCard() {
                           </div>
                         </td>
                         <td>{categoryLabelMap[item.category_code] || item.category_code || '-'}</td>
-                        <td>{item.price_start || '-'}</td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{item.price_start || '-'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            Checkout: Rp {(item.checkout_price || 0).toLocaleString('id-ID')}
+                          </div>
+                        </td>
                         <td>{item.sort_order ?? 100}</td>
                         <td>
                           <span className={`status ${status.className}`}>{status.label}</span>
@@ -669,7 +684,7 @@ export default function SosmedServiceSettingsCard() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 <div>
                   <label className="form-label">Harga Mulai</label>
                   <input
@@ -686,6 +701,17 @@ export default function SosmedServiceSettingsCard() {
                     value={form.price_per_1k}
                     onChange={(event) => setForm((prev) => ({ ...prev, price_per_1k: event.target.value }))}
                     placeholder="≈ Rp 28 / 1K"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Checkout Price (IDR)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min={0}
+                    value={form.checkout_price}
+                    onChange={(event) => setForm((prev) => ({ ...prev, checkout_price: event.target.value }))}
+                    placeholder="28000"
                   />
                 </div>
               </div>

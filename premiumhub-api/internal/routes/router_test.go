@@ -126,6 +126,30 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/services") {
 		t.Fatalf("public sosmed services route should exist")
 	}
+	if !hasRoute(routes, "POST", "/api/v1/sosmed/orders") {
+		t.Fatalf("sosmed order create route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/sosmed/orders") {
+		t.Fatalf("sosmed order list route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/sosmed/orders/:id") {
+		t.Fatalf("sosmed order detail route should exist")
+	}
+	if !hasRoute(routes, "DELETE", "/api/v1/sosmed/orders/:id") {
+		t.Fatalf("sosmed order cancel route should exist")
+	}
+	if !hasRoute(routes, "POST", "/api/v1/sosmed/payments") {
+		t.Fatalf("sosmed payment create route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/sosmed/payments/status/:orderId") {
+		t.Fatalf("sosmed payment status route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/orders") {
+		t.Fatalf("admin sosmed order list route should exist")
+	}
+	if !hasRoute(routes, "PATCH", "/api/v1/admin/sosmed/orders/:id/status") {
+		t.Fatalf("admin sosmed order status update route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/admin/wallet/topups/:id/recheck") {
 		t.Fatalf("admin recheck route should exist")
 	}
@@ -192,5 +216,8 @@ func TestSetupDevelopmentPaymentRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/services") {
 		t.Fatalf("public sosmed services route should exist")
+	}
+	if !hasRoute(routes, "POST", "/api/v1/sosmed/payments") {
+		t.Fatalf("sosmed payment create route should exist")
 	}
 }

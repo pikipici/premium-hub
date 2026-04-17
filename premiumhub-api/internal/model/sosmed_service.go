@@ -22,6 +22,7 @@ type SosmedService struct {
 	ETA           string    `gorm:"size:80" json:"eta"`
 	PriceStart    string    `gorm:"size:80" json:"price_start"`
 	PricePer1K    string    `gorm:"size:120" json:"price_per_1k"`
+	CheckoutPrice int64     `gorm:"not null;default:0" json:"checkout_price"`
 	TrustBadges   []string  `gorm:"serializer:json" json:"trust_badges,omitempty"`
 	SortOrder     int       `gorm:"default:100;index:idx_sosmed_services_sort" json:"sort_order"`
 	IsActive      bool      `gorm:"default:true" json:"is_active"`

@@ -35,6 +35,7 @@ type SosmedServiceCard = {
   eta: string
   priceStart: string
   pricePer1k: string
+  checkoutPrice: number
   trustBadges: string[]
 }
 
@@ -55,6 +56,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     eta: '2-12 jam',
     priceStart: 'Rp 28.000',
     pricePer1k: '≈ Rp 28 / 1K',
+    checkoutPrice: 28000,
     trustBadges: ['No Password', 'Gradual Delivery', 'Refill 30 Hari'],
   },
   {
@@ -71,6 +73,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     eta: '< 6 jam',
     priceStart: 'Rp 16.000',
     pricePer1k: '≈ Rp 16 / 1K',
+    checkoutPrice: 16000,
     trustBadges: ['No Password', 'Real Interaction', 'High Retention'],
   },
   {
@@ -87,6 +90,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     eta: '6-24 jam',
     priceStart: 'Rp 22.000',
     pricePer1k: '≈ Rp 22 / 1K',
+    checkoutPrice: 22000,
     trustBadges: ['No Password', 'Stable Delivery', 'Campaign Friendly'],
   },
   {
@@ -103,6 +107,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     eta: '6-24 jam',
     priceStart: 'Rp 35.000',
     pricePer1k: '≈ Rp 350 / 10',
+    checkoutPrice: 35000,
     trustBadges: ['No Password', 'Natural Pattern', 'Flexible Campaign'],
   },
   {
@@ -119,6 +124,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     eta: '< 12 jam',
     priceStart: 'Rp 19.000',
     pricePer1k: '≈ Rp 19 / 1K',
+    checkoutPrice: 19000,
     trustBadges: ['No Password', 'Gradual Delivery', 'Algorithm Friendly'],
   },
 ]
@@ -139,6 +145,10 @@ const THEME_TO_TONE: Record<string, string> = {
   mint: 'from-[#ECFFFA] to-[#D6FFF2]',
   orange: 'from-[#FFF4EC] to-[#FFE8D8]',
   gray: 'from-[#F4F4F2] to-[#ECECEA]',
+}
+
+function formatRupiah(value: number) {
+  return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
 }
 
 function cleanValue(value: string | null | undefined, fallback: string) {
@@ -172,6 +182,10 @@ function mapSosmedServicesToCards(items: SosmedService[]): SosmedServiceCard[] {
     const icon = ICON_BY_CATEGORY_CODE[item.category_code || ''] || fallback.icon
     const tone = THEME_TO_TONE[(item.theme || '').toLowerCase()] || fallback.tone
 
+    const checkoutPrice = item.checkout_price && item.checkout_price > 0
+      ? item.checkout_price
+      : fallback.checkoutPrice
+
     return {
       key: item.id || item.code || `${fallback.code}-${index}`,
       code: cleanValue(item.code, fallback.code),
@@ -185,8 +199,9 @@ function mapSosmedServicesToCards(items: SosmedService[]): SosmedServiceCard[] {
       startTime: cleanValue(item.start_time, fallback.startTime),
       refill: cleanValue(item.refill, fallback.refill),
       eta: cleanValue(item.eta, fallback.eta),
-      priceStart: cleanValue(item.price_start, fallback.priceStart),
+      priceStart: checkoutPrice > 0 ? formatRupiah(checkoutPrice) : cleanValue(item.price_start, fallback.priceStart),
       pricePer1k: cleanValue(item.price_per_1k, fallback.pricePer1k),
+      checkoutPrice,
       trustBadges: normalizeTrustBadges(item.trust_badges, fallback.trustBadges),
     }
   })
@@ -242,7 +257,7 @@ export default function ProductSosmedLandingPage() {
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {cards.map((service) => {
-              const nextTarget = encodeURIComponent(`/product/sosmed?service=${service.code}`)
+              const checkoutHref = `/product/sosmed/checkout?service=${encodeURIComponent(service.code)}`
 
               return (
                 <article
@@ -288,6 +303,7 @@ export default function ProductSosmedLandingPage() {
                     <p className="text-[10px] uppercase tracking-wide text-[#A2572E]">Harga mulai</p>
                     <p className="text-lg font-extrabold text-[#141414]">{service.priceStart}</p>
                     <p className="text-xs text-[#666]">{service.pricePer1k}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[#A2572E]">Checkout: {formatRupiah(service.checkoutPrice)}</p>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -303,13 +319,13 @@ export default function ProductSosmedLandingPage() {
 
                   <div className="mt-5 grid grid-cols-2 gap-2">
                     <Link
-                      href={`/register?next=${nextTarget}`}
+                      href={checkoutHref}
                       className="inline-flex items-center justify-center gap-1 rounded-full bg-[#FF5733] px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-[#e64d2e]"
                     >
                       Beli Sekarang <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                     <Link
-                      href={`/login?next=${nextTarget}`}
+                      href={checkoutHref}
                       className="inline-flex items-center justify-center rounded-full border border-[#141414] px-3 py-2.5 text-xs font-semibold text-[#141414] transition hover:bg-[#141414] hover:text-white"
                     >
                       Detail Paket

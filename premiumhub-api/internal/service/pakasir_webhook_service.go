@@ -16,6 +16,10 @@ type orderWebhookLookup interface {
 	FindByGatewayOrderID(gatewayOrderID string) (*model.Order, error)
 }
 
+type sosmedWebhookLookup interface {
+	FindByGatewayOrderID(gatewayOrderID string) (*model.SosmedOrder, error)
+}
+
 type walletWebhookLookup interface {
 	FindTopupByGatewayRef(provider, gatewayRef string) (*model.WalletTopup, error)
 }
@@ -24,29 +28,39 @@ type orderWebhookHandler interface {
 	HandleWebhook(input WebhookInput) error
 }
 
+type sosmedWebhookHandler interface {
+	HandleWebhook(input WebhookInput) error
+}
+
 type walletWebhookHandler interface {
 	HandlePakasirWebhook(ctx context.Context, input WalletPakasirWebhookInput) error
 }
 
 // PakasirWebhookService menangani 1 endpoint webhook untuk banyak flow
-// (order checkout + wallet topup) dengan routing by order_id / lookup DB.
+// (order checkout apps + order sosmed + wallet topup) dengan routing by order_id / lookup DB.
 type PakasirWebhookService struct {
 	orderLookup   orderWebhookLookup
+	sosmedLookup  sosmedWebhookLookup
 	walletLookup  walletWebhookLookup
 	orderHandler  orderWebhookHandler
+	sosmedHandler sosmedWebhookHandler
 	walletHandler walletWebhookHandler
 }
 
 func NewPakasirWebhookService(
 	orderRepo *repository.OrderRepo,
+	sosmedOrderRepo *repository.SosmedOrderRepo,
 	walletRepo *repository.WalletRepo,
 	paymentSvc *PaymentService,
+	sosmedPaymentSvc *SosmedPaymentService,
 	walletSvc *WalletService,
 ) *PakasirWebhookService {
 	return &PakasirWebhookService{
 		orderLookup:   orderRepo,
+		sosmedLookup:  sosmedOrderRepo,
 		walletLookup:  walletRepo,
 		orderHandler:  paymentSvc,
+		sosmedHandler: sosmedPaymentSvc,
 		walletHandler: walletSvc,
 	}
 }
@@ -67,6 +81,13 @@ func (s *PakasirWebhookService) Handle(ctx context.Context, input WebhookInput) 
 		log.Printf("[pakasir-webhook] route=order by_prefix order_id=%s", orderID)
 		return s.orderHandler.HandleWebhook(input)
 	}
+	if strings.HasPrefix(upperID, "SSM-") {
+		if s.sosmedHandler == nil {
+			return errors.New("sosmed webhook handler belum diinisialisasi")
+		}
+		log.Printf("[pakasir-webhook] route=sosmed by_prefix order_id=%s", orderID)
+		return s.sosmedHandler.HandleWebhook(input)
+	}
 	if strings.HasPrefix(upperID, "WLT-") {
 		if s.walletHandler == nil {
 			return errors.New("wallet webhook handler belum diinisialisasi")
@@ -85,6 +106,19 @@ func (s *PakasirWebhookService) Handle(ctx context.Context, input WebhookInput) 
 			return s.orderHandler.HandleWebhook(input)
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Printf("[pakasir-webhook] lookup_error target=order order_id=%s err=%v", orderID, err)
+			return err
+		}
+	}
+
+	if s.sosmedLookup != nil {
+		if _, err := s.sosmedLookup.FindByGatewayOrderID(orderID); err == nil {
+			if s.sosmedHandler == nil {
+				return errors.New("sosmed webhook handler belum diinisialisasi")
+			}
+			log.Printf("[pakasir-webhook] route=sosmed by_lookup order_id=%s", orderID)
+			return s.sosmedHandler.HandleWebhook(input)
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[pakasir-webhook] lookup_error target=sosmed order_id=%s err=%v", orderID, err)
 			return err
 		}
 	}

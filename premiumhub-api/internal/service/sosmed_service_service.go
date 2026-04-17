@@ -55,6 +55,7 @@ type CreateSosmedServiceInput struct {
 	ETA           string   `json:"eta"`
 	PriceStart    string   `json:"price_start"`
 	PricePer1K    string   `json:"price_per_1k"`
+	CheckoutPrice int64    `json:"checkout_price"`
 	TrustBadges   []string `json:"trust_badges"`
 	SortOrder     *int     `json:"sort_order"`
 	IsActive      *bool    `json:"is_active"`
@@ -74,6 +75,7 @@ type UpdateSosmedServiceInput struct {
 	ETA           *string   `json:"eta"`
 	PriceStart    *string   `json:"price_start"`
 	PricePer1K    *string   `json:"price_per_1k"`
+	CheckoutPrice *int64    `json:"checkout_price"`
 	TrustBadges   *[]string `json:"trust_badges"`
 	SortOrder     *int      `json:"sort_order"`
 	IsActive      *bool     `json:"is_active"`
@@ -186,6 +188,10 @@ func (s *SosmedServiceService) Create(input CreateSosmedServiceInput) (*model.So
 		isActive = *input.IsActive
 	}
 
+	if input.CheckoutPrice < 0 {
+		return nil, errors.New("checkout_price tidak valid")
+	}
+
 	item := &model.SosmedService{
 		CategoryCode:  categoryCode,
 		Code:          code,
@@ -200,6 +206,7 @@ func (s *SosmedServiceService) Create(input CreateSosmedServiceInput) (*model.So
 		ETA:           strings.TrimSpace(input.ETA),
 		PriceStart:    strings.TrimSpace(input.PriceStart),
 		PricePer1K:    strings.TrimSpace(input.PricePer1K),
+		CheckoutPrice: input.CheckoutPrice,
 		TrustBadges:   sanitizeSosmedTrustBadges(input.TrustBadges),
 		SortOrder:     sortOrder,
 		IsActive:      isActive,
@@ -273,6 +280,12 @@ func (s *SosmedServiceService) Update(id uuid.UUID, input UpdateSosmedServiceInp
 	}
 	if input.PricePer1K != nil {
 		item.PricePer1K = strings.TrimSpace(*input.PricePer1K)
+	}
+	if input.CheckoutPrice != nil {
+		if *input.CheckoutPrice < 0 {
+			return nil, errors.New("checkout_price tidak valid")
+		}
+		item.CheckoutPrice = *input.CheckoutPrice
 	}
 	if input.TrustBadges != nil {
 		item.TrustBadges = sanitizeSosmedTrustBadges(*input.TrustBadges)

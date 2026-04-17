@@ -12,7 +12,12 @@ type Item = {
 
 const ITEMS: Item[] = [
   { href: '/admin', label: 'Home', icon: '⌂' },
-  { href: '/admin/order', label: 'Order', icon: '◉' },
+  {
+    href: '/admin/order',
+    label: 'Order',
+    icon: '◉',
+    match: (pathname) => pathname.startsWith('/admin/order') || pathname.startsWith('/admin/sosmed/orders'),
+  },
   { href: '/admin/produk', label: 'Produk', icon: '◈' },
   { href: '/admin/stok', label: 'Stok', icon: '◧' },
   {
@@ -23,7 +28,7 @@ const ITEMS: Item[] = [
       pathname.startsWith('/admin/pengaturan') ||
       pathname.startsWith('/admin/pengguna') ||
       pathname.startsWith('/admin/garansi') ||
-      pathname.startsWith('/admin/sosmed') ||
+      (pathname.startsWith('/admin/sosmed') && !pathname.startsWith('/admin/sosmed/orders')) ||
       pathname.startsWith('/admin/convert'),
   },
 ]

@@ -27,6 +27,8 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.MaintenanceRule{},
 		&model.Product{},
 		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
 		&model.ProductPrice{},
 		&model.Stock{},
 		&model.Order{},
@@ -197,6 +199,7 @@ func ensureDefaultSosmedServices(db *gorm.DB) error {
 			ETA:           "2-12 jam",
 			PriceStart:    "Rp 28.000",
 			PricePer1K:    "≈ Rp 28 / 1K",
+			CheckoutPrice: 28000,
 			TrustBadges:   []string{"No Password", "Gradual Delivery", "Refill 30 Hari"},
 			SortOrder:     10,
 			IsActive:      true,
@@ -215,6 +218,7 @@ func ensureDefaultSosmedServices(db *gorm.DB) error {
 			ETA:           "< 6 jam",
 			PriceStart:    "Rp 16.000",
 			PricePer1K:    "≈ Rp 16 / 1K",
+			CheckoutPrice: 16000,
 			TrustBadges:   []string{"No Password", "Real Interaction", "High Retention"},
 			SortOrder:     20,
 			IsActive:      true,
@@ -233,6 +237,7 @@ func ensureDefaultSosmedServices(db *gorm.DB) error {
 			ETA:           "6-24 jam",
 			PriceStart:    "Rp 22.000",
 			PricePer1K:    "≈ Rp 22 / 1K",
+			CheckoutPrice: 22000,
 			TrustBadges:   []string{"No Password", "Stable Delivery", "Campaign Friendly"},
 			SortOrder:     30,
 			IsActive:      true,
@@ -251,6 +256,7 @@ func ensureDefaultSosmedServices(db *gorm.DB) error {
 			ETA:           "6-24 jam",
 			PriceStart:    "Rp 35.000",
 			PricePer1K:    "≈ Rp 350 / 10",
+			CheckoutPrice: 35000,
 			TrustBadges:   []string{"No Password", "Natural Pattern", "Flexible Campaign"},
 			SortOrder:     40,
 			IsActive:      true,
@@ -269,6 +275,7 @@ func ensureDefaultSosmedServices(db *gorm.DB) error {
 			ETA:           "< 12 jam",
 			PriceStart:    "Rp 19.000",
 			PricePer1K:    "≈ Rp 19 / 1K",
+			CheckoutPrice: 19000,
 			TrustBadges:   []string{"No Password", "Gradual Delivery", "Algorithm Friendly"},
 			SortOrder:     50,
 			IsActive:      true,
@@ -321,6 +328,9 @@ func ensureDefaultSosmedServices(db *gorm.DB) error {
 		}
 		if strings.TrimSpace(existing.PricePer1K) == "" {
 			updates["price_per1_k"] = item.PricePer1K
+		}
+		if existing.CheckoutPrice <= 0 {
+			updates["checkout_price"] = item.CheckoutPrice
 		}
 		if existing.SortOrder == 0 {
 			updates["sort_order"] = item.SortOrder

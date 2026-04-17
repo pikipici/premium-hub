@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
-import { LayoutDashboard, ShoppingBag, History, ShieldCheck, Bell, LogOut, Wallet, Smartphone, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, History, ShieldCheck, Bell, LogOut, Wallet, Smartphone, RefreshCw, Megaphone } from 'lucide-react'
 
 const MENU = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/wallet', icon: Wallet, label: 'Wallet' },
   { href: '/dashboard/convert/orders', icon: RefreshCw, label: 'Riwayat Convert' },
+  { href: '/dashboard/sosmed/orders', icon: Megaphone, label: 'Order Sosmed' },
   { href: '/dashboard/nokos', icon: Smartphone, label: 'Nomor Virtual' },
   { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Akun Aktif' },
   { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order' },

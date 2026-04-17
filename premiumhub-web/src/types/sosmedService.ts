@@ -15,6 +15,7 @@ export interface SosmedService {
   eta?: string
   price_start?: string
   price_per_1k?: string
+  checkout_price?: number
   trust_badges?: string[]
   sort_order?: number
   is_active: boolean

@@ -14,6 +14,7 @@ const MOBILE_ITEMS: MobileItem[] = [
   { href: '/admin/sosmed', label: 'Sosmed' },
   { href: '/admin/stok', label: 'Stok' },
   { href: '/admin/order', label: 'Order' },
+  { href: '/admin/sosmed/orders', label: 'Order SSM' },
   { href: '/admin/garansi', label: 'Garansi' },
   { href: '/admin/pengguna', label: 'Pengguna' },
   { href: '/admin/pengaturan', label: 'Pengaturan' },
@@ -21,6 +22,7 @@ const MOBILE_ITEMS: MobileItem[] = [
 
 function isActive(pathname: string, href: string) {
   if (href === '/admin') return pathname === '/admin'
+  if (href === '/admin/sosmed') return pathname === '/admin/sosmed'
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
