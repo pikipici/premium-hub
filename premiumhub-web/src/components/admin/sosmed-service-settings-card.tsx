@@ -132,6 +132,29 @@ function parseTrustBadges(value: string) {
   return [...new Set(parts)].slice(0, 8)
 }
 
+function formatRupiah(value: number) {
+  return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
+}
+
+function extractIDRAmount(raw?: string) {
+  if (!raw) return null
+
+  const match = raw.match(/rp\s*([0-9][0-9.]*)/i)
+  if (!match || !match[1]) return null
+
+  const normalized = match[1].replace(/\./g, '')
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed) || parsed < 0) return null
+  return parsed
+}
+
+function summarizeText(raw?: string, maxLength = 120) {
+  const text = (raw || '').trim()
+  if (!text) return '-'
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, maxLength).trim()}…`
+}
+
 function statusLabel(item: SosmedService) {
   if (!item.is_active) return { label: 'Nonaktif', className: 's-gagal' }
   return { label: 'Aktif', className: 's-lunas' }
@@ -177,6 +200,7 @@ export default function SosmedServiceSettingsCard() {
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<SosmedService | null>(null)
+  const [detailTarget, setDetailTarget] = useState<SosmedService | null>(null)
 
   const categoryOptions = useMemo(
     () => categories.sort((left, right) => (left.sort_order || 100) - (right.sort_order || 100)),
@@ -239,7 +263,7 @@ export default function SosmedServiceSettingsCard() {
   }, [loadData])
 
   useEffect(() => {
-    if (!formOpen && !confirmOpen) return
+    if (!formOpen && !confirmOpen && !detailTarget) return
 
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -247,7 +271,7 @@ export default function SosmedServiceSettingsCard() {
     return () => {
       document.body.style.overflow = previousOverflow
     }
-  }, [confirmOpen, formOpen])
+  }, [confirmOpen, detailTarget, formOpen])
 
   const openCreateForm = () => {
     setFormMode('create')
@@ -556,10 +580,11 @@ export default function SosmedServiceSettingsCard() {
                     <th>Kode</th>
                     <th>Layanan</th>
                     <th>Kategori</th>
-                    <th>Harga Mulai</th>
+                    <th>Operasional</th>
+                    <th>Harga</th>
                     <th>Urutan</th>
                     <th>Status</th>
-                    <th style={{ width: 220 }}>Aksi</th>
+                    <th style={{ width: 250 }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -571,18 +596,77 @@ export default function SosmedServiceSettingsCard() {
                         <td>
                           <code>{item.code}</code>
                         </td>
-                        <td>
+                        <td style={{ minWidth: 260 }}>
                           <div style={{ fontWeight: 600 }}>{item.title}</div>
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                             {item.platform_label || '-'} • {item.badge_text || '-'}
                           </div>
+                          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)', maxWidth: 420 }}>
+                            {summarizeText(item.summary, 140)}
+                          </div>
+                          {!!item.trust_badges?.length && (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                              {item.trust_badges.slice(0, 3).map((badge) => (
+                                <span
+                                  key={`${item.id}-${badge}`}
+                                  style={{
+                                    fontSize: 10,
+                                    border: '1px solid var(--line, #E5E7EB)',
+                                    borderRadius: 999,
+                                    padding: '2px 7px',
+                                    color: 'var(--muted)',
+                                    background: '#fff',
+                                  }}
+                                >
+                                  {badge}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td>{categoryLabelMap[item.category_code] || item.category_code || '-'}</td>
-                        <td>
-                          <div style={{ fontWeight: 600 }}>{item.price_start || '-'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                            Checkout: Rp {(item.checkout_price || 0).toLocaleString('id-ID')}
+                        <td style={{ minWidth: 190 }}>
+                          <div style={{ fontSize: 12, display: 'grid', gap: 3 }}>
+                            <div>Min: <strong>{item.min_order || '-'}</strong></div>
+                            <div>Start: <strong>{item.start_time || '-'}</strong></div>
+                            <div>Refill: <strong>{item.refill || '-'}</strong></div>
+                            <div>ETA: <strong>{item.eta || '-'}</strong></div>
                           </div>
+                        </td>
+                        <td style={{ minWidth: 240 }}>
+                          {(() => {
+                            const resellerPer1K = extractIDRAmount(item.price_per_1k || item.price_start)
+                            const checkoutPrice = item.checkout_price || 0
+                            const spread = resellerPer1K !== null && checkoutPrice > 0
+                              ? checkoutPrice - resellerPer1K
+                              : null
+
+                            return (
+                              <>
+                                <div style={{ fontWeight: 600 }}>{item.price_start || '-'}</div>
+                                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                                  {item.price_per_1k || '-'}
+                                </div>
+                                <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
+                                  Checkout: {formatRupiah(checkoutPrice)}
+                                </div>
+                                <div
+                                  style={{
+                                    marginTop: 2,
+                                    fontSize: 11,
+                                    color:
+                                      spread === null
+                                        ? 'var(--muted)'
+                                        : spread >= 0
+                                          ? 'var(--green, #047857)'
+                                          : 'var(--red, #DC2626)',
+                                  }}
+                                >
+                                  Spread vs reseller: {spread === null ? '-' : `${spread >= 0 ? '+' : '-'}${formatRupiah(Math.abs(spread))}`}
+                                </div>
+                              </>
+                            )
+                          })()}
                         </td>
                         <td>{item.sort_order ?? 100}</td>
                         <td>
@@ -590,6 +674,9 @@ export default function SosmedServiceSettingsCard() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button className="action-btn" type="button" onClick={() => setDetailTarget(item)}>
+                              Detail
+                            </button>
                             <button className="action-btn" type="button" onClick={() => openEditForm(item)}>
                               Edit
                             </button>
@@ -831,6 +918,149 @@ export default function SosmedServiceSettingsCard() {
           </div>
         </div>
       )}
+
+      {detailTarget && (() => {
+        const resellerPer1K = extractIDRAmount(detailTarget.price_per_1k || detailTarget.price_start)
+        const checkoutPrice = detailTarget.checkout_price || 0
+        const spread = resellerPer1K !== null && checkoutPrice > 0
+          ? checkoutPrice - resellerPer1K
+          : null
+
+        return (
+          <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={() => setDetailTarget(null)}>
+            <div
+              className="modal-card"
+              style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(880px, 96vw)' }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="modal-head" style={MODAL_HEAD_STYLE}>
+                <div>
+                  <h3>Detail Layanan Sosmed</h3>
+                  <div className="modal-sub" style={MODAL_SUB_STYLE}>{detailTarget.code}</div>
+                </div>
+                <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={() => setDetailTarget(null)}>×</button>
+              </div>
+
+              <div className="modal-body" style={MODAL_BODY_STYLE}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12 }}>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>Layanan</div>
+                    <div style={{ fontWeight: 700 }}>{detailTarget.title || '-'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      {(categoryLabelMap[detailTarget.category_code] || detailTarget.category_code || '-')}
+                      {' • '}
+                      {detailTarget.platform_label || '-'}
+                      {' • '}
+                      {detailTarget.badge_text || '-'}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>Status & Urutan</div>
+                    <div>
+                      <span className={`status ${statusLabel(detailTarget).className}`}>{statusLabel(detailTarget).label}</span>
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      Sort order: <strong>{detailTarget.sort_order ?? 100}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 8 }}>
+                  <div className="card" style={{ padding: 10 }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>Min Order</div>
+                    <div style={{ fontWeight: 600 }}>{detailTarget.min_order || '-'}</div>
+                  </div>
+                  <div className="card" style={{ padding: 10 }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>Start Time</div>
+                    <div style={{ fontWeight: 600 }}>{detailTarget.start_time || '-'}</div>
+                  </div>
+                  <div className="card" style={{ padding: 10 }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>Refill</div>
+                    <div style={{ fontWeight: 600 }}>{detailTarget.refill || '-'}</div>
+                  </div>
+                  <div className="card" style={{ padding: 10 }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>ETA</div>
+                    <div style={{ fontWeight: 600 }}>{detailTarget.eta || '-'}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div className="card" style={{ padding: 10 }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>Harga Reseller Start</div>
+                    <div style={{ fontWeight: 700 }}>{detailTarget.price_start || '-'}</div>
+                    <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>{detailTarget.price_per_1k || '-'}</div>
+                  </div>
+                  <div className="card" style={{ padding: 10 }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>Harga Checkout</div>
+                    <div style={{ fontWeight: 700 }}>{formatRupiah(checkoutPrice)}</div>
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 12,
+                        color:
+                          spread === null
+                            ? 'var(--muted)'
+                            : spread >= 0
+                              ? 'var(--green, #047857)'
+                              : 'var(--red, #DC2626)',
+                      }}
+                    >
+                      Spread vs reseller: {spread === null ? '-' : `${spread >= 0 ? '+' : '-'}${formatRupiah(Math.abs(spread))}`}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>Summary</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.5 }}>{detailTarget.summary || '-'}</div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Trust Badges</div>
+                  {!!detailTarget.trust_badges?.length ? (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {detailTarget.trust_badges.map((badge) => (
+                        <span
+                          key={`${detailTarget.id}-${badge}`}
+                          style={{
+                            fontSize: 11,
+                            border: '1px solid var(--line, #E5E7EB)',
+                            borderRadius: 999,
+                            padding: '3px 10px',
+                            color: 'var(--muted)',
+                            background: '#fff',
+                          }}
+                        >
+                          {badge}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>-</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-actions" style={MODAL_ACTIONS_STYLE}>
+                <button className="action-btn" type="button" onClick={() => setDetailTarget(null)}>
+                  Tutup
+                </button>
+                <button
+                  className="topbar-btn primary"
+                  type="button"
+                  onClick={() => {
+                    setDetailTarget(null)
+                    openEditForm(detailTarget)
+                  }}
+                >
+                  Edit Layanan
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {confirmOpen && confirmTarget && (
         <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={() => setConfirmOpen(false)}>
