@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type SVGProps } from 'react'
 import { AlertTriangle, CheckCircle, Clock, ShoppingBag } from 'lucide-react'
 
 import WalletCard from '@/components/shared/WalletCard'
@@ -21,6 +21,68 @@ function activityAmountText(item: ActivityHistoryItem) {
 
 function activityAmountClass(item: ActivityHistoryItem) {
   return item.direction === 'credit' ? 'text-green-600' : 'text-[#141414]'
+}
+
+function TransactionDollarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M20.8 13a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
+      <path d="M18 11v10" />
+      <path d="M3 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+      <path d="M15 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+      <path d="M7 5h8" />
+      <path d="M7 5v8a3 3 0 0 0 3 3h1" />
+    </svg>
+  )
+}
+
+function ReceiptRefundIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2" />
+      <path d="M15 14v-2a2 2 0 0 0 -2 -2h-4l2 -2m0 4l-2 -2" />
+    </svg>
+  )
+}
+
+function renderActivityIcon(item: ActivityHistoryItem) {
+  if (item.kind === 'nokos_purchase') {
+    return (
+      <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF3EC] text-[#E0592A]">
+        <TransactionDollarIcon className="h-5 w-5" />
+      </div>
+    )
+  }
+
+  if (item.kind === 'nokos_refund') {
+    return (
+      <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ECFDF3] text-[#16774C]">
+        <ReceiptRefundIcon className="h-5 w-5" />
+      </div>
+    )
+  }
+
+  return <div className="text-2xl">{item.icon || '📦'}</div>
 }
 
 export default function DashboardPage() {
@@ -132,7 +194,7 @@ export default function DashboardPage() {
                 className="flex items-center justify-between rounded-xl p-3 transition-colors hover:bg-[#F7F7F5]"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="text-2xl">{activity.icon || '📦'}</div>
+                  {renderActivityIcon(activity)}
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold">{activity.title}</div>
                     <div className="truncate text-xs text-[#888]">{new Date(activity.occurred_at).toLocaleDateString('id-ID')} • {activity.source_label}</div>
