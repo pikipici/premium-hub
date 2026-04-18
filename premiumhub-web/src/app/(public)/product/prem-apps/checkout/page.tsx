@@ -34,6 +34,7 @@ export default function CheckoutPage() {
   const [pakasirMethod, setPakasirMethod] = useState<PakasirMethod>('qris')
   const [walletLoading, setWalletLoading] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [redirectingAfterCheckout, setRedirectingAfterCheckout] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -44,10 +45,10 @@ export default function CheckoutPage() {
       return
     }
 
-    if (!item) {
+    if (!item && !redirectingAfterCheckout) {
       router.replace('/product/prem-apps')
     }
-  }, [hasHydrated, isAuthenticated, item, router])
+  }, [hasHydrated, isAuthenticated, item, redirectingAfterCheckout, router])
 
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated) return
@@ -115,11 +116,13 @@ export default function CheckoutPage() {
         if (typeof payment.wallet_balance_after === 'number') {
           setWalletBalance(payment.wallet_balance_after)
         }
+        setRedirectingAfterCheckout(true)
         clearCart()
         router.push(`/product/prem-apps/checkout/success?id=${orderRes.data.id}`)
         return
       }
 
+      setRedirectingAfterCheckout(true)
       clearCart()
       const query = new URLSearchParams({
         id: orderRes.data.id,
@@ -272,7 +275,7 @@ export default function CheckoutPage() {
 
           <button
             onClick={handleCheckout}
-            disabled={loading || (checkoutMethod === 'wallet' && (walletLoading || !walletSufficient))}
+            disabled={redirectingAfterCheckout || loading || (checkoutMethod === 'wallet' && (walletLoading || !walletSufficient))}
             className="w-full py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm"
           >
             {loading
