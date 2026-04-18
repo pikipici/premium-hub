@@ -148,13 +148,6 @@ function extractIDRAmount(raw?: string) {
   return parsed
 }
 
-function summarizeText(raw?: string, maxLength = 120) {
-  const text = (raw || '').trim()
-  if (!text) return '-'
-  if (text.length <= maxLength) return text
-  return `${text.slice(0, maxLength).trim()}…`
-}
-
 function statusLabel(item: SosmedService) {
   if (!item.is_active) return { label: 'Nonaktif', className: 's-gagal' }
   return { label: 'Aktif', className: 's-lunas' }
@@ -580,11 +573,10 @@ export default function SosmedServiceSettingsCard() {
                     <th>Kode</th>
                     <th>Layanan</th>
                     <th>Kategori</th>
-                    <th>Operasional</th>
-                    <th>Harga</th>
+                    <th>Harga Mulai</th>
                     <th>Urutan</th>
                     <th>Status</th>
-                    <th style={{ width: 250 }}>Aksi</th>
+                    <th style={{ width: 260 }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -596,77 +588,18 @@ export default function SosmedServiceSettingsCard() {
                         <td>
                           <code>{item.code}</code>
                         </td>
-                        <td style={{ minWidth: 260 }}>
+                        <td>
                           <div style={{ fontWeight: 600 }}>{item.title}</div>
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                             {item.platform_label || '-'} • {item.badge_text || '-'}
                           </div>
-                          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)', maxWidth: 420 }}>
-                            {summarizeText(item.summary, 140)}
-                          </div>
-                          {!!item.trust_badges?.length && (
-                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                              {item.trust_badges.slice(0, 3).map((badge) => (
-                                <span
-                                  key={`${item.id}-${badge}`}
-                                  style={{
-                                    fontSize: 10,
-                                    border: '1px solid var(--line, #E5E7EB)',
-                                    borderRadius: 999,
-                                    padding: '2px 7px',
-                                    color: 'var(--muted)',
-                                    background: '#fff',
-                                  }}
-                                >
-                                  {badge}
-                                </span>
-                              ))}
-                            </div>
-                          )}
                         </td>
                         <td>{categoryLabelMap[item.category_code] || item.category_code || '-'}</td>
-                        <td style={{ minWidth: 190 }}>
-                          <div style={{ fontSize: 12, display: 'grid', gap: 3 }}>
-                            <div>Min: <strong>{item.min_order || '-'}</strong></div>
-                            <div>Start: <strong>{item.start_time || '-'}</strong></div>
-                            <div>Refill: <strong>{item.refill || '-'}</strong></div>
-                            <div>ETA: <strong>{item.eta || '-'}</strong></div>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{item.price_start || '-'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            Checkout: Rp {(item.checkout_price || 0).toLocaleString('id-ID')}
                           </div>
-                        </td>
-                        <td style={{ minWidth: 240 }}>
-                          {(() => {
-                            const resellerPer1K = extractIDRAmount(item.price_per_1k || item.price_start)
-                            const checkoutPrice = item.checkout_price || 0
-                            const spread = resellerPer1K !== null && checkoutPrice > 0
-                              ? checkoutPrice - resellerPer1K
-                              : null
-
-                            return (
-                              <>
-                                <div style={{ fontWeight: 600 }}>{item.price_start || '-'}</div>
-                                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                                  {item.price_per_1k || '-'}
-                                </div>
-                                <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
-                                  Checkout: {formatRupiah(checkoutPrice)}
-                                </div>
-                                <div
-                                  style={{
-                                    marginTop: 2,
-                                    fontSize: 11,
-                                    color:
-                                      spread === null
-                                        ? 'var(--muted)'
-                                        : spread >= 0
-                                          ? 'var(--green, #047857)'
-                                          : 'var(--red, #DC2626)',
-                                  }}
-                                >
-                                  Spread vs reseller: {spread === null ? '-' : `${spread >= 0 ? '+' : '-'}${formatRupiah(Math.abs(spread))}`}
-                                </div>
-                              </>
-                            )
-                          })()}
                         </td>
                         <td>{item.sort_order ?? 100}</td>
                         <td>
@@ -925,6 +858,7 @@ export default function SosmedServiceSettingsCard() {
         const spread = resellerPer1K !== null && checkoutPrice > 0
           ? checkoutPrice - resellerPer1K
           : null
+        const detailStatus = statusLabel(detailTarget)
 
         return (
           <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={() => setDetailTarget(null)}>
@@ -958,7 +892,7 @@ export default function SosmedServiceSettingsCard() {
                   <div style={{ display: 'grid', gap: 6 }}>
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>Status & Urutan</div>
                     <div>
-                      <span className={`status ${statusLabel(detailTarget).className}`}>{statusLabel(detailTarget).label}</span>
+                      <span className={`status ${detailStatus.className}`}>{detailStatus.label}</span>
                     </div>
                     <div style={{ fontSize: 13 }}>
                       Sort order: <strong>{detailTarget.sort_order ?? 100}</strong>
