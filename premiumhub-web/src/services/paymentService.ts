@@ -10,6 +10,10 @@ export interface CreatePaymentResponse {
   amount: number
   total_payment?: number
   expires_at?: string
+  payment_status?: string
+  order_status?: string
+  wallet_balance_before?: number
+  wallet_balance_after?: number
 }
 
 export const paymentService = {

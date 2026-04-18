@@ -63,6 +63,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
 	paymentSvc := service.NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, nil)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
+	paymentSvc.SetWalletService(walletSvc)
 	pakasirWebhookSvc := service.NewPakasirWebhookService(orderRepo, sosmedOrderRepo, walletRepo, paymentSvc, sosmedPaymentSvc, walletSvc)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
 	nokosLandingSvc := service.NewNokosLandingSummaryService(cfg, nokosLandingRepo, nil, nil)

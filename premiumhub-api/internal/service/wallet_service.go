@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type WalletService struct {
@@ -50,6 +51,14 @@ func NewWalletService(
 
 type WalletBalanceResponse struct {
 	Balance int64 `json:"balance"`
+}
+
+type WalletOrderPaymentResult struct {
+	OrderID       string `json:"order_id"`
+	Amount        int64  `json:"amount"`
+	BalanceBefore int64  `json:"balance_before"`
+	BalanceAfter  int64  `json:"balance_after"`
+	Reference     string `json:"reference"`
 }
 
 type CreateTopupInput struct {
@@ -123,6 +132,158 @@ func (s *WalletService) GetBalance(userID uuid.UUID) (*WalletBalanceResponse, er
 		return nil, err
 	}
 	return &WalletBalanceResponse{Balance: user.WalletBalance}, nil
+}
+
+func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID uuid.UUID) (*WalletOrderPaymentResult, error) {
+	if _, err := s.ensureActiveUser(userID); err != nil {
+		return nil, err
+	}
+
+	result := &WalletOrderPaymentResult{}
+	chargeReference := fmt.Sprintf("order_wallet:%s:charge", orderID.String())
+
+	err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+		}
+
+		order := &model.Order{}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Preload("Price").
+			First(order, "id = ?", orderID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("order tidak ditemukan")
+			}
+			return errors.New("gagal memuat order")
+		}
+
+		if order.UserID != userID {
+			return errors.New("akses ditolak")
+		}
+
+		if order.PaymentStatus == "paid" && order.OrderStatus == "active" && strings.EqualFold(strings.TrimSpace(order.PaymentMethod), "wallet") {
+			user, err := s.walletRepo.LockUserByIDTx(tx, userID)
+			if err != nil {
+				return errors.New("user tidak ditemukan")
+			}
+			result.OrderID = order.ID.String()
+			result.Amount = order.TotalPrice
+			result.BalanceBefore = user.WalletBalance
+			result.BalanceAfter = user.WalletBalance
+			result.Reference = chargeReference
+			return nil
+		}
+
+		if order.PaymentStatus != "pending" {
+			return errors.New("order sudah diproses")
+		}
+		if order.TotalPrice <= 0 {
+			return errors.New("nominal order tidak valid")
+		}
+		if order.Price.ProductID == uuid.Nil || strings.TrimSpace(order.Price.AccountType) == "" || order.Price.Duration <= 0 {
+			return errors.New("detail harga order tidak valid")
+		}
+
+		user, err := s.walletRepo.LockUserByIDTx(tx, userID)
+		if err != nil {
+			return errors.New("user tidak ditemukan")
+		}
+		if !user.IsActive {
+			return errors.New("akun diblokir")
+		}
+
+		if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, chargeReference); err == nil {
+			return errors.New("transaksi wallet order sudah diproses")
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("gagal cek ledger wallet")
+		}
+
+		if user.WalletBalance < order.TotalPrice {
+			return errors.New("saldo wallet tidak cukup")
+		}
+
+		var stock model.Stock
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("product_id = ? AND account_type = ? AND status = ?", order.Price.ProductID, order.Price.AccountType, "available").
+			Order("created_at ASC").
+			First(&stock).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("stok tidak tersedia")
+			}
+			return errors.New("gagal memuat stok")
+		}
+
+		now := time.Now()
+		expiry := now.AddDate(0, order.Price.Duration, 0)
+
+		balanceBefore := user.WalletBalance
+		balanceAfter := balanceBefore - order.TotalPrice
+		user.WalletBalance = balanceAfter
+		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+			return errors.New("gagal update saldo wallet")
+		}
+
+		ledger := &model.WalletLedger{
+			ID:            uuid.New(),
+			UserID:        user.ID,
+			Type:          "debit",
+			Category:      "product_purchase",
+			Amount:        order.TotalPrice,
+			BalanceBefore: balanceBefore,
+			BalanceAfter:  balanceAfter,
+			Reference:     chargeReference,
+			Description:   fmt.Sprintf("Pembelian produk premium order %s via wallet", shortWalletLedgerRef(order.ID.String())),
+		}
+		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
+			return errors.New("gagal menulis ledger wallet")
+		}
+
+		stock.Status = "used"
+		stock.UsedBy = &order.UserID
+		stock.UsedAt = &now
+		stock.ExpiresAt = &expiry
+		if err := tx.Save(&stock).Error; err != nil {
+			return errors.New("gagal update stok")
+		}
+
+		order.PaymentMethod = "wallet"
+		order.PaymentStatus = "paid"
+		order.OrderStatus = "active"
+		order.PaidAt = &now
+		order.ExpiresAt = &expiry
+		order.StockID = &stock.ID
+		if err := tx.Save(order).Error; err != nil {
+			return errors.New("gagal update order")
+		}
+
+		if s.notifRepo != nil {
+			notif := &model.Notification{
+				UserID:  order.UserID,
+				Title:   "Pembayaran Berhasil",
+				Message: fmt.Sprintf("Pembayaran wallet untuk order %s berhasil. Akun kamu sudah aktif!", shortWalletLedgerRef(order.ID.String())),
+				Type:    "order",
+			}
+			if err := tx.Create(notif).Error; err != nil {
+				return errors.New("gagal membuat notifikasi")
+			}
+		}
+
+		result.OrderID = order.ID.String()
+		result.Amount = order.TotalPrice
+		result.BalanceBefore = balanceBefore
+		result.BalanceAfter = balanceAfter
+		result.Reference = chargeReference
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (s *WalletService) pakasirConfigured() bool {
@@ -300,6 +461,8 @@ func buildWalletLedgerPublicDescription(row model.WalletLedger) string {
 		return "Pembelian nomor OTP"
 	case "5sim_refund":
 		return "Refund nomor OTP"
+	case "product_purchase":
+		return "Pembelian produk premium"
 	case "manual_adjustment":
 		return "Penyesuaian saldo manual"
 	}
@@ -346,6 +509,25 @@ func buildWalletLedgerPublicReference(row model.WalletLedger) string {
 			}
 		}
 		return "Order nomor OTP"
+	}
+
+	if strings.HasPrefix(lowerRef, "order_wallet:") {
+		parts := strings.Split(reference, ":")
+		if len(parts) >= 3 {
+			orderID := strings.TrimSpace(parts[1])
+			action := strings.ToLower(strings.TrimSpace(parts[2]))
+			if orderID != "" {
+				switch action {
+				case "charge":
+					return fmt.Sprintf("Pembelian order #%s", shortWalletLedgerRef(orderID))
+				case "refund":
+					return fmt.Sprintf("Refund order #%s", shortWalletLedgerRef(orderID))
+				default:
+					return fmt.Sprintf("Order #%s", shortWalletLedgerRef(orderID))
+				}
+			}
+		}
+		return "Pembelian produk premium"
 	}
 
 	if strings.HasPrefix(lowerRef, "manual_") {

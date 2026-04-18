@@ -102,6 +102,10 @@ func setupWalletService(t *testing.T) (*WalletService, *gorm.DB, *fakePakasirWal
 
 	err = db.AutoMigrate(
 		&model.User{},
+		&model.Product{},
+		&model.ProductPrice{},
+		&model.Stock{},
+		&model.Order{},
 		&model.Notification{},
 		&model.WalletTopup{},
 		&model.WalletLedger{},
@@ -158,6 +162,66 @@ func mustLoadUser(t *testing.T, db *gorm.DB, userID uuid.UUID) model.User {
 		t.Fatalf("load user: %v", err)
 	}
 	return user
+}
+
+func seedWalletOrderFixture(t *testing.T, db *gorm.DB, userID uuid.UUID, priceAmount, walletBalance int64) (*model.Order, *model.Stock) {
+	t.Helper()
+
+	if err := db.Model(&model.User{}).Where("id = ?", userID).Update("wallet_balance", walletBalance).Error; err != nil {
+		t.Fatalf("seed wallet balance: %v", err)
+	}
+
+	product := &model.Product{
+		ID:        uuid.New(),
+		Name:      "Wallet Product",
+		Slug:      "wallet-product-" + uuid.NewString()[:8],
+		Category:  "streaming",
+		IsActive:  true,
+		IsPopular: false,
+	}
+	if err := db.Create(product).Error; err != nil {
+		t.Fatalf("seed product: %v", err)
+	}
+
+	price := &model.ProductPrice{
+		ID:          uuid.New(),
+		ProductID:   product.ID,
+		AccountType: "shared",
+		Duration:    1,
+		Price:       priceAmount,
+		IsActive:    true,
+	}
+	if err := db.Create(price).Error; err != nil {
+		t.Fatalf("seed price: %v", err)
+	}
+
+	stock := &model.Stock{
+		ID:          uuid.New(),
+		ProductID:   product.ID,
+		AccountType: "shared",
+		Email:       "stock-" + uuid.NewString()[:8] + "@example.com",
+		Password:    "pass123",
+		ProfileName: "profile-1",
+		Status:      "available",
+	}
+	if err := db.Create(stock).Error; err != nil {
+		t.Fatalf("seed stock: %v", err)
+	}
+
+	order := &model.Order{
+		ID:            uuid.New(),
+		UserID:        userID,
+		PriceID:       price.ID,
+		TotalPrice:    priceAmount,
+		PaymentMethod: "wallet",
+		PaymentStatus: "pending",
+		OrderStatus:   "pending",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("seed order: %v", err)
+	}
+
+	return order, stock
 }
 
 func TestWalletCreateTopupIdempotent(t *testing.T) {
@@ -366,6 +430,94 @@ func TestWalletReconcilePending(t *testing.T) {
 	}
 }
 
+func TestWalletPayOrderWithWalletSuccessAndIdempotent(t *testing.T) {
+	svc, db, _, user := setupWalletService(t)
+	order, stock := seedWalletOrderFixture(t, db, user.ID, 50000, 70000)
+
+	paid, err := svc.PayOrderWithWallet(context.Background(), user.ID, order.ID)
+	if err != nil {
+		t.Fatalf("pay order wallet: %v", err)
+	}
+	if paid.Amount != 50000 || paid.BalanceBefore != 70000 || paid.BalanceAfter != 20000 {
+		t.Fatalf("unexpected payment result: %+v", paid)
+	}
+
+	userAfter := mustLoadUser(t, db, user.ID)
+	if userAfter.WalletBalance != 20000 {
+		t.Fatalf("expected balance 20000, got %d", userAfter.WalletBalance)
+	}
+
+	var storedOrder model.Order
+	if err := db.Preload("Stock").First(&storedOrder, "id = ?", order.ID).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if storedOrder.PaymentStatus != "paid" || storedOrder.OrderStatus != "active" || storedOrder.PaymentMethod != "wallet" {
+		t.Fatalf("order not settled by wallet: %+v", storedOrder)
+	}
+	if storedOrder.StockID == nil {
+		t.Fatalf("expected stock id assigned")
+	}
+
+	var usedStock model.Stock
+	if err := db.First(&usedStock, "id = ?", stock.ID).Error; err != nil {
+		t.Fatalf("load stock: %v", err)
+	}
+	if usedStock.Status != "used" {
+		t.Fatalf("expected stock used, got %s", usedStock.Status)
+	}
+
+	var ledgers []model.WalletLedger
+	if err := db.Where("user_id = ?", user.ID).Order("created_at ASC").Find(&ledgers).Error; err != nil {
+		t.Fatalf("load ledgers: %v", err)
+	}
+	if len(ledgers) != 1 {
+		t.Fatalf("expected single wallet charge ledger, got %d", len(ledgers))
+	}
+	if ledgers[0].Category != "product_purchase" || ledgers[0].Type != "debit" || ledgers[0].Amount != 50000 {
+		t.Fatalf("unexpected ledger payload: %+v", ledgers[0])
+	}
+	if !strings.HasPrefix(ledgers[0].Reference, "order_wallet:") {
+		t.Fatalf("unexpected wallet charge reference: %s", ledgers[0].Reference)
+	}
+
+	paidAgain, err := svc.PayOrderWithWallet(context.Background(), user.ID, order.ID)
+	if err != nil {
+		t.Fatalf("pay order wallet idempotent: %v", err)
+	}
+	if paidAgain.BalanceBefore != 20000 || paidAgain.BalanceAfter != 20000 {
+		t.Fatalf("idempotent result should keep balance unchanged: %+v", paidAgain)
+	}
+
+	var ledgerCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", ledgers[0].Reference).Count(&ledgerCount).Error; err != nil {
+		t.Fatalf("count ledgers: %v", err)
+	}
+	if ledgerCount != 1 {
+		t.Fatalf("expected charge ledger once, got %d", ledgerCount)
+	}
+}
+
+func TestWalletPayOrderWithWalletValidation(t *testing.T) {
+	svc, db, _, user := setupWalletService(t)
+	order, _ := seedWalletOrderFixture(t, db, user.ID, 50000, 10000)
+
+	if _, err := svc.PayOrderWithWallet(context.Background(), user.ID, order.ID); err == nil || !strings.Contains(err.Error(), "saldo wallet tidak cukup") {
+		t.Fatalf("expected insufficient balance error, got: %v", err)
+	}
+
+	if _, err := svc.PayOrderWithWallet(context.Background(), uuid.New(), order.ID); err == nil || !strings.Contains(err.Error(), "user tidak ditemukan") {
+		t.Fatalf("expected missing user error, got: %v", err)
+	}
+
+	stockOrder, stock := seedWalletOrderFixture(t, db, user.ID, 20000, 50000)
+	if err := db.Model(&model.Stock{}).Where("id = ?", stock.ID).Update("status", "used").Error; err != nil {
+		t.Fatalf("mark stock used: %v", err)
+	}
+	if _, err := svc.PayOrderWithWallet(context.Background(), user.ID, stockOrder.ID); err == nil || !strings.Contains(err.Error(), "stok tidak tersedia") {
+		t.Fatalf("expected stock unavailable error, got: %v", err)
+	}
+}
+
 func TestWalletListLedgerSanitizesInternalCopy(t *testing.T) {
 	svc, db, _, user := setupWalletService(t)
 
@@ -408,6 +560,17 @@ func TestWalletListLedgerSanitizesInternalCopy(t *testing.T) {
 		{
 			ID:            uuid.New(),
 			UserID:        user.ID,
+			Type:          "debit",
+			Category:      "product_purchase",
+			Amount:        50000,
+			BalanceBefore: 100000,
+			BalanceAfter:  50000,
+			Reference:     "order_wallet:7f9057d5-5c33-4ad2-a454-331f65aa60c5:charge",
+			Description:   "Pembelian produk premium order 7f9057d5 via wallet",
+		},
+		{
+			ID:            uuid.New(),
+			UserID:        user.ID,
 			Type:          "credit",
 			Category:      "manual_adjustment",
 			Amount:        5000,
@@ -427,8 +590,8 @@ func TestWalletListLedgerSanitizesInternalCopy(t *testing.T) {
 		t.Fatalf("list ledger: %v", err)
 	}
 
-	if len(res.Ledgers) < 4 {
-		t.Fatalf("expected at least 4 ledgers, got %d", len(res.Ledgers))
+	if len(res.Ledgers) < 5 {
+		t.Fatalf("expected at least 5 ledgers, got %d", len(res.Ledgers))
 	}
 
 	byCategory := map[string]WalletLedgerResponse{}
@@ -469,6 +632,17 @@ func TestWalletListLedgerSanitizesInternalCopy(t *testing.T) {
 	}
 	if refundLedger.Reference != "Refund #987393457" {
 		t.Fatalf("unexpected refund reference: %s", refundLedger.Reference)
+	}
+
+	productLedger, ok := byCategory["product_purchase"]
+	if !ok {
+		t.Fatalf("expected product purchase ledger in response")
+	}
+	if productLedger.Description != "Pembelian produk premium" {
+		t.Fatalf("unexpected product purchase description: %s", productLedger.Description)
+	}
+	if !strings.HasPrefix(productLedger.Reference, "Pembelian order #") {
+		t.Fatalf("unexpected product purchase reference: %s", productLedger.Reference)
 	}
 
 	for _, ledger := range res.Ledgers {

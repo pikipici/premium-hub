@@ -948,6 +948,8 @@ func TestPaymentService_AllBranches(t *testing.T) {
 	orderRepo := repository.NewOrderRepo(db)
 	stockRepo := repository.NewStockRepo(db)
 	productRepo := repository.NewProductRepo(db)
+	userRepo := repository.NewUserRepo(db)
+	walletRepo := repository.NewWalletRepo(db)
 	notifRepo := repository.NewNotificationRepo(db)
 	orderSvc := NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
 
@@ -956,7 +958,8 @@ func TestPaymentService_AllBranches(t *testing.T) {
 		PakasirProject: "premiumhub",
 		PakasirAPIKey:  "PK_test",
 	}
-	svc := NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, fake)
+	walletSvc := NewWalletService(cfg, userRepo, walletRepo, notifRepo, fake)
+	svc := NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, fake).SetWalletService(walletSvc)
 	if svc == nil {
 		t.Fatalf("NewPaymentServiceWithGateway should return instance")
 	}
@@ -973,6 +976,35 @@ func TestPaymentService_AllBranches(t *testing.T) {
 	processed := seedOrder(t, db, user.ID, price.ID, "paid", price.Price)
 	if _, err := svc.CreateTransaction(user.ID, CreatePaymentInput{OrderID: processed.ID.String()}); err == nil || !strings.Contains(err.Error(), "order sudah diproses") {
 		t.Fatalf("expected processed order error, got: %v", err)
+	}
+
+	walletOrder := seedOrder(t, db, user.ID, price.ID, "pending", price.Price)
+	if err := db.Model(&model.User{}).Where("id = ?", user.ID).Update("wallet_balance", price.Price+1000).Error; err != nil {
+		t.Fatalf("seed wallet balance: %v", err)
+	}
+	seedStock(t, db, product.ID, "shared", "available")
+
+	walletTx, err := svc.CreateTransaction(user.ID, CreatePaymentInput{OrderID: walletOrder.ID.String(), PaymentMethod: "wallet"})
+	if err != nil {
+		t.Fatalf("wallet create transaction: %v", err)
+	}
+	if walletTx.Provider != "wallet" || walletTx.PaymentMethod != "wallet" || walletTx.PaymentStatus != "paid" || walletTx.OrderStatus != "active" {
+		t.Fatalf("unexpected wallet tx response: %+v", walletTx)
+	}
+	if walletTx.WalletBalanceAfter == nil || *walletTx.WalletBalanceAfter != 1000 {
+		t.Fatalf("expected wallet balance after=1000, got %+v", walletTx.WalletBalanceAfter)
+	}
+
+	walletOrderUpdated, err := orderRepo.FindByID(walletOrder.ID)
+	if err != nil {
+		t.Fatalf("find wallet order: %v", err)
+	}
+	if walletOrderUpdated.PaymentStatus != "paid" || walletOrderUpdated.OrderStatus != "active" || walletOrderUpdated.PaymentMethod != "wallet" {
+		t.Fatalf("wallet order not settled: %+v", walletOrderUpdated)
+	}
+
+	if _, err := svc.CreateTransaction(user.ID, CreatePaymentInput{OrderID: walletOrder.ID.String(), PaymentMethod: "wallet"}); err != nil {
+		t.Fatalf("wallet retry should be idempotent, got: %v", err)
 	}
 
 	createdTx, err := svc.CreateTransaction(user.ID, CreatePaymentInput{OrderID: pendingOrder.ID.String(), PaymentMethod: "qris"})

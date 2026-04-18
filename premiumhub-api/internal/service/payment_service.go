@@ -14,15 +14,25 @@ import (
 	"github.com/google/uuid"
 )
 
+type walletOrderCheckoutService interface {
+	PayOrderWithWallet(ctx context.Context, userID, orderID uuid.UUID) (*WalletOrderPaymentResult, error)
+}
+
 type PaymentService struct {
 	orderRepo *repository.OrderRepo
 	orderSvc  *OrderService
+	walletSvc walletOrderCheckoutService
 	cfg       *config.Config
 	pakasir   PakasirClient
 }
 
 func NewPaymentService(orderRepo *repository.OrderRepo, orderSvc *OrderService) *PaymentService {
 	return &PaymentService{orderRepo: orderRepo, orderSvc: orderSvc}
+}
+
+func (s *PaymentService) SetWalletService(walletSvc walletOrderCheckoutService) *PaymentService {
+	s.walletSvc = walletSvc
+	return s
 }
 
 func NewPaymentServiceWithGateway(
@@ -48,14 +58,18 @@ type CreatePaymentInput struct {
 }
 
 type PaymentResponse struct {
-	OrderID        string     `json:"order_id"`
-	Provider       string     `json:"provider"`
-	PaymentMethod  string     `json:"payment_method"`
-	PaymentNumber  string     `json:"payment_number"`
-	GatewayOrderID string     `json:"gateway_order_id"`
-	Amount         int64      `json:"amount"`
-	TotalPayment   int64      `json:"total_payment,omitempty"`
-	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	OrderID             string     `json:"order_id"`
+	Provider            string     `json:"provider"`
+	PaymentMethod       string     `json:"payment_method"`
+	PaymentNumber       string     `json:"payment_number"`
+	GatewayOrderID      string     `json:"gateway_order_id"`
+	Amount              int64      `json:"amount"`
+	TotalPayment        int64      `json:"total_payment,omitempty"`
+	ExpiresAt           *time.Time `json:"expires_at,omitempty"`
+	PaymentStatus       string     `json:"payment_status,omitempty"`
+	OrderStatus         string     `json:"order_status,omitempty"`
+	WalletBalanceBefore *int64     `json:"wallet_balance_before,omitempty"`
+	WalletBalanceAfter  *int64     `json:"wallet_balance_after,omitempty"`
 }
 
 func (s *PaymentService) pakasirConfigured() bool {
@@ -66,10 +80,6 @@ func (s *PaymentService) pakasirConfigured() bool {
 }
 
 func (s *PaymentService) CreateTransaction(userID uuid.UUID, input CreatePaymentInput) (*PaymentResponse, error) {
-	if !s.pakasirConfigured() {
-		return nil, fmt.Errorf("gateway payment belum dikonfigurasi")
-	}
-
 	orderID, err := uuid.Parse(strings.TrimSpace(input.OrderID))
 	if err != nil {
 		return nil, fmt.Errorf("order tidak ditemukan")
@@ -82,8 +92,42 @@ func (s *PaymentService) CreateTransaction(userID uuid.UUID, input CreatePayment
 	if order.UserID != userID {
 		return nil, fmt.Errorf("akses ditolak")
 	}
+
+	requestedMethod := strings.ToLower(strings.TrimSpace(input.PaymentMethod))
+	if requestedMethod == "wallet" {
+		if s.walletSvc == nil {
+			return nil, fmt.Errorf("wallet checkout belum tersedia")
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		walletRes, err := s.walletSvc.PayOrderWithWallet(ctx, userID, orderID)
+		if err != nil {
+			return nil, err
+		}
+
+		balanceBefore := walletRes.BalanceBefore
+		balanceAfter := walletRes.BalanceAfter
+		return &PaymentResponse{
+			OrderID:             order.ID.String(),
+			Provider:            "wallet",
+			PaymentMethod:       "wallet",
+			PaymentNumber:       "",
+			GatewayOrderID:      walletRes.Reference,
+			Amount:              walletRes.Amount,
+			PaymentStatus:       "paid",
+			OrderStatus:         "active",
+			WalletBalanceBefore: &balanceBefore,
+			WalletBalanceAfter:  &balanceAfter,
+		}, nil
+	}
+
 	if order.PaymentStatus != "pending" {
 		return nil, fmt.Errorf("order sudah diproses")
+	}
+
+	if !s.pakasirConfigured() {
+		return nil, fmt.Errorf("gateway payment belum dikonfigurasi")
 	}
 
 	method := NormalizePakasirPaymentMethod(input.PaymentMethod)

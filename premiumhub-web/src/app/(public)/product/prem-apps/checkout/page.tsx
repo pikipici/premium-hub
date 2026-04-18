@@ -2,19 +2,21 @@
 
 import axios from 'axios'
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CreditCard, Landmark, QrCode, ShieldCheck, Zap } from 'lucide-react'
+import { CreditCard, Landmark, QrCode, ShieldCheck, Wallet, Zap } from 'lucide-react'
 
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatRupiah } from '@/lib/utils'
 import { orderService } from '@/services/orderService'
 import { paymentService } from '@/services/paymentService'
+import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 
 type PakasirMethod = 'qris' | 'bri_va' | 'bni_va' | 'permata_va'
+type CheckoutMethod = 'pakasir' | 'wallet'
 
 const PAKASIR_METHOD_OPTIONS: Array<{ key: PakasirMethod; label: string; hint: string; icon: ReactNode }> = [
   { key: 'qris', label: 'QRIS', hint: 'Scan QRIS dari aplikasi e-wallet atau m-banking', icon: <QrCode className="w-4 h-4" /> },
@@ -26,9 +28,11 @@ const PAKASIR_METHOD_OPTIONS: Array<{ key: PakasirMethod; label: string; hint: s
 export default function CheckoutPage() {
   const router = useRouter()
   const { item, clearCart } = useCartStore()
-  const { isAuthenticated, hasHydrated } = useAuthStore()
+  const { isAuthenticated, hasHydrated, walletBalance, setWalletBalance } = useAuthStore()
 
+  const [checkoutMethod, setCheckoutMethod] = useState<CheckoutMethod>('pakasir')
   const [pakasirMethod, setPakasirMethod] = useState<PakasirMethod>('qris')
+  const [walletLoading, setWalletLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -45,8 +49,43 @@ export default function CheckoutPage() {
     }
   }, [hasHydrated, isAuthenticated, item, router])
 
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated) return
+
+    let cancelled = false
+    setWalletLoading(true)
+
+    walletService.getBalance()
+      .then((res) => {
+        if (cancelled || !res.success) return
+        setWalletBalance(res.data.balance)
+      })
+      .catch(() => {
+        // keep silent; checkout still can proceed via gateway
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setWalletLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [hasHydrated, isAuthenticated, setWalletBalance])
+
+  const walletSufficient = useMemo(() => {
+    if (!item) return false
+    return walletBalance >= item.price
+  }, [item, walletBalance])
+
   const handleCheckout = async () => {
     if (!item) return
+
+    if (checkoutMethod === 'wallet' && (!walletSufficient || walletLoading)) {
+      setError('Saldo wallet belum cukup buat checkout ini. Topup dulu ya.')
+      return
+    }
 
     setLoading(true)
     setError('')
@@ -54,7 +93,7 @@ export default function CheckoutPage() {
     try {
       const orderRes = await orderService.create({
         price_id: item.priceId,
-        payment_method: 'pakasir',
+        payment_method: checkoutMethod,
       })
       if (!orderRes.success) {
         setError(orderRes.message)
@@ -63,7 +102,7 @@ export default function CheckoutPage() {
 
       const payRes = await paymentService.create({
         order_id: orderRes.data.id,
-        payment_method: pakasirMethod,
+        payment_method: checkoutMethod === 'wallet' ? 'wallet' : pakasirMethod,
       })
       if (!payRes.success) {
         setError(payRes.message)
@@ -71,8 +110,17 @@ export default function CheckoutPage() {
       }
 
       const payment = payRes.data
-      clearCart()
 
+      if (payment.provider === 'wallet' || payment.payment_method === 'wallet') {
+        if (typeof payment.wallet_balance_after === 'number') {
+          setWalletBalance(payment.wallet_balance_after)
+        }
+        clearCart()
+        router.push(`/product/prem-apps/checkout/success?id=${orderRes.data.id}`)
+        return
+      }
+
+      clearCart()
       const query = new URLSearchParams({
         id: orderRes.data.id,
         paymentNumber: payment.payment_number || '',
@@ -128,45 +176,79 @@ export default function CheckoutPage() {
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6 space-y-3">
             <h3 className="text-sm font-bold mb-1">Metode Pembayaran</h3>
 
-            <div className="w-full rounded-xl border p-4 text-left border-[#FF5733] bg-[#FFF3EF]">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[#F7F7F5] flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-[#141414]" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCheckoutMethod('pakasir')}
+                className={`w-full rounded-xl border p-4 text-left transition-colors ${
+                  checkoutMethod === 'pakasir' ? 'border-[#FF5733] bg-[#FFF3EF]' : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D8]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-[#F7F7F5] flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-[#141414]" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">Pakasir Gateway</div>
+                    <div className="text-xs text-[#888]">QRIS / Virtual Account otomatis via Pakasir</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-semibold">Pakasir Gateway</div>
-                  <div className="text-xs text-[#888]">QRIS / Virtual Account otomatis via Pakasir</div>
-                </div>
-              </div>
-            </div>
+              </button>
 
-            <div className="rounded-xl border border-[#EBEBEB] p-3 bg-[#FAFAF8] space-y-2">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-[#777]">Pilih channel Pakasir</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {PAKASIR_METHOD_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => setPakasirMethod(option.key)}
-                    className={`rounded-lg border px-3 py-2 text-left transition-colors ${
-                      pakasirMethod === option.key
-                        ? 'border-[#141414] bg-white'
-                        : 'border-[#E5E5E5] bg-white/70 hover:border-[#CFCFCF]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 text-sm font-semibold text-[#141414]">
-                      {option.icon}
-                      {option.label}
+              <button
+                type="button"
+                onClick={() => setCheckoutMethod('wallet')}
+                className={`w-full rounded-xl border p-4 text-left transition-colors ${
+                  checkoutMethod === 'wallet' ? 'border-[#FF5733] bg-[#FFF3EF]' : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D8]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-[#F7F7F5] flex items-center justify-center">
+                    <Wallet className="w-5 h-5 text-[#141414]" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">Wallet Balance</div>
+                    <div className="text-xs text-[#888]">
+                      {walletLoading ? 'Memuat saldo wallet...' : `Saldo: ${formatRupiah(walletBalance)}`}
                     </div>
-                    <div className="text-[11px] text-[#888] mt-1">{option.hint}</div>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                </div>
+              </button>
             </div>
 
-            <p className="text-xs text-[#888] rounded-xl bg-[#F7F7F5] px-3 py-2">
-              Wallet checkout lagi disiapkan. Saat ini pembayaran order pakai Pakasir dulu.
-            </p>
+            {checkoutMethod === 'pakasir' ? (
+              <div className="rounded-xl border border-[#EBEBEB] p-3 bg-[#FAFAF8] space-y-2">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-[#777]">Pilih channel Pakasir</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {PAKASIR_METHOD_OPTIONS.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setPakasirMethod(option.key)}
+                      className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                        pakasirMethod === option.key
+                          ? 'border-[#141414] bg-white'
+                          : 'border-[#E5E5E5] bg-white/70 hover:border-[#CFCFCF]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[#141414]">
+                        {option.icon}
+                        {option.label}
+                      </div>
+                      <div className="text-[11px] text-[#888] mt-1">{option.hint}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className={`text-xs rounded-xl px-3 py-2 ${walletSufficient ? 'bg-[#F1FAF4] text-[#1B7A35]' : 'bg-[#FFF3EF] text-[#B7482A]'}`}>
+                {walletLoading
+                  ? 'Lagi cek saldo wallet...'
+                  : walletSufficient
+                    ? 'Saldo cukup. Checkout wallet akan langsung potong saldo dan aktifkan order.'
+                    : 'Saldo wallet belum cukup. Topup dulu sebelum lanjut checkout.'}
+              </p>
+            )}
           </div>
 
           <div className="bg-[#F7F7F5] rounded-2xl p-6 mb-6">
@@ -190,10 +272,16 @@ export default function CheckoutPage() {
 
           <button
             onClick={handleCheckout}
-            disabled={loading}
+            disabled={loading || (checkoutMethod === 'wallet' && (walletLoading || !walletSufficient))}
             className="w-full py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm"
           >
-            {loading ? 'Memproses Pembayaran...' : `Buat Invoice ${formatRupiah(item.price)}`}
+            {loading
+              ? checkoutMethod === 'wallet'
+                ? 'Memproses Pembayaran Wallet...'
+                : 'Memproses Pembayaran...'
+              : checkoutMethod === 'wallet'
+                ? `Bayar via Wallet ${formatRupiah(item.price)}`
+                : `Buat Invoice ${formatRupiah(item.price)}`}
           </button>
 
           <p className="text-xs text-center text-[#888] mt-4">

@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"premiumhub-api/internal/model"
@@ -23,7 +24,8 @@ func NewOrderService(orderRepo *repository.OrderRepo, stockRepo *repository.Stoc
 }
 
 type CreateOrderInput struct {
-	PriceID string `json:"price_id" binding:"required"`
+	PriceID       string `json:"price_id" binding:"required"`
+	PaymentMethod string `json:"payment_method"`
 }
 
 func (s *OrderService) Create(userID uuid.UUID, input CreateOrderInput) (*model.Order, error) {
@@ -32,10 +34,19 @@ func (s *OrderService) Create(userID uuid.UUID, input CreateOrderInput) (*model.
 		return nil, errors.New("price_id tidak valid")
 	}
 
+	paymentMethod := strings.ToLower(strings.TrimSpace(input.PaymentMethod))
+	if paymentMethod == "" {
+		paymentMethod = "pakasir"
+	}
+	if paymentMethod != "pakasir" && paymentMethod != "wallet" {
+		return nil, errors.New("metode pembayaran tidak didukung")
+	}
+
 	order := &model.Order{
 		UserID:        userID,
 		PriceID:       priceID,
 		TotalPrice:    0,
+		PaymentMethod: paymentMethod,
 		PaymentStatus: "pending",
 		OrderStatus:   "pending",
 	}
