@@ -5,6 +5,7 @@ export interface SosmedService {
   category_code: string
   code: string
   title: string
+  provider_title?: string
   summary?: string
   platform_label?: string
   badge_text?: string

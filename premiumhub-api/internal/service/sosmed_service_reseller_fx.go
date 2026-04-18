@@ -21,9 +21,34 @@ const (
 	defaultSosmedResellerFXCodePrefx = "jap-"
 )
 
+type sosmedTextReplacement struct {
+	pattern     *regexp.Regexp
+	replacement string
+}
+
 var (
 	sosmedResellerUSDPattern = regexp.MustCompile(`(?i)USD\s*([0-9]+(?:\.[0-9]+)?)`)
 	sosmedCodeSuffixPattern  = regexp.MustCompile(`([0-9]+)$`)
+
+	sosmedProviderTagPattern       = regexp.MustCompile(`(?i)\s*\(JAP\s*#?\d+\)\s*$`)
+	sosmedTitleAutoDayPattern      = regexp.MustCompile(`(?i)\bAuto[-\s]*([0-9]{1,4})\s*D\b`)
+	sosmedTitleDurationDayPattern  = regexp.MustCompile(`(?i)\b([0-9]{1,4})\s*D\b`)
+	sosmedTitleDurationDaysPattern = regexp.MustCompile(`(?i)\b([0-9]{1,4})\s*Days?\b`)
+	sosmedTitleTrailingDayPattern  = regexp.MustCompile(`(?i)^(.+?)\s+([0-9]{1,4}\s+Hari)$`)
+
+	sosmedRefillAutoDayPattern = regexp.MustCompile(`(?i)^auto(?:[-\s]*refill)?\s*([0-9]{1,4})\s*(?:d|days?)$`)
+	sosmedRefillDayPattern     = regexp.MustCompile(`(?i)^([0-9]{1,4})\s*(?:d|days?)$`)
+
+	sosmedRatePerTimePattern = regexp.MustCompile(`(?i)^\s*(up\s*to\s+)?([0-9]+(?:\.[0-9]+)?)([km]?)\s*/\s*(d|day|days|hr|hrs|hour|hours)\s*$`)
+
+	sosmedTitleGlossaryReplacements = []sosmedTextReplacement{
+		{pattern: regexp.MustCompile(`(?i)\bReactions?\s+Mixed\b`), replacement: "Reaksi Campuran"},
+		{pattern: regexp.MustCompile(`(?i)\bNon[\s-]?Drop\b`), replacement: "Stabil"},
+		{pattern: regexp.MustCompile(`(?i)\bAll\s+Videos?\b`), replacement: "Semua Video"},
+		{pattern: regexp.MustCompile(`(?i)\bAuto[-\s]*Refill\b`), replacement: "Refill Otomatis"},
+		{pattern: regexp.MustCompile(`(?i)\bREAL\b`), replacement: "Akun Asli"},
+		{pattern: regexp.MustCompile(`(?i)\bHQ\b`), replacement: "Kualitas Tinggi"},
+	}
 )
 
 type SosmedResellerFXConfig struct {
@@ -160,13 +185,45 @@ func (s *SosmedServiceService) RepriceResellerToIDR(ctx context.Context, input R
 			pricePer1K += fmt.Sprintf(" • JAP#%s", suffix)
 		}
 
-		if item.PriceStart == priceStart && item.PricePer1K == pricePer1K {
+		nextTitle := item.Title
+		nextProviderTitle := item.ProviderTitle
+		nextRefill := item.Refill
+		nextETA := item.ETA
+
+		if shouldFormatSosmedProviderCopy(item.Code) {
+			providerTitle := strings.TrimSpace(item.ProviderTitle)
+			if providerTitle == "" {
+				providerTitle = strings.TrimSpace(item.Title)
+			}
+
+			if providerTitle != "" {
+				nextProviderTitle = providerTitle
+				if formattedTitle := formatSosmedDisplayTitle(providerTitle); formattedTitle != "" {
+					nextTitle = formattedTitle
+				}
+			}
+
+			if formattedRefill := formatSosmedRefillValue(item.Refill); formattedRefill != "" {
+				nextRefill = formattedRefill
+			}
+			if formattedETA := formatSosmedETAValue(item.ETA); formattedETA != "" {
+				nextETA = formattedETA
+			}
+		}
+
+		if item.PriceStart == priceStart && item.PricePer1K == pricePer1K &&
+			item.Title == nextTitle && item.ProviderTitle == nextProviderTitle &&
+			item.Refill == nextRefill && item.ETA == nextETA {
 			continue
 		}
 
 		if !input.DryRun {
 			item.PriceStart = priceStart
 			item.PricePer1K = pricePer1K
+			item.Title = nextTitle
+			item.ProviderTitle = nextProviderTitle
+			item.Refill = nextRefill
+			item.ETA = nextETA
 			if err := s.repo.Update(item); err != nil {
 				return nil, errors.New("gagal memperbarui harga reseller sosmed")
 			}
@@ -270,6 +327,132 @@ func (s *SosmedServiceService) fetchLiveUSDtoIDR(ctx context.Context) (float64, 
 		return 0, errors.New("rate IDR tidak ditemukan")
 	}
 	return rate, nil
+}
+
+func shouldFormatSosmedProviderCopy(code string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(code)), defaultSosmedResellerFXCodePrefx)
+}
+
+func formatSosmedDisplayTitle(providerTitle string) string {
+	title := strings.TrimSpace(providerTitle)
+	if title == "" {
+		return ""
+	}
+
+	title = sosmedProviderTagPattern.ReplaceAllString(title, "")
+	title = strings.Join(strings.Fields(title), " ")
+	if title == "" {
+		return ""
+	}
+
+	for _, replacement := range sosmedTitleGlossaryReplacements {
+		title = replacement.pattern.ReplaceAllString(title, replacement.replacement)
+	}
+
+	title = sosmedTitleAutoDayPattern.ReplaceAllString(title, "Refill Otomatis $1 Hari")
+	title = sosmedTitleDurationDaysPattern.ReplaceAllString(title, "$1 Hari")
+	title = sosmedTitleDurationDayPattern.ReplaceAllString(title, "$1 Hari")
+	title = strings.Join(strings.Fields(title), " ")
+
+	if match := sosmedTitleTrailingDayPattern.FindStringSubmatch(title); len(match) == 3 {
+		prefix := strings.TrimSpace(match[1])
+		duration := strings.TrimSpace(match[2])
+		if prefix != "" && duration != "" && !strings.HasSuffix(strings.ToLower(prefix), "refill otomatis") {
+			title = fmt.Sprintf("%s (%s)", prefix, duration)
+		}
+	}
+
+	return strings.TrimSpace(title)
+}
+
+func formatSosmedRefillValue(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+
+	normalized := strings.ToLower(strings.Join(strings.Fields(value), " "))
+	switch normalized {
+	case "-", "n/a", "na":
+		return "-"
+	case "no", "none", "tidak", "tidak ada":
+		return "Tidak Ada"
+	case "lifetime":
+		return "Seumur Layanan"
+	}
+
+	if strings.Contains(normalized, "non drop") || strings.Contains(normalized, "nondrop") {
+		return "Stabil (Non Drop)"
+	}
+
+	if match := sosmedRefillAutoDayPattern.FindStringSubmatch(value); len(match) == 2 {
+		return fmt.Sprintf("Otomatis %s Hari", strings.TrimSpace(match[1]))
+	}
+	if match := sosmedRefillDayPattern.FindStringSubmatch(value); len(match) == 2 {
+		return fmt.Sprintf("%s Hari", strings.TrimSpace(match[1]))
+	}
+
+	value = sosmedTitleDurationDaysPattern.ReplaceAllString(value, "$1 Hari")
+	value = sosmedTitleDurationDayPattern.ReplaceAllString(value, "$1 Hari")
+	value = strings.ReplaceAll(value, "Auto-Refill", "Otomatis")
+	value = strings.ReplaceAll(value, "auto-refill", "Otomatis")
+	value = strings.ReplaceAll(value, "Auto Refill", "Otomatis")
+	value = strings.ReplaceAll(value, "auto refill", "Otomatis")
+	value = strings.Join(strings.Fields(value), " ")
+
+	return strings.TrimSpace(value)
+}
+
+func formatSosmedETAValue(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+	if value == "-" {
+		return "-"
+	}
+
+	if match := sosmedRatePerTimePattern.FindStringSubmatch(value); len(match) == 5 {
+		prefix := ""
+		if strings.TrimSpace(match[1]) != "" {
+			prefix = "Hingga "
+		}
+
+		amount := strings.TrimSpace(match[2])
+		suffix := strings.ToUpper(strings.TrimSpace(match[3]))
+		periodToken := strings.ToLower(strings.TrimSpace(match[4]))
+
+		switch suffix {
+		case "K":
+			amount += " rb"
+		case "M":
+			amount += " jt"
+		}
+
+		period := "hari"
+		switch periodToken {
+		case "hr", "hrs", "hour", "hours":
+			period = "jam"
+		}
+
+		return strings.TrimSpace(prefix + amount + "/" + period)
+	}
+
+	value = strings.ReplaceAll(value, "Hrs", "Jam")
+	value = strings.ReplaceAll(value, "hrs", "jam")
+	value = strings.ReplaceAll(value, "Hr", "Jam")
+	value = strings.ReplaceAll(value, "hr", "jam")
+	value = strings.ReplaceAll(value, "Hours", "Jam")
+	value = strings.ReplaceAll(value, "hours", "jam")
+	value = strings.ReplaceAll(value, "Hour", "Jam")
+	value = strings.ReplaceAll(value, "hour", "jam")
+	value = strings.ReplaceAll(value, "Days", "Hari")
+	value = strings.ReplaceAll(value, "days", "hari")
+	value = strings.ReplaceAll(value, "Day", "Hari")
+	value = strings.ReplaceAll(value, "day", "hari")
+	value = strings.Join(strings.Fields(value), " ")
+
+	return strings.TrimSpace(value)
 }
 
 func normalizeResellerFXMode(value string) string {

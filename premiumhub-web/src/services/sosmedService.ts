@@ -6,6 +6,7 @@ export interface AdminSosmedServicePayload {
   category_code: string
   code: string
   title: string
+  provider_title?: string
   summary?: string
   platform_label?: string
   badge_text?: string
@@ -26,6 +27,7 @@ export interface AdminSosmedServiceUpdatePayload {
   category_code?: string
   code?: string
   title?: string
+  provider_title?: string
   summary?: string
   platform_label?: string
   badge_text?: string

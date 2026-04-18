@@ -12,6 +12,7 @@ type SosmedService struct {
 	CategoryCode  string    `gorm:"size:50;not null;index:idx_sosmed_services_category" json:"category_code"`
 	Code          string    `gorm:"size:80;not null;uniqueIndex" json:"code"`
 	Title         string    `gorm:"size:180;not null" json:"title"`
+	ProviderTitle string    `gorm:"size:220" json:"provider_title,omitempty"`
 	Summary       string    `gorm:"type:text" json:"summary"`
 	PlatformLabel string    `gorm:"size:120" json:"platform_label"`
 	BadgeText     string    `gorm:"size:80" json:"badge_text"`

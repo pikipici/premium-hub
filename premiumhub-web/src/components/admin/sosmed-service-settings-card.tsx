@@ -887,6 +887,24 @@ export default function SosmedServiceSettingsCard() {
                       {' • '}
                       {detailTarget.badge_text || '-'}
                     </div>
+                    {detailTarget.provider_title && detailTarget.provider_title.trim() && (
+                      <div style={{ marginTop: 6 }}>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>Nama Asli Provider</div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            border: '1px solid var(--line, #E5E7EB)',
+                            borderRadius: 8,
+                            padding: '6px 8px',
+                            background: '#fff',
+                            lineHeight: 1.4,
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {detailTarget.provider_title}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'grid', gap: 6 }}>

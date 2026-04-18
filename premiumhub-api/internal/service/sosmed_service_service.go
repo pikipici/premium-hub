@@ -58,6 +58,7 @@ type CreateSosmedServiceInput struct {
 	CategoryCode  string   `json:"category_code" binding:"required"`
 	Code          string   `json:"code" binding:"required"`
 	Title         string   `json:"title" binding:"required"`
+	ProviderTitle string   `json:"provider_title"`
 	Summary       string   `json:"summary"`
 	PlatformLabel string   `json:"platform_label"`
 	BadgeText     string   `json:"badge_text"`
@@ -78,6 +79,7 @@ type UpdateSosmedServiceInput struct {
 	CategoryCode  *string   `json:"category_code"`
 	Code          *string   `json:"code"`
 	Title         *string   `json:"title"`
+	ProviderTitle *string   `json:"provider_title"`
 	Summary       *string   `json:"summary"`
 	PlatformLabel *string   `json:"platform_label"`
 	BadgeText     *string   `json:"badge_text"`
@@ -209,6 +211,7 @@ func (s *SosmedServiceService) Create(input CreateSosmedServiceInput) (*model.So
 		CategoryCode:  categoryCode,
 		Code:          code,
 		Title:         title,
+		ProviderTitle: strings.TrimSpace(input.ProviderTitle),
 		Summary:       strings.TrimSpace(input.Summary),
 		PlatformLabel: strings.TrimSpace(input.PlatformLabel),
 		BadgeText:     strings.TrimSpace(input.BadgeText),
@@ -262,6 +265,10 @@ func (s *SosmedServiceService) Update(id uuid.UUID, input UpdateSosmedServiceInp
 			return nil, errors.New("judul layanan wajib diisi")
 		}
 		item.Title = title
+	}
+
+	if input.ProviderTitle != nil {
+		item.ProviderTitle = strings.TrimSpace(*input.ProviderTitle)
 	}
 
 	if input.Summary != nil {

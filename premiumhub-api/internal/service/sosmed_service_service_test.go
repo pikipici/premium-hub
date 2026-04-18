@@ -256,3 +256,110 @@ func TestSosmedService_RepriceResellerToIDR_DryRun(t *testing.T) {
 		t.Fatalf("dry run should not mutate price_start, got %s", stored.PriceStart)
 	}
 }
+
+func TestSosmedService_RepriceResellerToIDR_FormatsProviderCopy(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(&model.ProductCategory{}, &model.SosmedService{}); err != nil {
+		t.Fatalf("migrate sosmed models: %v", err)
+	}
+
+	categoryRepo := repository.NewProductCategoryRepo(db)
+	seedSosmedCategory(t, categoryRepo, "likes", "Likes", 20)
+
+	repo := repository.NewSosmedServiceRepo(db)
+	svc := NewSosmedServiceService(repo, categoryRepo).SetResellerFXConfig(SosmedResellerFXConfig{
+		Mode:      "fixed",
+		FixedRate: 17000,
+	})
+
+	rawTitle := "TikTok Likes HQ 30D (JAP #10173)"
+	item, err := svc.Create(CreateSosmedServiceInput{
+		CategoryCode: "likes",
+		Code:         "jap-tt-likes-hq-30d-10173",
+		Title:        rawTitle,
+		Summary:      "Import dari JustAnotherPanel. Harga reseller USD 0.0825/1K.",
+		Refill:       "Auto-Refill 30 Days",
+		ETA:          "Up to 100K/D",
+		PriceStart:   "Reseller USD 0.0825/1K",
+		PricePer1K:   "Reseller USD 0.0825 per 1K • JAP#10173",
+		IsActive:     boolPtr(false),
+	})
+	if err != nil {
+		t.Fatalf("create sosmed service: %v", err)
+	}
+
+	res, err := svc.RepriceResellerToIDR(context.Background(), RepriceSosmedResellerInput{})
+	if err != nil {
+		t.Fatalf("reprice reseller: %v", err)
+	}
+	if res.Updated != 1 {
+		t.Fatalf("expected updated=1, got %d", res.Updated)
+	}
+
+	stored, err := repo.FindByID(item.ID)
+	if err != nil {
+		t.Fatalf("find sosmed service: %v", err)
+	}
+	if stored.ProviderTitle != rawTitle {
+		t.Fatalf("expected provider_title %q, got %q", rawTitle, stored.ProviderTitle)
+	}
+	if stored.Title != "TikTok Likes Kualitas Tinggi (30 Hari)" {
+		t.Fatalf("unexpected formatted title: %s", stored.Title)
+	}
+	if stored.Refill != "Otomatis 30 Hari" {
+		t.Fatalf("unexpected formatted refill: %s", stored.Refill)
+	}
+	if stored.ETA != "Hingga 100 rb/hari" {
+		t.Fatalf("unexpected formatted eta: %s", stored.ETA)
+	}
+}
+
+func TestSosmedService_FormatterHelpers(t *testing.T) {
+	titleCases := []struct {
+		name     string
+		raw      string
+		expected string
+	}{
+		{
+			name:     "hq_and_duration",
+			raw:      "TikTok Followers HQ 60D (JAP #9197)",
+			expected: "TikTok Followers Kualitas Tinggi (60 Hari)",
+		},
+		{
+			name:     "mixed_reactions",
+			raw:      "Telegram Reactions Mixed 30D",
+			expected: "Telegram Reaksi Campuran (30 Hari)",
+		},
+		{
+			name:     "auto_duration",
+			raw:      "TikTok Views Auto30D",
+			expected: "TikTok Views Refill Otomatis 30 Hari",
+		},
+	}
+
+	for _, tc := range titleCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := formatSosmedDisplayTitle(tc.raw)
+			if actual != tc.expected {
+				t.Fatalf("format title: expected %q, got %q", tc.expected, actual)
+			}
+		})
+	}
+
+	if got := formatSosmedRefillValue("Non Drop"); got != "Stabil (Non Drop)" {
+		t.Fatalf("format refill non-drop: expected %q, got %q", "Stabil (Non Drop)", got)
+	}
+	if got := formatSosmedRefillValue("365D"); got != "365 Hari" {
+		t.Fatalf("format refill day duration: expected %q, got %q", "365 Hari", got)
+	}
+	if got := formatSosmedRefillValue("No"); got != "Tidak Ada" {
+		t.Fatalf("format refill no: expected %q, got %q", "Tidak Ada", got)
+	}
+
+	if got := formatSosmedETAValue("15K/Hr"); got != "15 rb/jam" {
+		t.Fatalf("format eta hourly: expected %q, got %q", "15 rb/jam", got)
+	}
+	if got := formatSosmedETAValue("Up to 5M/D"); got != "Hingga 5 jt/hari" {
+		t.Fatalf("format eta up-to daily: expected %q, got %q", "Hingga 5 jt/hari", got)
+	}
+}
