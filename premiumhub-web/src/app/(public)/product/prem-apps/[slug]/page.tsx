@@ -306,7 +306,7 @@ export default function PremAppsProductDetailPage() {
       <Navbar />
 
       <section className="py-12 md:py-16">
-        <div className="max-w-4xl mx-auto px-4 pb-12 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto px-4 pb-24 sm:px-6 sm:pb-20 lg:px-8">
           <div className="rounded-3xl p-8 md:p-10 mb-8 border border-[#EBEBEB] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
             <div className="flex flex-col items-center text-center">
               {product.icon_image_url ? (
@@ -486,7 +486,10 @@ export default function PremAppsProductDetailPage() {
             </div>
           )}
 
-          <div className="mt-10 rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-lg">
+          <div
+            className="sticky z-20 mt-10 rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-lg"
+            style={{ bottom: 'max(12px, env(safe-area-inset-bottom))' }}
+          >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-xs text-[#888]">Total</div>
