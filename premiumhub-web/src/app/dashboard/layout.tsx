@@ -22,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Navbar />
       <div className="flex min-h-[calc(100vh-64px)]">
         <DashboardSidebar />
-        <main className="flex-1 p-6 md:p-8 bg-[#F7F7F5]">
+        <main className="min-w-0 w-full flex-1 overflow-x-hidden bg-[#F7F7F5] p-4 sm:p-6 md:p-8">
           {children}
         </main>
       </div>
