@@ -269,13 +269,13 @@ export default function AkunAktifPage() {
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-[#F7F7F5] p-3">
                     <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Email akun</div>
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#141414]">{stockEmail}</span>
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="min-w-0 break-all text-sm font-semibold text-[#141414]">{stockEmail}</span>
                       <button
                         type="button"
                         onClick={() => void copyText(stockEmail, `${order.id}:email`)}
                         disabled={stockEmail === '-'}
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex h-8 w-8 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40 sm:self-auto"
                         aria-label="Copy email akun"
                       >
                         {copiedKey === `${order.id}:email` ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
@@ -295,12 +295,12 @@ export default function AkunAktifPage() {
 
                   <div className="rounded-xl bg-[#F7F7F5] p-3">
                     <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Order ID</div>
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#141414]">{order.id}</span>
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="min-w-0 break-all text-sm font-semibold text-[#141414]">{order.id}</span>
                       <button
                         type="button"
                         onClick={() => void copyText(order.id, `${order.id}:id`)}
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE]"
+                        className="inline-flex h-8 w-8 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] sm:self-auto"
                         aria-label="Copy order id"
                       >
                         {copiedKey === `${order.id}:id` ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
