@@ -306,7 +306,7 @@ export default function PremAppsProductDetailPage() {
       <Navbar />
 
       <section className="py-12 md:py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto px-4 pb-28 sm:px-6 md:pb-20 lg:px-8">
           <div className="rounded-3xl p-8 md:p-10 mb-8 border border-[#EBEBEB] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
             <div className="flex flex-col items-center text-center">
               {product.icon_image_url ? (
@@ -486,7 +486,7 @@ export default function PremAppsProductDetailPage() {
             </div>
           )}
 
-          <div className="sticky bottom-4 bg-white rounded-2xl shadow-lg border border-[#EBEBEB] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="sticky bottom-4 z-20 rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-lg flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-xs text-[#888]">Total</div>
               <div className="text-xl font-extrabold">
@@ -501,13 +501,13 @@ export default function PremAppsProductDetailPage() {
               )}
             </div>
 
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
               {showWaButton && waLink && (
                 <a
                   href={waLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-4 py-3 border border-[#D1D5DB] text-[#111827] font-semibold rounded-full text-sm text-center"
+                  className="w-full rounded-full border border-[#D1D5DB] px-4 py-3 text-center text-sm font-semibold text-[#111827] sm:w-auto"
                 >
                   {product.whatsapp_button_text?.trim() || 'Tanya via WhatsApp'}
                 </a>
