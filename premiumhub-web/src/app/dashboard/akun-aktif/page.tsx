@@ -33,12 +33,27 @@ function formatDateTime(date?: string | null) {
   })
 }
 
-function daysUntilExpiry(date?: string | null) {
+function getExpiryTimestamp(date?: string | null) {
   if (!date) return null
   const parsed = new Date(date)
   if (Number.isNaN(parsed.getTime())) return null
+  return parsed.getTime()
+}
 
-  const msDiff = parsed.getTime() - Date.now()
+function isOrderExpired(order: Order, nowMs = Date.now()) {
+  if ((order.order_status || '').toLowerCase() === 'expired') return true
+
+  const expiryTimestamp = getExpiryTimestamp(order.expires_at)
+  if (expiryTimestamp === null) return false
+
+  return expiryTimestamp < nowMs
+}
+
+function daysUntilExpiry(date?: string | null) {
+  const expiryTimestamp = getExpiryTimestamp(date)
+  if (expiryTimestamp === null) return null
+
+  const msDiff = expiryTimestamp - Date.now()
   return Math.ceil(msDiff / (24 * 60 * 60 * 1000))
 }
 
@@ -64,6 +79,7 @@ export default function AkunAktifPage() {
   const [productsByID, setProductsByID] = useState<ProductLookup>({})
   const [copiedKey, setCopiedKey] = useState('')
   const [revealedPasswordKeys, setRevealedPasswordKeys] = useState<Record<string, boolean>>({})
+  const [activeTab, setActiveTab] = useState<'active' | 'expired'>('active')
 
   const loadProducts = useCallback(async () => {
     try {
@@ -123,15 +139,45 @@ export default function AkunAktifPage() {
     void Promise.all([loadProducts(), loadOrders()])
   }, [loadOrders, loadProducts])
 
-  const activeOrders = useMemo(() => {
-    return orders
-      .filter((item) => item.order_status === 'active' && item.payment_status === 'paid')
+  const accountOrders = useMemo(() => {
+    const nowMs = Date.now()
+
+    const paidOrders = orders
+      .filter((item) => item.payment_status === 'paid' && item.stock)
       .sort((a, b) => {
         const left = new Date(b.paid_at || b.created_at).getTime()
         const right = new Date(a.paid_at || a.created_at).getTime()
         return left - right
       })
+
+    const active: Order[] = []
+    const expired: Order[] = []
+
+    paidOrders.forEach((item) => {
+      if (isOrderExpired(item, nowMs)) {
+        expired.push(item)
+        return
+      }
+
+      active.push(item)
+    })
+
+    return { active, expired }
   }, [orders])
+
+  const visibleOrders = activeTab === 'active' ? accountOrders.active : accountOrders.expired
+  const hasAnyAccountOrder = accountOrders.active.length + accountOrders.expired.length > 0
+
+  useEffect(() => {
+    if (activeTab === 'active' && accountOrders.active.length === 0 && accountOrders.expired.length > 0) {
+      setActiveTab('expired')
+      return
+    }
+
+    if (activeTab === 'expired' && accountOrders.expired.length === 0 && accountOrders.active.length > 0) {
+      setActiveTab('active')
+    }
+  }, [activeTab, accountOrders])
 
   const copyText = async (value: string, key: string) => {
     if (!value || typeof navigator === 'undefined' || !navigator.clipboard) return
@@ -203,7 +249,7 @@ export default function AkunAktifPage() {
             <Loader2 className="h-3.5 w-3.5" /> Coba lagi
           </button>
         </div>
-      ) : activeOrders.length === 0 ? (
+      ) : !hasAnyAccountOrder ? (
         <div className="rounded-2xl border border-[#EBEBEB] bg-white px-6 py-12 text-center">
           <PackageOpen className="mx-auto mb-3 h-10 w-10 text-[#D1D1CD]" />
           <p className="text-sm font-semibold text-[#444]">Belum ada akun aktif.</p>
@@ -225,37 +271,77 @@ export default function AkunAktifPage() {
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          {activeOrders.map((order) => {
-            const product = resolveProduct(order)
-            const expiryDays = daysUntilExpiry(order.expires_at)
-            const expiryBadgeClass =
-              expiryDays === null
-                ? 'bg-[#F1F1EE] text-[#666]'
-                : expiryDays <= 0
-                  ? 'bg-red-100 text-red-700'
-                  : expiryDays <= 3
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-green-100 text-green-700'
-            const expiryLabel =
-              expiryDays === null
-                ? 'Tanpa tanggal expired'
-                : expiryDays <= 0
-                  ? 'Sudah expired'
-                  : `Sisa ${expiryDays} hari`
+        <>
+          <div className="mb-4 inline-flex rounded-xl border border-[#E4E4DF] bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab('active')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                activeTab === 'active'
+                  ? 'bg-[#FF5733] text-white'
+                  : 'text-[#666] hover:bg-[#F4F4F1]'
+              }`}
+            >
+              Aktif ({accountOrders.active.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('expired')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                activeTab === 'expired'
+                  ? 'bg-[#FF5733] text-white'
+                  : 'text-[#666] hover:bg-[#F4F4F1]'
+              }`}
+            >
+              Expired ({accountOrders.expired.length})
+            </button>
+          </div>
 
-            const accountType = accountTypeLabel(order.price?.account_type)
-            const stockEmail = order.stock?.email || '-'
-            const passwordRaw = (order.stock?.password || '').trim()
-            const passwordKey = `${order.id}:password`
-            const showPassword = Boolean(revealedPasswordKeys[passwordKey])
-            const passwordText = passwordRaw
-              ? showPassword
-                ? passwordRaw
-                : '••••••••••••'
-              : 'Belum tersedia, hubungi admin'
-            const profileName = order.stock?.profile_name || '-'
-            const startedAt = order.paid_at || order.created_at
+          {visibleOrders.length === 0 ? (
+            <div className="rounded-2xl border border-[#EBEBEB] bg-white px-6 py-10 text-center">
+              <PackageOpen className="mx-auto mb-3 h-8 w-8 text-[#D1D1CD]" />
+              <p className="text-sm font-semibold text-[#444]">
+                {activeTab === 'active' ? 'Belum ada akun yang masih aktif.' : 'Belum ada akun yang expired.'}
+              </p>
+              <p className="mt-1 text-xs text-[#888]">
+                {activeTab === 'active'
+                  ? 'Akun yang aktif akan tampil di tab ini.'
+                  : 'Akun yang masa aktifnya habis akan pindah ke tab ini.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {visibleOrders.map((order) => {
+                const product = resolveProduct(order)
+                const expiredNow = isOrderExpired(order)
+                const expiryDays = daysUntilExpiry(order.expires_at)
+                const expiryBadgeClass =
+                  expiryDays === null
+                    ? 'bg-[#F1F1EE] text-[#666]'
+                    : expiryDays <= 0
+                      ? 'bg-red-100 text-red-700'
+                      : expiryDays <= 3
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-green-100 text-green-700'
+                const expiryLabel =
+                  expiryDays === null
+                    ? 'Tanpa tanggal expired'
+                    : expiryDays <= 0
+                      ? 'Sudah expired'
+                      : `Sisa ${expiryDays} hari`
+
+                const accountType = accountTypeLabel(order.price?.account_type)
+                const stockEmail = order.stock?.email || '-'
+                const passwordRaw = (order.stock?.password || '').trim()
+                const passwordKey = `${order.id}:password`
+                const showPassword = Boolean(revealedPasswordKeys[passwordKey])
+                const passwordText = passwordRaw
+                  ? showPassword
+                    ? passwordRaw
+                    : '••••••••••••'
+                  : 'Belum tersedia, hubungi admin'
+                const profileName = order.stock?.profile_name || '-'
+                const startedAt = order.paid_at || order.created_at
 
             return (
               <div key={order.id} className="overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-4 sm:p-5">
@@ -265,13 +351,19 @@ export default function AkunAktifPage() {
                     <div className="min-w-0">
                       <div className="truncate text-sm font-bold text-[#141414]">{product.name}</div>
                       <div className="mt-1 break-words text-xs text-[#888]">{shortOrderCode(order.id)} • {accountType} • {order.price?.duration || '-'} Bulan</div>
-                      <div className="mt-1 text-xs text-[#888]">Aktif sejak {formatDateTime(startedAt)}</div>
+                      <div className="mt-1 text-xs text-[#888]">{expiredNow ? 'Dibeli' : 'Aktif sejak'} {formatDateTime(startedAt)}</div>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center justify-end gap-1.5">
                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${expiryBadgeClass}`}>{expiryLabel}</span>
-                    <span className="rounded-full bg-[#ECFDF3] px-2.5 py-1 text-[10px] font-bold text-[#16774C]">Aktif</span>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                        expiredNow ? 'bg-red-100 text-red-700' : 'bg-[#ECFDF3] text-[#16774C]'
+                      }`}
+                    >
+                      {expiredNow ? 'Expired' : 'Aktif'}
+                    </span>
                   </div>
                 </div>
 
@@ -360,9 +452,11 @@ export default function AkunAktifPage() {
                   </div>
                 ) : null}
               </div>
-            )
-          })}
-        </div>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
