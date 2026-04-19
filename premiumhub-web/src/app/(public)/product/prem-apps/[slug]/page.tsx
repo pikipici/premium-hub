@@ -486,10 +486,7 @@ export default function PremAppsProductDetailPage() {
             </div>
           )}
 
-          <div
-            className="fixed inset-x-0 z-[60] pointer-events-none"
-            style={{ bottom: 'max(10px, env(safe-area-inset-bottom))' }}
-          >
+          <div className="purchase-floating-bar fixed inset-x-0 z-[60] pointer-events-none">
             <div className="mx-auto w-full max-w-4xl px-3 sm:px-6 lg:px-8">
               <div className="pointer-events-auto rounded-2xl border border-[#EBEBEB] bg-white p-3 shadow-[0_10px_28px_rgba(20,20,20,0.16)] sm:p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
