@@ -3,7 +3,25 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
-import { LayoutDashboard, ShoppingBag, History, ShieldCheck, Bell, LogOut, Wallet, Smartphone, RefreshCw, Megaphone } from 'lucide-react'
+import {
+  Bell,
+  History,
+  LayoutDashboard,
+  LogOut,
+  Megaphone,
+  PanelLeftClose,
+  PanelLeftOpen,
+  RefreshCw,
+  ShieldCheck,
+  ShoppingBag,
+  Smartphone,
+  Wallet,
+} from 'lucide-react'
+
+type DashboardSidebarProps = {
+  collapsed?: boolean
+  onToggle?: () => void
+}
 
 const MENU = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -17,37 +35,74 @@ const MENU = [
   { href: '/dashboard/notifikasi', icon: Bell, label: 'Notifikasi' },
 ]
 
-export default function DashboardSidebar() {
+export default function DashboardSidebar({ collapsed = false, onToggle }: DashboardSidebarProps) {
   const pathname = usePathname()
   const { logout } = useAuthStore()
 
   return (
-    <aside className="w-64 bg-white border-r border-[#EBEBEB] min-h-screen py-6 px-4 hidden md:block">
-      <nav className="space-y-1">
-        {MENU.map(item => {
-          const active = item.href === '/dashboard'
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(`${item.href}/`)
+    <aside
+      className={`hidden border-r border-[#EBEBEB] bg-white px-3 py-4 transition-all duration-200 md:flex md:flex-col ${
+        collapsed ? 'w-[84px]' : 'w-64'
+      }`}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2 px-1">
+        {!collapsed ? (
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.08em] text-[#A6A6A1]">Menu User</div>
+            <div className="text-sm font-semibold text-[#141414]">Dashboard</div>
+          </div>
+        ) : (
+          <div className="h-8 w-8" />
+        )}
+
+        <button
+          type="button"
+          onClick={onToggle}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E5E1] bg-white text-[#6E6D69] transition-colors hover:bg-[#F4F4F1]"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </button>
+      </div>
+
+      <nav className="flex-1 space-y-1">
+        {MENU.map((item) => {
+          const active =
+            item.href === '/dashboard'
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(`${item.href}/`)
+
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                active ? 'bg-[#FFF3EF] text-[#FF5733]' : 'text-[#888] hover:bg-[#F7F7F5] hover:text-[#141414]'
+              title={collapsed ? item.label : undefined}
+              className={`group flex items-center rounded-xl text-sm font-medium transition-all ${
+                collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3.5 py-2.5'
+              } ${
+                active
+                  ? 'bg-[#FFF3EF] text-[#FF5733]'
+                  : 'text-[#777772] hover:bg-[#F7F7F5] hover:text-[#141414]'
               }`}
             >
-              <item.icon className="w-4 h-4" />
-              {item.label}
+              <item.icon className="h-4 w-4 shrink-0" />
+              {!collapsed ? <span>{item.label}</span> : null}
             </Link>
           )
         })}
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-[#888] hover:bg-red-50 hover:text-red-500 transition-all w-full"
-        >
-          <LogOut className="w-4 h-4" /> Logout
-        </button>
       </nav>
+
+      <button
+        onClick={logout}
+        title={collapsed ? 'Logout' : undefined}
+        className={`mt-2 flex items-center rounded-xl text-sm font-medium text-[#8A8985] transition-all hover:bg-red-50 hover:text-red-600 ${
+          collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3.5 py-2.5'
+        }`}
+      >
+        <LogOut className="h-4 w-4 shrink-0" />
+        {!collapsed ? <span>Logout</span> : null}
+      </button>
     </aside>
   )
 }
