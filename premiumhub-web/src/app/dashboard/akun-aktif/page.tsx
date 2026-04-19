@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Check, Copy, Loader2, PackageOpen, RefreshCw, ShoppingBag } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Eye, EyeOff, Loader2, PackageOpen, RefreshCw, ShoppingBag } from 'lucide-react'
 
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
@@ -63,6 +63,7 @@ export default function AkunAktifPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [productsByID, setProductsByID] = useState<ProductLookup>({})
   const [copiedKey, setCopiedKey] = useState('')
+  const [revealedPasswordKeys, setRevealedPasswordKeys] = useState<Record<string, boolean>>({})
 
   const loadProducts = useCallback(async () => {
     try {
@@ -245,6 +246,14 @@ export default function AkunAktifPage() {
 
             const accountType = accountTypeLabel(order.price?.account_type)
             const stockEmail = order.stock?.email || '-'
+            const passwordRaw = (order.stock?.password || '').trim()
+            const passwordKey = `${order.id}:password`
+            const showPassword = Boolean(revealedPasswordKeys[passwordKey])
+            const passwordText = passwordRaw
+              ? showPassword
+                ? passwordRaw
+                : '••••••••••••'
+              : 'Belum tersedia, hubungi admin'
             const profileName = order.stock?.profile_name || '-'
             const startedAt = order.paid_at || order.created_at
 
@@ -280,6 +289,41 @@ export default function AkunAktifPage() {
                       >
                         {copiedKey === `${order.id}:email` ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                       </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-[#F7F7F5] p-3">
+                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Password akun</div>
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span className={`min-w-0 break-all text-sm font-semibold ${passwordRaw && !showPassword ? 'tracking-[0.16em] text-[#6B6A66]' : 'text-[#141414]'}`}>
+                        {passwordText}
+                      </span>
+
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRevealedPasswordKeys((prev) => ({
+                              ...prev,
+                              [passwordKey]: !prev[passwordKey],
+                            }))
+                          }
+                          disabled={!passwordRaw}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label="Tampilkan password"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void copyText(passwordRaw, passwordKey)}
+                          disabled={!passwordRaw}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label="Copy password akun"
+                        >
+                          {copiedKey === passwordKey ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
