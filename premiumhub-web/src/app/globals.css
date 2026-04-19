@@ -128,15 +128,3 @@
     @apply font-sans;
   }
 }
-
-@layer components {
-  .purchase-floating-bar {
-    bottom: max(10px, env(safe-area-inset-bottom));
-  }
-
-  @media (min-width: 768px) {
-    .purchase-floating-bar {
-      bottom: 72px;
-    }
-  }
-}

@@ -306,7 +306,7 @@ export default function PremAppsProductDetailPage() {
       <Navbar />
 
       <section className="py-12 md:py-16">
-        <div className="max-w-4xl mx-auto px-4 pb-48 sm:px-6 sm:pb-44 lg:px-8 lg:pb-36">
+        <div className="max-w-4xl mx-auto px-4 pb-12 sm:px-6 sm:pb-14 lg:px-8">
           <div className="rounded-3xl p-8 md:p-10 mb-8 border border-[#EBEBEB] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
             <div className="flex flex-col items-center text-center">
               {product.icon_image_url ? (
@@ -486,44 +486,42 @@ export default function PremAppsProductDetailPage() {
             </div>
           )}
 
-          <div className="purchase-floating-bar fixed inset-x-0 z-[60] pointer-events-none">
-            <div className="mx-auto w-full max-w-4xl px-3 sm:px-6 lg:px-8">
-              <div className="pointer-events-auto rounded-2xl border border-[#EBEBEB] bg-white p-3 shadow-[0_10px_28px_rgba(20,20,20,0.16)] sm:p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
-                  <div className="min-w-0">
-                    <div className="text-xs text-[#888]">Total</div>
-                    <div className="text-xl font-extrabold">
-                      {effectiveSelectedPrice ? formatRupiah(effectiveSelectedPrice.price) : '-'}
-                    </div>
-                    {!!priceOriginalText && (
-                      <div className="hidden text-xs text-[#9CA3AF] line-through sm:block">{priceOriginalText}</div>
-                    )}
-                    {!!pricePerDayText && <div className="hidden text-xs text-[#4B5563] mt-1 sm:block">{pricePerDayText}</div>}
-                    {!!discountBadgeText && (
-                      <div className="hidden text-[11px] font-semibold text-[#0F766E] mt-1 sm:block">{discountBadgeText}</div>
-                    )}
+          <div className="sticky bottom-3 z-30 mt-10 md:bottom-6">
+            <div className="rounded-2xl border border-[#EBEBEB] bg-white p-3 shadow-[0_10px_28px_rgba(20,20,20,0.16)] sm:p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs text-[#888]">Total</div>
+                  <div className="text-xl font-extrabold">
+                    {effectiveSelectedPrice ? formatRupiah(effectiveSelectedPrice.price) : '-'}
                   </div>
+                  {!!priceOriginalText && (
+                    <div className="hidden text-xs text-[#9CA3AF] line-through sm:block">{priceOriginalText}</div>
+                  )}
+                  {!!pricePerDayText && <div className="hidden text-xs text-[#4B5563] mt-1 sm:block">{pricePerDayText}</div>}
+                  {!!discountBadgeText && (
+                    <div className="hidden text-[11px] font-semibold text-[#0F766E] mt-1 sm:block">{discountBadgeText}</div>
+                  )}
+                </div>
 
-                  <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
-                    {showWaButton && waLink && (
-                      <a
-                        href={waLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="hidden rounded-full border border-[#D1D5DB] px-4 py-3 text-center text-sm font-semibold text-[#111827] sm:inline-flex"
-                      >
-                        {product.whatsapp_button_text?.trim() || 'Tanya via WhatsApp'}
-                      </a>
-                    )}
-
-                    <button
-                      onClick={handleBuy}
-                      disabled={!effectiveSelectedPrice}
-                      className="w-full rounded-full bg-[#FF5733] px-6 py-3 text-sm font-bold text-white transition-all hover:bg-[#e64d2e] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-8 sm:py-3.5"
+                <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+                  {showWaButton && waLink && (
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hidden rounded-full border border-[#D1D5DB] px-4 py-3 text-center text-sm font-semibold text-[#111827] sm:inline-flex"
                     >
-                      Beli Sekarang
-                    </button>
-                  </div>
+                      {product.whatsapp_button_text?.trim() || 'Tanya via WhatsApp'}
+                    </a>
+                  )}
+
+                  <button
+                    onClick={handleBuy}
+                    disabled={!effectiveSelectedPrice}
+                    className="w-full rounded-full bg-[#FF5733] px-6 py-3 text-sm font-bold text-white transition-all hover:bg-[#e64d2e] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-8 sm:py-3.5"
+                  >
+                    Beli Sekarang
+                  </button>
                 </div>
               </div>
             </div>
