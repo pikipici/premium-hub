@@ -225,6 +225,24 @@ function normalizePriceLabel(label: string, duration: number) {
   return `${Math.max(duration, 1)} Bulan`
 }
 
+function findNextAvailableDuration(rows: ProductPriceDraft[], accountType: string) {
+  const normalizedType = normalizeAccountTypeCode(accountType)
+  const used = new Set<number>()
+
+  rows.forEach((row) => {
+    if (normalizeAccountTypeCode(row.account_type) !== normalizedType) return
+    const duration = Math.max(1, Number(row.duration) || 1)
+    used.add(duration)
+  })
+
+  let next = 1
+  while (used.has(next)) {
+    next += 1
+  }
+
+  return next
+}
+
 function slugify(input: string) {
   return input
     .toLowerCase()
@@ -593,7 +611,27 @@ export default function ProdukPage() {
   }
 
   const addPriceRow = (type: ProductPrice['account_type']) => {
-    setPriceDrafts((prev) => [...prev, createPriceDraft({ account_type: type })])
+    setPriceDrafts((prev) => {
+      const accountType = normalizeAccountTypeCode(type) || activeAccountTypeOptions[0]?.value || 'shared'
+      const nextDuration = findNextAvailableDuration(prev, accountType)
+
+      const latestSameType = prev
+        .filter((row) => normalizeAccountTypeCode(row.account_type) === accountType)
+        .sort((left, right) => right.duration - left.duration)[0]
+
+      const fallbackPrice = accountType === 'private' ? 50000 : 25000
+      const seededPrice = latestSameType?.price && latestSameType.price > 0 ? latestSameType.price : fallbackPrice
+
+      return [
+        ...prev,
+        createPriceDraft({
+          account_type: accountType,
+          duration: nextDuration,
+          label: normalizePriceLabel('', nextDuration),
+          price: seededPrice,
+        }),
+      ]
+    })
   }
 
   const updatePriceRow = (localId: string, patch: Partial<ProductPriceDraft>) => {
@@ -1852,10 +1890,14 @@ export default function ProdukPage() {
                         type="button"
                         onClick={() => addPriceRow(option.value)}
                       >
-                        + {option.label}
+                        + Tambah Paket {option.label}
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+                  Klik tipe yang sama berulang kali untuk bikin paket durasi baru (auto isi 1, 2, 3 bulan tanpa duplikat).
                 </div>
 
                 <div style={{ display: 'grid', gap: 8 }}>
