@@ -486,41 +486,48 @@ export default function PremAppsProductDetailPage() {
             </div>
           )}
 
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#ECECEC] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
-            <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-              <div className="min-w-0">
-                <div className="text-xs text-[#888]">Total</div>
-                <div className="text-xl font-extrabold">
-                  {effectiveSelectedPrice ? formatRupiah(effectiveSelectedPrice.price) : '-'}
+          <div
+            className="fixed inset-x-0 z-[60] pointer-events-none"
+            style={{ bottom: 'max(10px, env(safe-area-inset-bottom))' }}
+          >
+            <div className="mx-auto w-full max-w-4xl px-3 sm:px-6 lg:px-8">
+              <div className="pointer-events-auto rounded-2xl border border-[#EBEBEB] bg-white p-3 shadow-[0_10px_28px_rgba(20,20,20,0.16)] sm:p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs text-[#888]">Total</div>
+                    <div className="text-xl font-extrabold">
+                      {effectiveSelectedPrice ? formatRupiah(effectiveSelectedPrice.price) : '-'}
+                    </div>
+                    {!!priceOriginalText && (
+                      <div className="hidden text-xs text-[#9CA3AF] line-through sm:block">{priceOriginalText}</div>
+                    )}
+                    {!!pricePerDayText && <div className="hidden text-xs text-[#4B5563] mt-1 sm:block">{pricePerDayText}</div>}
+                    {!!discountBadgeText && (
+                      <div className="hidden text-[11px] font-semibold text-[#0F766E] mt-1 sm:block">{discountBadgeText}</div>
+                    )}
+                  </div>
+
+                  <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+                    {showWaButton && waLink && (
+                      <a
+                        href={waLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hidden rounded-full border border-[#D1D5DB] px-4 py-3 text-center text-sm font-semibold text-[#111827] sm:inline-flex"
+                      >
+                        {product.whatsapp_button_text?.trim() || 'Tanya via WhatsApp'}
+                      </a>
+                    )}
+
+                    <button
+                      onClick={handleBuy}
+                      disabled={!effectiveSelectedPrice}
+                      className="w-full rounded-full bg-[#FF5733] px-6 py-3 text-sm font-bold text-white transition-all hover:bg-[#e64d2e] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-8 sm:py-3.5"
+                    >
+                      Beli Sekarang
+                    </button>
+                  </div>
                 </div>
-                {!!priceOriginalText && (
-                  <div className="hidden text-xs text-[#9CA3AF] line-through sm:block">{priceOriginalText}</div>
-                )}
-                {!!pricePerDayText && <div className="hidden text-xs text-[#4B5563] mt-1 sm:block">{pricePerDayText}</div>}
-                {!!discountBadgeText && (
-                  <div className="hidden text-[11px] font-semibold text-[#0F766E] mt-1 sm:block">{discountBadgeText}</div>
-                )}
-              </div>
-
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                {showWaButton && waLink && (
-                  <a
-                    href={waLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full rounded-full border border-[#D1D5DB] px-4 py-3 text-center text-sm font-semibold text-[#111827] sm:w-auto"
-                  >
-                    {product.whatsapp_button_text?.trim() || 'Tanya via WhatsApp'}
-                  </a>
-                )}
-
-                <button
-                  onClick={handleBuy}
-                  disabled={!effectiveSelectedPrice}
-                  className="w-full rounded-full bg-[#FF5733] px-8 py-3.5 text-sm font-bold text-white transition-all hover:bg-[#e64d2e] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                >
-                  Beli Sekarang
-                </button>
               </div>
             </div>
           </div>
