@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"mime/multipart"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -81,12 +82,15 @@ func (s *ProductService) attachPriceAvailableStock(product *model.Product) error
 
 	exact := make(map[string]map[int]int64)
 	fallback := make(map[string]int64)
+	typeTotals := make(map[string]int64)
 
 	for _, row := range rows {
 		accountType := normalizeAccountType(row.AccountType)
 		if accountType == "" {
 			continue
 		}
+
+		typeTotals[accountType] += row.Total
 
 		if row.DurationMonth <= 0 {
 			fallback[accountType] += row.Total
@@ -112,6 +116,22 @@ func (s *ProductService) attachPriceAvailableStock(product *model.Product) error
 		}
 
 		product.Prices[index].AvailableStock = stock
+	}
+
+	if len(typeTotals) > 0 {
+		keys := make([]string, 0, len(typeTotals))
+		for key := range typeTotals {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		product.AccountTypeStocks = make([]model.ProductAccountTypeStock, 0, len(keys))
+		for _, key := range keys {
+			product.AccountTypeStocks = append(product.AccountTypeStocks, model.ProductAccountTypeStock{
+				AccountType:    key,
+				AvailableStock: typeTotals[key],
+			})
+		}
 	}
 
 	return nil

@@ -220,25 +220,43 @@ export default function PremAppsProductDetailPage() {
     return result
   }, [selectablePrices])
 
+  const accountTypeStockByCode = useMemo(() => {
+    const result = new Map<string, number>()
+
+    ;(product?.account_type_stocks || []).forEach((item) => {
+      const code = normalizeAccountType(item.account_type)
+      if (!code) return
+      result.set(code, normalizePriceStock(item.available_stock))
+    })
+
+    return result
+  }, [product])
+
   const accountTypeOptions = useMemo(() => {
-    const map = new Map<string, { code: string; stock: number }>()
+    const fallbackByCode = new Map<string, number>()
 
     selectablePrices.forEach((price) => {
       const code = normalizeAccountType(price.account_type)
       if (!code) return
-
-      const current = map.get(code) || { code, stock: 0 }
-      current.stock += priceStockByID.get(price.id) || 0
-      map.set(code, current)
+      fallbackByCode.set(code, (fallbackByCode.get(code) || 0) + (priceStockByID.get(price.id) || 0))
     })
 
-    return Array.from(map.values()).sort((left, right) => {
-      const leftPriority = left.code === 'shared' ? 0 : left.code === 'private' ? 1 : 99
-      const rightPriority = right.code === 'shared' ? 0 : right.code === 'private' ? 1 : 99
-      if (leftPriority !== rightPriority) return leftPriority - rightPriority
-      return left.code.localeCompare(right.code)
-    })
-  }, [priceStockByID, selectablePrices])
+    const allCodes = new Set<string>([...fallbackByCode.keys(), ...accountTypeStockByCode.keys()])
+
+    return Array.from(allCodes)
+      .map((code) => ({
+        code,
+        stock: accountTypeStockByCode.has(code)
+          ? accountTypeStockByCode.get(code) || 0
+          : fallbackByCode.get(code) || 0,
+      }))
+      .sort((left, right) => {
+        const leftPriority = left.code === 'shared' ? 0 : left.code === 'private' ? 1 : 99
+        const rightPriority = right.code === 'shared' ? 0 : right.code === 'private' ? 1 : 99
+        if (leftPriority !== rightPriority) return leftPriority - rightPriority
+        return left.code.localeCompare(right.code)
+      })
+  }, [accountTypeStockByCode, priceStockByID, selectablePrices])
 
   const activeAccountType = useMemo(() => {
     const normalizedCurrent = normalizeAccountType(accountType)
@@ -353,7 +371,7 @@ export default function PremAppsProductDetailPage() {
   const showWaButton = product.show_whatsapp_button !== false
   const waLink = buildWaLink(product, effectiveSelectedPrice)
   const availableStock = typeof product.available_stock === 'number' ? Math.max(0, product.available_stock) : null
-  const hasAnyStock = selectablePrices.some((price) => (priceStockByID.get(price.id) || 0) > 0)
+  const hasAnyStock = accountTypeOptions.some((item) => item.stock > 0)
 
   return (
     <>

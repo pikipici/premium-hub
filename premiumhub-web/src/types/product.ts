@@ -13,6 +13,11 @@ export interface ProductTrustBadge {
   text: string
 }
 
+export interface ProductAccountTypeStock {
+  account_type: string
+  available_stock: number
+}
+
 export interface Product {
   id: string
   name: string
@@ -45,6 +50,7 @@ export interface Product {
   is_popular: boolean
   is_active: boolean
   available_stock?: number
+  account_type_stocks?: ProductAccountTypeStock[]
   prices: ProductPrice[]
 }
 
