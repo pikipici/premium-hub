@@ -97,7 +97,7 @@ func (s *ClaimService) Approve(id uuid.UUID, input AdminActionInput) error {
 	order, _ := s.orderRepo.FindByID(claim.OrderID)
 
 	// Find new stock
-	newStock, err := s.stockRepo.FindAvailable(order.Price.ProductID, order.Price.AccountType)
+	newStock, err := s.stockRepo.FindAvailable(order.Price.ProductID, order.Price.AccountType, order.Price.Duration)
 	if err != nil {
 		return errors.New("stok pengganti tidak tersedia")
 	}

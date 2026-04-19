@@ -116,7 +116,7 @@ func (s *OrderService) ConfirmPayment(orderID uuid.UUID) error {
 	order.PaidAt = &now
 
 	// Assign stock
-	stock, err := s.stockRepo.FindAvailable(order.Price.ProductID, order.Price.AccountType)
+	stock, err := s.stockRepo.FindAvailable(order.Price.ProductID, order.Price.AccountType, order.Price.Duration)
 	if err != nil {
 		return errors.New("stok tidak tersedia")
 	}

@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 
 	"premiumhub-api/internal/model"
@@ -36,11 +38,12 @@ func (s *StockService) SetAccountTypeRepo(repo *repository.AccountTypeRepo) *Sto
 }
 
 type CreateStockInput struct {
-	ProductID   string `json:"product_id" binding:"required"`
-	AccountType string `json:"account_type" binding:"required"`
-	Email       string `json:"email" binding:"required,email"`
-	Password    string `json:"password" binding:"required"`
-	ProfileName string `json:"profile_name"`
+	ProductID     string `json:"product_id" binding:"required"`
+	AccountType   string `json:"account_type" binding:"required"`
+	DurationMonth int    `json:"duration_month"`
+	Email         string `json:"email" binding:"required,email"`
+	Password      string `json:"password" binding:"required"`
+	ProfileName   string `json:"profile_name"`
 }
 
 func (s *StockService) validateAccountType(productID uuid.UUID, accountType string) (string, error) {
@@ -98,6 +101,72 @@ func (s *StockService) validateAccountType(productID uuid.UUID, accountType stri
 	return normalized, nil
 }
 
+func (s *StockService) availableDurationsForAccountType(productID uuid.UUID, accountType string) ([]int, error) {
+	if s.productRepo == nil {
+		if accountType == "" {
+			return nil, nil
+		}
+		return []int{1}, nil
+	}
+
+	product, err := s.productRepo.FindByID(productID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("produk tidak ditemukan")
+		}
+		return nil, errors.New("gagal validasi durasi produk")
+	}
+
+	durationsSet := make(map[int]struct{})
+	for _, price := range product.Prices {
+		if !price.IsActive {
+			continue
+		}
+		if normalizeAccountType(price.AccountType) != accountType {
+			continue
+		}
+		if price.Duration < 1 {
+			continue
+		}
+		durationsSet[price.Duration] = struct{}{}
+	}
+
+	if len(durationsSet) == 0 {
+		return nil, errors.New("produk belum punya durasi aktif untuk tipe akun ini")
+	}
+
+	durations := make([]int, 0, len(durationsSet))
+	for value := range durationsSet {
+		durations = append(durations, value)
+	}
+	sort.Ints(durations)
+	return durations, nil
+}
+
+func (s *StockService) resolveDurationMonth(productID uuid.UUID, accountType string, durationInput int) (int, error) {
+	durations, err := s.availableDurationsForAccountType(productID, accountType)
+	if err != nil {
+		return 0, err
+	}
+
+	if durationInput <= 0 {
+		return durations[0], nil
+	}
+
+	for _, duration := range durations {
+		if duration == durationInput {
+			return durationInput, nil
+		}
+	}
+
+	labels := make([]string, 0, len(durations))
+	for _, duration := range durations {
+		labels = append(labels, strconv.Itoa(duration))
+	}
+
+	return 0, fmt.Errorf("durasi %d bulan tidak valid untuk tipe akun ini. Opsi: %s", durationInput, strings.Join(labels, ", "))
+}
+
 func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {
 	productID, err := uuid.Parse(input.ProductID)
 	if err != nil {
@@ -105,6 +174,11 @@ func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {
 	}
 
 	accountType, err := s.validateAccountType(productID, input.AccountType)
+	if err != nil {
+		return nil, err
+	}
+
+	durationMonth, err := s.resolveDurationMonth(productID, accountType, input.DurationMonth)
 	if err != nil {
 		return nil, err
 	}
@@ -125,12 +199,13 @@ func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {
 	}
 
 	stock := &model.Stock{
-		ProductID:   productID,
-		AccountType: accountType,
-		Email:       email,
-		Password:    encryptedPw,
-		ProfileName: strings.TrimSpace(input.ProfileName),
-		Status:      "available",
+		ProductID:     productID,
+		AccountType:   accountType,
+		DurationMonth: durationMonth,
+		Email:         email,
+		Password:      encryptedPw,
+		ProfileName:   strings.TrimSpace(input.ProfileName),
+		Status:        "available",
 	}
 
 	if err := s.stockRepo.Create(stock); err != nil {
@@ -140,9 +215,10 @@ func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {
 }
 
 type BulkStockInput struct {
-	ProductID   string `json:"product_id" binding:"required"`
-	AccountType string `json:"account_type" binding:"required"`
-	Accounts    []struct {
+	ProductID     string `json:"product_id" binding:"required"`
+	AccountType   string `json:"account_type" binding:"required"`
+	DurationMonth int    `json:"duration_month"`
+	Accounts      []struct {
 		Email       string `json:"email"`
 		Password    string `json:"password"`
 		ProfileName string `json:"profile_name"`
@@ -156,6 +232,11 @@ func (s *StockService) CreateBulk(input BulkStockInput) (int, error) {
 	}
 
 	accountType, err := s.validateAccountType(productID, input.AccountType)
+	if err != nil {
+		return 0, err
+	}
+
+	durationMonth, err := s.resolveDurationMonth(productID, accountType, input.DurationMonth)
 	if err != nil {
 		return 0, err
 	}
@@ -178,12 +259,13 @@ func (s *StockService) CreateBulk(input BulkStockInput) (int, error) {
 		}
 
 		stocks = append(stocks, model.Stock{
-			ProductID:   productID,
-			AccountType: accountType,
-			Email:       email,
-			Password:    encPw,
-			ProfileName: strings.TrimSpace(acc.ProfileName),
-			Status:      "available",
+			ProductID:     productID,
+			AccountType:   accountType,
+			DurationMonth: durationMonth,
+			Email:         email,
+			Password:      encPw,
+			ProfileName:   strings.TrimSpace(acc.ProfileName),
+			Status:        "available",
 		})
 	}
 
@@ -224,6 +306,15 @@ func (s *StockService) Update(id uuid.UUID, input CreateStockInput) (*model.Stoc
 		return nil, err
 	}
 
+	durationInput := input.DurationMonth
+	if durationInput <= 0 {
+		durationInput = stock.DurationMonth
+	}
+	durationMonth, err := s.resolveDurationMonth(stock.ProductID, accountType, durationInput)
+	if err != nil {
+		return nil, err
+	}
+
 	email := strings.TrimSpace(input.Email)
 	if email == "" {
 		return nil, errors.New("email wajib diisi")
@@ -239,6 +330,7 @@ func (s *StockService) Update(id uuid.UUID, input CreateStockInput) (*model.Stoc
 	}
 	stock.ProfileName = strings.TrimSpace(input.ProfileName)
 	stock.AccountType = accountType
+	stock.DurationMonth = durationMonth
 	if err := s.stockRepo.Update(stock); err != nil {
 		return nil, err
 	}

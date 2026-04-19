@@ -15,6 +15,7 @@ export interface Stock {
   id: string
   product_id: string
   account_type: string
+  duration_month?: number
   email: string
   profile_name?: string
   status: StockStatus

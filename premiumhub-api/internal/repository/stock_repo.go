@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+
 	"premiumhub-api/internal/model"
 
 	"github.com/google/uuid"
@@ -23,11 +25,43 @@ func (r *StockRepo) CreateBulk(stocks []model.Stock) error {
 	return r.db.Create(&stocks).Error
 }
 
-func (r *StockRepo) FindAvailable(productID uuid.UUID, accountType string) (*model.Stock, error) {
+func (r *StockRepo) FindAvailable(productID uuid.UUID, accountType string, durationMonth int) (*model.Stock, error) {
 	var s model.Stock
-	err := r.db.Where("product_id = ? AND account_type = ? AND status = ?", productID, accountType, "available").
+
+	if durationMonth > 0 {
+		err := r.db.Where("product_id = ? AND account_type = ? AND status = ? AND duration_month = ?", productID, accountType, "available", durationMonth).
+			Order("created_at ASC").
+			First(&s).Error
+		if err == nil {
+			return &s, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+
+	err := r.db.Where("product_id = ? AND account_type = ? AND status = ? AND (duration_month = 0 OR duration_month IS NULL)", productID, accountType, "available").
+		Order("created_at ASC").
 		First(&s).Error
-	return &s, err
+	if err == nil {
+		return &s, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if durationMonth <= 0 {
+		return nil, err
+	}
+
+	// Fallback terakhir untuk data lama yang mungkin belum punya duration mapping rapi.
+	err = r.db.Where("product_id = ? AND account_type = ? AND status = ?", productID, accountType, "available").
+		Order("created_at ASC").
+		First(&s).Error
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 func (r *StockRepo) FindByID(id uuid.UUID) (*model.Stock, error) {

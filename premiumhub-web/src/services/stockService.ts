@@ -7,6 +7,7 @@ export type AdminStockStatus = 'available' | 'used'
 export interface AdminStockPayload {
   product_id: string
   account_type: string
+  duration_month?: number
   email: string
   password: string
   profile_name?: string
@@ -21,6 +22,7 @@ export interface AdminBulkStockAccount {
 export interface AdminBulkStockPayload {
   product_id: string
   account_type: string
+  duration_month?: number
   accounts: AdminBulkStockAccount[]
 }
 

@@ -21,6 +21,7 @@ type StockModalMode = 'closed' | 'create' | 'edit' | 'bulk'
 type StockFormState = {
   product_id: string
   account_type: string
+  duration_month: number
   email: string
   password: string
   profile_name: string
@@ -29,6 +30,7 @@ type StockFormState = {
 type BulkFormState = {
   product_id: string
   account_type: string
+  duration_month: number
   rows: string
 }
 
@@ -54,6 +56,7 @@ const STATUS_FILTERS: Array<{ value: StockFilter; label: string }> = [
 const EMPTY_FORM: StockFormState = {
   product_id: '',
   account_type: '',
+  duration_month: 0,
   email: '',
   password: '',
   profile_name: '',
@@ -62,6 +65,7 @@ const EMPTY_FORM: StockFormState = {
 const EMPTY_BULK_FORM: BulkFormState = {
   product_id: '',
   account_type: '',
+  duration_month: 0,
   rows: '',
 }
 
@@ -245,6 +249,26 @@ function extractProductAccountTypes(product?: Product | null, accountTypeMap?: R
   return sortAccountTypes(Array.from(set), accountTypeMap)
 }
 
+function extractProductDurations(product?: Product | null, accountType?: string) {
+  if (!product) return []
+
+  const normalizedType = normalizeAccountType(accountType)
+  if (!normalizedType) return []
+
+  const set = new Set<number>()
+  product.prices?.forEach((price) => {
+    if (price.is_active === false) return
+    if (normalizeAccountType(price.account_type) !== normalizedType) return
+
+    const duration = Number(price.duration) || 0
+    if (duration > 0) {
+      set.add(duration)
+    }
+  })
+
+  return Array.from(set).sort((left, right) => left - right)
+}
+
 export default function StokPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [stocks, setStocks] = useState<Stock[]>([])
@@ -293,6 +317,14 @@ export default function StokPage() {
       return extractProductAccountTypes(productLookup[productID], accountTypeLookup)
     },
     [accountTypeLookup, productLookup]
+  )
+
+  const getProductDurations = useCallback(
+    (productID?: string, accountType?: string) => {
+      if (!productID || !accountType) return []
+      return extractProductDurations(productLookup[productID], accountType)
+    },
+    [productLookup]
   )
 
   const resolveProduct = useCallback(
@@ -344,16 +376,20 @@ export default function StokPage() {
         const firstProductID = res.data[0].id
         const firstTypes = extractProductAccountTypes(res.data[0])
         const firstAccountType = firstTypes[0] || ''
+        const firstDurations = extractProductDurations(res.data[0], firstAccountType)
+        const firstDuration = firstDurations[0] || 0
 
         setForm((prev) => ({
           ...prev,
           product_id: prev.product_id || firstProductID,
           account_type: prev.account_type || firstAccountType,
+          duration_month: prev.duration_month || firstDuration,
         }))
         setBulkForm((prev) => ({
           ...prev,
           product_id: prev.product_id || firstProductID,
           account_type: prev.account_type || firstAccountType,
+          duration_month: prev.duration_month || firstDuration,
         }))
       }
     } catch {
@@ -422,6 +458,16 @@ export default function StokPage() {
   const bulkAccountTypeOptions = useMemo(
     () => getProductAccountTypes(bulkForm.product_id),
     [bulkForm.product_id, getProductAccountTypes]
+  )
+
+  const formDurationOptions = useMemo(
+    () => getProductDurations(form.product_id, form.account_type),
+    [form.account_type, form.product_id, getProductDurations]
+  )
+
+  const bulkDurationOptions = useMemo(
+    () => getProductDurations(bulkForm.product_id, bulkForm.account_type),
+    [bulkForm.account_type, bulkForm.product_id, getProductDurations]
   )
 
   const filteredStocks = useMemo(() => {
@@ -502,11 +548,14 @@ export default function StokPage() {
       ''
 
     const accountTypes = getProductAccountTypes(fallbackProductID)
+    const accountType = accountTypes[0] || ''
+    const durations = getProductDurations(fallbackProductID, accountType)
 
     setForm({
       ...EMPTY_FORM,
       product_id: fallbackProductID,
-      account_type: accountTypes[0] || '',
+      account_type: accountType,
+      duration_month: durations[0] || 0,
     })
     setEditingStock(null)
     setModalMode('create')
@@ -520,9 +569,14 @@ export default function StokPage() {
     const accountType =
       accountTypes.find((item) => item === currentAccountType) || accountTypes[0] || currentAccountType
 
+    const durations = getProductDurations(stock.product_id, accountType)
+    const currentDuration = Number(stock.duration_month) || 0
+    const durationMonth = durations.includes(currentDuration) ? currentDuration : durations[0] || currentDuration
+
     setForm({
       product_id: stock.product_id,
       account_type: accountType,
+      duration_month: durationMonth,
       email: stock.email,
       password: '',
       profile_name: stock.profile_name || '',
@@ -538,11 +592,14 @@ export default function StokPage() {
       ''
 
     const accountTypes = getProductAccountTypes(fallbackProductID)
+    const accountType = accountTypes[0] || ''
+    const durations = getProductDurations(fallbackProductID, accountType)
 
     setBulkForm({
       ...EMPTY_BULK_FORM,
       product_id: fallbackProductID,
-      account_type: accountTypes[0] || '',
+      account_type: accountType,
+      duration_month: durations[0] || 0,
     })
     setModalMode('bulk')
   }
@@ -556,6 +613,7 @@ export default function StokPage() {
     const payload: AdminStockPayload = {
       product_id: form.product_id,
       account_type: form.account_type.trim(),
+      duration_month: form.duration_month,
       email: form.email.trim(),
       password: form.password,
       profile_name: form.profile_name.trim() || undefined,
@@ -568,6 +626,11 @@ export default function StokPage() {
 
     if (!payload.account_type) {
       setError('Tipe akun wajib diisi')
+      return
+    }
+
+    if (!payload.duration_month || payload.duration_month < 1) {
+      setError('Durasi paket wajib dipilih')
       return
     }
 
@@ -615,6 +678,7 @@ export default function StokPage() {
   const runBulkSave = async () => {
     const productID = bulkForm.product_id
     const accountType = bulkForm.account_type.trim()
+    const durationMonth = bulkForm.duration_month
 
     if (!productID) {
       setError('Produk wajib dipilih untuk bulk import')
@@ -623,6 +687,11 @@ export default function StokPage() {
 
     if (!accountType) {
       setError('Tipe akun bulk wajib diisi')
+      return
+    }
+
+    if (!durationMonth || durationMonth < 1) {
+      setError('Durasi paket bulk wajib dipilih')
       return
     }
 
@@ -639,6 +708,7 @@ export default function StokPage() {
       const res = await stockService.adminCreateBulk({
         product_id: productID,
         account_type: accountType,
+        duration_month: durationMonth,
         accounts: parsed.accounts,
       })
 
@@ -696,6 +766,7 @@ export default function StokPage() {
       'product',
       'account_email',
       'account_type',
+      'duration_month',
       'profile_name',
       'status',
       'used_by',
@@ -709,6 +780,7 @@ export default function StokPage() {
         product.name,
         stock.email,
         stock.account_type,
+        stock.duration_month ? String(stock.duration_month) : '',
         stock.profile_name || '',
         stock.status,
         stock.used_by || '',
@@ -992,23 +1064,30 @@ export default function StokPage() {
                           <div className="order-email">ID: {shortID(stock.id)}</div>
                         </td>
                         <td>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '4px 10px',
-                              borderRadius: 999,
-                              border: `1px solid ${accountTypeStyle.borderColor}`,
-                              background: accountTypeStyle.backgroundColor,
-                              color: accountTypeStyle.color,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              letterSpacing: 0.1,
-                              lineHeight: 1.2,
-                            }}
-                          >
-                            {accountTypeLabel}
-                          </span>
+                          <div style={{ display: 'grid', gap: 4 }}>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '4px 10px',
+                                borderRadius: 999,
+                                border: `1px solid ${accountTypeStyle.borderColor}`,
+                                background: accountTypeStyle.backgroundColor,
+                                color: accountTypeStyle.color,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                letterSpacing: 0.1,
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              {accountTypeLabel}
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                              {stock.duration_month && stock.duration_month > 0
+                                ? `${stock.duration_month} Bulan`
+                                : 'Semua Durasi'}
+                            </span>
+                          </div>
                         </td>
                         <td>{stock.profile_name || '-'}</td>
                         <td>
@@ -1251,6 +1330,14 @@ export default function StokPage() {
                       <span className="mobile-card-value">{stock.profile_name || '-'}</span>
                     </div>
                     <div className="mobile-card-row">
+                      <span className="mobile-card-label">Durasi</span>
+                      <span className="mobile-card-value">
+                        {stock.duration_month && stock.duration_month > 0
+                          ? `${stock.duration_month} Bulan`
+                          : 'Semua Durasi'}
+                      </span>
+                    </div>
+                    <div className="mobile-card-row">
                       <span className="mobile-card-label">Dipakai oleh</span>
                       <span className="mobile-card-value">{stock.used_by ? shortID(stock.used_by) : '-'}</span>
                     </div>
@@ -1341,11 +1428,16 @@ export default function StokPage() {
                     const options = getProductAccountTypes(nextProductID)
                     setForm((prev) => {
                       const currentAccountType = normalizeAccountType(prev.account_type)
+                      const nextAccountType =
+                        options.find((item) => item === currentAccountType) || options[0] || ''
+                      const durationOptions = getProductDurations(nextProductID, nextAccountType)
+
                       return {
                         ...prev,
                         product_id: nextProductID,
-                        account_type:
-                          options.find((item) => item === currentAccountType) || options[0] || '',
+                        account_type: nextAccountType,
+                        duration_month:
+                          durationOptions.find((item) => item === prev.duration_month) || durationOptions[0] || 0,
                       }
                     })
                   }}
@@ -1365,10 +1457,17 @@ export default function StokPage() {
                   className="form-select"
                   value={form.account_type}
                   onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      account_type: event.target.value,
-                    }))
+                    setForm((prev) => {
+                      const nextAccountType = event.target.value
+                      const durationOptions = getProductDurations(prev.product_id, nextAccountType)
+
+                      return {
+                        ...prev,
+                        account_type: nextAccountType,
+                        duration_month:
+                          durationOptions.find((item) => item === prev.duration_month) || durationOptions[0] || 0,
+                      }
+                    })
                   }
                   disabled={formAccountTypeOptions.length === 0}
                 >
@@ -1384,6 +1483,35 @@ export default function StokPage() {
                 {form.product_id && formAccountTypeOptions.length === 0 && (
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
                     Produk ini belum punya tipe akun aktif.
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="form-label">Durasi Paket</label>
+                <select
+                  className="form-select"
+                  value={form.duration_month || ''}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      duration_month: Number(event.target.value) || 0,
+                    }))
+                  }
+                  disabled={formDurationOptions.length === 0}
+                >
+                  <option value="">
+                    {form.account_type ? 'Pilih durasi...' : 'Pilih tipe akun dulu...'}
+                  </option>
+                  {formDurationOptions.map((duration) => (
+                    <option key={duration} value={duration}>
+                      {duration} Bulan
+                    </option>
+                  ))}
+                </select>
+                {form.account_type && formDurationOptions.length === 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                    Tipe akun ini belum punya durasi aktif.
                   </div>
                 )}
               </div>
@@ -1469,7 +1597,7 @@ export default function StokPage() {
             </div>
 
             <div style={{ padding: 16, display: 'grid', gap: 10 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
                 <div>
                   <label className="form-label">Produk</label>
                   <select
@@ -1480,11 +1608,16 @@ export default function StokPage() {
                       const options = getProductAccountTypes(nextProductID)
                       setBulkForm((prev) => {
                         const currentAccountType = normalizeAccountType(prev.account_type)
+                        const nextAccountType =
+                          options.find((item) => item === currentAccountType) || options[0] || ''
+                        const durationOptions = getProductDurations(nextProductID, nextAccountType)
+
                         return {
                           ...prev,
                           product_id: nextProductID,
-                          account_type:
-                            options.find((item) => item === currentAccountType) || options[0] || '',
+                          account_type: nextAccountType,
+                          duration_month:
+                            durationOptions.find((item) => item === prev.duration_month) || durationOptions[0] || 0,
                         }
                       })
                     }}
@@ -1504,10 +1637,17 @@ export default function StokPage() {
                     className="form-select"
                     value={bulkForm.account_type}
                     onChange={(event) =>
-                      setBulkForm((prev) => ({
-                        ...prev,
-                        account_type: event.target.value,
-                      }))
+                      setBulkForm((prev) => {
+                        const nextAccountType = event.target.value
+                        const durationOptions = getProductDurations(prev.product_id, nextAccountType)
+
+                        return {
+                          ...prev,
+                          account_type: nextAccountType,
+                          duration_month:
+                            durationOptions.find((item) => item === prev.duration_month) || durationOptions[0] || 0,
+                        }
+                      })
                     }
                     disabled={bulkAccountTypeOptions.length === 0}
                   >
@@ -1523,6 +1663,35 @@ export default function StokPage() {
                   {bulkForm.product_id && bulkAccountTypeOptions.length === 0 && (
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
                       Produk ini belum punya tipe akun aktif.
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="form-label">Durasi</label>
+                  <select
+                    className="form-select"
+                    value={bulkForm.duration_month || ''}
+                    onChange={(event) =>
+                      setBulkForm((prev) => ({
+                        ...prev,
+                        duration_month: Number(event.target.value) || 0,
+                      }))
+                    }
+                    disabled={bulkDurationOptions.length === 0}
+                  >
+                    <option value="">
+                      {bulkForm.account_type ? 'Pilih durasi...' : 'Pilih tipe akun dulu...'}
+                    </option>
+                    {bulkDurationOptions.map((duration) => (
+                      <option key={duration} value={duration}>
+                        {duration} Bulan
+                      </option>
+                    ))}
+                  </select>
+                  {bulkForm.account_type && bulkDurationOptions.length === 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                      Tipe akun ini belum punya durasi aktif.
                     </div>
                   )}
                 </div>

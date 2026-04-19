@@ -207,14 +207,33 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 		}
 
 		var stock model.Stock
+
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("product_id = ? AND account_type = ? AND status = ?", order.Price.ProductID, order.Price.AccountType, "available").
+			Where("product_id = ? AND account_type = ? AND status = ? AND duration_month = ?", order.Price.ProductID, order.Price.AccountType, "available", order.Price.Duration).
 			Order("created_at ASC").
 			First(&stock).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("stok tidak tersedia")
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("gagal memuat stok")
 			}
-			return errors.New("gagal memuat stok")
+
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("product_id = ? AND account_type = ? AND status = ? AND (duration_month = 0 OR duration_month IS NULL)", order.Price.ProductID, order.Price.AccountType, "available").
+				Order("created_at ASC").
+				First(&stock).Error; err != nil {
+				if !errors.Is(err, gorm.ErrRecordNotFound) {
+					return errors.New("gagal memuat stok")
+				}
+
+				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+					Where("product_id = ? AND account_type = ? AND status = ?", order.Price.ProductID, order.Price.AccountType, "available").
+					Order("created_at ASC").
+					First(&stock).Error; err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						return errors.New("stok tidak tersedia")
+					}
+					return errors.New("gagal memuat stok")
+				}
+			}
 		}
 
 		now := time.Now()
