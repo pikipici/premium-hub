@@ -1,5 +1,6 @@
 "use client"
 
+import Link from 'next/link'
 import { useCallback, useEffect, useState, type SVGProps } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 
@@ -88,6 +89,27 @@ function renderActivityIcon(item: ActivityHistoryItem) {
   return <div className="text-2xl">{item.icon || '📦'}</div>
 }
 
+function extractSourceID(item: ActivityHistoryItem) {
+  const idx = item.id.indexOf(':')
+  if (idx < 0) return ''
+  return item.id.slice(idx + 1).trim()
+}
+
+function activitySuccessHref(item: ActivityHistoryItem) {
+  const sourceID = extractSourceID(item)
+  if (!sourceID) return ''
+
+  if (item.kind === 'premium_order') {
+    return `/product/prem-apps/checkout/success?id=${encodeURIComponent(sourceID)}`
+  }
+
+  if (item.source === 'sosmed') {
+    return `/product/sosmed/checkout/success?id=${encodeURIComponent(sourceID)}`
+  }
+
+  return ''
+}
+
 export default function RiwayatOrderPage() {
   const [items, setItems] = useState<ActivityHistoryItem[]>([])
   const [page, setPage] = useState(1)
@@ -156,23 +178,45 @@ export default function RiwayatOrderPage() {
       ) : (
         <>
           <div className="space-y-3">
-            {items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-2xl border border-[#EBEBEB] bg-white p-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  {renderActivityIcon(item)}
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-bold text-[#141414]">{item.title}</div>
-                    {item.subtitle ? <div className="truncate text-xs text-[#888]">{item.subtitle}</div> : null}
-                    <div className="mt-1 text-xs text-[#888]">{formatActivityDate(item.occurred_at)}</div>
+            {items.map((item) => {
+              const href = activitySuccessHref(item)
+              const body = (
+                <>
+                  <div className="flex min-w-0 items-center gap-3">
+                    {renderActivityIcon(item)}
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold text-[#141414]">{item.title}</div>
+                      {item.subtitle ? <div className="truncate text-xs text-[#888]">{item.subtitle}</div> : null}
+                      <div className="mt-1 text-xs text-[#888]">{formatActivityDate(item.occurred_at)}</div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="ml-3 shrink-0 text-right">
-                  <div className={`mb-1 text-sm font-bold ${amountClass(item)}`}>{amountText(item)}</div>
-                  <span className="rounded-full bg-[#F3F3F1] px-2.5 py-1 text-[10px] font-bold text-[#555]">{item.source_label}</span>
+                  <div className="ml-3 shrink-0 text-right">
+                    <div className={`mb-1 text-sm font-bold ${amountClass(item)}`}>{amountText(item)}</div>
+                    <span className="rounded-full bg-[#F3F3F1] px-2.5 py-1 text-[10px] font-bold text-[#555]">{item.source_label}</span>
+                  </div>
+                </>
+              )
+
+              if (href) {
+                return (
+                  <Link
+                    key={item.id}
+                    href={href}
+                    className="flex items-center justify-between rounded-2xl border border-[#EBEBEB] bg-white p-4 transition-colors hover:border-[#FFD3C8] hover:bg-[#FFF9F6]"
+                    title="Buka detail pembelian"
+                  >
+                    {body}
+                  </Link>
+                )
+              }
+
+              return (
+                <div key={item.id} className="flex items-center justify-between rounded-2xl border border-[#EBEBEB] bg-white p-4">
+                  {body}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-[#EBEBEB] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">

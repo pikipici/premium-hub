@@ -1,4 +1,4 @@
-export type ActivitySource = 'premium_apps' | 'nokos' | 'other'
+export type ActivitySource = 'premium_apps' | 'sosmed' | 'nokos' | 'other'
 export type ActivityDirection = 'debit' | 'credit'
 
 export interface ActivityHistoryItem {
