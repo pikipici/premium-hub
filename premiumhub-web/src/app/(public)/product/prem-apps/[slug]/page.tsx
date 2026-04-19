@@ -119,6 +119,11 @@ function formatAccountTypeLabel(value?: string | null) {
     .join(' ')
 }
 
+function normalizePriceStock(value?: number | null) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 0
+  return Math.max(0, Math.floor(value))
+}
+
 function getAccountTypeDescription(value: string, sharedNote: string, privateNote: string) {
   const normalized = normalizeAccountType(value)
   if (normalized === 'shared') return sharedNote
@@ -166,6 +171,11 @@ export default function PremAppsProductDetailPage() {
 
         const selectablePrices = getSelectablePrices(res.data)
         const firstPrice =
+          selectablePrices.find(
+            (item) =>
+              normalizeAccountType(item.account_type) === 'shared' && normalizePriceStock(item.available_stock) > 0
+          ) ||
+          selectablePrices.find((item) => normalizePriceStock(item.available_stock) > 0) ||
           selectablePrices.find((item) => normalizeAccountType(item.account_type) === 'shared') ||
           selectablePrices[0]
 
@@ -200,28 +210,48 @@ export default function PremAppsProductDetailPage() {
     return getSelectablePrices(product)
   }, [product])
 
+  const priceStockByID = useMemo(() => {
+    const result = new Map<string, number>()
+
+    selectablePrices.forEach((price) => {
+      result.set(price.id, normalizePriceStock(price.available_stock))
+    })
+
+    return result
+  }, [selectablePrices])
+
   const accountTypeOptions = useMemo(() => {
-    const set = new Set<string>()
+    const map = new Map<string, { code: string; stock: number }>()
 
     selectablePrices.forEach((price) => {
       const code = normalizeAccountType(price.account_type)
-      if (code) set.add(code)
+      if (!code) return
+
+      const current = map.get(code) || { code, stock: 0 }
+      current.stock += priceStockByID.get(price.id) || 0
+      map.set(code, current)
     })
 
-    return Array.from(set).sort((left, right) => {
-      const leftPriority = left === 'shared' ? 0 : left === 'private' ? 1 : 99
-      const rightPriority = right === 'shared' ? 0 : right === 'private' ? 1 : 99
+    return Array.from(map.values()).sort((left, right) => {
+      const leftPriority = left.code === 'shared' ? 0 : left.code === 'private' ? 1 : 99
+      const rightPriority = right.code === 'shared' ? 0 : right.code === 'private' ? 1 : 99
       if (leftPriority !== rightPriority) return leftPriority - rightPriority
-      return left.localeCompare(right)
+      return left.code.localeCompare(right.code)
     })
-  }, [selectablePrices])
+  }, [priceStockByID, selectablePrices])
 
   const activeAccountType = useMemo(() => {
     const normalizedCurrent = normalizeAccountType(accountType)
-    if (normalizedCurrent && accountTypeOptions.includes(normalizedCurrent)) {
-      return normalizedCurrent
+    const hasAnyInStockAccountType = accountTypeOptions.some((item) => item.stock > 0)
+
+    if (normalizedCurrent) {
+      const matched = accountTypeOptions.find((item) => item.code === normalizedCurrent)
+      if (matched && (matched.stock > 0 || !hasAnyInStockAccountType)) {
+        return normalizedCurrent
+      }
     }
-    return accountTypeOptions[0] || ''
+
+    return accountTypeOptions.find((item) => item.stock > 0)?.code || accountTypeOptions[0]?.code || ''
   }, [accountType, accountTypeOptions])
 
   const filteredPrices = useMemo(
@@ -230,6 +260,11 @@ export default function PremAppsProductDetailPage() {
         (item) => normalizeAccountType(item.account_type) === normalizeAccountType(activeAccountType)
       ),
     [activeAccountType, selectablePrices]
+  )
+
+  const inStockFilteredPrices = useMemo(
+    () => filteredPrices.filter((item) => (priceStockByID.get(item.id) || 0) > 0),
+    [filteredPrices, priceStockByID]
   )
 
   const trustBadges = useMemo(() => {
@@ -253,15 +288,15 @@ export default function PremAppsProductDetailPage() {
   }, [product])
 
   const effectiveSelectedPrice = useMemo(() => {
-    if (!filteredPrices.length) return null
+    if (!inStockFilteredPrices.length) return null
 
     if (selectedPrice) {
-      const matched = filteredPrices.find((price) => price.id === selectedPrice.id)
+      const matched = inStockFilteredPrices.find((price) => price.id === selectedPrice.id)
       if (matched) return matched
     }
 
-    return filteredPrices[0]
-  }, [filteredPrices, selectedPrice])
+    return inStockFilteredPrices[0]
+  }, [inStockFilteredPrices, selectedPrice])
 
   const handleBuy = () => {
     if (!effectiveSelectedPrice || !product) return
@@ -318,6 +353,7 @@ export default function PremAppsProductDetailPage() {
   const showWaButton = product.show_whatsapp_button !== false
   const waLink = buildWaLink(product, effectiveSelectedPrice)
   const availableStock = typeof product.available_stock === 'number' ? Math.max(0, product.available_stock) : null
+  const hasAnyStock = selectablePrices.some((price) => (priceStockByID.get(price.id) || 0) > 0)
 
   return (
     <>
@@ -415,21 +451,31 @@ export default function PremAppsProductDetailPage() {
           <div className="mb-6">
             <h3 className="text-sm font-bold mb-3">Tipe Akun</h3>
             <div className="flex gap-3 flex-wrap">
-              {accountTypeOptions.map((type) => {
-                const active = normalizeAccountType(activeAccountType) === type
+              {accountTypeOptions.map((option) => {
+                const active = normalizeAccountType(activeAccountType) === option.code
+                const disabled = option.stock <= 0
 
                 return (
                   <button
-                    key={type}
-                    onClick={() => setAccountType(type)}
+                    key={option.code}
+                    onClick={() => {
+                      if (disabled) return
+                      setAccountType(option.code)
+                    }}
+                    disabled={disabled}
                     className={`flex-1 min-w-[180px] p-4 rounded-2xl border-2 transition-all text-left ${
-                      active
-                        ? 'border-[#FF5733] bg-[#FFF3EF]'
-                        : 'border-[#EBEBEB] bg-white hover:border-[#ccc]'
+                      disabled
+                        ? 'border-[#E5E7EB] bg-[#F9FAFB] opacity-60 cursor-not-allowed'
+                        : active
+                          ? 'border-[#FF5733] bg-[#FFF3EF]'
+                          : 'border-[#EBEBEB] bg-white hover:border-[#ccc]'
                     }`}
                   >
-                    <div className="text-sm font-bold mb-1">{formatAccountTypeLabel(type)} Account</div>
-                    <div className="text-xs text-[#888]">{getAccountTypeDescription(type, sharedNote, privateNote)}</div>
+                    <div className="text-sm font-bold mb-1">{formatAccountTypeLabel(option.code)} Account</div>
+                    <div className="text-xs text-[#888]">{getAccountTypeDescription(option.code, sharedNote, privateNote)}</div>
+                    <div className={`text-[11px] font-semibold mt-2 ${disabled ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>
+                      {disabled ? 'Stok habis' : `Stok tersedia: ${option.stock} akun`}
+                    </div>
                   </button>
                 )
               })}
@@ -447,25 +493,36 @@ export default function PremAppsProductDetailPage() {
                 filteredPrices.map((price) => {
                   const label = price.label?.trim() || `${price.duration} Bulan`
                   const savingsText = price.savings_text?.trim() || ''
+                  const stockCount = priceStockByID.get(price.id) || 0
+                  const disabled = stockCount <= 0
 
                   return (
                     <button
                       key={price.id}
-                      onClick={() => setSelectedPrice(price)}
+                      onClick={() => {
+                        if (disabled) return
+                        setSelectedPrice(price)
+                      }}
+                      disabled={disabled}
                       className={`p-4 rounded-2xl border-2 transition-all text-center ${
-                        effectiveSelectedPrice?.id === price.id
-                          ? 'border-[#FF5733] bg-[#FFF3EF]'
-                          : 'border-[#EBEBEB] bg-white hover:border-[#ccc]'
+                        disabled
+                          ? 'border-[#E5E7EB] bg-[#F9FAFB] opacity-60 cursor-not-allowed'
+                          : effectiveSelectedPrice?.id === price.id
+                            ? 'border-[#FF5733] bg-[#FFF3EF]'
+                            : 'border-[#EBEBEB] bg-white hover:border-[#ccc]'
                       }`}
                     >
-                      {effectiveSelectedPrice?.id === price.id && (
+                      {effectiveSelectedPrice?.id === price.id && !disabled && (
                         <Check className="w-4 h-4 text-[#FF5733] mx-auto mb-1" />
                       )}
                       <div className="text-base font-extrabold">{label}</div>
                       <div className="text-sm font-bold text-[#FF5733] mt-1">
                         {formatRupiah(price.price)}
                       </div>
-                      {!!savingsText && (
+                      <div className={`text-[11px] mt-1 font-semibold ${disabled ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>
+                        {disabled ? 'Stok habis' : `Stok ${stockCount} akun`}
+                      </div>
+                      {!!savingsText && !disabled && (
                         <div className="text-[11px] text-[#0F766E] mt-1 font-semibold">{savingsText}</div>
                       )}
                     </button>
@@ -473,6 +530,12 @@ export default function PremAppsProductDetailPage() {
                 })
               )}
             </div>
+
+            {filteredPrices.length > 0 && inStockFilteredPrices.length === 0 && (
+              <div className="mt-3 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-xs font-semibold text-[#B91C1C]">
+                Semua paket untuk tipe akun ini sedang habis. Pilih tipe akun lain atau tunggu restock.
+              </div>
+            )}
           </div>
 
           {specItems.length > 0 && (
@@ -542,10 +605,10 @@ export default function PremAppsProductDetailPage() {
 
                     <button
                       onClick={handleBuy}
-                      disabled={!effectiveSelectedPrice}
+                      disabled={!effectiveSelectedPrice || !hasAnyStock}
                       className="w-full rounded-full bg-[#FF5733] px-6 py-3 text-sm font-bold text-white transition-all hover:bg-[#e64d2e] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-8 sm:py-3.5"
                     >
-                      Beli Sekarang
+                      {hasAnyStock ? 'Beli Sekarang' : 'Stok Habis'}
                     </button>
                   </div>
                 </div>

@@ -60,14 +60,15 @@ type Product struct {
 }
 
 type ProductPrice struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	ProductID   uuid.UUID `gorm:"type:uuid;not null" json:"product_id"`
-	Duration    int       `gorm:"not null" json:"duration"`
-	AccountType string    `gorm:"size:20;not null" json:"account_type"`
-	Label       string    `gorm:"size:80" json:"label"`
-	SavingsText string    `gorm:"size:120" json:"savings_text"`
-	Price       int64     `gorm:"not null" json:"price"`
-	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	ProductID      uuid.UUID `gorm:"type:uuid;not null" json:"product_id"`
+	Duration       int       `gorm:"not null" json:"duration"`
+	AccountType    string    `gorm:"size:20;not null" json:"account_type"`
+	Label          string    `gorm:"size:80" json:"label"`
+	SavingsText    string    `gorm:"size:120" json:"savings_text"`
+	Price          int64     `gorm:"not null" json:"price"`
+	IsActive       bool      `gorm:"default:true" json:"is_active"`
+	AvailableStock int64     `gorm:"-" json:"available_stock"`
 }
 
 func (p *Product) BeforeCreate(_ *gorm.DB) error {

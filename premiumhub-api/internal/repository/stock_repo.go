@@ -13,6 +13,12 @@ type StockRepo struct {
 	db *gorm.DB
 }
 
+type ProductStockDurationCount struct {
+	AccountType   string
+	DurationMonth int
+	Total         int64
+}
+
 func NewStockRepo(db *gorm.DB) *StockRepo {
 	return &StockRepo{db: db}
 }
@@ -130,4 +136,18 @@ func (r *StockRepo) CountAvailableByProductIDs(productIDs []uuid.UUID) (map[uuid
 	}
 
 	return counts, nil
+}
+
+func (r *StockRepo) CountAvailableByProductAndDurations(productID uuid.UUID) ([]ProductStockDurationCount, error) {
+	rows := make([]ProductStockDurationCount, 0)
+	err := r.db.Model(&model.Stock{}).
+		Select("account_type, duration_month, COUNT(*) as total").
+		Where("status = ? AND product_id = ?", "available", productID).
+		Group("account_type, duration_month").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, nil
 }

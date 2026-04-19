@@ -69,6 +69,54 @@ func (s *ProductService) attachAvailableStock(products []model.Product) error {
 	return nil
 }
 
+func (s *ProductService) attachPriceAvailableStock(product *model.Product) error {
+	if product == nil || len(product.Prices) == 0 {
+		return nil
+	}
+
+	rows, err := s.stockRepo.CountAvailableByProductAndDurations(product.ID)
+	if err != nil {
+		return err
+	}
+
+	exact := make(map[string]map[int]int64)
+	fallback := make(map[string]int64)
+
+	for _, row := range rows {
+		accountType := normalizeAccountType(row.AccountType)
+		if accountType == "" {
+			continue
+		}
+
+		if row.DurationMonth <= 0 {
+			fallback[accountType] += row.Total
+			continue
+		}
+
+		if _, ok := exact[accountType]; !ok {
+			exact[accountType] = make(map[int]int64)
+		}
+		exact[accountType][row.DurationMonth] += row.Total
+	}
+
+	for index := range product.Prices {
+		accountType := normalizeAccountType(product.Prices[index].AccountType)
+		duration := product.Prices[index].Duration
+
+		stock := int64(0)
+		if byDuration, ok := exact[accountType]; ok {
+			stock = byDuration[duration]
+		}
+		if stock <= 0 {
+			stock = fallback[accountType]
+		}
+
+		product.Prices[index].AvailableStock = stock
+	}
+
+	return nil
+}
+
 func (s *ProductService) List(category string, page, limit int) ([]model.Product, int64, error) {
 	if page < 1 {
 		page = 1
@@ -100,6 +148,10 @@ func (s *ProductService) GetBySlug(slug string) (*model.Product, error) {
 		return nil, err
 	}
 	product.AvailableStock = counts[product.ID]
+
+	if err := s.attachPriceAvailableStock(product); err != nil {
+		return nil, err
+	}
 
 	return product, nil
 }

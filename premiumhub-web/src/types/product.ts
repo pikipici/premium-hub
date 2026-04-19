@@ -57,4 +57,5 @@ export interface ProductPrice {
   savings_text?: string
   price: number
   is_active: boolean
+  available_stock?: number
 }
