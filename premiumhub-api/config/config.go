@@ -11,7 +11,7 @@ import (
 type Config struct {
 	AppPort, AppEnv                                                             string
 	DBHost, DBPort, DBUser, DBPassword, DBName                                  string
-	JWTSecret, JWTExpiry                                                        string
+	JWTSecret, JWTExpiry, StockCredentialKey                                    string
 	PakasirBaseURL, PakasirProject, PakasirAPIKey, PakasirHTTPTimeoutSec        string
 	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                        string
 	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                         string
@@ -53,6 +53,8 @@ func Load() *Config {
 
 	appEnv := e("APP_ENV", "development")
 	isProd := strings.EqualFold(strings.TrimSpace(appEnv), "production")
+	jwtSecret := e("JWT_SECRET", "changeme-secret-32chars-minimum!!")
+	stockCredentialKey := e("STOCK_CREDENTIAL_KEY", jwtSecret)
 
 	return &Config{
 		AppPort:                              e("APP_PORT", "8080"),
@@ -62,8 +64,9 @@ func Load() *Config {
 		DBUser:                               e("DB_USER", "postgres"),
 		DBPassword:                           e("DB_PASSWORD", ""),
 		DBName:                               e("DB_NAME", "premiumhub"),
-		JWTSecret:                            e("JWT_SECRET", "changeme-secret-32chars-minimum!!"),
+		JWTSecret:                            jwtSecret,
 		JWTExpiry:                            e("JWT_EXPIRY", "24h"),
+		StockCredentialKey:                   stockCredentialKey,
 		PakasirBaseURL:                       e("PAKASIR_BASE_URL", "https://app.pakasir.com"),
 		PakasirProject:                       e("PAKASIR_PROJECT", ""),
 		PakasirAPIKey:                        e("PAKASIR_API_KEY", ""),

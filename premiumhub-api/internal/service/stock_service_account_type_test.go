@@ -17,7 +17,9 @@ func TestStockService_Create_ValidatesMasterAccountType(t *testing.T) {
 		t.Fatalf("ensure defaults: %v", err)
 	}
 
-	svc := NewStockService(stockRepo, productRepo).SetAccountTypeRepo(accountTypeRepo)
+	svc := NewStockService(stockRepo, productRepo).
+		SetAccountTypeRepo(accountTypeRepo).
+		SetStockCredentialCipher(mustTestStockCipher(t))
 	product, _ := seedProductAndPrice(t, db, "Stock Product", "streaming", "shared", 10000, 1)
 
 	if _, err := svc.Create(CreateStockInput{

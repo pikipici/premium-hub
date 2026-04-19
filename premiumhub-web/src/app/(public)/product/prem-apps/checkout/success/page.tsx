@@ -31,8 +31,11 @@ function OrderSuksesContent() {
     }
   }, [orderId])
 
-  const copyToClip = (text: string, field: string) => {
-    navigator.clipboard.writeText(text)
+  const copyToClip = (text: string | undefined, field: string) => {
+    const value = (text || '').trim()
+    if (!value) return
+
+    navigator.clipboard.writeText(value)
     setCopied(field)
     setTimeout(() => setCopied(''), 2000)
   }
@@ -64,9 +67,13 @@ function OrderSuksesContent() {
                 <div className="flex items-center justify-between bg-[#F7F7F5] rounded-xl p-3">
                   <div>
                     <span className="text-xs text-[#888] block">Password</span>
-                    <span className="text-sm font-semibold">{order.stock.password}</span>
+                    <span className="text-sm font-semibold">{order.stock.password || 'Belum tersedia, hubungi admin'}</span>
                   </div>
-                  <button onClick={() => copyToClip(order.stock!.password, 'pw')} className="p-2 hover:bg-white rounded-lg transition-colors">
+                  <button
+                    onClick={() => copyToClip(order.stock?.password, 'pw')}
+                    disabled={!order.stock?.password}
+                    className="p-2 hover:bg-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
                     {copied === 'pw' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-[#888]" />}
                   </button>
                 </div>

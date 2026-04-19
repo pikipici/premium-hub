@@ -207,9 +207,10 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 		}
 
 		var stock model.Stock
+		const usableCredentialCondition = "(password LIKE 'enc:v1:%' OR (password NOT LIKE '$2a$%' AND password NOT LIKE '$2b$%' AND password NOT LIKE '$2y$%'))"
 
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("product_id = ? AND account_type = ? AND status = ? AND duration_month = ?", order.Price.ProductID, order.Price.AccountType, "available", order.Price.Duration).
+			Where("product_id = ? AND account_type = ? AND status = ? AND duration_month = ? AND "+usableCredentialCondition, order.Price.ProductID, order.Price.AccountType, "available", order.Price.Duration).
 			Order("created_at ASC").
 			First(&stock).Error; err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -217,7 +218,7 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 			}
 
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-				Where("product_id = ? AND account_type = ? AND status = ? AND (duration_month = 0 OR duration_month IS NULL)", order.Price.ProductID, order.Price.AccountType, "available").
+				Where("product_id = ? AND account_type = ? AND status = ? AND (duration_month = 0 OR duration_month IS NULL) AND "+usableCredentialCondition, order.Price.ProductID, order.Price.AccountType, "available").
 				Order("created_at ASC").
 				First(&stock).Error; err != nil {
 				if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -225,7 +226,7 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 				}
 
 				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-					Where("product_id = ? AND account_type = ? AND status = ?", order.Price.ProductID, order.Price.AccountType, "available").
+					Where("product_id = ? AND account_type = ? AND status = ? AND "+usableCredentialCondition, order.Price.ProductID, order.Price.AccountType, "available").
 					Order("created_at ASC").
 					First(&stock).Error; err != nil {
 					if errors.Is(err, gorm.ErrRecordNotFound) {

@@ -103,9 +103,9 @@ func seedProductAndPrice(t *testing.T, db *gorm.DB, name, category, accountType 
 
 func seedStock(t *testing.T, db *gorm.DB, productID uuid.UUID, accountType, status string) *model.Stock {
 	t.Helper()
-	pw, err := hash.Password("accpass123")
+	pw, err := mustTestStockCipher(t).Encrypt("accpass123")
 	if err != nil {
-		t.Fatalf("hash stock password: %v", err)
+		t.Fatalf("encrypt stock password: %v", err)
 	}
 
 	s := &model.Stock{
@@ -579,7 +579,7 @@ func TestStockService_AllBranches(t *testing.T) {
 	stockRepo := repository.NewStockRepo(db)
 	product, _ := seedProductAndPrice(t, db, "Spotify", "music", "shared", 10000, 1)
 
-	svc := NewStockService(stockRepo)
+	svc := NewStockService(stockRepo).SetStockCredentialCipher(mustTestStockCipher(t))
 	if svc == nil {
 		t.Fatalf("NewStockService should return instance")
 	}
@@ -589,8 +589,8 @@ func TestStockService_AllBranches(t *testing.T) {
 	}
 
 	longPass := strings.Repeat("x", 80)
-	if _, err := svc.Create(CreateStockInput{ProductID: product.ID.String(), AccountType: "shared", Email: "a@b.com", Password: longPass}); err == nil || !strings.Contains(err.Error(), "gagal enkripsi password") {
-		t.Fatalf("expected hash error, got: %v", err)
+	if _, err := svc.Create(CreateStockInput{ProductID: product.ID.String(), AccountType: "shared", Email: "a@b.com", Password: longPass}); err != nil {
+		t.Fatalf("expected long password create success, got: %v", err)
 	}
 
 	created, err := svc.Create(CreateStockInput{ProductID: product.ID.String(), AccountType: "shared", Email: "ok@b.com", Password: "abc12345", ProfileName: "P1"})
@@ -602,7 +602,7 @@ func TestStockService_AllBranches(t *testing.T) {
 	}
 
 	dbErr := setupCoreDB(t)
-	svcErr := NewStockService(repository.NewStockRepo(dbErr))
+	svcErr := NewStockService(repository.NewStockRepo(dbErr)).SetStockCredentialCipher(mustTestStockCipher(t))
 	productErr, _ := seedProductAndPrice(t, dbErr, "Drop", "streaming", "shared", 10000, 1)
 	if err := dbErr.Migrator().DropTable(&model.Stock{}); err != nil {
 		t.Fatalf("drop stocks table: %v", err)
@@ -636,7 +636,7 @@ func TestStockService_AllBranches(t *testing.T) {
 	}
 
 	dbBulkErr := setupCoreDB(t)
-	svcBulkErr := NewStockService(repository.NewStockRepo(dbBulkErr))
+	svcBulkErr := NewStockService(repository.NewStockRepo(dbBulkErr)).SetStockCredentialCipher(mustTestStockCipher(t))
 	productBulkErr, _ := seedProductAndPrice(t, dbBulkErr, "BulkErr", "streaming", "shared", 10000, 1)
 	if err := dbBulkErr.Migrator().DropTable(&model.Stock{}); err != nil {
 		t.Fatalf("drop stocks table bulk: %v", err)

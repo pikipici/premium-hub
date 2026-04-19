@@ -14,6 +14,7 @@ type Stock struct {
 	DurationMonth int        `gorm:"default:0" json:"duration_month"`
 	Email         string     `gorm:"size:150;not null" json:"email"`
 	Password      string     `gorm:"size:255;not null" json:"-"`
+	PlainPassword string     `gorm:"-" json:"password,omitempty"`
 	ProfileName   string     `gorm:"size:100" json:"profile_name"`
 	Status        string     `gorm:"size:20;default:available" json:"status"`
 	UsedBy        *uuid.UUID `gorm:"type:uuid" json:"used_by"`

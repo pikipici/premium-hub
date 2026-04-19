@@ -14,7 +14,7 @@ func TestStockService_AccountTypeValidationAgainstProductPrices(t *testing.T) {
 	db := setupCoreDB(t)
 	stockRepo := repository.NewStockRepo(db)
 	productRepo := repository.NewProductRepo(db)
-	svc := NewStockService(stockRepo, productRepo)
+	svc := NewStockService(stockRepo, productRepo).SetStockCredentialCipher(mustTestStockCipher(t))
 
 	product, _ := seedProductAndPrice(t, db, "Validation Product", "streaming", "shared", 10000, 1)
 	if err := db.Create(&model.ProductPrice{
@@ -85,7 +85,7 @@ func TestStockService_CreateRejectsProductWithoutActiveAccountType(t *testing.T)
 	db := setupCoreDB(t)
 	stockRepo := repository.NewStockRepo(db)
 	productRepo := repository.NewProductRepo(db)
-	svc := NewStockService(stockRepo, productRepo)
+	svc := NewStockService(stockRepo, productRepo).SetStockCredentialCipher(mustTestStockCipher(t))
 
 	product := &model.Product{
 		Name:      "No Price Product",

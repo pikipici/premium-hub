@@ -19,6 +19,12 @@ type ProductStockDurationCount struct {
 	Total         int64
 }
 
+const stockUsableCredentialCondition = "(password LIKE ? OR (password NOT LIKE ? AND password NOT LIKE ? AND password NOT LIKE ?))"
+
+func applyUsableCredentialScope(db *gorm.DB) *gorm.DB {
+	return db.Where(stockUsableCredentialCondition, "enc:v1:%", "$2a$%", "$2b$%", "$2y$%")
+}
+
 func NewStockRepo(db *gorm.DB) *StockRepo {
 	return &StockRepo{db: db}
 }
@@ -35,7 +41,8 @@ func (r *StockRepo) FindAvailable(productID uuid.UUID, accountType string, durat
 	var s model.Stock
 
 	if durationMonth > 0 {
-		err := r.db.Where("product_id = ? AND account_type = ? AND status = ? AND duration_month = ?", productID, accountType, "available", durationMonth).
+		err := applyUsableCredentialScope(r.db).
+			Where("product_id = ? AND account_type = ? AND status = ? AND duration_month = ?", productID, accountType, "available", durationMonth).
 			Order("created_at ASC").
 			First(&s).Error
 		if err == nil {
@@ -46,7 +53,8 @@ func (r *StockRepo) FindAvailable(productID uuid.UUID, accountType string, durat
 		}
 	}
 
-	err := r.db.Where("product_id = ? AND account_type = ? AND status = ? AND (duration_month = 0 OR duration_month IS NULL)", productID, accountType, "available").
+	err := applyUsableCredentialScope(r.db).
+		Where("product_id = ? AND account_type = ? AND status = ? AND (duration_month = 0 OR duration_month IS NULL)", productID, accountType, "available").
 		Order("created_at ASC").
 		First(&s).Error
 	if err == nil {
@@ -61,7 +69,8 @@ func (r *StockRepo) FindAvailable(productID uuid.UUID, accountType string, durat
 	}
 
 	// Fallback terakhir untuk data lama yang mungkin belum punya duration mapping rapi.
-	err = r.db.Where("product_id = ? AND account_type = ? AND status = ?", productID, accountType, "available").
+	err = applyUsableCredentialScope(r.db).
+		Where("product_id = ? AND account_type = ? AND status = ?", productID, accountType, "available").
 		Order("created_at ASC").
 		First(&s).Error
 	if err != nil {
@@ -104,7 +113,7 @@ func (r *StockRepo) List(productID *uuid.UUID, status string, page, limit int) (
 
 func (r *StockRepo) CountByProduct(productID uuid.UUID, accountType string) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.Stock{}).
+	err := applyUsableCredentialScope(r.db.Model(&model.Stock{})).
 		Where("product_id = ? AND account_type = ? AND status = ?", productID, accountType, "available").
 		Count(&count).Error
 	return count, err
@@ -122,7 +131,7 @@ func (r *StockRepo) CountAvailableByProductIDs(productIDs []uuid.UUID) (map[uuid
 	}
 
 	var rows []row
-	err := r.db.Model(&model.Stock{}).
+	err := applyUsableCredentialScope(r.db.Model(&model.Stock{})).
 		Select("product_id, COUNT(*) as total").
 		Where("status = ? AND product_id IN ?", "available", productIDs).
 		Group("product_id").
@@ -140,7 +149,7 @@ func (r *StockRepo) CountAvailableByProductIDs(productIDs []uuid.UUID) (map[uuid
 
 func (r *StockRepo) CountAvailableByProductAndDurations(productID uuid.UUID) ([]ProductStockDurationCount, error) {
 	rows := make([]ProductStockDurationCount, 0)
-	err := r.db.Model(&model.Stock{}).
+	err := applyUsableCredentialScope(r.db.Model(&model.Stock{})).
 		Select("account_type, duration_month, COUNT(*) as total").
 		Where("status = ? AND product_id = ?", "available", productID).
 		Group("account_type, duration_month").

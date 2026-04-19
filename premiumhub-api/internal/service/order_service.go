@@ -8,19 +8,46 @@ import (
 
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
+	"premiumhub-api/pkg/credential"
 
 	"github.com/google/uuid"
 )
 
 type OrderService struct {
-	orderRepo *repository.OrderRepo
-	stockRepo *repository.StockRepo
-	priceRepo *repository.ProductRepo
-	notifRepo *repository.NotificationRepo
+	orderRepo             *repository.OrderRepo
+	stockRepo             *repository.StockRepo
+	priceRepo             *repository.ProductRepo
+	notifRepo             *repository.NotificationRepo
+	stockCredentialCipher *credential.StockCipher
 }
 
 func NewOrderService(orderRepo *repository.OrderRepo, stockRepo *repository.StockRepo, priceRepo *repository.ProductRepo, notifRepo *repository.NotificationRepo) *OrderService {
 	return &OrderService{orderRepo: orderRepo, stockRepo: stockRepo, priceRepo: priceRepo, notifRepo: notifRepo}
+}
+
+func (s *OrderService) SetStockCredentialCipher(cipher *credential.StockCipher) *OrderService {
+	s.stockCredentialCipher = cipher
+	return s
+}
+
+func (s *OrderService) exposeStockPassword(stock *model.Stock) {
+	if stock == nil || strings.TrimSpace(stock.Password) == "" {
+		return
+	}
+
+	if s.stockCredentialCipher == nil {
+		if !credential.IsEncryptedStockCredential(stock.Password) && !credential.IsBcryptHash(stock.Password) {
+			stock.PlainPassword = stock.Password
+		}
+		return
+	}
+
+	plain, err := s.stockCredentialCipher.Decrypt(stock.Password)
+	if err != nil {
+		return
+	}
+
+	stock.PlainPassword = plain
 }
 
 type CreateOrderInput struct {
@@ -71,6 +98,8 @@ func (s *OrderService) GetByID(id, userID uuid.UUID) (*model.Order, error) {
 	if order.UserID != userID {
 		return nil, errors.New("akses ditolak")
 	}
+
+	s.exposeStockPassword(order.Stock)
 	return order, nil
 }
 
@@ -81,7 +110,17 @@ func (s *OrderService) ListByUser(userID uuid.UUID, page, limit int) ([]model.Or
 	if limit < 1 {
 		limit = 10
 	}
-	return s.orderRepo.FindByUserID(userID, page, limit)
+
+	orders, total, err := s.orderRepo.FindByUserID(userID, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	for index := range orders {
+		s.exposeStockPassword(orders[index].Stock)
+	}
+
+	return orders, total, nil
 }
 
 func (s *OrderService) Cancel(id, userID uuid.UUID) error {

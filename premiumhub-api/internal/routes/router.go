@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"premiumhub-api/config"
 	"premiumhub-api/internal/handler"
@@ -10,6 +11,7 @@ import (
 	"premiumhub-api/internal/repository"
 	"premiumhub-api/internal/service"
 	"premiumhub-api/internal/storage"
+	"premiumhub-api/pkg/credential"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -44,6 +46,16 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	maintenanceRuleRepo := repository.NewMaintenanceRuleRepo(db)
 	activityRepo := repository.NewActivityRepo(db)
 
+	stockCredentialKey := strings.TrimSpace(cfg.StockCredentialKey)
+	if stockCredentialKey == "" {
+		stockCredentialKey = strings.TrimSpace(cfg.JWTSecret)
+	}
+
+	stockCredentialCipher, err := credential.NewStockCipher(stockCredentialKey)
+	if err != nil {
+		panic(fmt.Errorf("gagal inisialisasi stock credential cipher: %w", err))
+	}
+
 	// Services
 	authSvc := service.NewAuthService(userRepo, cfg)
 	notifSvc := service.NewNotificationService(notifRepo)
@@ -58,8 +70,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		))
 	sosmedOrderSvc := service.NewSosmedOrderService(sosmedOrderRepo, sosmedServiceRepo, notifRepo)
 	sosmedPaymentSvc := service.NewSosmedPaymentServiceWithGateway(cfg, sosmedOrderRepo, sosmedOrderSvc, nil)
-	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
-	stockSvc := service.NewStockService(stockRepo, productRepo).SetAccountTypeRepo(accountTypeRepo)
+	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo).
+		SetStockCredentialCipher(stockCredentialCipher)
+	stockSvc := service.NewStockService(stockRepo, productRepo).
+		SetAccountTypeRepo(accountTypeRepo).
+		SetStockCredentialCipher(stockCredentialCipher)
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
 	paymentSvc := service.NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, nil)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)

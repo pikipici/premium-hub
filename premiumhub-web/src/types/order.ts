@@ -19,7 +19,7 @@ export interface OrderStock {
   product_id?: string
   account_type?: string
   email: string
-  password: string
+  password?: string
   profile_name?: string
   status?: string
   used_by?: string

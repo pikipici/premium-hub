@@ -9,16 +9,17 @@ import (
 
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
-	"premiumhub-api/pkg/hash"
+	"premiumhub-api/pkg/credential"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type StockService struct {
-	stockRepo      *repository.StockRepo
-	productRepo    *repository.ProductRepo
-	accountTypeSvc *AccountTypeService
+	stockRepo             *repository.StockRepo
+	productRepo           *repository.ProductRepo
+	accountTypeSvc        *AccountTypeService
+	stockCredentialCipher *credential.StockCipher
 }
 
 func NewStockService(stockRepo *repository.StockRepo, productRepos ...*repository.ProductRepo) *StockService {
@@ -35,6 +36,24 @@ func (s *StockService) SetAccountTypeRepo(repo *repository.AccountTypeRepo) *Sto
 		s.accountTypeSvc = NewAccountTypeService(repo)
 	}
 	return s
+}
+
+func (s *StockService) SetStockCredentialCipher(cipher *credential.StockCipher) *StockService {
+	s.stockCredentialCipher = cipher
+	return s
+}
+
+func (s *StockService) encryptStockPassword(password string) (string, error) {
+	if s.stockCredentialCipher == nil {
+		return "", errors.New("stock credential cipher belum dikonfigurasi")
+	}
+
+	encryptedPw, err := s.stockCredentialCipher.Encrypt(password)
+	if err != nil {
+		return "", errors.New("gagal enkripsi password")
+	}
+
+	return encryptedPw, nil
 }
 
 type CreateStockInput struct {
@@ -193,9 +212,9 @@ func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {
 		return nil, errors.New("password wajib diisi")
 	}
 
-	encryptedPw, err := hash.Password(password)
+	encryptedPw, err := s.encryptStockPassword(password)
 	if err != nil {
-		return nil, errors.New("gagal enkripsi password")
+		return nil, err
 	}
 
 	stock := &model.Stock{
@@ -253,9 +272,9 @@ func (s *StockService) CreateBulk(input BulkStockInput) (int, error) {
 			return 0, fmt.Errorf("password akun bulk baris %d wajib diisi", index+1)
 		}
 
-		encPw, err := hash.Password(password)
+		encPw, err := s.encryptStockPassword(password)
 		if err != nil {
-			return 0, errors.New("gagal enkripsi password")
+			return 0, err
 		}
 
 		stocks = append(stocks, model.Stock{
@@ -322,9 +341,9 @@ func (s *StockService) Update(id uuid.UUID, input CreateStockInput) (*model.Stoc
 
 	stock.Email = email
 	if strings.TrimSpace(input.Password) != "" {
-		encPw, err := hash.Password(strings.TrimSpace(input.Password))
+		encPw, err := s.encryptStockPassword(strings.TrimSpace(input.Password))
 		if err != nil {
-			return nil, errors.New("gagal enkripsi password")
+			return nil, err
 		}
 		stock.Password = encPw
 	}
