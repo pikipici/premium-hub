@@ -357,14 +357,16 @@ export default function PremAppsProductDetailPage() {
             <p className="mt-4 text-sm text-[#666] leading-relaxed text-center max-w-2xl mx-auto">{product.description}</p>
 
             {availableStock !== null && (
-              <div
-                className={`mt-4 text-xs font-semibold border rounded-full inline-flex px-3 py-1.5 mx-auto ${
-                  availableStock > 0
-                    ? 'text-[#166534] bg-[#ECFDF3] border-[#BBF7D0]'
-                    : 'text-[#B91C1C] bg-[#FEF2F2] border-[#FECACA]'
-                }`}
-              >
-                {availableStock > 0 ? `Stok tersedia: ${availableStock} akun` : 'Stok saat ini habis'}
+              <div className="mt-4 flex justify-center">
+                <div
+                  className={`text-xs font-semibold border rounded-full inline-flex px-3 py-1.5 ${
+                    availableStock > 0
+                      ? 'text-[#166534] bg-[#ECFDF3] border-[#BBF7D0]'
+                      : 'text-[#B91C1C] bg-[#FEF2F2] border-[#FECACA]'
+                  }`}
+                >
+                  {availableStock > 0 ? `Stok tersedia: ${availableStock} akun` : 'Stok saat ini habis'}
+                </div>
               </div>
             )}
 
