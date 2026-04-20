@@ -3,7 +3,7 @@
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import ProductCard from '@/components/shared/ProductCard'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { productService } from '@/services/productService'
 import { productCategoryService } from '@/services/productCategoryService'
@@ -64,6 +64,8 @@ function PremAppsContent() {
   const [categories, setCategories] = useState<CategoryOption[]>(FALLBACK_CATEGORIES)
   const [category, setCategory] = useState(searchParams.get('category') || '')
   const [loading, setLoading] = useState(true)
+  const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false)
+  const categoryFilterRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -88,6 +90,33 @@ function PremAppsContent() {
   }, [])
 
   const effectiveCategory = categories.some((item) => item.value === category) ? category : ''
+  const activeCategoryLabel = categories.find((item) => item.value === effectiveCategory)?.label || 'Semua'
+
+  useEffect(() => {
+    if (!isCategoryFilterOpen) return
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!categoryFilterRef.current) return
+      if (categoryFilterRef.current.contains(event.target as Node)) return
+      setIsCategoryFilterOpen(false)
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCategoryFilterOpen(false)
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    window.addEventListener('touchstart', handlePointerDown)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown)
+      window.removeEventListener('touchstart', handlePointerDown)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isCategoryFilterOpen])
 
   useEffect(() => {
     productService.list({ category: effectiveCategory || undefined, limit: 50 })
@@ -99,9 +128,14 @@ function PremAppsContent() {
   }, [effectiveCategory])
 
   const handleCategoryChange = (nextCategory: string) => {
-    if (nextCategory === effectiveCategory) return
+    if (nextCategory === effectiveCategory) {
+      setIsCategoryFilterOpen(false)
+      return
+    }
+
     setLoading(true)
     setCategory(nextCategory)
+    setIsCategoryFilterOpen(false)
   }
 
   return (
@@ -115,21 +149,55 @@ function PremAppsContent() {
             <p className="text-[#888] text-sm">Pilih aplikasi premium sesuai kebutuhan lu</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 mb-8 justify-center">
-            <SlidersHorizontal className="w-4 h-4 text-[#888]" />
-            {categories.map((cat) => (
+          <div className="mb-8 flex justify-center">
+            <div ref={categoryFilterRef} className="relative inline-flex items-center gap-2">
               <button
-                key={cat.value || 'all'}
-                onClick={() => handleCategoryChange(cat.value)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  effectiveCategory === cat.value
-                    ? 'bg-[#141414] text-white'
-                    : 'bg-white text-[#888] hover:bg-[#EBEBEB] border border-[#EBEBEB]'
+                type="button"
+                aria-label="Buka filter kategori"
+                aria-haspopup="true"
+                aria-expanded={isCategoryFilterOpen}
+                onClick={() => setIsCategoryFilterOpen((prev) => !prev)}
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-all ${
+                  isCategoryFilterOpen
+                    ? 'border-[#141414] bg-[#141414] text-white'
+                    : 'border-[#EBEBEB] bg-white text-[#888] hover:bg-[#F7F7F7]'
                 }`}
               >
-                {cat.label}
+                <SlidersHorizontal className="w-4 h-4" />
               </button>
-            ))}
+
+              {effectiveCategory ? (
+                <button
+                  type="button"
+                  onClick={() => handleCategoryChange('')}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#EBEBEB] bg-white px-3 py-2 text-xs font-medium text-[#666] hover:bg-[#F7F7F7] transition-colors"
+                >
+                  {activeCategoryLabel}
+                  <span aria-hidden>✕</span>
+                </button>
+              ) : null}
+
+              {isCategoryFilterOpen ? (
+                <div className="absolute left-1/2 top-full z-20 mt-3 w-[min(92vw,720px)] -translate-x-1/2 rounded-2xl border border-[#EBEBEB] bg-white p-3 shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.value || 'all'}
+                        type="button"
+                        onClick={() => handleCategoryChange(cat.value)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                          effectiveCategory === cat.value
+                            ? 'bg-[#141414] text-white'
+                            : 'bg-white text-[#888] hover:bg-[#EBEBEB] border border-[#EBEBEB]'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {loading ? (
