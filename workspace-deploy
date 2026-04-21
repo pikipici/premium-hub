@@ -6,6 +6,7 @@ set -Eeuo pipefail
 # - ONLY targets workspace services
 # - NEVER touches runtime services (premiumhub-*.service)
 # - Deterministic build plan from git delta vs last successful deploy
+# - Can be triggered locally via SSH; execution still happens on server
 # =============================================================
 
 # ---------- Terminal colors ----------
@@ -137,6 +138,15 @@ FORCE_NPM_CI="${FORCE_NPM_CI:-0}"
 # - WEB: auto|dev|prod
 WORKSPACE_API_RUN_MODE="${WORKSPACE_API_RUN_MODE:-auto}"
 WORKSPACE_WEB_RUN_MODE="${WORKSPACE_WEB_RUN_MODE:-auto}"
+
+# Local orchestration mode:
+# - auto : when run from Windows Git Bash/MSYS/Cygwin, delegate to remote over SSH
+# - 1    : always delegate to remote over SSH
+# - 0    : never delegate; run directly on current machine
+REMOTE_DEPLOY_ENABLED="${REMOTE_DEPLOY_ENABLED:-auto}"
+REMOTE_DEPLOY_HOST="${REMOTE_DEPLOY_HOST:-rdpkhorur}"
+REMOTE_PROJECT_ROOT="${REMOTE_PROJECT_ROOT:-/home/ubuntu/openclaw-vcp/profiles/openai-codex/shared/workspace/premium-hub}"
+REMOTE_SCRIPT_PATH="${REMOTE_SCRIPT_PATH:-${REMOTE_PROJECT_ROOT}/workspace-deploy}"
 
 EXPECT_BE_BINARY_ARTIFACT=1
 EXPECT_FE_BUILD_ARTIFACT=1
@@ -276,6 +286,151 @@ is_worktree_dirty() {
 
   [[ -n "$(git ls-files --others --exclude-standard)" ]]
 }
+
+is_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_falsey() {
+  case "${1:-}" in
+    0|false|FALSE|no|NO|off|OFF)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_windows_git_bash() {
+  local uname_s
+  uname_s="$(uname -s 2>/dev/null || true)"
+
+  case "${uname_s}" in
+    MINGW*|MSYS*|CYGWIN*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+should_delegate_remote_deploy() {
+  if is_truthy "${WORKSPACE_DEPLOY_REMOTE_HOP:-0}"; then
+    return 1
+  fi
+
+  if is_truthy "${REMOTE_DEPLOY_ENABLED}"; then
+    return 0
+  fi
+
+  if is_falsey "${REMOTE_DEPLOY_ENABLED}"; then
+    return 1
+  fi
+
+  is_windows_git_bash
+}
+
+print_remote_export_if_set() {
+  local name="$1"
+  if [[ -v "${name}" ]]; then
+    printf 'export %s=%q\n' "${name}" "${!name}"
+  fi
+}
+
+warn_if_local_branch_not_pushed() {
+  local counts ahead behind
+
+  if ! git -C "${SCRIPT_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return 0
+  fi
+
+  counts="$(git -C "${SCRIPT_ROOT}" rev-list --left-right --count "HEAD...@{upstream}" 2>/dev/null || true)"
+  if [[ -z "${counts}" ]]; then
+    return 0
+  fi
+
+  read -r ahead behind <<<"${counts}"
+  ahead="${ahead:-0}"
+  behind="${behind:-0}"
+
+  if (( ahead > 0 )); then
+    log_warn "Local branch ahead ${ahead} commit dari upstream. Remote deploy akan pakai origin/${BRANCH}, jadi pastikan perubahan sudah di-push."
+  fi
+
+  if (( behind > 0 )); then
+    log_warn "Local branch behind ${behind} commit dari upstream. Remote deploy akan pull origin/${BRANCH} terbaru."
+  fi
+}
+
+run_remote_deploy() {
+  local env_name
+  local -a forwarded_env_names=(
+    "RUN_GO_MOD_TIDY"
+    "NPM_FLAGS"
+    "GIT_UPDATE_MODE"
+    "ALLOW_DIRTY_TREE"
+    "AUTO_STASH"
+    "SHOW_GIT_SUMMARY"
+    "AUTO_DETECT_CHANGES"
+    "FORCE_FULL_BUILD"
+    "FORCE_FE_BUILD"
+    "FORCE_BE_BUILD"
+    "FORCE_NPM_CI"
+    "WORKSPACE_API_RUN_MODE"
+    "WORKSPACE_WEB_RUN_MODE"
+    "DEPLOY_STATE_DIR"
+    "LAST_SUCCESS_COMMIT_FILE"
+    "FE_HEALTH_URL"
+    "BE_HEALTH_URL"
+  )
+
+  command -v ssh >/dev/null || {
+    log_err "Command ssh tidak ditemukan. Jalankan skrip ini dari environment yang punya OpenSSH/Git Bash."
+    exit 1
+  }
+
+  warn_if_local_branch_not_pushed
+
+  step_start "REMOTE DEPLOY ORCHESTRATION"
+  log_info "Delegating deploy ke server via SSH"
+  log_info "Remote host : ${REMOTE_DEPLOY_HOST}"
+  log_info "Remote root : ${REMOTE_PROJECT_ROOT}"
+  log_info "Remote script: ${REMOTE_SCRIPT_PATH}"
+  log_warn "Bootstrap remote akan git pull dulu supaya server pakai commit terbaru yang sudah di-push"
+
+  {
+    printf 'set -Eeuo pipefail\n'
+    printf 'cd %q\n' "${REMOTE_PROJECT_ROOT}"
+    printf 'git fetch origin %q\n' "${BRANCH}"
+    printf 'git checkout %q\n' "${BRANCH}"
+    printf 'git pull --ff-only origin %q\n' "${BRANCH}"
+    printf 'export WORKSPACE_DEPLOY_REMOTE_HOP=1\n'
+    printf 'export PROJECT_ROOT=%q\n' "${REMOTE_PROJECT_ROOT}"
+    printf 'export BRANCH=%q\n' "${BRANCH}"
+
+    for env_name in "${forwarded_env_names[@]}"; do
+      print_remote_export_if_set "${env_name}"
+    done
+
+    printf 'exec bash %q\n' "${REMOTE_SCRIPT_PATH}"
+  } | ssh "${REMOTE_DEPLOY_HOST}" bash -s
+
+  step_done "REMOTE DEPLOY ORCHESTRATION"
+}
+
+if should_delegate_remote_deploy; then
+  run_remote_deploy
+  exit 0
+fi
 
 # ---------- Precheck ----------
 step_start "PRECHECK"
