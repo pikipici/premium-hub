@@ -29,6 +29,7 @@ node_modules/
 # Private files
 PROJECT_SPEC.md
 setup.sh
+LOCAL_AI_CONTEXT.md
 
 # Deploy runtime state (local-only)
 .deploy-state/
