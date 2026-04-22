@@ -41,7 +41,7 @@ export default function DashboardSidebar({ collapsed = false, onToggle }: Dashbo
 
   return (
     <aside
-      className={`hidden border-r border-[#EBEBEB] bg-white px-3 py-4 transition-all duration-200 md:flex md:flex-col ${
+      className={`hidden shrink-0 border-r border-[#EBEBEB] bg-white px-3 py-4 transition-all duration-200 md:sticky md:top-14 md:flex md:h-[calc(100vh-56px)] md:flex-col md:self-start md:overflow-y-auto ${
         collapsed ? 'w-[84px]' : 'w-64'
       }`}
     >
