@@ -144,26 +144,27 @@ function PremAppsContent() {
 
       <section className="py-12 md:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <h1 className="text-3xl md:text-4xl font-extrabold mb-3">Apps Premium</h1>
-            <p className="text-[#888] text-sm">Pilih aplikasi premium sesuai kebutuhan lu</p>
-          </div>
+          <div className="mb-8 flex flex-col gap-4 md:mb-10 md:flex-row md:items-end md:justify-between">
+            <div className="text-center md:text-left">
+              <h1 className="mb-3 text-3xl font-extrabold md:text-4xl">Apps Premium</h1>
+              <p className="text-sm text-[#888]">Pilih aplikasi premium sesuai kebutuhan lu</p>
+            </div>
 
-          <div className="mb-8 flex justify-center">
-            <div ref={categoryFilterRef} className="relative inline-flex items-center gap-2">
+            <div ref={categoryFilterRef} className="relative flex items-center justify-center gap-2 md:justify-end">
               <button
                 type="button"
                 aria-label="Buka filter kategori"
                 aria-haspopup="true"
                 aria-expanded={isCategoryFilterOpen}
                 onClick={() => setIsCategoryFilterOpen((prev) => !prev)}
-                className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-all ${
+                className={`inline-flex h-11 items-center justify-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all ${
                   isCategoryFilterOpen
-                    ? 'border-[#141414] bg-[#141414] text-white'
-                    : 'border-[#EBEBEB] bg-white text-[#888] hover:bg-[#F7F7F7]'
+                    ? 'border-[#141414] bg-[#141414] text-white shadow-[0_10px_24px_rgba(20,20,20,0.18)]'
+                    : 'border-[#EBEBEB] bg-white text-[#666] hover:bg-[#F7F7F7]'
                 }`}
               >
-                <SlidersHorizontal className="w-4 h-4" />
+                <SlidersHorizontal className="h-4 w-4" />
+                <span>Filter</span>
               </button>
 
               {effectiveCategory ? (
@@ -178,7 +179,7 @@ function PremAppsContent() {
               ) : null}
 
               {isCategoryFilterOpen ? (
-                <div className="absolute left-1/2 top-full z-20 mt-3 w-[min(92vw,720px)] -translate-x-1/2 rounded-2xl border border-[#EBEBEB] bg-white p-3 shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                <div className="absolute left-1/2 top-full z-20 mt-3 w-[min(92vw,720px)] -translate-x-1/2 rounded-2xl border border-[#EBEBEB] bg-white p-3 shadow-[0_12px_30px_rgba(0,0,0,0.08)] md:left-auto md:right-0 md:translate-x-0">
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     {categories.map((cat) => (
                       <button
