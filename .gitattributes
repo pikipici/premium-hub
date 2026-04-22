@@ -1,0 +1,3 @@
+*.sh text eol=lf
+workspace-deploy text eol=lf
+workspace-deploy-khorur text eol=lf

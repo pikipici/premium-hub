@@ -140,7 +140,9 @@ WORKSPACE_API_RUN_MODE="${WORKSPACE_API_RUN_MODE:-auto}"
 WORKSPACE_WEB_RUN_MODE="${WORKSPACE_WEB_RUN_MODE:-auto}"
 
 # Local orchestration mode:
-# - auto : when run from Windows Git Bash/MSYS/Cygwin, delegate to remote over SSH
+# - auto : when current checkout is not the real workspace root on server,
+#          delegate to remote over SSH. This makes local Windows/WSL clones
+#          behave as launchers, while direct execution on server still runs in-place.
 # - 1    : always delegate to remote over SSH
 # - 0    : never delegate; run directly on current machine
 REMOTE_DEPLOY_ENABLED="${REMOTE_DEPLOY_ENABLED:-auto}"
@@ -309,18 +311,35 @@ is_falsey() {
   esac
 }
 
-is_windows_git_bash() {
-  local uname_s
-  uname_s="$(uname -s 2>/dev/null || true)"
+normalize_compare_path() {
+  local path="${1:-}"
 
-  case "${uname_s}" in
-    MINGW*|MSYS*|CYGWIN*)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
+  if [[ -z "${path}" ]]; then
+    printf '\n'
+    return 0
+  fi
+
+  if [[ -d "${path}" ]]; then
+    (
+      cd "${path}" && pwd -P
+    )
+    return 0
+  fi
+
+  if [[ "${path}" == "/" ]]; then
+    printf '/\n'
+  else
+    printf '%s\n' "${path%/}"
+  fi
+}
+
+is_remote_project_root_here() {
+  local normalized_script_root normalized_remote_root
+
+  normalized_script_root="$(normalize_compare_path "${SCRIPT_ROOT}")"
+  normalized_remote_root="$(normalize_compare_path "${REMOTE_PROJECT_ROOT}")"
+
+  [[ -n "${normalized_remote_root}" && "${normalized_script_root}" == "${normalized_remote_root}" ]]
 }
 
 should_delegate_remote_deploy() {
@@ -336,7 +355,7 @@ should_delegate_remote_deploy() {
     return 1
   fi
 
-  is_windows_git_bash
+  ! is_remote_project_root_here
 }
 
 print_remote_export_if_set() {
@@ -402,6 +421,7 @@ run_remote_deploy() {
 
   step_start "REMOTE DEPLOY ORCHESTRATION"
   log_info "Delegating deploy ke server via SSH"
+  log_info "Local root  : ${SCRIPT_ROOT}"
   log_info "Remote host : ${REMOTE_DEPLOY_HOST}"
   log_info "Remote root : ${REMOTE_PROJECT_ROOT}"
   log_info "Remote script: ${REMOTE_SCRIPT_PATH}"
