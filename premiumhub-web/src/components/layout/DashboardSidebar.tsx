@@ -45,15 +45,17 @@ export default function DashboardSidebar({ collapsed = false, onToggle }: Dashbo
         collapsed ? 'w-[84px]' : 'w-64'
       }`}
     >
-      <div className="mb-3 flex items-center justify-between gap-2 px-1">
+      <div
+        className={`mb-3 flex items-center px-1 ${
+          collapsed ? 'justify-center' : 'justify-between gap-2'
+        }`}
+      >
         {!collapsed ? (
           <div>
             <div className="text-xs font-bold uppercase tracking-[0.08em] text-[#A6A6A1]">Menu User</div>
             <div className="text-sm font-semibold text-[#141414]">Dashboard</div>
           </div>
-        ) : (
-          <div className="h-8 w-8" />
-        )}
+        ) : null}
 
         <button
           type="button"
