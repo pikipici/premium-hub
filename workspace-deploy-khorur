@@ -4,6 +4,7 @@ set -Eeuo pipefail
 # =============================================================
 # Khorur Workspace Deploy Script (isolated)
 # - Targets ONLY workspace-khorur services
+# - Can act as remote SSH launcher like workspace-deploy
 # - Uses dedicated ports/db:
 #   FE : 3006
 #   API: 18083
@@ -79,6 +80,65 @@ require_cmd() {
     log_err "Command tidak ditemukan: $1"
     exit 1
   }
+}
+
+is_truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_falsey() {
+  case "${1:-}" in
+    0|false|FALSE|no|NO|off|OFF)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+default_remote_deploy_host() {
+  if command -v ssh >/dev/null 2>&1; then
+    if ssh -G sandbox-ubuntu >/dev/null 2>&1; then
+      printf 'sandbox-ubuntu\n'
+      return 0
+    fi
+    if ssh -G rdpkhorur >/dev/null 2>&1; then
+      printf 'rdpkhorur\n'
+      return 0
+    fi
+  fi
+
+  printf 'sandbox-ubuntu\n'
+}
+
+normalize_compare_path() {
+  local path="${1:-}"
+
+  if [[ -z "${path}" ]]; then
+    printf '\n'
+    return 0
+  fi
+
+  if [[ -d "${path}" ]]; then
+    (
+      cd "${path}" && pwd -P
+    )
+    return 0
+  fi
+
+  if [[ "${path}" == "/" ]]; then
+    printf '/\n'
+  else
+    printf '%s\n' "${path%/}"
+  fi
 }
 
 wait_http() {
@@ -182,15 +242,32 @@ build_frontend_with_retry() {
 }
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${PROJECT_ROOT:-${SCRIPT_ROOT}}"
+API_SERVICE_NAME="workspace-khorur-premiumhub-api.service"
+WEB_SERVICE_NAME="workspace-khorur-premiumhub-web.service"
+
+WS_KHORUR_WEB_DIR="$(systemctl --user show -p WorkingDirectory --value "${WEB_SERVICE_NAME}" 2>/dev/null || true)"
+WS_KHORUR_API_DIR="$(systemctl --user show -p WorkingDirectory --value "${API_SERVICE_NAME}" 2>/dev/null || true)"
+
+DEFAULT_WORKSPACE_ROOT=""
+if [[ -n "${WS_KHORUR_WEB_DIR}" ]]; then
+  DEFAULT_WORKSPACE_ROOT="$(dirname "${WS_KHORUR_WEB_DIR}")"
+elif [[ -n "${WS_KHORUR_API_DIR}" ]]; then
+  DEFAULT_WORKSPACE_ROOT="$(dirname "${WS_KHORUR_API_DIR}")"
+else
+  DEFAULT_WORKSPACE_ROOT="${SCRIPT_ROOT}"
+fi
+
+PROJECT_ROOT="${PROJECT_ROOT:-${DEFAULT_WORKSPACE_ROOT}}"
 BRANCH="${BRANCH:-main}"
 PULL_LATEST="${PULL_LATEST:-1}"
 
+REMOTE_DEPLOY_ENABLED="${REMOTE_DEPLOY_ENABLED:-auto}"
+REMOTE_DEPLOY_HOST="${REMOTE_DEPLOY_HOST:-$(default_remote_deploy_host)}"
+REMOTE_PROJECT_ROOT="${REMOTE_PROJECT_ROOT:-/home/ubuntu/openclaw-vcp/profiles/openai-codex/shared/workspace/khorur-premium-hub}"
+REMOTE_SCRIPT_PATH="${REMOTE_SCRIPT_PATH:-${REMOTE_PROJECT_ROOT}/workspace-deploy-khorur}"
+
 FRONTEND_DIR="${PROJECT_ROOT}/premiumhub-web"
 BACKEND_DIR="${PROJECT_ROOT}/premiumhub-api"
-
-API_SERVICE_NAME="workspace-khorur-premiumhub-api.service"
-WEB_SERVICE_NAME="workspace-khorur-premiumhub-web.service"
 
 API_PORT="${API_PORT:-18083}"
 WEB_PORT="${WEB_PORT:-3006}"
@@ -215,6 +292,124 @@ SOURCE_NODE_MODULES="${SOURCE_NODE_MODULES:-/home/ubuntu/openclaw-vcp/profiles/o
 
 API_SERVICE_FILE="${SYSTEMD_USER_DIR}/${API_SERVICE_NAME}"
 WEB_SERVICE_FILE="${SYSTEMD_USER_DIR}/${WEB_SERVICE_NAME}"
+
+is_remote_project_root_here() {
+  local normalized_script_root normalized_remote_root
+
+  normalized_script_root="$(normalize_compare_path "${SCRIPT_ROOT}")"
+  normalized_remote_root="$(normalize_compare_path "${REMOTE_PROJECT_ROOT}")"
+
+  [[ -n "${normalized_remote_root}" && "${normalized_script_root}" == "${normalized_remote_root}" ]]
+}
+
+should_delegate_remote_deploy() {
+  if is_truthy "${WORKSPACE_DEPLOY_REMOTE_HOP:-0}"; then
+    return 1
+  fi
+
+  if is_truthy "${REMOTE_DEPLOY_ENABLED}"; then
+    return 0
+  fi
+
+  if is_falsey "${REMOTE_DEPLOY_ENABLED}"; then
+    return 1
+  fi
+
+  ! is_remote_project_root_here
+}
+
+print_remote_export_if_set() {
+  local name="$1"
+  if [[ -v "${name}" ]]; then
+    printf 'export %s=%q\n' "${name}" "${!name}"
+  fi
+}
+
+warn_if_local_branch_not_pushed() {
+  local counts ahead behind
+
+  if ! git -C "${SCRIPT_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return 0
+  fi
+
+  counts="$(git -C "${SCRIPT_ROOT}" rev-list --left-right --count "HEAD...@{upstream}" 2>/dev/null || true)"
+  if [[ -z "${counts}" ]]; then
+    return 0
+  fi
+
+  read -r ahead behind <<<"${counts}"
+  ahead="${ahead:-0}"
+  behind="${behind:-0}"
+
+  if (( ahead > 0 )); then
+    log_warn "Local branch ahead ${ahead} commit dari upstream. Remote deploy akan pakai origin/${BRANCH}, jadi pastikan perubahan sudah di-push."
+  fi
+
+  if (( behind > 0 )); then
+    log_warn "Local branch behind ${behind} commit dari upstream. Remote deploy akan pull origin/${BRANCH} terbaru."
+  fi
+}
+
+run_remote_deploy() {
+  local env_name
+  local -a forwarded_env_names=(
+    "API_PORT"
+    "WEB_PORT"
+    "FE_HEALTH_URL"
+    "BE_HEALTH_URL"
+    "DB_HOST"
+    "DB_PORT"
+    "DB_USER"
+    "DB_NAME"
+    "DB_PASSWORD"
+    "RUN_SEED"
+    "FORCE_NPM_CI"
+    "BUILD_RETRIES"
+    "NPM_CI_RETRIES"
+    "NPM_FLAGS"
+    "SOURCE_NODE_MODULES"
+  )
+
+  command -v ssh >/dev/null || {
+    log_err "Command ssh tidak ditemukan. Jalankan skrip ini dari environment yang punya OpenSSH."
+    exit 1
+  }
+
+  warn_if_local_branch_not_pushed
+
+  step_start "REMOTE DEPLOY ORCHESTRATION"
+  log_info "Delegating khorur deploy ke server via SSH"
+  log_info "Local root   : ${SCRIPT_ROOT}"
+  log_info "Remote host  : ${REMOTE_DEPLOY_HOST}"
+  log_info "Remote root  : ${REMOTE_PROJECT_ROOT}"
+  log_info "Remote script: ${REMOTE_SCRIPT_PATH}"
+  log_warn "Bootstrap remote akan git pull dulu supaya server pakai commit terbaru yang sudah di-push"
+
+  {
+    printf 'set -Eeuo pipefail\n'
+    printf 'cd %q\n' "${REMOTE_PROJECT_ROOT}"
+    printf 'git fetch origin %q\n' "${BRANCH}"
+    printf 'git checkout %q\n' "${BRANCH}"
+    printf 'git pull --ff-only origin %q\n' "${BRANCH}"
+    printf 'export WORKSPACE_DEPLOY_REMOTE_HOP=1\n'
+    printf 'export PROJECT_ROOT=%q\n' "${REMOTE_PROJECT_ROOT}"
+    printf 'export BRANCH=%q\n' "${BRANCH}"
+    printf 'export PULL_LATEST=0\n'
+
+    for env_name in "${forwarded_env_names[@]}"; do
+      print_remote_export_if_set "${env_name}"
+    done
+
+    printf 'exec bash %q\n' "${REMOTE_SCRIPT_PATH}"
+  } | ssh "${REMOTE_DEPLOY_HOST}" bash -s
+
+  step_done "REMOTE DEPLOY ORCHESTRATION"
+}
+
+if should_delegate_remote_deploy; then
+  run_remote_deploy
+  exit 0
+fi
 
 step_start "PRECHECK"
 require_cmd git
