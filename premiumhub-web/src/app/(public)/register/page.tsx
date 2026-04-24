@@ -4,34 +4,25 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { authService } from '@/services/authService'
+import { resolvePostAuthPath } from '@/lib/auth'
 import { useAuthStore } from '@/store/authStore'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { Eye, EyeOff, UserPlus } from 'lucide-react'
 
-function resolvePostAuthPath(nextParam: string | null, role: string) {
-  const fallback = role === 'admin' ? '/admin' : '/dashboard'
-  if (!nextParam) return fallback
-
-  const candidate = nextParam.trim()
-  if (!candidate || !candidate.startsWith('/') || candidate.startsWith('//')) {
-    return fallback
-  }
-
-  return candidate
-}
-
-export default function RegisterPage() {
+function RegisterPageContent() {
   const router = useRouter()
-  const { setUser } = useAuthStore()
-  const [nextAuthPath, setNextAuthPath] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const { setUser, user, isAuthenticated, hasHydrated, isBootstrapped } = useAuthStore()
+  const authReady = hasHydrated && isBootstrapped
+  const nextAuthPath = searchParams.get('next')
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    setNextAuthPath(params.get('next'))
-  }, [])
+    if (!authReady || !isAuthenticated || !user) return
+    router.replace(resolvePostAuthPath(nextAuthPath, user.role))
+  }, [authReady, isAuthenticated, nextAuthPath, router, user])
 
   const loginHref = useMemo(() => {
     if (!nextAuthPath) return '/login'
@@ -83,6 +74,8 @@ export default function RegisterPage() {
       setLoading(false)
     }
   }, [nextAuthPath, router, setUser])
+
+  if (authReady && isAuthenticated) return null
 
   return (
     <>
@@ -164,5 +157,13 @@ export default function RegisterPage() {
       </section>
       <Footer />
     </>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterPageContent />
+    </Suspense>
   )
 }

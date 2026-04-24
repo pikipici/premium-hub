@@ -1,14 +1,19 @@
 "use client"
 
-import { useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, type ReactNode, useCallback, useEffect, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+
+import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import { useAuthStore } from '@/store/authStore'
 import Navbar from '@/components/layout/Navbar'
 import DashboardSidebar from '@/components/layout/DashboardSidebar'
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, hasHydrated } = useAuthStore()
+function DashboardLayoutContent({ children }: { children: ReactNode }) {
+  const { isAuthenticated, hasHydrated, isBootstrapped } = useAuthStore()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const authReady = hasHydrated && isBootstrapped
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false
@@ -33,11 +38,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [])
 
   useEffect(() => {
-    if (!hasHydrated) return
-    if (!isAuthenticated) router.replace('/login')
-  }, [hasHydrated, isAuthenticated, router])
+    if (!authReady) return
+    if (!isAuthenticated) {
+      router.replace(buildLoginHref(buildPathWithSearch(pathname, searchParams?.toString())))
+    }
+  }, [authReady, isAuthenticated, pathname, router, searchParams])
 
-  if (!hasHydrated || !isAuthenticated) return null
+  if (!authReady || !isAuthenticated) return null
 
   return (
     <>
@@ -49,5 +56,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
     </>
+  )
+}
+
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={null}>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </Suspense>
   )
 }

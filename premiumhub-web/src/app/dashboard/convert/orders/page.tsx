@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Loader2, RefreshCcw } from 'lucide-react'
 
@@ -57,7 +57,7 @@ function assetLabel(asset: ConvertAssetType) {
   return 'Crypto'
 }
 
-export default function DashboardConvertOrdersPage() {
+function DashboardConvertOrdersPageContent() {
   const searchParams = useSearchParams()
   const currentAsset = (searchParams.get('asset') || 'all') as 'all' | ConvertAssetType
 
@@ -263,5 +263,13 @@ export default function DashboardConvertOrdersPage() {
         </section>
       ) : null}
     </div>
+  )
+}
+
+export default function DashboardConvertOrdersPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-[#888]">Memuat riwayat convert...</div>}>
+      <DashboardConvertOrdersPageContent />
+    </Suspense>
   )
 }
