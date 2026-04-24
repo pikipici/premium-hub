@@ -2,6 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"time"
@@ -18,6 +22,7 @@ import (
 
 type AuthService struct {
 	userRepo       *repository.UserRepo
+	sessionRepo    *repository.AuthSessionRepo
 	cfg            *config.Config
 	googleVerifier GoogleVerifier
 }
@@ -32,6 +37,11 @@ func NewAuthService(userRepo *repository.UserRepo, cfg *config.Config) *AuthServ
 
 func (s *AuthService) SetGoogleVerifier(verifier GoogleVerifier) {
 	s.googleVerifier = verifier
+}
+
+func (s *AuthService) SetSessionRepo(sessionRepo *repository.AuthSessionRepo) *AuthService {
+	s.sessionRepo = sessionRepo
+	return s
 }
 
 type RegisterInput struct {
@@ -53,6 +63,19 @@ type GoogleLoginInput struct {
 type AuthResponse struct {
 	User  *model.User `json:"user"`
 	Token string      `json:"token"`
+}
+
+type SessionMeta struct {
+	UserAgent string
+	IPAddress string
+}
+
+type SessionBundle struct {
+	User         *model.User
+	AccessToken  string
+	RefreshToken string
+	AccessTTL    time.Duration
+	RefreshTTL   time.Duration
 }
 
 func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
@@ -92,7 +115,7 @@ func (s *AuthService) Register(input RegisterInput) (*AuthResponse, error) {
 		return nil, errors.New("gagal membuat akun")
 	}
 
-	token, err := s.generateToken(user)
+	token, _, err := s.generateAccessToken(user)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +142,7 @@ func (s *AuthService) Login(input LoginInput) (*AuthResponse, error) {
 		return nil, errors.New("email atau password salah")
 	}
 
-	token, err := s.generateToken(user)
+	token, _, err := s.generateAccessToken(user)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +189,7 @@ func (s *AuthService) LoginWithGoogle(ctx context.Context, input GoogleLoginInpu
 		return nil, errors.New("akun diblokir")
 	}
 
-	token, err := s.generateToken(user)
+	token, _, err := s.generateAccessToken(user)
 	if err != nil {
 		return nil, err
 	}
@@ -272,19 +295,213 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, input ChangePasswordInput
 	return s.userRepo.Update(user)
 }
 
-func (s *AuthService) generateToken(user *model.User) (string, error) {
-	if s.cfg == nil {
-		return "", errors.New("config auth tidak valid")
-	}
-	if strings.TrimSpace(s.cfg.JWTSecret) == "" {
-		return "", errors.New("JWT secret belum diisi")
+func (s *AuthService) AccessTokenTTL() time.Duration {
+	if s == nil || s.cfg == nil {
+		return 24 * time.Hour
 	}
 
-	dur, _ := time.ParseDuration(s.cfg.JWTExpiry)
-	if dur == 0 {
-		dur = 24 * time.Hour
+	dur, err := time.ParseDuration(strings.TrimSpace(s.cfg.JWTExpiry))
+	if err != nil || dur <= 0 {
+		return 24 * time.Hour
 	}
-	return jwt.Generate(user.ID, user.Role, s.cfg.JWTSecret, dur)
+
+	return dur
+}
+
+func (s *AuthService) RefreshTokenTTL() time.Duration {
+	if s == nil || s.cfg == nil {
+		return 30 * 24 * time.Hour
+	}
+
+	dur, err := time.ParseDuration(strings.TrimSpace(s.cfg.RefreshTokenExpiry))
+	if err != nil || dur <= 0 {
+		return 30 * 24 * time.Hour
+	}
+
+	return dur
+}
+
+func (s *AuthService) CreateRefreshSession(user *model.User, meta SessionMeta) (string, time.Duration, error) {
+	if s.sessionRepo == nil {
+		return "", 0, errors.New("config session tidak valid")
+	}
+	if user == nil || user.ID == uuid.Nil {
+		return "", 0, errors.New("user sesi tidak valid")
+	}
+
+	refreshToken, tokenHash, err := generateSessionToken()
+	if err != nil {
+		return "", 0, errors.New("gagal membuat refresh token")
+	}
+
+	now := time.Now()
+	ttl := s.RefreshTokenTTL()
+	session := &model.AuthSession{
+		UserID:     user.ID,
+		TokenHash:  tokenHash,
+		UserAgent:  strings.TrimSpace(meta.UserAgent),
+		IPAddress:  strings.TrimSpace(meta.IPAddress),
+		LastSeenAt: &now,
+		ExpiresAt:  now.Add(ttl),
+	}
+
+	if err := s.sessionRepo.Create(session); err != nil {
+		return "", 0, errors.New("gagal menyimpan sesi login")
+	}
+
+	return refreshToken, ttl, nil
+}
+
+func (s *AuthService) RestoreSession(accessToken, refreshToken string, meta SessionMeta) (*SessionBundle, error) {
+	if strings.TrimSpace(accessToken) != "" {
+		user, err := s.getUserFromAccessToken(accessToken)
+		if err == nil {
+			bundle := &SessionBundle{User: user}
+			if err := s.ensureRefreshSession(user, strings.TrimSpace(refreshToken), meta, bundle); err != nil {
+				return nil, err
+			}
+			return bundle, nil
+		}
+	}
+
+	if strings.TrimSpace(refreshToken) == "" {
+		return nil, errors.New("sesi login tidak valid")
+	}
+
+	if s.sessionRepo == nil {
+		return nil, errors.New("config session tidak valid")
+	}
+
+	now := time.Now()
+	session, err := s.sessionRepo.FindActiveByTokenHash(hashSessionToken(strings.TrimSpace(refreshToken)), now)
+	if err != nil {
+		return nil, errors.New("sesi login tidak valid")
+	}
+
+	user, err := s.userRepo.FindByID(session.UserID)
+	if err != nil || user.ID == uuid.Nil || !user.IsActive {
+		_ = s.sessionRepo.RevokeByID(session.ID, now)
+		return nil, errors.New("sesi login tidak valid")
+	}
+
+	access, accessTTL, err := s.generateAccessToken(user)
+	if err != nil {
+		return nil, err
+	}
+
+	newRefreshToken, newHash, err := generateSessionToken()
+	if err != nil {
+		return nil, errors.New("gagal membuat refresh token")
+	}
+
+	refreshTTL := s.RefreshTokenTTL()
+	if err := s.sessionRepo.Rotate(
+		session.ID,
+		newHash,
+		strings.TrimSpace(meta.UserAgent),
+		strings.TrimSpace(meta.IPAddress),
+		now.Add(refreshTTL),
+		now,
+	); err != nil {
+		return nil, errors.New("gagal memperbarui sesi login")
+	}
+
+	return &SessionBundle{
+		User:         user,
+		AccessToken:  access,
+		RefreshToken: newRefreshToken,
+		AccessTTL:    accessTTL,
+		RefreshTTL:   refreshTTL,
+	}, nil
+}
+
+func (s *AuthService) RevokeSession(refreshToken string) error {
+	if s.sessionRepo == nil {
+		return nil
+	}
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return nil
+	}
+	return s.sessionRepo.RevokeByTokenHash(hashSessionToken(refreshToken), time.Now())
+}
+
+func (s *AuthService) ensureRefreshSession(user *model.User, refreshToken string, meta SessionMeta, bundle *SessionBundle) error {
+	if s.sessionRepo == nil || user == nil || bundle == nil {
+		return nil
+	}
+
+	refreshToken = strings.TrimSpace(refreshToken)
+	now := time.Now()
+	if refreshToken != "" {
+		session, err := s.sessionRepo.FindActiveByTokenHash(hashSessionToken(refreshToken), now)
+		if err == nil && session.UserID == user.ID {
+			_ = s.sessionRepo.Touch(session.ID, now)
+			return nil
+		}
+	}
+
+	newRefreshToken, refreshTTL, err := s.CreateRefreshSession(user, meta)
+	if err != nil {
+		return err
+	}
+
+	bundle.RefreshToken = newRefreshToken
+	bundle.RefreshTTL = refreshTTL
+	return nil
+}
+
+func (s *AuthService) getUserFromAccessToken(token string) (*model.User, error) {
+	if s.cfg == nil {
+		return nil, errors.New("config auth tidak valid")
+	}
+
+	claims, err := jwt.Validate(strings.TrimSpace(token), s.cfg.JWTSecret)
+	if err != nil {
+		return nil, errors.New("token akses tidak valid")
+	}
+
+	user, err := s.userRepo.FindByID(claims.UserID)
+	if err != nil || user.ID == uuid.Nil {
+		return nil, errors.New("user sesi tidak ditemukan")
+	}
+	if !user.IsActive {
+		return nil, errors.New("akun diblokir")
+	}
+
+	return user, nil
+}
+
+func (s *AuthService) generateAccessToken(user *model.User) (string, time.Duration, error) {
+	if s.cfg == nil {
+		return "", 0, errors.New("config auth tidak valid")
+	}
+	if strings.TrimSpace(s.cfg.JWTSecret) == "" {
+		return "", 0, errors.New("JWT secret belum diisi")
+	}
+
+	dur := s.AccessTokenTTL()
+	token, err := jwt.Generate(user.ID, user.Role, s.cfg.JWTSecret, dur)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return token, dur, nil
+}
+
+func generateSessionToken() (string, string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", "", err
+	}
+
+	token := base64.RawURLEncoding.EncodeToString(buf)
+	return token, hashSessionToken(token), nil
+}
+
+func hashSessionToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func normalizeEmail(email string) string {

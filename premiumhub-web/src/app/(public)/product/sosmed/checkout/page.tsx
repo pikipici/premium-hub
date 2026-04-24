@@ -3,9 +3,10 @@
 import axios from 'axios'
 import type { ReactNode } from 'react'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CreditCard, Landmark, QrCode, ShieldCheck, Zap } from 'lucide-react'
 
+import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatRupiah } from '@/lib/utils'
@@ -47,10 +48,12 @@ export default function SosmedCheckoutPage() {
 
 function SosmedCheckoutContent() {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const serviceCode = (searchParams.get('service') || '').trim().toLowerCase()
 
-  const { isAuthenticated, hasHydrated } = useAuthStore()
+  const { isAuthenticated, hasHydrated, isBootstrapped } = useAuthStore()
+  const authReady = hasHydrated && isBootstrapped
 
   const [service, setService] = useState<SosmedService | null>(null)
   const [targetLink, setTargetLink] = useState('')
@@ -64,11 +67,10 @@ function SosmedCheckoutContent() {
   const checkoutPrice = useMemo(() => defaultCheckoutPrice(service), [service])
 
   useEffect(() => {
-    if (!hasHydrated) return
+    if (!authReady) return
 
     if (!isAuthenticated) {
-      const next = encodeURIComponent(`/product/sosmed/checkout?service=${encodeURIComponent(serviceCode)}`)
-      router.replace(`/login?next=${next}`)
+      router.replace(buildLoginHref(buildPathWithSearch(pathname, searchParams?.toString())))
       return
     }
 
@@ -107,7 +109,7 @@ function SosmedCheckoutContent() {
     return () => {
       alive = false
     }
-  }, [hasHydrated, isAuthenticated, router, serviceCode])
+  }, [authReady, isAuthenticated, pathname, router, searchParams, serviceCode])
 
   const handleCheckout = async () => {
     if (!service) return
@@ -171,7 +173,7 @@ function SosmedCheckoutContent() {
     }
   }
 
-  if (!hasHydrated || loadingService) {
+  if (!authReady || loadingService) {
     return (
       <>
         <Navbar />

@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"premiumhub-api/config"
+	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/service"
 	"premiumhub-api/pkg/response"
 
@@ -15,6 +18,15 @@ import (
 type AuthHandler struct {
 	authSvc *service.AuthService
 	cfg     *config.Config
+}
+
+const (
+	accessTokenCookieName  = "access_token"
+	refreshTokenCookieName = "refresh_token"
+)
+
+type authSessionPayload struct {
+	User *model.User `json:"user"`
 }
 
 func NewAuthHandler(authSvc *service.AuthService, cfg *config.Config) *AuthHandler {
@@ -34,7 +46,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	h.setAuthCookie(c, res.Token, 86400)
+	if err := h.issueLoginCookies(c, res.User, res.Token); err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	response.Created(c, "Registrasi berhasil", res)
 }
 
@@ -51,7 +67,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	h.setAuthCookie(c, res.Token, 86400)
+	if err := h.issueLoginCookies(c, res.User, res.Token); err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	response.Success(c, "Login berhasil", res)
 }
 
@@ -69,13 +89,41 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 		return
 	}
 
-	h.setAuthCookie(c, res.Token, 86400)
+	if err := h.issueLoginCookies(c, res.User, res.Token); err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	response.Success(c, "Login Google berhasil", res)
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	h.setAuthCookie(c, "", -1)
+	if refreshToken, err := c.Cookie(refreshTokenCookieName); err == nil {
+		_ = h.authSvc.RevokeSession(refreshToken)
+	}
+	h.clearAuthCookies(c)
 	response.Success(c, "Logout berhasil", nil)
+}
+
+func (h *AuthHandler) Session(c *gin.Context) {
+	accessToken, _ := c.Cookie(accessTokenCookieName)
+	refreshToken, _ := c.Cookie(refreshTokenCookieName)
+
+	bundle, err := h.authSvc.RestoreSession(accessToken, refreshToken, requestSessionMeta(c))
+	if err != nil {
+		h.clearAuthCookies(c)
+		response.Unauthorized(c)
+		return
+	}
+
+	if strings.TrimSpace(bundle.AccessToken) != "" {
+		h.setAccessCookie(c, bundle.AccessToken, bundle.AccessTTL)
+	}
+	if strings.TrimSpace(bundle.RefreshToken) != "" {
+		h.setRefreshCookie(c, bundle.RefreshToken, bundle.RefreshTTL)
+	}
+
+	response.Success(c, "Session aktif", authSessionPayload{User: bundle.User})
 }
 
 func (h *AuthHandler) GetProfile(c *gin.Context) {
@@ -117,7 +165,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	response.Success(c, "Password berhasil diubah", nil)
 }
 
-func (h *AuthHandler) setAuthCookie(c *gin.Context, token string, maxAge int) {
+func (h *AuthHandler) cookieSettings() (string, bool, http.SameSite) {
 	domain := ""
 	secure := false
 	sameSite := http.SameSiteLaxMode
@@ -132,8 +180,55 @@ func (h *AuthHandler) setAuthCookie(c *gin.Context, token string, maxAge int) {
 		secure = true
 	}
 
+	return domain, secure, sameSite
+}
+
+func (h *AuthHandler) issueLoginCookies(c *gin.Context, user *model.User, accessToken string) error {
+	refreshToken, refreshTTL, err := h.authSvc.CreateRefreshSession(user, requestSessionMeta(c))
+	if err != nil {
+		return errors.New("gagal membuat sesi login")
+	}
+
+	h.setAccessCookie(c, accessToken, h.authSvc.AccessTokenTTL())
+	h.setRefreshCookie(c, refreshToken, refreshTTL)
+	return nil
+}
+
+func (h *AuthHandler) setAccessCookie(c *gin.Context, token string, ttl time.Duration) {
+	h.setCookie(c, accessTokenCookieName, token, ttl)
+}
+
+func (h *AuthHandler) setRefreshCookie(c *gin.Context, token string, ttl time.Duration) {
+	h.setCookie(c, refreshTokenCookieName, token, ttl)
+}
+
+func (h *AuthHandler) clearAuthCookies(c *gin.Context) {
+	h.setCookie(c, accessTokenCookieName, "", -1*time.Second)
+	h.setCookie(c, refreshTokenCookieName, "", -1*time.Second)
+}
+
+func (h *AuthHandler) setCookie(c *gin.Context, name, token string, ttl time.Duration) {
+	domain, secure, sameSite := h.cookieSettings()
 	c.SetSameSite(sameSite)
-	c.SetCookie("access_token", token, maxAge, "/", domain, secure, true)
+	c.SetCookie(name, token, durationToMaxAge(ttl), "/", domain, secure, true)
+}
+
+func durationToMaxAge(ttl time.Duration) int {
+	if ttl < 0 {
+		return -1
+	}
+	if ttl == 0 {
+		return 0
+	}
+
+	return int(ttl.Round(time.Second) / time.Second)
+}
+
+func requestSessionMeta(c *gin.Context) service.SessionMeta {
+	return service.SessionMeta{
+		UserAgent: strings.TrimSpace(c.GetHeader("User-Agent")),
+		IPAddress: strings.TrimSpace(c.ClientIP()),
+	}
 }
 
 func parseSameSiteMode(v string) http.SameSite {

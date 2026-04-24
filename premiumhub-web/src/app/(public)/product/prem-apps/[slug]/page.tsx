@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, usePathname, useRouter } from 'next/navigation'
 import { Check, Clock, ShieldCheck, Zap } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
+import { buildLoginHref } from '@/lib/auth'
 import { formatRupiah } from '@/lib/utils'
 import { productService } from '@/services/productService'
 import { useAuthStore } from '@/store/authStore'
@@ -149,8 +150,9 @@ function buildWaLink(product: Product, selectedPrice: ProductPrice | null) {
 
 export default function PremAppsProductDetailPage() {
   const params = useParams()
+  const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, hasHydrated, isBootstrapped } = useAuthStore()
   const { setItem } = useCartStore()
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -318,8 +320,8 @@ export default function PremAppsProductDetailPage() {
 
   const handleBuy = () => {
     if (!effectiveSelectedPrice || !product) return
-    if (!isAuthenticated) {
-      router.push('/login')
+    if (!(hasHydrated && isBootstrapped && isAuthenticated)) {
+      router.push(buildLoginHref(pathname))
       return
     }
 

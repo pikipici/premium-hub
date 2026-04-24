@@ -22,6 +22,7 @@ func InitDB(cfg *Config) *gorm.DB {
 	}
 	if err := db.AutoMigrate(
 		&model.User{},
+		&model.AuthSession{},
 		&model.AccountType{},
 		&model.ProductCategory{},
 		&model.MaintenanceRule{},

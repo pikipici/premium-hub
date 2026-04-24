@@ -30,6 +30,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	// Repositories
 	userRepo := repository.NewUserRepo(db)
+	authSessionRepo := repository.NewAuthSessionRepo(db)
 	accountTypeRepo := repository.NewAccountTypeRepo(db)
 	productRepo := repository.NewProductRepo(db)
 	productCategoryRepo := repository.NewProductCategoryRepo(db)
@@ -57,7 +58,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	}
 
 	// Services
-	authSvc := service.NewAuthService(userRepo, cfg)
+	authSvc := service.NewAuthService(userRepo, cfg).SetSessionRepo(authSessionRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
 	accountTypeSvc := service.NewAccountTypeService(accountTypeRepo)
 	productCategorySvc := service.NewProductCategoryService(productCategoryRepo)
@@ -133,6 +134,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	auth.POST("/login", authHandler.Login)
 	auth.POST("/google", authHandler.GoogleLogin)
 	auth.POST("/logout", authHandler.Logout)
+	auth.GET("/session", authHandler.Session)
 
 	products := api.Group("/products")
 	products.GET("", productHandler.List)

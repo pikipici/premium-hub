@@ -1,4 +1,5 @@
 import api from '@/lib/api'
+import { restoreSession } from '@/lib/authSession'
 import type { ApiResponse } from '@/types/api'
 import type { User } from '@/types/user'
 
@@ -22,6 +23,8 @@ export const authService = {
     const res = await api.post<ApiResponse<AuthResponse>>('/auth/google', data)
     return res.data
   },
+
+  restoreSession,
 
   logout: async () => {
     const res = await api.post<ApiResponse<null>>('/auth/logout')

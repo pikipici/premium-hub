@@ -10,7 +10,8 @@ import { useAuthStore } from '@/store/authStore'
 import { formatRupiah } from '@/lib/utils'
 
 export default function WalletBadge() {
-  const { isAuthenticated, walletBalance, setWalletBalance, hasHydrated } = useAuthStore()
+  const { isAuthenticated, walletBalance, setWalletBalance, hasHydrated, isBootstrapped } = useAuthStore()
+  const authReady = hasHydrated && isBootstrapped
 
   const { data } = useQuery({
     queryKey: ['wallet-balance-badge'],
@@ -18,7 +19,7 @@ export default function WalletBadge() {
       const res = await walletService.getBalance()
       return res.data.balance
     },
-    enabled: hasHydrated && isAuthenticated,
+    enabled: authReady && isAuthenticated,
   })
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export default function WalletBadge() {
     }
   }, [data, setWalletBalance])
 
-  if (!hasHydrated || !isAuthenticated) return null
+  if (!authReady || !isAuthenticated) return null
 
   const balance = typeof data === 'number' ? data : walletBalance
 

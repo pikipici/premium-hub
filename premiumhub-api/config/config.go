@@ -11,7 +11,7 @@ import (
 type Config struct {
 	AppPort, AppEnv                                                             string
 	DBHost, DBPort, DBUser, DBPassword, DBName                                  string
-	JWTSecret, JWTExpiry, StockCredentialKey                                    string
+	JWTSecret, JWTExpiry, RefreshTokenExpiry, StockCredentialKey                string
 	PakasirBaseURL, PakasirProject, PakasirAPIKey, PakasirHTTPTimeoutSec        string
 	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                        string
 	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                         string
@@ -66,6 +66,7 @@ func Load() *Config {
 		DBName:                               e("DB_NAME", "premiumhub"),
 		JWTSecret:                            jwtSecret,
 		JWTExpiry:                            e("JWT_EXPIRY", "24h"),
+		RefreshTokenExpiry:                   e("REFRESH_TOKEN_EXPIRY", "720h"),
 		StockCredentialKey:                   stockCredentialKey,
 		PakasirBaseURL:                       e("PAKASIR_BASE_URL", "https://app.pakasir.com"),
 		PakasirProject:                       e("PAKASIR_PROJECT", ""),

@@ -128,7 +128,7 @@ const paymentMethodLabel = (method: string) => {
 
 export default function LandingPage() {
   const [landingSummary, setLandingSummary] = useState<NokosLandingSummary | null>(null)
-  const { isAuthenticated, hasHydrated } = useAuthStore()
+  const { isAuthenticated, hasHydrated, isBootstrapped } = useAuthStore()
 
   useEffect(() => {
     let canceled = false
@@ -186,7 +186,7 @@ export default function LandingPage() {
   const nokosDashboardHref = '/dashboard/nokos'
   const registerNokosHref = `/register?next=${encodeURIComponent(nokosDashboardHref)}`
   const loginNokosHref = `/login?next=${encodeURIComponent(nokosDashboardHref)}`
-  const isReady = hasHydrated
+  const isReady = hasHydrated && isBootstrapped
   const isLoggedIn = isReady && isAuthenticated
 
   const heroPrimaryCta = isLoggedIn

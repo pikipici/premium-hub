@@ -51,7 +51,7 @@ function firstName(name?: string | null) {
 
 export default function Navbar() {
   const pathname = usePathname()
-  const { user, isAuthenticated, logout, hasHydrated } = useAuthStore()
+  const { user, isAuthenticated, logout, hasHydrated, isBootstrapped } = useAuthStore()
 
   const [open, setOpen] = useState(false)
   const [logouting, setLogouting] = useState(false)
@@ -64,7 +64,8 @@ export default function Navbar() {
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
 
-  const showAuthenticated = hasHydrated && isAuthenticated
+  const authReady = hasHydrated && isBootstrapped
+  const showAuthenticated = authReady && isAuthenticated
   const isAdminUser = showAuthenticated && user?.role === 'admin'
   const isDashboardSurface =
     pathname === '/dashboard' ||

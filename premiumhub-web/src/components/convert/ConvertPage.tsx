@@ -128,8 +128,8 @@ type ConvertPageProps = {
 }
 
 export default function ConvertPage({ assetType: forcedAssetType = 'pulsa' }: ConvertPageProps) {
-  const { isAuthenticated, hasHydrated, user } = useAuthStore()
-  const isMember = hasHydrated && isAuthenticated
+  const { isAuthenticated, hasHydrated, isBootstrapped, user } = useAuthStore()
+  const isMember = hasHydrated && isBootstrapped && isAuthenticated
 
   const pathname = usePathname()
   const router = useRouter()

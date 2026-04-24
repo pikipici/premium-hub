@@ -7,10 +7,12 @@ interface AuthState {
   isAuthenticated: boolean
   walletBalance: number
   hasHydrated: boolean
+  isBootstrapped: boolean
   setUser: (u: User | null) => void
   setWalletBalance: (balance: number) => void
   logout: () => void
   setHasHydrated: (value: boolean) => void
+  setBootstrapped: (value: boolean) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -20,10 +22,12 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       walletBalance: 0,
       hasHydrated: false,
-      setUser: (user) => set({ user, isAuthenticated: !!user, walletBalance: 0 }),
+      isBootstrapped: false,
+      setUser: (user) => set({ user, isAuthenticated: !!user, walletBalance: 0, isBootstrapped: true }),
       setWalletBalance: (walletBalance) => set({ walletBalance }),
       logout: () => set({ user: null, isAuthenticated: false, walletBalance: 0 }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+      setBootstrapped: (isBootstrapped) => set({ isBootstrapped }),
     }),
     {
       name: 'premiumhub-auth',

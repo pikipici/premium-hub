@@ -3,9 +3,10 @@
 import axios from 'axios'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { CreditCard, Landmark, QrCode, ShieldCheck, Wallet, Zap } from 'lucide-react'
 
+import { buildLoginHref } from '@/lib/auth'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatRupiah } from '@/lib/utils'
@@ -27,8 +28,10 @@ const PAKASIR_METHOD_OPTIONS: Array<{ key: PakasirMethod; label: string; hint: s
 
 export default function CheckoutPage() {
   const router = useRouter()
+  const pathname = usePathname()
   const { item, clearCart } = useCartStore()
-  const { isAuthenticated, hasHydrated, walletBalance, setWalletBalance } = useAuthStore()
+  const { isAuthenticated, hasHydrated, isBootstrapped, walletBalance, setWalletBalance } = useAuthStore()
+  const authReady = hasHydrated && isBootstrapped
 
   const [checkoutMethod, setCheckoutMethod] = useState<CheckoutMethod>('pakasir')
   const [pakasirMethod, setPakasirMethod] = useState<PakasirMethod>('qris')
@@ -38,20 +41,20 @@ export default function CheckoutPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!hasHydrated) return
+    if (!authReady) return
 
     if (!isAuthenticated) {
-      router.replace('/login')
+      router.replace(buildLoginHref(pathname))
       return
     }
 
     if (!item && !redirectingAfterCheckout) {
       router.replace('/product/prem-apps')
     }
-  }, [hasHydrated, isAuthenticated, item, redirectingAfterCheckout, router])
+  }, [authReady, isAuthenticated, item, pathname, redirectingAfterCheckout, router])
 
   useEffect(() => {
-    if (!hasHydrated || !isAuthenticated) return
+    if (!authReady || !isAuthenticated) return
 
     let cancelled = false
     setWalletLoading(true)
@@ -73,7 +76,7 @@ export default function CheckoutPage() {
     return () => {
       cancelled = true
     }
-  }, [hasHydrated, isAuthenticated, setWalletBalance])
+  }, [authReady, isAuthenticated, setWalletBalance])
 
   const walletSufficient = useMemo(() => {
     if (!item) return false
@@ -145,7 +148,7 @@ export default function CheckoutPage() {
     }
   }
 
-  if (!hasHydrated || !item) return null
+  if (!authReady || !item) return null
 
   return (
     <>
