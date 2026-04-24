@@ -36,6 +36,10 @@ type SosmedServiceFormState = {
   is_active: boolean
 }
 
+type ImportJAPFormState = {
+  service_ids_text: string
+}
+
 const THEME_OPTIONS = [
   { value: 'blue', label: 'Blue' },
   { value: 'pink', label: 'Pink' },
@@ -132,6 +136,15 @@ function parseTrustBadges(value: string) {
   return [...new Set(parts)].slice(0, 8)
 }
 
+function parseJAPServiceIds(value: string) {
+  return [...new Set(
+    value
+      .split(/[\s,]+/)
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isInteger(item) && item > 0)
+  )]
+}
+
 function formatRupiah(value: number) {
   return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
 }
@@ -194,6 +207,8 @@ export default function SosmedServiceSettingsCard() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<SosmedService | null>(null)
   const [detailTarget, setDetailTarget] = useState<SosmedService | null>(null)
+  const [importJAPOpen, setImportJAPOpen] = useState(false)
+  const [importJAPForm, setImportJAPForm] = useState<ImportJAPFormState>({ service_ids_text: '' })
 
   const categoryOptions = useMemo(
     () => categories.sort((left, right) => (left.sort_order || 100) - (right.sort_order || 100)),
@@ -256,7 +271,7 @@ export default function SosmedServiceSettingsCard() {
   }, [loadData])
 
   useEffect(() => {
-    if (!formOpen && !confirmOpen && !detailTarget) return
+    if (!formOpen && !confirmOpen && !detailTarget && !importJAPOpen) return
 
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -264,7 +279,7 @@ export default function SosmedServiceSettingsCard() {
     return () => {
       document.body.style.overflow = previousOverflow
     }
-  }, [confirmOpen, detailTarget, formOpen])
+  }, [confirmOpen, detailTarget, formOpen, importJAPOpen])
 
   const openCreateForm = () => {
     setFormMode('create')
@@ -305,6 +320,18 @@ export default function SosmedServiceSettingsCard() {
     setFormOpen(false)
     setEditingItem(null)
     setForm(createEmptyForm(defaultCategoryCode))
+  }
+
+  const openImportJAPForm = () => {
+    setImportJAPForm({ service_ids_text: '' })
+    setError('')
+    setImportJAPOpen(true)
+  }
+
+  const closeImportJAPForm = () => {
+    if (saving) return
+    setImportJAPOpen(false)
+    setImportJAPForm({ service_ids_text: '' })
   }
 
   const submitForm = async () => {
@@ -498,6 +525,46 @@ export default function SosmedServiceSettingsCard() {
     }
   }
 
+  const importSelectedJAPServices = async () => {
+    const serviceIds = parseJAPServiceIds(importJAPForm.service_ids_text)
+    if (serviceIds.length === 0) {
+      setError('Masukin minimal satu service ID JAP yang valid')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+
+    try {
+      const res = await sosmedService.adminImportJAPSelected({ service_ids: serviceIds })
+      if (!res.success) {
+        setError(res.message || 'Gagal import layanan JAP')
+        return
+      }
+
+      const data = res.data
+      const importedTitles = (data.items || [])
+        .slice(0, 3)
+        .map((item) => item.title)
+        .filter(Boolean)
+        .join(', ')
+
+      const importedSuffix = importedTitles ? ` • ${importedTitles}` : ''
+      const warningSuffix = data.warning ? ` • ${data.warning}` : ''
+      const notFoundSuffix = data.not_found?.length ? ` • Tidak ketemu: ${data.not_found.join(', ')}` : ''
+
+      setNotice(
+        `Import JAP selesai. Dibuat ${data.created}, diperbarui ${data.updated}, dilewati ${data.skipped}.${importedSuffix}${warningSuffix}${notFoundSuffix}`
+      )
+      closeImportJAPForm()
+      await loadData()
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal import layanan JAP'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <>
       <div className="card" style={{ marginBottom: 12 }}>
@@ -545,6 +612,9 @@ export default function SosmedServiceSettingsCard() {
 
             <button className="topbar-btn primary" type="button" onClick={openCreateForm} disabled={saving}>
               + Tambah Layanan
+            </button>
+            <button className="topbar-btn" type="button" onClick={openImportJAPForm} disabled={saving || loading}>
+              Import JAP Pilihan
             </button>
           </div>
         </div>
@@ -635,6 +705,54 @@ export default function SosmedServiceSettingsCard() {
           )}
         </div>
       </div>
+
+      {importJAPOpen && (
+        <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={closeImportJAPForm}>
+          <div
+            className="modal-card"
+            style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(560px, 96vw)' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head" style={MODAL_HEAD_STYLE}>
+              <div>
+                <h3>Import Layanan JAP Pilihan</h3>
+                <div className="modal-sub" style={MODAL_SUB_STYLE}>
+                  Masukin ID JAP dipisah koma atau spasi. Service bakal masuk sebagai draft nonaktif.
+                </div>
+              </div>
+              <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={closeImportJAPForm}>×</button>
+            </div>
+
+            <div className="modal-body" style={MODAL_BODY_STYLE}>
+              <div>
+                <label className="form-label">Service IDs JAP</label>
+                <textarea
+                  className="form-textarea"
+                  rows={5}
+                  value={importJAPForm.service_ids_text}
+                  onChange={(event) =>
+                    setImportJAPForm((prev) => ({ ...prev, service_ids_text: event.target.value }))
+                  }
+                  placeholder="Contoh: 6331, 10242, 8695"
+                />
+              </div>
+
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                Import ini otomatis nyimpen nama mentah provider, mapping kategori lokal, harga reseller IDR, dan status awal nonaktif.
+              </div>
+            </div>
+
+            <div className="modal-actions" style={MODAL_ACTIONS_STYLE}>
+              <button className="action-btn" type="button" onClick={closeImportJAPForm} disabled={saving}>
+                Batal
+              </button>
+              <button className="topbar-btn primary" type="button" onClick={importSelectedJAPServices} disabled={saving}>
+                {saving ? 'Mengimpor...' : 'Import Draft JAP'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {formOpen && (
         <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={closeForm}>
@@ -902,6 +1020,38 @@ export default function SosmedServiceSettingsCard() {
                           }}
                         >
                           {detailTarget.provider_title}
+                        </div>
+                      </div>
+                    )}
+                    {(detailTarget.provider_code || detailTarget.provider_service_id || detailTarget.provider_rate) && (
+                      <div style={{ marginTop: 6 }}>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>Metadata Provider</div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            border: '1px solid var(--line, #E5E7EB)',
+                            borderRadius: 8,
+                            padding: '6px 8px',
+                            background: '#fff',
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          <div>
+                            {(detailTarget.provider_code || '-').toUpperCase()}
+                            {detailTarget.provider_service_id ? ` #${detailTarget.provider_service_id}` : ''}
+                            {detailTarget.provider_type ? ` • ${detailTarget.provider_type}` : ''}
+                          </div>
+                          <div style={{ color: 'var(--muted)' }}>
+                            {detailTarget.provider_category || '-'}
+                            {detailTarget.provider_rate ? ` • ${detailTarget.provider_currency || 'USD'} ${detailTarget.provider_rate}` : ''}
+                          </div>
+                          <div style={{ color: 'var(--muted)' }}>
+                            Refill: {detailTarget.provider_refill_supported ? 'Ya' : 'Tidak'}
+                            {' • '}
+                            Cancel: {detailTarget.provider_cancel_supported ? 'Ya' : 'Tidak'}
+                            {' • '}
+                            Dripfeed: {detailTarget.provider_dripfeed_supported ? 'Ya' : 'Tidak'}
+                          </div>
                         </div>
                       </div>
                     )}

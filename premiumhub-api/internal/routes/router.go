@@ -70,6 +70,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			cfg.SosmedResellerFXLiveTimeout,
 		))
 	japSvc := service.NewJAPService(cfg, nil)
+	sosmedServiceSvc.SetJAPCatalogProvider(japSvc)
 	sosmedOrderSvc := service.NewSosmedOrderService(sosmedOrderRepo, sosmedServiceRepo, notifRepo)
 	sosmedPaymentSvc := service.NewSosmedPaymentServiceWithGateway(cfg, sosmedOrderRepo, sosmedOrderSvc, nil)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo).
@@ -281,6 +282,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.GET("/sosmed/provider/jap/balance", japHandler.GetBalance)
 	admin.GET("/sosmed/provider/jap/services", japHandler.GetServices)
 	admin.POST("/sosmed/services", sosmedServiceHandler.Create)
+	admin.POST("/sosmed/services/import-jap-selected", sosmedServiceHandler.ImportSelectedFromJAP)
 	admin.POST("/sosmed/services/reprice-reseller", sosmedServiceHandler.RepriceReseller)
 	admin.PUT("/sosmed/services/:id", sosmedServiceHandler.Update)
 	admin.DELETE("/sosmed/services/:id", sosmedServiceHandler.Delete)

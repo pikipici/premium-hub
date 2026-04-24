@@ -5,7 +5,16 @@ export interface SosmedService {
   category_code: string
   code: string
   title: string
+  provider_code?: string
+  provider_service_id?: string
   provider_title?: string
+  provider_category?: string
+  provider_type?: string
+  provider_rate?: string
+  provider_currency?: string
+  provider_refill_supported?: boolean
+  provider_cancel_supported?: boolean
+  provider_dripfeed_supported?: boolean
   summary?: string
   platform_label?: string
   badge_text?: string

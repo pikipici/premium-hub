@@ -9,6 +9,15 @@ import (
 	"premiumhub-api/internal/repository"
 )
 
+type staticJAPCatalogProvider struct {
+	items []JAPServiceItem
+	err   error
+}
+
+func (p staticJAPCatalogProvider) GetServices(context.Context) ([]JAPServiceItem, error) {
+	return p.items, p.err
+}
+
 func seedSosmedCategory(t *testing.T, repo *repository.ProductCategoryRepo, code, label string, sortOrder int) {
 	t.Helper()
 
@@ -361,5 +370,109 @@ func TestSosmedService_FormatterHelpers(t *testing.T) {
 	}
 	if got := formatSosmedETAValue("Up to 5M/D"); got != "Hingga 5 jt/hari" {
 		t.Fatalf("format eta up-to daily: expected %q, got %q", "Hingga 5 jt/hari", got)
+	}
+}
+
+func TestSosmedService_ImportSelectedFromJAP_CreatesDrafts(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(&model.ProductCategory{}, &model.SosmedService{}); err != nil {
+		t.Fatalf("migrate sosmed models: %v", err)
+	}
+
+	categoryRepo := repository.NewProductCategoryRepo(db)
+	seedSosmedCategory(t, categoryRepo, "followers", "Followers", 10)
+
+	repo := repository.NewSosmedServiceRepo(db)
+	svc := NewSosmedServiceService(repo, categoryRepo).
+		SetResellerFXConfig(SosmedResellerFXConfig{
+			Mode:      "fixed",
+			FixedRate: 17000,
+		}).
+		SetJAPCatalogProvider(staticJAPCatalogProvider{
+			items: []JAPServiceItem{
+				{
+					Service:  "6331",
+					Name:     "Instagram Followers [Refill: 30D] [Max: 50K] [Start Time: 2 Hours] [Speed: 30K/Day]💧♻️",
+					Type:     "Default",
+					Category: "Instagram Followers [Guaranteed]",
+					Rate:     "0.375",
+					Min:      "10",
+					Max:      "1000000",
+					Dripfeed: true,
+					Refill:   true,
+					Cancel:   false,
+				},
+				{
+					Service:  "8695",
+					Name:     "Twitter Followers [Refill: No] [Max: 10K] [Start Time: 0-3 Hrs] [Speed: 5K/D] 💧",
+					Type:     "Default",
+					Category: "X - Twitter Followers",
+					Rate:     "0.50",
+					Min:      "10",
+					Max:      "1000000",
+					Dripfeed: true,
+					Refill:   false,
+					Cancel:   false,
+				},
+			},
+		})
+
+	res, err := svc.ImportSelectedFromJAP(context.Background(), ImportSelectedJAPServicesInput{
+		ServiceIDs: []int64{6331, 8695},
+	})
+	if err != nil {
+		t.Fatalf("import selected JAP: %v", err)
+	}
+	if res.Created != 2 || res.Updated != 0 || res.Skipped != 0 {
+		t.Fatalf("unexpected import result: %+v", res)
+	}
+
+	insta, err := repo.FindByProvider("jap", "6331")
+	if err != nil {
+		t.Fatalf("find instagram draft: %v", err)
+	}
+	if insta.Code != "jap-ig-followers-r30-6331" {
+		t.Fatalf("unexpected instagram code: %s", insta.Code)
+	}
+	if insta.Title != "Instagram Followers Refill 30 Hari" {
+		t.Fatalf("unexpected instagram title: %s", insta.Title)
+	}
+	if insta.PlatformLabel != "Instagram" {
+		t.Fatalf("unexpected instagram platform: %s", insta.PlatformLabel)
+	}
+	if insta.Refill != "30 Hari" {
+		t.Fatalf("unexpected instagram refill: %s", insta.Refill)
+	}
+	if insta.StartTime != "2 Jam" {
+		t.Fatalf("unexpected instagram start time: %s", insta.StartTime)
+	}
+	if insta.ETA != "30 rb/hari" {
+		t.Fatalf("unexpected instagram eta: %s", insta.ETA)
+	}
+	if insta.CheckoutPrice != 0 || insta.IsActive {
+		t.Fatalf("instagram draft should stay inactive with zero checkout price")
+	}
+	if !strings.Contains(insta.PricePer1K, "USD 0.375") {
+		t.Fatalf("expected instagram price_per_1k to keep USD marker, got %s", insta.PricePer1K)
+	}
+
+	twitter, err := repo.FindByProvider("jap", "8695")
+	if err != nil {
+		t.Fatalf("find twitter draft: %v", err)
+	}
+	if twitter.Code != "jap-x-followers-8695" {
+		t.Fatalf("unexpected twitter code: %s", twitter.Code)
+	}
+	if twitter.Title != "Twitter Followers" {
+		t.Fatalf("unexpected twitter title: %s", twitter.Title)
+	}
+	if twitter.PlatformLabel != "X / Twitter" {
+		t.Fatalf("unexpected twitter platform: %s", twitter.PlatformLabel)
+	}
+	if twitter.Refill != "Tidak Ada" {
+		t.Fatalf("unexpected twitter refill: %s", twitter.Refill)
+	}
+	if twitter.ProviderRate != "0.5" {
+		t.Fatalf("unexpected twitter provider rate: %s", twitter.ProviderRate)
 	}
 }

@@ -55,6 +55,7 @@ type JAPServiceItem struct {
 	Rate     string       `json:"rate"`
 	Min      string       `json:"min"`
 	Max      string       `json:"max"`
+	Dripfeed bool         `json:"dripfeed"`
 	Refill   bool         `json:"refill"`
 	Cancel   bool         `json:"cancel"`
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"regexp"
@@ -30,8 +31,13 @@ var sosmedServiceAllowedThemes = map[string]struct{}{
 type SosmedServiceService struct {
 	repo                 *repository.SosmedServiceRepo
 	productCategorySvc   *ProductCategoryService
+	japCatalogProvider   SosmedJAPCatalogProvider
 	resellerFXConfig     SosmedResellerFXConfig
 	resellerFXHTTPClient *http.Client
+}
+
+type SosmedJAPCatalogProvider interface {
+	GetServices(ctx context.Context) ([]JAPServiceItem, error)
 }
 
 func NewSosmedServiceService(
@@ -52,6 +58,11 @@ func NewSosmedServiceService(
 	}
 	svc.resellerFXHTTPClient = &http.Client{Timeout: svc.resellerFXConfig.LiveTimeout}
 	return svc
+}
+
+func (s *SosmedServiceService) SetJAPCatalogProvider(provider SosmedJAPCatalogProvider) *SosmedServiceService {
+	s.japCatalogProvider = provider
+	return s
 }
 
 type CreateSosmedServiceInput struct {

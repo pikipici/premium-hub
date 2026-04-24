@@ -38,6 +38,14 @@ func (r *SosmedServiceRepo) FindByCode(code string) (*model.SosmedService, error
 	return &item, err
 }
 
+func (r *SosmedServiceRepo) FindByProvider(providerCode, providerServiceID string) (*model.SosmedService, error) {
+	var item model.SosmedService
+	err := r.db.
+		Where("provider_code = ? AND provider_service_id = ?", providerCode, providerServiceID).
+		First(&item).Error
+	return &item, err
+}
+
 func (r *SosmedServiceRepo) Create(item *model.SosmedService) error {
 	return r.db.Create(item).Error
 }
