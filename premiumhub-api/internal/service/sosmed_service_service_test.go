@@ -475,4 +475,7 @@ func TestSosmedService_ImportSelectedFromJAP_CreatesDrafts(t *testing.T) {
 	if twitter.ProviderRate != "0.5" {
 		t.Fatalf("unexpected twitter provider rate: %s", twitter.ProviderRate)
 	}
+	if twitter.IsActive {
+		t.Fatalf("twitter draft should stay inactive after import")
+	}
 }

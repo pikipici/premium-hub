@@ -47,7 +47,7 @@ func (r *SosmedServiceRepo) FindByProvider(providerCode, providerServiceID strin
 }
 
 func (r *SosmedServiceRepo) Create(item *model.SosmedService) error {
-	return r.db.Create(item).Error
+	return r.db.Select("*").Create(item).Error
 }
 
 func (r *SosmedServiceRepo) Update(item *model.SosmedService) error {

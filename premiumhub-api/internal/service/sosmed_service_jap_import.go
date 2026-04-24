@@ -251,7 +251,7 @@ func mergeImportedJAPDraft(existing *model.SosmedService, draft *model.SosmedSer
 		return
 	}
 
-	preserveUserFacing := existing.CheckoutPrice > 0 || existing.IsActive
+	preserveUserFacing := existing.CheckoutPrice > 0
 
 	existing.ProviderCode = draft.ProviderCode
 	existing.ProviderServiceID = draft.ProviderServiceID
