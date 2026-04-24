@@ -13,6 +13,7 @@ type Config struct {
 	DBHost, DBPort, DBUser, DBPassword, DBName                                  string
 	JWTSecret, JWTExpiry, RefreshTokenExpiry, StockCredentialKey                string
 	PakasirBaseURL, PakasirProject, PakasirAPIKey, PakasirHTTPTimeoutSec        string
+	JAPAPIURL, JAPAPIKey, JAPHTTPTimeoutSec                                     string
 	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                        string
 	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                         string
 	FiveSimReconcileWorkerInterval, FiveSimReconcileWorkerBatchLimit            string
@@ -72,6 +73,9 @@ func Load() *Config {
 		PakasirProject:                       e("PAKASIR_PROJECT", ""),
 		PakasirAPIKey:                        e("PAKASIR_API_KEY", ""),
 		PakasirHTTPTimeoutSec:                e("PAKASIR_HTTP_TIMEOUT_SEC", "12"),
+		JAPAPIURL:                            e("JAP_API_URL", "https://justanotherpanel.com/api/v2"),
+		JAPAPIKey:                            e("JAP_API_KEY", ""),
+		JAPHTTPTimeoutSec:                    e("JAP_HTTP_TIMEOUT_SEC", "15"),
 		FiveSimBaseURL:                       e("FIVESIM_BASE_URL", "https://5sim.net/v1"),
 		FiveSimAPIKey:                        e("FIVESIM_API_KEY", ""),
 		FiveSimHTTPTimeoutSec:                e("FIVESIM_HTTP_TIMEOUT_SEC", "15"),

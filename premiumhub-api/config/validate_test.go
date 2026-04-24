@@ -86,6 +86,25 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject malformed jap config", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:              "development",
+			JWTSecret:           "super-secure-secret-value-32chars++",
+			CookieSameSite:      "lax",
+			AuthRateLimitMax:    "20",
+			AuthRateLimitWindow: "1m",
+			JAPAPIURL:           "ftp://invalid-jap-endpoint",
+			JAPHTTPTimeoutSec:   "300",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected JAP config validation error")
+		}
+		if !strings.Contains(err.Error(), "JAP_API_URL") || !strings.Contains(err.Error(), "JAP_HTTP_TIMEOUT_SEC") {
+			t.Fatalf("expected JAP config errors, got: %v", err)
+		}
+	})
+
 	t.Run("reject invalid fivesim wallet debit config", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:                       "development",

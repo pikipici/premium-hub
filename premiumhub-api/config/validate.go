@@ -56,6 +56,17 @@ func (c *Config) Validate() error {
 			problems = append(problems, "PAKASIR_BASE_URL tidak valid: "+err.Error())
 		}
 	}
+	if v := strings.TrimSpace(c.JAPHTTPTimeoutSec); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 120 {
+			problems = append(problems, "JAP_HTTP_TIMEOUT_SEC harus angka 1-120")
+		}
+	}
+	if v := strings.TrimSpace(c.JAPAPIURL); v != "" {
+		if err := validateHTTPURL(v); err != nil {
+			problems = append(problems, "JAP_API_URL tidak valid: "+err.Error())
+		}
+	}
 
 	if v := strings.TrimSpace(c.WalletTopupReconcileWorkerInterval); v != "" {
 		if _, err := time.ParseDuration(v); err != nil {

@@ -69,6 +69,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			cfg.SosmedResellerFXLiveURL,
 			cfg.SosmedResellerFXLiveTimeout,
 		))
+	japSvc := service.NewJAPService(cfg, nil)
 	sosmedOrderSvc := service.NewSosmedOrderService(sosmedOrderRepo, sosmedServiceRepo, notifRepo)
 	sosmedPaymentSvc := service.NewSosmedPaymentServiceWithGateway(cfg, sosmedOrderRepo, sosmedOrderSvc, nil)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo).
@@ -118,6 +119,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	accountTypeHandler := handler.NewAccountTypeHandler(accountTypeSvc)
 	productCategoryHandler := handler.NewProductCategoryHandler(productCategorySvc)
 	sosmedServiceHandler := handler.NewSosmedServiceHandler(sosmedServiceSvc)
+	japHandler := handler.NewJAPHandler(japSvc)
 	sosmedOrderHandler := handler.NewSosmedOrderHandler(sosmedOrderSvc)
 	sosmedPaymentHandler := handler.NewSosmedPaymentHandler(sosmedPaymentSvc)
 	maintenanceHandler := handler.NewMaintenanceHandler(maintenanceSvc)
@@ -276,6 +278,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.DELETE("/product-categories/:id", productCategoryHandler.Delete)
 
 	admin.GET("/sosmed/services", sosmedServiceHandler.AdminList)
+	admin.GET("/sosmed/provider/jap/balance", japHandler.GetBalance)
+	admin.GET("/sosmed/provider/jap/services", japHandler.GetServices)
 	admin.POST("/sosmed/services", sosmedServiceHandler.Create)
 	admin.POST("/sosmed/services/reprice-reseller", sosmedServiceHandler.RepriceReseller)
 	admin.PUT("/sosmed/services/:id", sosmedServiceHandler.Update)
