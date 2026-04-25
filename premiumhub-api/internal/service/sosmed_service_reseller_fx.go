@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"premiumhub-api/internal/model"
 )
 
 const (
@@ -19,6 +21,7 @@ const (
 	defaultSosmedResellerFXRate      = 17000
 	defaultSosmedResellerFXLiveURL   = "https://open.er-api.com/v6/latest/USD"
 	defaultSosmedResellerFXCodePrefx = "jap-"
+	defaultSosmedResellerProvider    = sosmedJAPProviderCode
 )
 
 type sosmedTextReplacement struct {
@@ -63,6 +66,7 @@ type RepriceSosmedResellerInput struct {
 	FixedRate       *float64 `json:"fixed_rate"`
 	IncludeInactive *bool    `json:"include_inactive"`
 	CodePrefix      string   `json:"code_prefix"`
+	ProviderCode    string   `json:"provider_code"`
 	DryRun          bool     `json:"dry_run"`
 }
 
@@ -72,6 +76,7 @@ type RepriceSosmedResellerResult struct {
 	RateUsed        float64 `json:"rate_used"`
 	Warning         string  `json:"warning,omitempty"`
 	CodePrefix      string  `json:"code_prefix"`
+	ProviderCode    string  `json:"provider_code"`
 	IncludeInactive bool    `json:"include_inactive"`
 	DryRun          bool    `json:"dry_run"`
 	Total           int     `json:"total"`
@@ -132,8 +137,12 @@ func (s *SosmedServiceService) RepriceResellerToIDR(ctx context.Context, input R
 	}
 
 	codePrefix := strings.TrimSpace(strings.ToLower(input.CodePrefix))
+	providerCode := strings.TrimSpace(strings.ToLower(input.ProviderCode))
 	if codePrefix == "" {
 		codePrefix = defaultSosmedResellerFXCodePrefx
+	}
+	if providerCode == "" {
+		providerCode = defaultSosmedResellerProvider
 	}
 
 	items, err := s.repo.List(includeInactive)
@@ -152,6 +161,7 @@ func (s *SosmedServiceService) RepriceResellerToIDR(ctx context.Context, input R
 		RateUsed:        rateUsed,
 		Warning:         warning,
 		CodePrefix:      codePrefix,
+		ProviderCode:    providerCode,
 		IncludeInactive: includeInactive,
 		DryRun:          input.DryRun,
 		Total:           len(items),
@@ -159,7 +169,7 @@ func (s *SosmedServiceService) RepriceResellerToIDR(ctx context.Context, input R
 
 	for idx := range items {
 		item := &items[idx]
-		if codePrefix != "" && !strings.HasPrefix(strings.ToLower(item.Code), codePrefix) {
+		if !matchesSosmedResellerCandidate(*item, providerCode, codePrefix) {
 			result.Skipped++
 			continue
 		}
@@ -181,7 +191,7 @@ func (s *SosmedServiceService) RepriceResellerToIDR(ctx context.Context, input R
 
 		priceStart := fmt.Sprintf("Reseller Rp %s/1K", idrText)
 		pricePer1K := fmt.Sprintf("Reseller Rp %s per 1K • USD %s", idrText, usdText)
-		if suffix := extractSosmedServiceNumericSuffix(item.Code); suffix != "" {
+		if suffix := extractSosmedProviderServiceID(*item); suffix != "" {
 			pricePer1K += fmt.Sprintf(" • JAP#%s", suffix)
 		}
 
@@ -190,7 +200,7 @@ func (s *SosmedServiceService) RepriceResellerToIDR(ctx context.Context, input R
 		nextRefill := item.Refill
 		nextETA := item.ETA
 
-		if shouldFormatSosmedProviderCopy(item.Code) {
+		if shouldFormatSosmedProviderCopy(*item) {
 			providerTitle := strings.TrimSpace(item.ProviderTitle)
 			if providerTitle == "" {
 				providerTitle = strings.TrimSpace(item.Title)
@@ -329,8 +339,18 @@ func (s *SosmedServiceService) fetchLiveUSDtoIDR(ctx context.Context) (float64, 
 	return rate, nil
 }
 
-func shouldFormatSosmedProviderCopy(code string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(code)), defaultSosmedResellerFXCodePrefx)
+func matchesSosmedResellerCandidate(item model.SosmedService, providerCode, codePrefix string) bool {
+	if providerCode != "" && strings.EqualFold(strings.TrimSpace(item.ProviderCode), providerCode) {
+		return true
+	}
+	if codePrefix != "" && strings.HasPrefix(strings.ToLower(strings.TrimSpace(item.Code)), codePrefix) {
+		return true
+	}
+	return false
+}
+
+func shouldFormatSosmedProviderCopy(item model.SosmedService) bool {
+	return matchesSosmedResellerCandidate(item, defaultSosmedResellerProvider, defaultSosmedResellerFXCodePrefx)
 }
 
 func formatSosmedDisplayTitle(providerTitle string) string {
@@ -531,4 +551,11 @@ func extractSosmedServiceNumericSuffix(code string) string {
 		return ""
 	}
 	return match[1]
+}
+
+func extractSosmedProviderServiceID(item model.SosmedService) string {
+	if value := strings.TrimSpace(item.ProviderServiceID); value != "" {
+		return value
+	}
+	return extractSosmedServiceNumericSuffix(item.Code)
 }

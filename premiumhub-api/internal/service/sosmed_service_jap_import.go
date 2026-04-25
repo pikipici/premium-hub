@@ -29,6 +29,48 @@ type ImportSelectedJAPServicesInput struct {
 	ServiceIDs []int64 `json:"service_ids"`
 }
 
+type PreviewSelectedJAPServicesResult struct {
+	Mode       string                         `json:"mode"`
+	RateSource string                         `json:"rate_source"`
+	RateUsed   float64                        `json:"rate_used"`
+	Warning    string                         `json:"warning,omitempty"`
+	Requested  int                            `json:"requested"`
+	Matched    int                            `json:"matched"`
+	NotFound   []string                       `json:"not_found"`
+	Items      []PreviewSelectedJAPServiceRow `json:"items"`
+}
+
+type PreviewSelectedJAPServiceRow struct {
+	ServiceID                string   `json:"service_id"`
+	ProviderName             string   `json:"provider_name"`
+	ProviderCategory         string   `json:"provider_category"`
+	ProviderType             string   `json:"provider_type"`
+	ProviderRate             string   `json:"provider_rate"`
+	ProviderCurrency         string   `json:"provider_currency"`
+	Min                      string   `json:"min"`
+	Max                      string   `json:"max"`
+	RefillSupported          bool     `json:"refill_supported"`
+	CancelSupported          bool     `json:"cancel_supported"`
+	DripfeedSupported        bool     `json:"dripfeed_supported"`
+	LocalCode                string   `json:"local_code"`
+	LocalTitle               string   `json:"local_title"`
+	LocalCategoryCode        string   `json:"local_category_code"`
+	PlatformLabel            string   `json:"platform_label"`
+	PriceStart               string   `json:"price_start"`
+	PricePer1K               string   `json:"price_per_1k"`
+	StartTime                string   `json:"start_time"`
+	ETA                      string   `json:"eta"`
+	Refill                   string   `json:"refill"`
+	FulfillmentMode          string   `json:"fulfillment_mode"`
+	RequiredOrderFields      []string `json:"required_order_fields"`
+	OptionalOrderFields      []string `json:"optional_order_fields"`
+	SupportedForInitialOrder bool     `json:"supported_for_initial_order"`
+	ExistingID               string   `json:"existing_id,omitempty"`
+	ExistingCode             string   `json:"existing_code,omitempty"`
+	ExistingActive           bool     `json:"existing_active,omitempty"`
+	Warnings                 []string `json:"warnings"`
+}
+
 type ImportSelectedJAPServicesResult struct {
 	Mode       string                `json:"mode"`
 	RateSource string                `json:"rate_source"`
@@ -40,6 +82,83 @@ type ImportSelectedJAPServicesResult struct {
 	Skipped    int                   `json:"skipped"`
 	NotFound   []string              `json:"not_found"`
 	Items      []model.SosmedService `json:"items"`
+}
+
+func (s *SosmedServiceService) PreviewSelectedFromJAP(ctx context.Context, input ImportSelectedJAPServicesInput) (*PreviewSelectedJAPServicesResult, error) {
+	if s.japCatalogProvider == nil {
+		return nil, errors.New("provider katalog JAP belum terhubung")
+	}
+
+	serviceIDs, err := normalizeSelectedJAPServiceIDs(input.ServiceIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := s.repo.List(true)
+	if err != nil {
+		return nil, errors.New("gagal memuat master layanan sosmed")
+	}
+
+	modeUsed, rateUsed, rateSource, warning, err := s.resolveResellerFXRate(ctx, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	providerServices, err := s.japCatalogProvider.GetServices(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	byID := make(map[string]JAPServiceItem, len(providerServices))
+	for _, item := range providerServices {
+		id := strings.TrimSpace(string(item.Service))
+		if id == "" {
+			continue
+		}
+		byID[id] = item
+	}
+
+	result := &PreviewSelectedJAPServicesResult{
+		Mode:       modeUsed,
+		RateSource: rateSource,
+		RateUsed:   rateUsed,
+		Warning:    warning,
+		Requested:  len(serviceIDs),
+		NotFound:   []string{},
+		Items:      []PreviewSelectedJAPServiceRow{},
+	}
+
+	nextSort := nextSosmedServiceSortOrder(items)
+	for _, serviceID := range serviceIDs {
+		providerItem, ok := byID[serviceID]
+		if !ok {
+			result.NotFound = append(result.NotFound, serviceID)
+			continue
+		}
+
+		row, err := s.buildJAPPreviewRow(providerItem, nextSort, rateUsed)
+		if err != nil {
+			return nil, err
+		}
+
+		if existing, lookupErr := s.repo.FindByProvider(sosmedJAPProviderCode, serviceID); lookupErr == nil && existing != nil && existing.ID != uuid.Nil {
+			row.ExistingID = existing.ID.String()
+			row.ExistingCode = existing.Code
+			row.ExistingActive = existing.IsActive
+		} else if !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+			return nil, errors.New("gagal mengecek layanan JAP yang sudah ada")
+		}
+
+		result.Matched++
+		result.Items = append(result.Items, row)
+		nextSort += 10
+	}
+
+	sort.Slice(result.Items, func(left, right int) bool {
+		return result.Items[left].ServiceID < result.Items[right].ServiceID
+	})
+
+	return result, nil
 }
 
 func (s *SosmedServiceService) ImportSelectedFromJAP(ctx context.Context, input ImportSelectedJAPServicesInput) (*ImportSelectedJAPServicesResult, error) {
@@ -134,6 +253,85 @@ func (s *SosmedServiceService) ImportSelectedFromJAP(ctx context.Context, input 
 	})
 
 	return result, nil
+}
+
+func (s *SosmedServiceService) buildJAPPreviewRow(item JAPServiceItem, sortOrder int, rateUsed float64) (PreviewSelectedJAPServiceRow, error) {
+	draft, err := s.buildJAPDraftService(item, sortOrder, rateUsed)
+	if err != nil {
+		return PreviewSelectedJAPServiceRow{}, err
+	}
+
+	requiredFields, optionalFields, fulfillmentMode, supportedForInitialOrder, warnings := analyzeJAPOrderRequirements(item.Type)
+	if !item.Refill {
+		warnings = append(warnings, "Supplier tidak support refill.")
+	}
+
+	serviceID := strings.TrimSpace(string(item.Service))
+	return PreviewSelectedJAPServiceRow{
+		ServiceID:                serviceID,
+		ProviderName:             strings.TrimSpace(item.Name),
+		ProviderCategory:         strings.TrimSpace(item.Category),
+		ProviderType:             strings.TrimSpace(item.Type),
+		ProviderRate:             draft.ProviderRate,
+		ProviderCurrency:         draft.ProviderCurrency,
+		Min:                      strings.TrimSpace(item.Min),
+		Max:                      strings.TrimSpace(item.Max),
+		RefillSupported:          item.Refill,
+		CancelSupported:          item.Cancel,
+		DripfeedSupported:        item.Dripfeed,
+		LocalCode:                draft.Code,
+		LocalTitle:               draft.Title,
+		LocalCategoryCode:        draft.CategoryCode,
+		PlatformLabel:            draft.PlatformLabel,
+		PriceStart:               draft.PriceStart,
+		PricePer1K:               draft.PricePer1K,
+		StartTime:                draft.StartTime,
+		ETA:                      draft.ETA,
+		Refill:                   draft.Refill,
+		FulfillmentMode:          fulfillmentMode,
+		RequiredOrderFields:      requiredFields,
+		OptionalOrderFields:      optionalFields,
+		SupportedForInitialOrder: supportedForInitialOrder,
+		Warnings:                 warnings,
+	}, nil
+}
+
+func analyzeJAPOrderRequirements(providerType string) (requiredFields []string, optionalFields []string, fulfillmentMode string, supportedForInitialOrder bool, warnings []string) {
+	normalized := strings.ToLower(strings.TrimSpace(providerType))
+	switch normalized {
+	case "", "default":
+		return []string{"service", "link", "quantity"}, []string{"runs", "interval"}, "simple_quantity", true, []string{}
+	case "package":
+		return []string{"service", "link"}, []string{}, "package", false, []string{"Tipe Package belum masuk jalur order otomatis awal."}
+	case "custom comments":
+		return []string{"service", "link", "comments"}, []string{}, "custom_comments", false, []string{"Butuh input comments khusus dari user sebelum bisa order otomatis."}
+	case "custom comments package":
+		return []string{"service", "link", "comments"}, []string{}, "custom_comments_package", false, []string{"Butuh input comments khusus dari user sebelum bisa order otomatis."}
+	case "mentions with hashtags":
+		return []string{"service", "link", "quantity", "usernames", "hashtags"}, []string{}, "mentions_with_hashtags", false, []string{"Butuh usernames dan hashtags sebelum bisa order otomatis."}
+	case "mentions custom list":
+		return []string{"service", "link", "usernames"}, []string{}, "mentions_custom_list", false, []string{"Butuh list username sebelum bisa order otomatis."}
+	case "mentions hashtag":
+		return []string{"service", "link", "quantity", "hashtag"}, []string{}, "mentions_hashtag", false, []string{"Butuh hashtag sumber sebelum bisa order otomatis."}
+	case "mentions user followers":
+		return []string{"service", "link", "quantity", "username"}, []string{}, "mentions_user_followers", false, []string{"Butuh username sumber sebelum bisa order otomatis."}
+	case "mentions media likers":
+		return []string{"service", "link", "quantity", "media"}, []string{}, "mentions_media_likers", false, []string{"Butuh media URL sumber sebelum bisa order otomatis."}
+	case "subscriptions":
+		return []string{"service", "username", "min", "max", "delay"}, []string{"posts", "old_posts", "expiry"}, "subscription", false, []string{"Tipe subscription butuh form dan lifecycle khusus."}
+	case "web traffic":
+		return []string{"service", "link", "quantity", "country", "device", "type_of_traffic"}, []string{"runs", "interval", "google_keyword", "referring_url"}, "web_traffic", false, []string{"Tipe web traffic butuh field campaign khusus."}
+	case "comment likes":
+		return []string{"service", "link", "quantity", "username"}, []string{}, "comment_likes", false, []string{"Butuh username pemilik komentar sebelum bisa order otomatis."}
+	case "poll":
+		return []string{"service", "link", "quantity", "answer_number"}, []string{}, "poll", false, []string{"Butuh nomor jawaban poll sebelum bisa order otomatis."}
+	case "comment replies":
+		return []string{"service", "link", "username", "comments"}, []string{}, "comment_replies", false, []string{"Butuh username dan replies sebelum bisa order otomatis."}
+	case "invites from groups":
+		return []string{"service", "link", "quantity", "groups"}, []string{}, "group_invites", false, []string{"Butuh list group sebelum bisa order otomatis."}
+	default:
+		return []string{"service"}, []string{}, "unknown", false, []string{"Tipe JAP belum dikenali, review manual dulu sebelum diaktifkan."}
+	}
 }
 
 func normalizeSelectedJAPServiceIDs(items []int64) ([]string, error) {

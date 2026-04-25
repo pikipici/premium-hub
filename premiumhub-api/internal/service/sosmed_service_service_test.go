@@ -479,3 +479,134 @@ func TestSosmedService_ImportSelectedFromJAP_CreatesDrafts(t *testing.T) {
 		t.Fatalf("twitter draft should stay inactive after import")
 	}
 }
+
+func TestSosmedService_PreviewSelectedFromJAP_AuditsOrderRequirements(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(&model.ProductCategory{}, &model.SosmedService{}); err != nil {
+		t.Fatalf("migrate sosmed models: %v", err)
+	}
+
+	categoryRepo := repository.NewProductCategoryRepo(db)
+	seedSosmedCategory(t, categoryRepo, "followers", "Followers", 10)
+
+	repo := repository.NewSosmedServiceRepo(db)
+	svc := NewSosmedServiceService(repo, categoryRepo).
+		SetResellerFXConfig(SosmedResellerFXConfig{
+			Mode:      "fixed",
+			FixedRate: 17000,
+		}).
+		SetJAPCatalogProvider(staticJAPCatalogProvider{
+			items: []JAPServiceItem{
+				{
+					Service:  "6331",
+					Name:     "Instagram Followers [Refill: 30D] [Max: 50K] [Start Time: 2 Hours] [Speed: 30K/Day]",
+					Type:     "Default",
+					Category: "Instagram Followers [Guaranteed]",
+					Rate:     "0.375",
+					Min:      "10",
+					Max:      "1000000",
+					Refill:   true,
+				},
+				{
+					Service:  "7777",
+					Name:     "Instagram Comments Custom",
+					Type:     "Custom Comments",
+					Category: "Instagram Comments",
+					Rate:     "1.25",
+					Min:      "10",
+					Max:      "1000",
+					Refill:   false,
+				},
+			},
+		})
+
+	preview, err := svc.PreviewSelectedFromJAP(context.Background(), ImportSelectedJAPServicesInput{
+		ServiceIDs: []int64{6331, 7777, 9999},
+	})
+	if err != nil {
+		t.Fatalf("preview selected JAP: %v", err)
+	}
+	if preview.Requested != 3 || preview.Matched != 2 || len(preview.NotFound) != 1 || preview.NotFound[0] != "9999" {
+		t.Fatalf("unexpected preview counts: %+v", preview)
+	}
+
+	var defaultRow, commentsRow PreviewSelectedJAPServiceRow
+	for _, item := range preview.Items {
+		switch item.ServiceID {
+		case "6331":
+			defaultRow = item
+		case "7777":
+			commentsRow = item
+		}
+	}
+
+	if !defaultRow.SupportedForInitialOrder || defaultRow.FulfillmentMode != "simple_quantity" {
+		t.Fatalf("expected default service to support initial order, got %+v", defaultRow)
+	}
+	if strings.Join(defaultRow.RequiredOrderFields, ",") != "service,link,quantity" {
+		t.Fatalf("unexpected default required fields: %v", defaultRow.RequiredOrderFields)
+	}
+	if commentsRow.SupportedForInitialOrder || commentsRow.FulfillmentMode != "custom_comments" {
+		t.Fatalf("expected custom comments service to require manual review, got %+v", commentsRow)
+	}
+	if !strings.Contains(strings.Join(commentsRow.Warnings, " "), "comments") {
+		t.Fatalf("expected custom comments warning, got %v", commentsRow.Warnings)
+	}
+}
+
+func TestSosmedService_RepriceResellerToIDR_MatchesProviderCode(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(&model.ProductCategory{}, &model.SosmedService{}); err != nil {
+		t.Fatalf("migrate sosmed models: %v", err)
+	}
+
+	categoryRepo := repository.NewProductCategoryRepo(db)
+	seedSosmedCategory(t, categoryRepo, "followers", "Followers", 10)
+
+	repo := repository.NewSosmedServiceRepo(db)
+	svc := NewSosmedServiceService(repo, categoryRepo).SetResellerFXConfig(SosmedResellerFXConfig{
+		Mode:      "fixed",
+		FixedRate: 17000,
+	})
+
+	item := &model.SosmedService{
+		CategoryCode:      "followers",
+		Code:              "instagram-followers-6331",
+		Title:             "Instagram Followers Refill 30 Hari",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderTitle:     "Instagram Followers [Refill: 30D]",
+		ProviderRate:      "0.375",
+		ProviderCurrency:  "USD",
+		PriceStart:        "Reseller Rp 6.375/1K",
+		PricePer1K:        "Reseller Rp 6.375 per 1K • USD 0.375 • JAP#6331",
+		IsActive:          false,
+	}
+	if err := repo.Create(item); err != nil {
+		t.Fatalf("create provider-coded sosmed service: %v", err)
+	}
+
+	fixedRate := 18000.0
+	res, err := svc.RepriceResellerToIDR(context.Background(), RepriceSosmedResellerInput{
+		FixedRate:       &fixedRate,
+		IncludeInactive: boolPtr(true),
+		ProviderCode:    "jap",
+	})
+	if err != nil {
+		t.Fatalf("reprice provider-coded service: %v", err)
+	}
+	if res.Eligible != 1 || res.Updated != 1 {
+		t.Fatalf("expected eligible/update 1, got %+v", res)
+	}
+
+	stored, err := repo.FindByID(item.ID)
+	if err != nil {
+		t.Fatalf("find provider-coded service: %v", err)
+	}
+	if stored.PriceStart != "Reseller Rp 6.750/1K" {
+		t.Fatalf("unexpected provider-coded price_start: %s", stored.PriceStart)
+	}
+	if !strings.Contains(stored.PricePer1K, "JAP#6331") {
+		t.Fatalf("expected provider service id marker, got %s", stored.PricePer1K)
+	}
+}

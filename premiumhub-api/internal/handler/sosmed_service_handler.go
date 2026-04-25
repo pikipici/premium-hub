@@ -102,6 +102,22 @@ func (h *SosmedServiceHandler) RepriceReseller(c *gin.Context) {
 	response.Success(c, "Sinkronisasi harga reseller selesai", res)
 }
 
+func (h *SosmedServiceHandler) PreviewSelectedFromJAP(c *gin.Context) {
+	var input service.ImportSelectedJAPServicesInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	res, err := h.svc.PreviewSelectedFromJAP(c.Request.Context(), input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Preview layanan JAP selesai", res)
+}
+
 func (h *SosmedServiceHandler) ImportSelectedFromJAP(c *gin.Context) {
 	var input service.ImportSelectedJAPServicesInput
 	if err := c.ShouldBindJSON(&input); err != nil {

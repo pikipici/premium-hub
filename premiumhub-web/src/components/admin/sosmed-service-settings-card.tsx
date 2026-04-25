@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { productCategoryService } from '@/services/productCategoryService'
 import {
   sosmedService,
+  type AdminSosmedImportJAPPreviewResult,
   type AdminSosmedResellerRepricePayload,
   type AdminSosmedServicePayload,
   type AdminSosmedServiceUpdatePayload,
@@ -161,6 +162,10 @@ function extractIDRAmount(raw?: string) {
   return parsed
 }
 
+function formatCompactList(items?: string[]) {
+  return items?.filter(Boolean).join(', ') || '-'
+}
+
 function statusLabel(item: SosmedService) {
   if (!item.is_active) return { label: 'Nonaktif', className: 's-gagal' }
   return { label: 'Aktif', className: 's-lunas' }
@@ -209,6 +214,8 @@ export default function SosmedServiceSettingsCard() {
   const [detailTarget, setDetailTarget] = useState<SosmedService | null>(null)
   const [importJAPOpen, setImportJAPOpen] = useState(false)
   const [importJAPForm, setImportJAPForm] = useState<ImportJAPFormState>({ service_ids_text: '' })
+  const [importJAPPreview, setImportJAPPreview] = useState<AdminSosmedImportJAPPreviewResult | null>(null)
+  const [previewingJAP, setPreviewingJAP] = useState(false)
 
   const categoryOptions = useMemo(
     () => categories.sort((left, right) => (left.sort_order || 100) - (right.sort_order || 100)),
@@ -237,6 +244,22 @@ export default function SosmedServiceSettingsCard() {
       }),
     [items]
   )
+
+  const importJAPServiceIds = useMemo(
+    () => parseJAPServiceIds(importJAPForm.service_ids_text),
+    [importJAPForm.service_ids_text]
+  )
+
+  const unsupportedJAPPreviewItems = useMemo(
+    () => (importJAPPreview?.items || []).filter((item) => !item.supported_for_initial_order),
+    [importJAPPreview]
+  )
+
+  const canImportJAPPreview =
+    !!importJAPPreview &&
+    importJAPPreview.matched > 0 &&
+    (importJAPPreview.not_found || []).length === 0 &&
+    unsupportedJAPPreviewItems.length === 0
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -324,14 +347,16 @@ export default function SosmedServiceSettingsCard() {
 
   const openImportJAPForm = () => {
     setImportJAPForm({ service_ids_text: '' })
+    setImportJAPPreview(null)
     setError('')
     setImportJAPOpen(true)
   }
 
   const closeImportJAPForm = () => {
-    if (saving) return
+    if (saving || previewingJAP) return
     setImportJAPOpen(false)
     setImportJAPForm({ service_ids_text: '' })
+    setImportJAPPreview(null)
   }
 
   const submitForm = async () => {
@@ -489,6 +514,7 @@ export default function SosmedServiceSettingsCard() {
       const payload: AdminSosmedResellerRepricePayload = {
         mode: resellerFXMode,
         include_inactive: true,
+        provider_code: 'jap',
         code_prefix: 'jap-',
       }
 
@@ -526,9 +552,13 @@ export default function SosmedServiceSettingsCard() {
   }
 
   const importSelectedJAPServices = async () => {
-    const serviceIds = parseJAPServiceIds(importJAPForm.service_ids_text)
+    const serviceIds = importJAPServiceIds
     if (serviceIds.length === 0) {
       setError('Masukin minimal satu service ID JAP yang valid')
+      return
+    }
+    if (!canImportJAPPreview) {
+      setError('Preview dulu sampai semua service ketemu dan support order awal.')
       return
     }
 
@@ -562,6 +592,36 @@ export default function SosmedServiceSettingsCard() {
       setError(mapErrorMessage(err, 'Gagal import layanan JAP'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const previewSelectedJAPServices = async () => {
+    if (importJAPServiceIds.length === 0) {
+      setError('Masukin minimal satu service ID JAP yang valid')
+      return
+    }
+
+    setPreviewingJAP(true)
+    setImportJAPPreview(null)
+    setError('')
+
+    try {
+      const res = await sosmedService.adminPreviewJAPSelected({ service_ids: importJAPServiceIds })
+      if (!res.success) {
+        setError(res.message || 'Gagal preview layanan JAP')
+        return
+      }
+
+      setImportJAPPreview(res.data)
+      const notFoundSuffix = res.data.not_found?.length ? ` • Tidak ketemu: ${res.data.not_found.join(', ')}` : ''
+      const unsupportedSuffix = res.data.items.some((item) => !item.supported_for_initial_order)
+        ? ' • Ada tipe yang belum support order awal'
+        : ''
+      setNotice(`Preview JAP selesai. Ketemu ${res.data.matched}/${res.data.requested}.${notFoundSuffix}${unsupportedSuffix}`)
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal preview layanan JAP'))
+    } finally {
+      setPreviewingJAP(false)
     }
   }
 
@@ -710,14 +770,14 @@ export default function SosmedServiceSettingsCard() {
         <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={closeImportJAPForm}>
           <div
             className="modal-card"
-            style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(560px, 96vw)' }}
+            style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(920px, 96vw)' }}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-head" style={MODAL_HEAD_STYLE}>
               <div>
                 <h3>Import Layanan JAP Pilihan</h3>
                 <div className="modal-sub" style={MODAL_SUB_STYLE}>
-                  Masukin ID JAP dipisah koma atau spasi. Service bakal masuk sebagai draft nonaktif.
+                  Masukin ID JAP, preview audit dulu, lalu import service yang support order awal.
                 </div>
               </div>
               <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={closeImportJAPForm}>×</button>
@@ -730,23 +790,115 @@ export default function SosmedServiceSettingsCard() {
                   className="form-textarea"
                   rows={5}
                   value={importJAPForm.service_ids_text}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    setImportJAPPreview(null)
                     setImportJAPForm((prev) => ({ ...prev, service_ids_text: event.target.value }))
-                  }
+                  }}
                   placeholder="Contoh: 6331, 10242, 8695"
                 />
               </div>
 
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                Import ini otomatis nyimpen nama mentah provider, mapping kategori lokal, harga reseller IDR, dan status awal nonaktif.
+                Preview ngecek nama lokal, kategori, tipe order JAP, field wajib, harga reseller, dan apakah service aman buat jalur order awal.
               </div>
+
+              {importJAPPreview && (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
+                    <span className="status s-lunas">Ketemu {importJAPPreview.matched}/{importJAPPreview.requested}</span>
+                    <span className="status s-lunas">
+                      Kurs {importJAPPreview.rate_used.toLocaleString('id-ID', { maximumFractionDigits: 2 })}
+                    </span>
+                    {unsupportedJAPPreviewItems.length > 0 && (
+                      <span className="status s-gagal">Belum support: {unsupportedJAPPreviewItems.length}</span>
+                    )}
+                    {(importJAPPreview.not_found || []).length > 0 && (
+                      <span className="status s-gagal">Tidak ketemu: {importJAPPreview.not_found.join(', ')}</span>
+                    )}
+                  </div>
+
+                  <div className="table-wrap" style={{ overflowX: 'auto', border: '1px solid var(--line, #E5E7EB)', borderRadius: 10 }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>JAP ID</th>
+                          <th>Draft Lokal</th>
+                          <th>Tipe Order</th>
+                          <th>Harga Reseller</th>
+                          <th>Field Wajib</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importJAPPreview.items.map((item) => (
+                          <tr key={item.service_id}>
+                            <td>
+                              <code>{item.service_id}</code>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{item.local_title}</div>
+                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                                <code>{item.local_code}</code>
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                                {item.platform_label} • {item.local_category_code}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{item.provider_type || '-'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{item.fulfillment_mode}</div>
+                              {item.existing_code && (
+                                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                                  Existing: <code>{item.existing_code}</code>
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{item.price_start || '-'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                                Min {item.min || '-'} • Max {item.max || '-'}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ fontSize: 12 }}>{formatCompactList(item.required_order_fields)}</div>
+                              {item.optional_order_fields?.length > 0 && (
+                                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                                  Opsional: {formatCompactList(item.optional_order_fields)}
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <span className={`status ${item.supported_for_initial_order ? 's-lunas' : 's-gagal'}`}>
+                                {item.supported_for_initial_order ? 'Siap Awal' : 'Review Manual'}
+                              </span>
+                              {item.warnings?.length > 0 && (
+                                <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
+                                  {item.warnings.join(' ')}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="modal-actions" style={MODAL_ACTIONS_STYLE}>
-              <button className="action-btn" type="button" onClick={closeImportJAPForm} disabled={saving}>
+              <button className="action-btn" type="button" onClick={closeImportJAPForm} disabled={saving || previewingJAP}>
                 Batal
               </button>
-              <button className="topbar-btn primary" type="button" onClick={importSelectedJAPServices} disabled={saving}>
+              <button className="topbar-btn" type="button" onClick={previewSelectedJAPServices} disabled={saving || previewingJAP}>
+                {previewingJAP ? 'Preview...' : 'Preview Audit'}
+              </button>
+              <button
+                className="topbar-btn primary"
+                type="button"
+                onClick={importSelectedJAPServices}
+                disabled={saving || previewingJAP || !canImportJAPPreview}
+              >
                 {saving ? 'Mengimpor...' : 'Import Draft JAP'}
               </button>
             </div>
