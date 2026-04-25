@@ -100,6 +100,46 @@ func TestJAPClientGetServices(t *testing.T) {
 	}
 }
 
+func TestJAPClientAddOrder(t *testing.T) {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST request, got %s", r.Method)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		assertJAPFormValue(t, r.Form, "key", "secret-key")
+		assertJAPFormValue(t, r.Form, "action", "add")
+		assertJAPFormValue(t, r.Form, "service", "6331")
+		assertJAPFormValue(t, r.Form, "link", "https://instagram.com/example")
+		assertJAPFormValue(t, r.Form, "quantity", "5000")
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"order": 991122}`))
+	}))
+	defer server.Close()
+
+	client := NewJAPClient(&config.Config{
+		JAPAPIURL:         server.URL,
+		JAPAPIKey:         "secret-key",
+		JAPHTTPTimeoutSec: "5",
+	})
+
+	res, err := client.AddOrder(context.Background(), JAPAddOrderInput{
+		ServiceID: "6331",
+		Link:      "https://instagram.com/example",
+		Quantity:  5000,
+	})
+	if err != nil {
+		t.Fatalf("add order: %v", err)
+	}
+	if res.Order != "991122" {
+		t.Fatalf("expected order 991122, got %q", res.Order)
+	}
+}
+
 func TestJAPClientRequiresAPIKey(t *testing.T) {
 	client := NewJAPClient(&config.Config{
 		JAPAPIURL:         "https://justanotherpanel.com/api/v2",

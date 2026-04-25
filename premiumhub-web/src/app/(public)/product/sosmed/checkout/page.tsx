@@ -1,10 +1,9 @@
 "use client"
 
 import axios from 'axios'
-import type { ReactNode } from 'react'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CreditCard, Landmark, QrCode, ShieldCheck, Zap } from 'lucide-react'
+import { CreditCard, ShieldCheck, WalletCards, Zap } from 'lucide-react'
 
 import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import Navbar from '@/components/layout/Navbar'
@@ -12,17 +11,9 @@ import Footer from '@/components/layout/Footer'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
+import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
 import type { SosmedService } from '@/types/sosmedService'
-
-type PakasirMethod = 'qris' | 'bri_va' | 'bni_va' | 'permata_va'
-
-const PAKASIR_METHOD_OPTIONS: Array<{ key: PakasirMethod; label: string; hint: string; icon: ReactNode }> = [
-  { key: 'qris', label: 'QRIS', hint: 'Scan QRIS dari aplikasi e-wallet atau m-banking', icon: <QrCode className="w-4 h-4" /> },
-  { key: 'bri_va', label: 'BRI Virtual Account', hint: 'Bayar via transfer VA BRI', icon: <Landmark className="w-4 h-4" /> },
-  { key: 'bni_va', label: 'BNI Virtual Account', hint: 'Bayar via transfer VA BNI', icon: <Landmark className="w-4 h-4" /> },
-  { key: 'permata_va', label: 'Permata Virtual Account', hint: 'Bayar via transfer VA Permata', icon: <Landmark className="w-4 h-4" /> },
-]
 
 function defaultCheckoutPrice(service: SosmedService | null) {
   if (!service) return 0
@@ -67,14 +58,17 @@ function SosmedCheckoutContent() {
   const [packageQuantity, setPackageQuantity] = useState(1)
   const [notes, setNotes] = useState('')
   const [loadingService, setLoadingService] = useState(true)
+  const [loadingWallet, setLoadingWallet] = useState(true)
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
 
-  const [pakasirMethod, setPakasirMethod] = useState<PakasirMethod>('qris')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   const checkoutPrice = useMemo(() => defaultCheckoutPrice(service), [service])
   const totalPrice = useMemo(() => checkoutPrice * packageQuantity, [checkoutPrice, packageQuantity])
   const estimatedUnits = useMemo(() => packageQuantity * 1000, [packageQuantity])
+  const walletBalanceAfter = walletBalance === null ? null : walletBalance - totalPrice
+  const walletEnough = walletBalance === null || walletBalanceAfter === null || walletBalanceAfter >= 0
 
   useEffect(() => {
     if (!authReady) return
@@ -121,6 +115,33 @@ function SosmedCheckoutContent() {
     }
   }, [authReady, isAuthenticated, pathname, router, searchParams, serviceCode])
 
+  useEffect(() => {
+    if (!authReady || !isAuthenticated) return
+
+    let alive = true
+    setLoadingWallet(true)
+
+    walletService
+      .getBalance()
+      .then((res) => {
+        if (!alive) return
+        if (res.success) {
+          setWalletBalance(res.data.balance)
+        }
+      })
+      .catch(() => {
+        if (!alive) return
+        setWalletBalance(null)
+      })
+      .finally(() => {
+        if (alive) setLoadingWallet(false)
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [authReady, isAuthenticated])
+
   const handleCheckout = async () => {
     if (!service) return
 
@@ -131,6 +152,11 @@ function SosmedCheckoutContent() {
 
     if (checkoutPrice <= 0) {
       setError('Harga checkout layanan belum diatur, hubungi admin')
+      return
+    }
+
+    if (walletBalance !== null && walletBalance < totalPrice) {
+      setError('Saldo wallet lu tidak cukup. Top up dulu sebelum checkout sosmed.')
       return
     }
 
@@ -155,27 +181,7 @@ function SosmedCheckoutContent() {
       }
 
       const order = orderRes.data.order
-
-      const payRes = await sosmedOrderService.createPayment({
-        order_id: order.id,
-        payment_method: pakasirMethod,
-      })
-      if (!payRes.success) {
-        setError(payRes.message || 'Gagal membuat invoice pembayaran')
-        return
-      }
-
-      const payment = payRes.data
-      const query = new URLSearchParams({
-        id: order.id,
-        paymentNumber: payment.payment_number || '',
-        paymentMethod: payment.payment_method || pakasirMethod,
-        gatewayOrderId: payment.gateway_order_id || '',
-        amount: String(payment.total_payment || payment.amount || order.total_price),
-        expiresAt: payment.expires_at || '',
-      })
-
-      router.push(`/product/sosmed/checkout/invoice?${query.toString()}`)
+      router.push(`/product/sosmed/checkout/success?id=${encodeURIComponent(order.id)}`)
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const message = (err.response?.data as { message?: string } | undefined)?.message
@@ -311,42 +317,46 @@ function SosmedCheckoutContent() {
           </div>
 
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6 space-y-3">
-            <h3 className="text-sm font-bold mb-1">Metode Pembayaran</h3>
+            <h3 className="text-sm font-bold mb-1">Pembayaran Wallet</h3>
 
             <div className="w-full rounded-xl border p-4 text-left border-[#FF5733] bg-[#FFF3EF]">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-[#F7F7F5] flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-[#141414]" />
+                  <WalletCards className="w-5 h-5 text-[#141414]" />
                 </div>
-                <div>
-                  <div className="text-sm font-semibold">Pakasir Gateway</div>
-                  <div className="text-xs text-[#888]">QRIS / Virtual Account otomatis via Pakasir</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold">Saldo Wallet DigiMarket</div>
+                  <div className="text-xs text-[#888]">
+                    Saldo dipotong langsung, lalu order otomatis dikirim ke supplier.
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-xl border border-[#EBEBEB] p-3 bg-[#FAFAF8] space-y-2">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-[#777]">Pilih channel Pakasir</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {PAKASIR_METHOD_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => setPakasirMethod(option.key)}
-                    className={`rounded-lg border px-3 py-2 text-left transition-colors ${
-                      pakasirMethod === option.key
-                        ? 'border-[#141414] bg-white'
-                        : 'border-[#E5E5E5] bg-white/70 hover:border-[#CFCFCF]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 text-sm font-semibold text-[#141414]">
-                      {option.icon}
-                      {option.label}
-                    </div>
-                    <div className="text-[11px] text-[#888] mt-1">{option.hint}</div>
-                  </button>
-                ))}
+            <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#888]">Saldo Sekarang</p>
+                  <p className="mt-1 text-sm font-extrabold text-[#141414]">
+                    {loadingWallet ? 'Memuat...' : formatRupiah(walletBalance || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#888]">Total Order</p>
+                  <p className="mt-1 text-sm font-extrabold text-[#FF5733]">{formatRupiah(totalPrice)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#888]">Sisa Saldo</p>
+                  <p className={`mt-1 text-sm font-extrabold ${walletEnough ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {loadingWallet || walletBalanceAfter === null ? '-' : formatRupiah(Math.max(0, walletBalanceAfter))}
+                  </p>
+                </div>
               </div>
+              {!walletEnough && (
+                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                  Saldo wallet kurang. Top up dulu dari dashboard wallet, baru balik checkout.
+                </p>
+              )}
             </div>
           </div>
 
@@ -371,14 +381,14 @@ function SosmedCheckoutContent() {
 
           <button
             onClick={handleCheckout}
-            disabled={submitting}
+            disabled={submitting || !walletEnough}
             className="w-full py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm"
           >
-            {submitting ? 'Memproses Pembayaran...' : `Buat Invoice ${formatRupiah(totalPrice)}`}
+            {submitting ? 'Memproses Order...' : `Bayar Pakai Wallet ${formatRupiah(totalPrice)}`}
           </button>
 
           <p className="text-xs text-center text-[#888] mt-4">
-            Dengan melanjutkan, lu menyetujui syarat pembelian layanan sosmed.
+            Dengan melanjutkan, saldo wallet lu langsung dipotong dan order dikirim otomatis ke supplier.
           </p>
         </div>
       </section>

@@ -481,6 +481,10 @@ func buildWalletLedgerPublicDescription(row model.WalletLedger) string {
 		return "Pembelian nomor OTP"
 	case "5sim_refund":
 		return "Refund nomor OTP"
+	case "sosmed_purchase":
+		return "Pembelian layanan sosmed"
+	case "sosmed_refund":
+		return "Refund layanan sosmed"
 	case "product_purchase":
 		return "Pembelian produk premium"
 	case "manual_adjustment":
@@ -529,6 +533,25 @@ func buildWalletLedgerPublicReference(row model.WalletLedger) string {
 			}
 		}
 		return "Order nomor OTP"
+	}
+
+	if strings.HasPrefix(lowerRef, "sosmed_order:") {
+		parts := strings.Split(reference, ":")
+		if len(parts) >= 3 {
+			orderID := strings.TrimSpace(parts[1])
+			action := strings.ToLower(strings.TrimSpace(parts[2]))
+			if orderID != "" {
+				switch action {
+				case "charge":
+					return fmt.Sprintf("Pembelian sosmed #%s", shortWalletLedgerRef(orderID))
+				case "refund":
+					return fmt.Sprintf("Refund sosmed #%s", shortWalletLedgerRef(orderID))
+				default:
+					return fmt.Sprintf("Order sosmed #%s", shortWalletLedgerRef(orderID))
+				}
+			}
+		}
+		return "Order layanan sosmed"
 	}
 
 	if strings.HasPrefix(lowerRef, "order_wallet:") {

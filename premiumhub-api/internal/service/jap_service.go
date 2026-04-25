@@ -50,6 +50,30 @@ func (s *JAPService) GetServices(ctx context.Context) ([]JAPServiceItem, error) 
 	return res, nil
 }
 
+func (s *JAPService) AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
+
+	input.ServiceID = strings.TrimSpace(input.ServiceID)
+	input.Link = strings.TrimSpace(input.Link)
+	if input.ServiceID == "" {
+		return nil, errors.New("service JAP wajib diisi")
+	}
+	if input.Link == "" {
+		return nil, errors.New("target link JAP wajib diisi")
+	}
+	if input.Quantity <= 0 {
+		return nil, errors.New("quantity JAP tidak valid")
+	}
+
+	res, err := s.client.AddOrder(ctx, input)
+	if err != nil {
+		return nil, s.normalizeProviderErr(err)
+	}
+	return res, nil
+}
+
 func (s *JAPService) ensureConfigured() error {
 	if s == nil || s.cfg == nil {
 		return errors.New("konfigurasi JAP belum siap")

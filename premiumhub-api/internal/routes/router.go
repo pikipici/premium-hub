@@ -71,7 +71,9 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		))
 	japSvc := service.NewJAPService(cfg, nil)
 	sosmedServiceSvc.SetJAPCatalogProvider(japSvc)
-	sosmedOrderSvc := service.NewSosmedOrderService(sosmedOrderRepo, sosmedServiceRepo, notifRepo)
+	sosmedOrderSvc := service.NewSosmedOrderService(sosmedOrderRepo, sosmedServiceRepo, notifRepo).
+		SetWalletRepo(walletRepo).
+		SetJAPOrderProvider(japSvc)
 	sosmedPaymentSvc := service.NewSosmedPaymentServiceWithGateway(cfg, sosmedOrderRepo, sosmedOrderSvc, nil)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo).
 		SetStockCredentialCipher(stockCredentialCipher)

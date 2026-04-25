@@ -18,6 +18,12 @@ export interface SosmedOrder {
   order_status: SosmedOrderStatus
   gateway_order_id?: string
   payment_payload?: string
+  provider_code?: string
+  provider_service_id?: string
+  provider_order_id?: string
+  provider_status?: string
+  provider_payload?: string
+  provider_error?: string
   notes?: string
   paid_at?: string
   expires_at?: string

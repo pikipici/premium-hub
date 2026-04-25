@@ -28,7 +28,7 @@ func (h *SosmedOrderHandler) Create(c *gin.Context) {
 		return
 	}
 
-	detail, err := h.svc.Create(userID, input)
+	detail, err := h.svc.Create(c.Request.Context(), userID, input)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return

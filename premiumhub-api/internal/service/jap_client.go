@@ -18,6 +18,7 @@ import (
 type JAPClient interface {
 	GetBalance(ctx context.Context) (*JAPBalanceResponse, error)
 	GetServices(ctx context.Context) ([]JAPServiceItem, error)
+	AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error)
 }
 
 type JAPBalanceResponse struct {
@@ -58,6 +59,16 @@ type JAPServiceItem struct {
 	Dripfeed bool         `json:"dripfeed"`
 	Refill   bool         `json:"refill"`
 	Cancel   bool         `json:"cancel"`
+}
+
+type JAPAddOrderInput struct {
+	ServiceID string
+	Link      string
+	Quantity  int64
+}
+
+type JAPAddOrderResponse struct {
+	Order JAPServiceID `json:"order"`
 }
 
 type JAPAPIError struct {
@@ -101,7 +112,7 @@ func NewJAPClient(cfg *config.Config) JAPClient {
 }
 
 func (c *japHTTPClient) GetBalance(ctx context.Context) (*JAPBalanceResponse, error) {
-	raw, err := c.request(ctx, "balance")
+	raw, err := c.request(ctx, "balance", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +132,7 @@ func (c *japHTTPClient) GetBalance(ctx context.Context) (*JAPBalanceResponse, er
 }
 
 func (c *japHTTPClient) GetServices(ctx context.Context) ([]JAPServiceItem, error) {
-	raw, err := c.request(ctx, "services")
+	raw, err := c.request(ctx, "services", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +148,35 @@ func (c *japHTTPClient) GetServices(ctx context.Context) ([]JAPServiceItem, erro
 	return out, nil
 }
 
-func (c *japHTTPClient) request(ctx context.Context, action string) ([]byte, error) {
+func (c *japHTTPClient) AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error) {
+	extra := url.Values{}
+	extra.Set("service", strings.TrimSpace(input.ServiceID))
+	extra.Set("link", strings.TrimSpace(input.Link))
+	extra.Set("quantity", strconv.FormatInt(input.Quantity, 10))
+
+	raw, err := c.request(ctx, "add", extra)
+	if err != nil {
+		return nil, err
+	}
+
+	var out JAPAddOrderResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		if msg := extractJAPProviderMessage(raw); msg != "" {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+		}
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response add order JAP tidak valid", Retryable: true}
+	}
+	if strings.TrimSpace(string(out.Order)) == "" {
+		if msg := extractJAPProviderMessage(raw); msg != "" {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+		}
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response add order JAP tidak berisi order id", Retryable: true}
+	}
+
+	return &out, nil
+}
+
+func (c *japHTTPClient) request(ctx context.Context, action string, extra url.Values) ([]byte, error) {
 	if strings.TrimSpace(c.baseURL) == "" {
 		return nil, &JAPAPIError{StatusCode: http.StatusInternalServerError, Message: "konfigurasi JAP_API_URL belum diisi"}
 	}
@@ -148,6 +187,11 @@ func (c *japHTTPClient) request(ctx context.Context, action string) ([]byte, err
 	form := url.Values{}
 	form.Set("key", c.apiKey)
 	form.Set("action", strings.TrimSpace(action))
+	for key, values := range extra {
+		for _, value := range values {
+			form.Add(key, value)
+		}
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, strings.NewReader(form.Encode()))
 	if err != nil {
