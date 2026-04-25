@@ -185,6 +185,17 @@ func ensureDefaultProductCategories(db *gorm.DB) error {
 }
 
 func ensureDefaultSosmedServices(db *gorm.DB) error {
+	var existingCount int64
+	if err := db.Model(&model.SosmedService{}).Count(&existingCount).Error; err != nil {
+		return err
+	}
+	// Seed default sosmed services only for a brand-new database.
+	// Once operators manage the catalog manually, we should not recreate
+	// deleted defaults on every restart/deploy.
+	if existingCount > 0 {
+		return nil
+	}
+
 	defaults := []model.SosmedService{
 		{
 			CategoryCode:  "followers",
