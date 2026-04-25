@@ -54,8 +54,8 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     startTime: '5-15 menit',
     refill: '30 hari',
     eta: '2-12 jam',
-    priceStart: 'Rp 28.000',
-    pricePer1k: '≈ Rp 28 / 1K',
+    priceStart: 'Rp 28.000/1K',
+    pricePer1k: '1 paket = 1.000 followers',
     checkoutPrice: 28000,
     trustBadges: ['No Password', 'Gradual Delivery', 'Refill 30 Hari'],
   },
@@ -71,8 +71,8 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     startTime: 'Instan',
     refill: 'Opsional',
     eta: '< 6 jam',
-    priceStart: 'Rp 16.000',
-    pricePer1k: '≈ Rp 16 / 1K',
+    priceStart: 'Rp 16.000/1K',
+    pricePer1k: '1 paket = 1.000 likes',
     checkoutPrice: 16000,
     trustBadges: ['No Password', 'Real Interaction', 'High Retention'],
   },
@@ -88,8 +88,8 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     startTime: '10-30 menit',
     refill: 'N/A',
     eta: '6-24 jam',
-    priceStart: 'Rp 22.000',
-    pricePer1k: '≈ Rp 22 / 1K',
+    priceStart: 'Rp 22.000/1K',
+    pricePer1k: '1 paket = 1.000 views',
     checkoutPrice: 22000,
     trustBadges: ['No Password', 'Stable Delivery', 'Campaign Friendly'],
   },
@@ -105,8 +105,8 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     startTime: '30-90 menit',
     refill: 'Opsional',
     eta: '6-24 jam',
-    priceStart: 'Rp 35.000',
-    pricePer1k: '≈ Rp 350 / 10',
+    priceStart: 'Rp 35.000/paket',
+    pricePer1k: 'Paket komentar custom',
     checkoutPrice: 35000,
     trustBadges: ['No Password', 'Natural Pattern', 'Flexible Campaign'],
   },
@@ -122,8 +122,8 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     startTime: '15-45 menit',
     refill: 'N/A',
     eta: '< 12 jam',
-    priceStart: 'Rp 19.000',
-    pricePer1k: '≈ Rp 19 / 1K',
+    priceStart: 'Rp 19.000/1K',
+    pricePer1k: '1 paket = 1.000 unit',
     checkoutPrice: 19000,
     trustBadges: ['No Password', 'Gradual Delivery', 'Algorithm Friendly'],
   },
@@ -185,6 +185,7 @@ function mapSosmedServicesToCards(items: SosmedService[]): SosmedServiceCard[] {
     const checkoutPrice = item.checkout_price && item.checkout_price > 0
       ? item.checkout_price
       : fallback.checkoutPrice
+    const packageCopy = checkoutPrice > 0 ? '1 paket = 1.000 unit layanan' : fallback.pricePer1k
 
     return {
       key: item.id || item.code || `${fallback.code}-${index}`,
@@ -199,8 +200,8 @@ function mapSosmedServicesToCards(items: SosmedService[]): SosmedServiceCard[] {
       startTime: cleanValue(item.start_time, fallback.startTime),
       refill: cleanValue(item.refill, fallback.refill),
       eta: cleanValue(item.eta, fallback.eta),
-      priceStart: checkoutPrice > 0 ? formatRupiah(checkoutPrice) : cleanValue(item.price_start, fallback.priceStart),
-      pricePer1k: cleanValue(item.price_per_1k, fallback.pricePer1k),
+      priceStart: checkoutPrice > 0 ? `${formatRupiah(checkoutPrice)}/1K` : cleanValue(item.price_start, fallback.priceStart),
+      pricePer1k: cleanValue(item.price_per_1k, packageCopy),
       checkoutPrice,
       trustBadges: normalizeTrustBadges(item.trust_badges, fallback.trustBadges),
     }
@@ -303,7 +304,9 @@ export default function ProductSosmedLandingPage() {
                     <p className="text-[10px] uppercase tracking-wide text-[#A2572E]">Harga mulai</p>
                     <p className="text-lg font-extrabold text-[#141414]">{service.priceStart}</p>
                     <p className="text-xs text-[#666]">{service.pricePer1k}</p>
-                    <p className="mt-1 text-[11px] font-semibold text-[#A2572E]">Checkout: {formatRupiah(service.checkoutPrice)}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[#A2572E]">
+                      Checkout dihitung per kelipatan paket 1K
+                    </p>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">

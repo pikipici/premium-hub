@@ -4,7 +4,9 @@ import (
 	"errors"
 	"io"
 	"strconv"
+	"time"
 
+	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/service"
 	"premiumhub-api/pkg/response"
 
@@ -16,8 +18,56 @@ type SosmedServiceHandler struct {
 	svc *service.SosmedServiceService
 }
 
+type publicSosmedServiceResponse struct {
+	ID            uuid.UUID `json:"id"`
+	CategoryCode  string    `json:"category_code"`
+	Code          string    `json:"code"`
+	Title         string    `json:"title"`
+	Summary       string    `json:"summary"`
+	PlatformLabel string    `json:"platform_label"`
+	BadgeText     string    `json:"badge_text"`
+	Theme         string    `json:"theme"`
+	MinOrder      string    `json:"min_order"`
+	StartTime     string    `json:"start_time"`
+	Refill        string    `json:"refill"`
+	ETA           string    `json:"eta"`
+	PriceStart    string    `json:"price_start"`
+	PricePer1K    string    `json:"price_per_1k"`
+	CheckoutPrice int64     `json:"checkout_price"`
+	TrustBadges   []string  `json:"trust_badges,omitempty"`
+	SortOrder     int       `json:"sort_order"`
+	IsActive      bool      `json:"is_active"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 func NewSosmedServiceHandler(svc *service.SosmedServiceService) *SosmedServiceHandler {
 	return &SosmedServiceHandler{svc: svc}
+}
+
+func toPublicSosmedServiceResponse(item model.SosmedService) publicSosmedServiceResponse {
+	return publicSosmedServiceResponse{
+		ID:            item.ID,
+		CategoryCode:  item.CategoryCode,
+		Code:          item.Code,
+		Title:         item.Title,
+		Summary:       item.Summary,
+		PlatformLabel: item.PlatformLabel,
+		BadgeText:     item.BadgeText,
+		Theme:         item.Theme,
+		MinOrder:      item.MinOrder,
+		StartTime:     item.StartTime,
+		Refill:        item.Refill,
+		ETA:           item.ETA,
+		PriceStart:    item.PriceStart,
+		PricePer1K:    item.PricePer1K,
+		CheckoutPrice: item.CheckoutPrice,
+		TrustBadges:   item.TrustBadges,
+		SortOrder:     item.SortOrder,
+		IsActive:      item.IsActive,
+		CreatedAt:     item.CreatedAt,
+		UpdatedAt:     item.UpdatedAt,
+	}
 }
 
 func (h *SosmedServiceHandler) PublicList(c *gin.Context) {
@@ -27,7 +77,12 @@ func (h *SosmedServiceHandler) PublicList(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, "OK", items)
+	publicItems := make([]publicSosmedServiceResponse, 0, len(items))
+	for _, item := range items {
+		publicItems = append(publicItems, toPublicSosmedServiceResponse(item))
+	}
+
+	response.Success(c, "OK", publicItems)
 }
 
 func (h *SosmedServiceHandler) AdminList(c *gin.Context) {

@@ -30,6 +30,13 @@ function defaultCheckoutPrice(service: SosmedService | null) {
   return 0
 }
 
+const MAX_SOSMED_PACKAGE_QUANTITY = 1000
+
+function clampSosmedPackageQuantity(value: number) {
+  if (!Number.isFinite(value)) return 1
+  return Math.min(MAX_SOSMED_PACKAGE_QUANTITY, Math.max(1, Math.floor(value)))
+}
+
 export default function SosmedCheckoutPage() {
   return (
     <Suspense
@@ -57,6 +64,7 @@ function SosmedCheckoutContent() {
 
   const [service, setService] = useState<SosmedService | null>(null)
   const [targetLink, setTargetLink] = useState('')
+  const [packageQuantity, setPackageQuantity] = useState(1)
   const [notes, setNotes] = useState('')
   const [loadingService, setLoadingService] = useState(true)
 
@@ -65,6 +73,8 @@ function SosmedCheckoutContent() {
   const [error, setError] = useState('')
 
   const checkoutPrice = useMemo(() => defaultCheckoutPrice(service), [service])
+  const totalPrice = useMemo(() => checkoutPrice * packageQuantity, [checkoutPrice, packageQuantity])
+  const estimatedUnits = useMemo(() => packageQuantity * 1000, [packageQuantity])
 
   useEffect(() => {
     if (!authReady) return
@@ -124,6 +134,11 @@ function SosmedCheckoutContent() {
       return
     }
 
+    const normalizedQuantity = clampSosmedPackageQuantity(packageQuantity)
+    if (normalizedQuantity !== packageQuantity) {
+      setPackageQuantity(normalizedQuantity)
+    }
+
     setSubmitting(true)
     setError('')
 
@@ -131,7 +146,7 @@ function SosmedCheckoutContent() {
       const orderRes = await sosmedOrderService.create({
         service_id: service.id,
         target_link: targetLink.trim(),
-        quantity: 1,
+        quantity: normalizedQuantity,
         notes: notes.trim(),
       })
       if (!orderRes.success) {
@@ -220,9 +235,19 @@ function SosmedCheckoutContent() {
                 <span className="text-[#888]">Platform</span>
                 <span className="font-semibold text-right">{service.platform_label || '-'}</span>
               </div>
+              <div className="flex justify-between text-sm gap-4">
+                <span className="text-[#888]">Harga per paket</span>
+                <span className="font-semibold text-right">{formatRupiah(checkoutPrice)} / 1K</span>
+              </div>
+              <div className="flex justify-between text-sm gap-4">
+                <span className="text-[#888]">Jumlah paket</span>
+                <span className="font-semibold text-right">
+                  {packageQuantity.toLocaleString('id-ID')} paket ({estimatedUnits.toLocaleString('id-ID')} unit)
+                </span>
+              </div>
               <div className="border-t border-[#EBEBEB] pt-3 flex justify-between gap-4">
                 <span className="font-bold">Total</span>
-                <span className="text-xl font-extrabold text-[#FF5733]">{formatRupiah(checkoutPrice)}</span>
+                <span className="text-xl font-extrabold text-[#FF5733]">{formatRupiah(totalPrice)}</span>
               </div>
             </div>
           </div>
@@ -237,6 +262,41 @@ function SosmedCheckoutContent() {
                 placeholder="contoh: https://instagram.com/username"
                 className="w-full rounded-xl border border-[#E5E5E5] px-3 py-2.5 text-sm"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#666] mb-1">Jumlah Paket 1K</label>
+              <div className="flex overflow-hidden rounded-xl border border-[#E5E5E5] bg-white">
+                <input
+                  value={packageQuantity}
+                  onChange={(event) => setPackageQuantity(clampSosmedPackageQuantity(Number(event.target.value)))}
+                  type="number"
+                  min={1}
+                  max={MAX_SOSMED_PACKAGE_QUANTITY}
+                  className="w-full px-3 py-2.5 text-sm outline-none"
+                />
+                <div className="flex min-w-20 items-center justify-center border-l border-[#E5E5E5] bg-[#FAFAF8] px-3 text-xs font-bold text-[#666]">
+                  x 1K
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-[#888]">
+                1 paket = 1.000 unit layanan. Contoh: 5 paket berarti sekitar 5.000 followers/unit.
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {[1, 5, 10].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setPackageQuantity(preset)}
+                    className={`rounded-full border px-3 py-2 text-xs font-bold transition-colors ${
+                      packageQuantity === preset
+                        ? 'border-[#141414] bg-[#141414] text-white'
+                        : 'border-[#E5E5E5] bg-white text-[#666] hover:border-[#141414]'
+                    }`}
+                  >
+                    {preset.toLocaleString('id-ID')}K
+                  </button>
+                ))}
+              </div>
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#666] mb-1">Catatan (opsional)</label>
@@ -314,7 +374,7 @@ function SosmedCheckoutContent() {
             disabled={submitting}
             className="w-full py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm"
           >
-            {submitting ? 'Memproses Pembayaran...' : `Buat Invoice ${formatRupiah(checkoutPrice)}`}
+            {submitting ? 'Memproses Pembayaran...' : `Buat Invoice ${formatRupiah(totalPrice)}`}
           </button>
 
           <p className="text-xs text-center text-[#888] mt-4">
