@@ -431,7 +431,7 @@ func TestSosmedService_ImportSelectedFromJAP_CreatesDrafts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find instagram draft: %v", err)
 	}
-	if insta.Code != "jap-ig-followers-r30-6331" {
+	if insta.Code != "instagram-followers-6331" {
 		t.Fatalf("unexpected instagram code: %s", insta.Code)
 	}
 	if insta.Title != "Instagram Followers Refill 30 Hari" {
@@ -460,7 +460,7 @@ func TestSosmedService_ImportSelectedFromJAP_CreatesDrafts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find twitter draft: %v", err)
 	}
-	if twitter.Code != "jap-x-followers-8695" {
+	if twitter.Code != "twitter-followers-8695" {
 		t.Fatalf("unexpected twitter code: %s", twitter.Code)
 	}
 	if twitter.Title != "Twitter Followers" {

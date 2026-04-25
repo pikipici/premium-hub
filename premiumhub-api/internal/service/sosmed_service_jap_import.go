@@ -23,7 +23,6 @@ var (
 	sosmedJAPStartTimePattern = regexp.MustCompile(`(?i)\[Start Time:\s*([^\]]+)\]`)
 	sosmedJAPSpeedPattern     = regexp.MustCompile(`(?i)\[Speed:\s*([^\]]+)\]`)
 	sosmedJAPMaxPattern       = regexp.MustCompile(`(?i)\[Max:\s*([^\]]+)\]`)
-	sosmedJAPDayNumberPattern = regexp.MustCompile(`([0-9]{1,4})`)
 )
 
 type ImportSelectedJAPServicesInput struct {
@@ -189,7 +188,6 @@ func (s *SosmedServiceService) buildJAPDraftService(item JAPServiceItem, sortOrd
 	}
 
 	platformLabel := detectJAPPlatformLabel(item)
-	platformToken := detectJAPPlatformToken(platformLabel)
 	refillValue := extractJAPBracketValue(item.Name, sosmedJAPRefillPattern)
 	startTimeValue := formatSosmedStartTimeValue(extractJAPBracketValue(item.Name, sosmedJAPStartTimePattern))
 	etaValue := formatSosmedETAValue(extractJAPBracketValue(item.Name, sosmedJAPSpeedPattern))
@@ -211,7 +209,7 @@ func (s *SosmedServiceService) buildJAPDraftService(item JAPServiceItem, sortOrd
 	idrText := formatIDRThousands(idrPer1K)
 	usdText := normalizeUSDText(rateUSD)
 
-	code := buildJAPLocalCode(platformToken, categoryCode, refillLabel, serviceID)
+	code := buildJAPLocalCode(platformLabel, categoryCode, serviceID)
 	summary := buildJAPSummary(platformLabel, categoryCode, refillLabel, maxValue)
 	theme := detectJAPTheme(platformLabel)
 
@@ -426,24 +424,24 @@ func detectJAPPlatformLabel(item JAPServiceItem) string {
 	}
 }
 
-func detectJAPPlatformToken(platformLabel string) string {
+func detectJAPPlatformCodeSlug(platformLabel string) string {
 	switch strings.ToLower(strings.TrimSpace(platformLabel)) {
 	case "instagram":
-		return "ig"
+		return "instagram"
 	case "tiktok":
-		return "tt"
+		return "tiktok"
 	case "youtube":
-		return "yt"
+		return "youtube"
 	case "telegram":
-		return "tg"
+		return "telegram"
 	case "facebook":
-		return "fb"
+		return "facebook"
 	case "x / twitter":
-		return "x"
+		return "twitter"
 	case "spotify":
-		return "sp"
+		return "spotify"
 	default:
-		return "svc"
+		return "social"
 	}
 }
 
@@ -484,36 +482,13 @@ func detectJAPTheme(platformLabel string) string {
 	}
 }
 
-func buildJAPLocalCode(platformToken, categoryCode, refillLabel, serviceID string) string {
-	parts := []string{sosmedJAPProviderCode}
-	if platformToken != "" {
-		parts = append(parts, platformToken)
+func buildJAPLocalCode(platformLabel, categoryCode, serviceID string) string {
+	parts := []string{
+		detectJAPPlatformCodeSlug(platformLabel),
+		strings.TrimSpace(categoryCode),
+		strings.TrimSpace(serviceID),
 	}
-	parts = append(parts, categoryCode)
-
-	if refillToken := deriveJAPRefillToken(refillLabel); refillToken != "" {
-		parts = append(parts, refillToken)
-	}
-
-	parts = append(parts, serviceID)
 	return normalizeSosmedServiceCode(strings.Join(parts, "-"))
-}
-
-func deriveJAPRefillToken(refillLabel string) string {
-	refillLabel = strings.TrimSpace(refillLabel)
-	if refillLabel == "" || refillLabel == "-" || refillLabel == "Tidak Ada" {
-		return ""
-	}
-
-	match := sosmedJAPDayNumberPattern.FindStringSubmatch(refillLabel)
-	if len(match) == 2 {
-		return "r" + match[1]
-	}
-
-	if strings.Contains(strings.ToLower(refillLabel), "otomatis") {
-		return "auto"
-	}
-	return "refill"
 }
 
 func formatSosmedStartTimeValue(raw string) string {
