@@ -138,3 +138,33 @@ func (h *SosmedOrderHandler) AdminUpdateStatus(c *gin.Context) {
 
 	response.Success(c, "Status order sosmed diperbarui", detail)
 }
+
+func (h *SosmedOrderHandler) AdminSyncProvider(c *gin.Context) {
+	adminID := c.MustGet("user_id").(uuid.UUID)
+	orderID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+
+	detail, err := h.svc.AdminSyncProviderStatus(c.Request.Context(), orderID, adminID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Status provider berhasil disinkronkan", detail)
+}
+
+func (h *SosmedOrderHandler) AdminSyncProcessingProviders(c *gin.Context) {
+	adminID := c.MustGet("user_id").(uuid.UUID)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	result, err := h.svc.AdminSyncProcessingProviderOrders(c.Request.Context(), adminID, limit)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Sync provider selesai", result)
+}

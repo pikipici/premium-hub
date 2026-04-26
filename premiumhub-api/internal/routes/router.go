@@ -306,7 +306,9 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/orders/:id/send", orderHandler.SendAccount)
 
 	admin.GET("/sosmed/orders", sosmedOrderHandler.AdminList)
+	admin.POST("/sosmed/orders/sync-provider", sosmedOrderHandler.AdminSyncProcessingProviders)
 	admin.PATCH("/sosmed/orders/:id/status", sosmedOrderHandler.AdminUpdateStatus)
+	admin.POST("/sosmed/orders/:id/sync-provider", sosmedOrderHandler.AdminSyncProvider)
 
 	admin.GET("/claims", claimHandler.AdminList)
 	admin.PUT("/claims/:id/approve", claimHandler.Approve)

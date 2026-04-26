@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"strings"
+
 	"premiumhub-api/internal/model"
 
 	"github.com/google/uuid"
@@ -78,6 +80,24 @@ func (r *SosmedOrderRepo) AdminList(status string, page, limit int) ([]model.Sos
 		Order("created_at DESC").
 		Find(&orders).Error
 	return orders, total, err
+}
+
+func (r *SosmedOrderRepo) FindSyncableProviderOrders(providerCode string, limit int) ([]model.SosmedOrder, error) {
+	var orders []model.SosmedOrder
+
+	q := r.db.Model(&model.SosmedOrder{}).
+		Where("provider_code = ?", strings.TrimSpace(providerCode)).
+		Where("provider_order_id IS NOT NULL AND provider_order_id <> ''").
+		Where("payment_status = ?", "paid").
+		Where("order_status = ?", "processing").
+		Order("updated_at ASC")
+
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+
+	err := q.Find(&orders).Error
+	return orders, err
 }
 
 func (r *SosmedOrderRepo) CreateEvent(event *model.SosmedOrderEvent) error {

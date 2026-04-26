@@ -24,6 +24,7 @@ export interface SosmedOrder {
   provider_status?: string
   provider_payload?: string
   provider_error?: string
+  provider_synced_at?: string
   notes?: string
   paid_at?: string
   expires_at?: string

@@ -50,6 +50,7 @@ type SosmedOrderService struct {
 
 type SosmedJAPOrderProvider interface {
 	AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error)
+	GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error)
 }
 
 func NewSosmedOrderService(
@@ -81,6 +82,26 @@ type AdminUpdateSosmedOrderStatusInput struct {
 	ToStatus     string `json:"to_status" binding:"required"`
 	Reason       string `json:"reason"`
 	InternalNote string `json:"internal_note"`
+}
+
+type AdminSyncSosmedProviderResult struct {
+	Requested int                                 `json:"requested"`
+	Synced    int                                 `json:"synced"`
+	Updated   int                                 `json:"updated"`
+	Failed    int                                 `json:"failed"`
+	Skipped   int                                 `json:"skipped"`
+	Items     []AdminSyncSosmedProviderResultItem `json:"items,omitempty"`
+}
+
+type AdminSyncSosmedProviderResultItem struct {
+	OrderID         uuid.UUID `json:"order_id"`
+	ServiceCode     string    `json:"service_code"`
+	ProviderCode    string    `json:"provider_code"`
+	ProviderOrderID string    `json:"provider_order_id"`
+	ProviderStatus  string    `json:"provider_status"`
+	OrderStatus     string    `json:"order_status"`
+	Result          string    `json:"result"`
+	Message         string    `json:"message,omitempty"`
 }
 
 type SosmedOrderDetail struct {
@@ -564,6 +585,123 @@ func truncateSosmedProviderText(value string, max int) string {
 	return strings.TrimSpace(trimmed[:max])
 }
 
+func normalizeSosmedProviderStatus(value string) string {
+	fields := strings.Fields(strings.ToLower(strings.TrimSpace(value)))
+	return strings.Join(fields, " ")
+}
+
+func humanizeSosmedProviderStatus(value string) string {
+	normalized := normalizeSosmedProviderStatus(value)
+	if normalized == "" {
+		return "status provider kosong"
+	}
+	return normalized
+}
+
+func mapSosmedProviderOrderStatus(currentOrderStatus, providerStatus string) string {
+	if normalizeSosmedOrderStatus(currentOrderStatus) != sosmedOrderStatusProcessing {
+		return normalizeSosmedOrderStatus(currentOrderStatus)
+	}
+
+	switch normalizeSosmedProviderStatus(providerStatus) {
+	case "completed", "complete", "success", "delivered":
+		return sosmedOrderStatusSuccess
+	case "partial", "partially completed", "partial completed", "failed", "fail", "canceled", "cancelled", "error":
+		return sosmedOrderStatusFailed
+	case "pending", "processing", "in progress", "inprogress", "queued", "queue", "active", "refilling":
+		return sosmedOrderStatusProcessing
+	default:
+		return sosmedOrderStatusProcessing
+	}
+}
+
+func buildSosmedProviderSyncPayload(order *model.SosmedOrder, response *JAPOrderStatusResponse) string {
+	payload := map[string]any{
+		"provider":          "jap",
+		"action":            "status",
+		"local_order_id":    "",
+		"provider_order_id": "",
+		"response":          response,
+	}
+	if order != nil {
+		payload["local_order_id"] = order.ID.String()
+		payload["provider_order_id"] = order.ProviderOrderID
+		payload["service_code"] = order.ServiceCode
+	}
+	raw, _ := json.Marshal(payload)
+	return string(raw)
+}
+
+func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *model.SosmedOrder, actorType string, actorID *uuid.UUID) (*model.SosmedOrder, bool, error) {
+	if s.japOrderProvider == nil {
+		return nil, false, errors.New("konfigurasi JAP order provider belum siap")
+	}
+	if order == nil {
+		return nil, false, errors.New("order sosmed tidak ditemukan")
+	}
+	if !isJAPSosmedOrder(order) {
+		return nil, false, errors.New("order ini bukan order supplier JAP")
+	}
+	if strings.TrimSpace(order.ProviderOrderID) == "" {
+		return nil, false, errors.New("provider order id belum tersedia")
+	}
+
+	syncedAt := time.Now()
+	providerRes, err := s.japOrderProvider.GetOrderStatus(ctx, order.ProviderOrderID)
+	if err != nil {
+		order.ProviderError = truncateSosmedProviderText(err.Error(), 2000)
+		order.ProviderSyncedAt = &syncedAt
+		if saveErr := s.repo.Update(order); saveErr != nil {
+			return nil, false, errors.New("gagal menyimpan error sync provider")
+		}
+		return nil, false, err
+	}
+
+	providerStatus := strings.TrimSpace(providerRes.Status)
+	previousOrderStatus := normalizeSosmedOrderStatus(order.OrderStatus)
+	previousProviderStatus := strings.TrimSpace(order.ProviderStatus)
+	nextOrderStatus := mapSosmedProviderOrderStatus(previousOrderStatus, providerStatus)
+
+	order.ProviderStatus = providerStatus
+	order.ProviderPayload = truncateSosmedProviderText(buildSosmedProviderSyncPayload(order, providerRes), 4000)
+	order.ProviderError = ""
+	order.ProviderSyncedAt = &syncedAt
+	order.OrderStatus = nextOrderStatus
+
+	if err := s.repo.Update(order); err != nil {
+		return nil, false, errors.New("gagal menyimpan sync status provider")
+	}
+
+	statusChanged := previousOrderStatus != nextOrderStatus
+	providerChanged := previousProviderStatus != providerStatus
+	if statusChanged || providerChanged {
+		reason := fmt.Sprintf("sync JAP: provider status %s", humanizeSosmedProviderStatus(providerStatus))
+		if statusChanged {
+			reason = fmt.Sprintf("%s, order jadi %s", reason, nextOrderStatus)
+		}
+
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: previousOrderStatus,
+			ToStatus:   nextOrderStatus,
+			Reason:     reason,
+			ActorType:  strings.TrimSpace(actorType),
+			ActorID:    actorID,
+			CreatedAt:  syncedAt,
+		}
+		if err := s.repo.CreateEvent(event); err != nil {
+			return nil, false, errors.New("gagal mencatat event sync provider")
+		}
+	}
+
+	stored, err := s.repo.FindByID(order.ID)
+	if err != nil {
+		return nil, false, errors.New("gagal memuat order sosmed hasil sync")
+	}
+
+	return stored, statusChanged || providerChanged, nil
+}
+
 func (s *SosmedOrderService) GetByID(id, userID uuid.UUID) (*SosmedOrderDetail, error) {
 	order, err := s.repo.FindByID(id)
 	if err != nil {
@@ -719,4 +857,72 @@ func (s *SosmedOrderService) AdminUpdateStatus(orderID uuid.UUID, actorID uuid.U
 		return nil, errors.New("gagal memuat order sosmed")
 	}
 	return s.buildDetail(stored)
+}
+
+func (s *SosmedOrderService) AdminSyncProviderStatus(ctx context.Context, orderID uuid.UUID, actorID uuid.UUID) (*SosmedOrderDetail, error) {
+	order, err := s.repo.FindByID(orderID)
+	if err != nil {
+		return nil, errors.New("order sosmed tidak ditemukan")
+	}
+
+	stored, _, err := s.syncJAPProviderOrder(ctx, order, "admin", &actorID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.buildDetail(stored)
+}
+
+func (s *SosmedOrderService) AdminSyncProcessingProviderOrders(ctx context.Context, actorID uuid.UUID, limit int) (*AdminSyncSosmedProviderResult, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	orders, err := s.repo.FindSyncableProviderOrders("jap", limit)
+	if err != nil {
+		return nil, errors.New("gagal memuat order sync provider")
+	}
+
+	result := &AdminSyncSosmedProviderResult{
+		Requested: len(orders),
+		Items:     make([]AdminSyncSosmedProviderResultItem, 0, len(orders)),
+	}
+
+	for _, item := range orders {
+		order := item
+		row := AdminSyncSosmedProviderResultItem{
+			OrderID:         order.ID,
+			ServiceCode:     order.ServiceCode,
+			ProviderCode:    order.ProviderCode,
+			ProviderOrderID: order.ProviderOrderID,
+			ProviderStatus:  order.ProviderStatus,
+			OrderStatus:     order.OrderStatus,
+		}
+
+		stored, changed, syncErr := s.syncJAPProviderOrder(ctx, &order, "admin", &actorID)
+		if syncErr != nil {
+			row.Result = "failed"
+			row.Message = syncErr.Error()
+			result.Failed++
+			result.Items = append(result.Items, row)
+			continue
+		}
+
+		row.ProviderStatus = stored.ProviderStatus
+		row.OrderStatus = stored.OrderStatus
+		if changed {
+			row.Result = "updated"
+			result.Updated++
+		} else {
+			row.Result = "synced"
+			result.Skipped++
+		}
+		result.Synced++
+		result.Items = append(result.Items, row)
+	}
+
+	return result, nil
 }

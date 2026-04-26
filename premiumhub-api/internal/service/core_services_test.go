@@ -293,13 +293,13 @@ func TestAuthService_AllBranches(t *testing.T) {
 	}
 
 	svcNilCfg := &AuthService{userRepo: userRepo, cfg: nil}
-	if _, err := svcNilCfg.generateToken(user); err == nil || !strings.Contains(err.Error(), "config auth tidak valid") {
+	if _, _, err := svcNilCfg.generateAccessToken(user); err == nil || !strings.Contains(err.Error(), "config auth tidak valid") {
 		t.Fatalf("expected nil config token error, got: %v", err)
 	}
 
 	cfg2 := &config.Config{JWTSecret: "jwt-secret-test", JWTExpiry: "invalid-duration"}
 	svc2 := NewAuthService(userRepo, cfg2)
-	if _, err := svc2.generateToken(user); err != nil {
+	if _, _, err := svc2.generateAccessToken(user); err != nil {
 		t.Fatalf("generate token with invalid duration should fallback, got: %v", err)
 	}
 }

@@ -30,12 +30,13 @@ type SosmedOrder struct {
 	GatewayOrderID string `gorm:"size:120;index" json:"gateway_order_id"`
 	PaymentPayload string `gorm:"type:text" json:"payment_payload,omitempty"`
 
-	ProviderCode      string `gorm:"size:32;index" json:"provider_code,omitempty"`
-	ProviderServiceID string `gorm:"size:64;index" json:"provider_service_id,omitempty"`
-	ProviderOrderID   string `gorm:"size:80;index" json:"provider_order_id,omitempty"`
-	ProviderStatus    string `gorm:"size:40;index" json:"provider_status,omitempty"`
-	ProviderPayload   string `gorm:"type:text" json:"provider_payload,omitempty"`
-	ProviderError     string `gorm:"type:text" json:"provider_error,omitempty"`
+	ProviderCode      string     `gorm:"size:32;index" json:"provider_code,omitempty"`
+	ProviderServiceID string     `gorm:"size:64;index" json:"provider_service_id,omitempty"`
+	ProviderOrderID   string     `gorm:"size:80;index" json:"provider_order_id,omitempty"`
+	ProviderStatus    string     `gorm:"size:40;index" json:"provider_status,omitempty"`
+	ProviderPayload   string     `gorm:"type:text" json:"provider_payload,omitempty"`
+	ProviderError     string     `gorm:"type:text" json:"provider_error,omitempty"`
+	ProviderSyncedAt  *time.Time `json:"provider_synced_at"`
 
 	Notes string `gorm:"type:text" json:"notes"`
 

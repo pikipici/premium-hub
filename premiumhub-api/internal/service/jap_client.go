@@ -19,6 +19,7 @@ type JAPClient interface {
 	GetBalance(ctx context.Context) (*JAPBalanceResponse, error)
 	GetServices(ctx context.Context) ([]JAPServiceItem, error)
 	AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error)
+	GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error)
 }
 
 type JAPBalanceResponse struct {
@@ -69,6 +70,36 @@ type JAPAddOrderInput struct {
 
 type JAPAddOrderResponse struct {
 	Order JAPServiceID `json:"order"`
+}
+
+type JAPFlexibleValue string
+
+func (v *JAPFlexibleValue) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		*v = ""
+		return nil
+	}
+
+	if trimmed[0] == '"' {
+		var value string
+		if err := json.Unmarshal(trimmed, &value); err != nil {
+			return err
+		}
+		*v = JAPFlexibleValue(strings.TrimSpace(value))
+		return nil
+	}
+
+	*v = JAPFlexibleValue(strings.TrimSpace(string(trimmed)))
+	return nil
+}
+
+type JAPOrderStatusResponse struct {
+	Charge     JAPFlexibleValue `json:"charge"`
+	StartCount JAPFlexibleValue `json:"start_count"`
+	Status     string           `json:"status"`
+	Remains    JAPFlexibleValue `json:"remains"`
+	Currency   string           `json:"currency"`
 }
 
 type JAPAPIError struct {
@@ -171,6 +202,32 @@ func (c *japHTTPClient) AddOrder(ctx context.Context, input JAPAddOrderInput) (*
 			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
 		}
 		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response add order JAP tidak berisi order id", Retryable: true}
+	}
+
+	return &out, nil
+}
+
+func (c *japHTTPClient) GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error) {
+	extra := url.Values{}
+	extra.Set("order", strings.TrimSpace(orderID))
+
+	raw, err := c.request(ctx, "status", extra)
+	if err != nil {
+		return nil, err
+	}
+
+	var out JAPOrderStatusResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		if msg := extractJAPProviderMessage(raw); msg != "" {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+		}
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response status order JAP tidak valid", Retryable: true}
+	}
+	if strings.TrimSpace(out.Status) == "" {
+		if msg := extractJAPProviderMessage(raw); msg != "" {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+		}
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response status order JAP kosong", Retryable: true}
 	}
 
 	return &out, nil

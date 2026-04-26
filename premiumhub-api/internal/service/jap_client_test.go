@@ -140,6 +140,43 @@ func TestJAPClientAddOrder(t *testing.T) {
 	}
 }
 
+func TestJAPClientGetOrderStatus(t *testing.T) {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST request, got %s", r.Method)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		assertJAPFormValue(t, r.Form, "key", "secret-key")
+		assertJAPFormValue(t, r.Form, "action", "status")
+		assertJAPFormValue(t, r.Form, "order", "991122")
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"charge":"0.27819","start_count":"3572","status":"Completed","remains":"0","currency":"USD"}`))
+	}))
+	defer server.Close()
+
+	client := NewJAPClient(&config.Config{
+		JAPAPIURL:         server.URL,
+		JAPAPIKey:         "secret-key",
+		JAPHTTPTimeoutSec: "5",
+	})
+
+	res, err := client.GetOrderStatus(context.Background(), "991122")
+	if err != nil {
+		t.Fatalf("get order status: %v", err)
+	}
+	if res.Status != "Completed" {
+		t.Fatalf("expected status Completed, got %q", res.Status)
+	}
+	if res.Remains != "0" {
+		t.Fatalf("expected remains 0, got %q", res.Remains)
+	}
+}
+
 func TestJAPClientRequiresAPIKey(t *testing.T) {
 	client := NewJAPClient(&config.Config{
 		JAPAPIURL:         "https://justanotherpanel.com/api/v2",

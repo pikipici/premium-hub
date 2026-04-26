@@ -48,6 +48,15 @@ function statusLabel(value: string) {
   }
 }
 
+function formatProviderStatus(value?: string) {
+  const normalized = value?.trim()
+  if (!normalized) return '-'
+  return normalized
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 function nextStatusActions(order: SosmedOrder) {
   if (order.order_status === 'pending_payment') {
     return [
@@ -141,6 +150,48 @@ export default function SosmedOrderPage() {
     }
   }
 
+  const syncProvider = async (order: SosmedOrder) => {
+    setSaving(true)
+    setError('')
+
+    try {
+      const res = await sosmedOrderService.adminSyncProvider(order.id)
+      if (!res.success) {
+        setError(res.message || 'Gagal sync provider order sosmed')
+        return
+      }
+
+      setNotice(`Provider order ${order.id.slice(0, 8)} berhasil disinkronkan`)
+      await loadData()
+    } catch {
+      setError('Gagal sync provider order sosmed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const syncAllProviders = async () => {
+    setSaving(true)
+    setError('')
+
+    try {
+      const res = await sosmedOrderService.adminSyncProcessingProviders({ limit: PAGE_LIMIT })
+      if (!res.success || !res.data) {
+        setError(res.message || 'Gagal sync massal provider')
+        return
+      }
+
+      setNotice(
+        `Sync provider selesai: ${res.data.synced} sukses, ${res.data.updated} update status, ${res.data.failed} gagal, ${res.data.skipped} tetap`
+      )
+      await loadData()
+    } catch {
+      setError('Gagal sync massal provider')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="page">
       <div className="card">
@@ -152,9 +203,14 @@ export default function SosmedOrderPage() {
             </div>
           </div>
 
-          <button className="action-btn" type="button" disabled={loading || saving} onClick={() => void loadData()}>
-            Refresh
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="action-btn" type="button" disabled={loading || saving} onClick={() => void syncAllProviders()}>
+              Sync Semua Provider
+            </button>
+            <button className="action-btn" type="button" disabled={loading || saving} onClick={() => void loadData()}>
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div style={{ padding: '0 18px 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -201,8 +257,9 @@ export default function SosmedOrderPage() {
                     <th>Total</th>
                     <th>Pembayaran</th>
                     <th>Status</th>
+                    <th>Provider</th>
                     <th>Dibuat</th>
-                    <th style={{ width: 240 }}>Aksi</th>
+                    <th style={{ width: 280 }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -224,9 +281,36 @@ export default function SosmedOrderPage() {
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>{order.payment_method || '-'}</div>
                         </td>
                         <td><span className={`status ${status.className}`}>{status.label}</span></td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{(order.provider_code || '-').toUpperCase()}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            {order.provider_order_id ? `Order ${order.provider_order_id}` : 'Belum ada provider order id'}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            Status: {formatProviderStatus(order.provider_status)}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            Sync: {order.provider_synced_at ? formatDate(order.provider_synced_at) : '-'}
+                          </div>
+                          {order.provider_error ? (
+                            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--red)' }}>
+                              {order.provider_error}
+                            </div>
+                          ) : null}
+                        </td>
                         <td>{formatDate(order.created_at)}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {order.provider_code === 'jap' && order.provider_order_id ? (
+                              <button
+                                className="action-btn"
+                                type="button"
+                                disabled={saving}
+                                onClick={() => void syncProvider(order)}
+                              >
+                                Sync Provider
+                              </button>
+                            ) : null}
                             {actions.length === 0 ? (
                               <span style={{ fontSize: 11, color: 'var(--muted)' }}>Tidak ada aksi</span>
                             ) : (

@@ -74,6 +74,23 @@ func (s *JAPService) AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAP
 	return res, nil
 }
 
+func (s *JAPService) GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
+
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, errors.New("provider order id JAP wajib diisi")
+	}
+
+	res, err := s.client.GetOrderStatus(ctx, orderID)
+	if err != nil {
+		return nil, s.normalizeProviderErr(err)
+	}
+	return res, nil
+}
+
 func (s *JAPService) ensureConfigured() error {
 	if s == nil || s.cfg == nil {
 		return errors.New("konfigurasi JAP belum siap")

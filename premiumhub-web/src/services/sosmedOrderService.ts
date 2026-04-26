@@ -20,6 +20,26 @@ export interface AdminUpdateSosmedOrderStatusPayload {
   internal_note?: string
 }
 
+export interface AdminSyncSosmedProviderResultItem {
+  order_id: string
+  service_code: string
+  provider_code: string
+  provider_order_id: string
+  provider_status: string
+  order_status: string
+  result: string
+  message?: string
+}
+
+export interface AdminSyncSosmedProviderResult {
+  requested: number
+  synced: number
+  updated: number
+  failed: number
+  skipped: number
+  items?: AdminSyncSosmedProviderResultItem[]
+}
+
 export const sosmedOrderService = {
   create: async (payload: CreateSosmedOrderPayload) => {
     const res = await api.post<ApiResponse<SosmedOrderDetail>>('/sosmed/orders', payload)
@@ -72,6 +92,16 @@ export const sosmedOrderService = {
 
   adminUpdateStatus: async (id: string, payload: AdminUpdateSosmedOrderStatusPayload) => {
     const res = await api.patch<ApiResponse<SosmedOrderDetail>>(`/admin/sosmed/orders/${id}/status`, payload)
+    return res.data
+  },
+
+  adminSyncProvider: async (id: string) => {
+    const res = await api.post<ApiResponse<SosmedOrderDetail>>(`/admin/sosmed/orders/${id}/sync-provider`)
+    return res.data
+  },
+
+  adminSyncProcessingProviders: async (params?: { limit?: number }) => {
+    const res = await api.post<ApiResponse<AdminSyncSosmedProviderResult>>('/admin/sosmed/orders/sync-provider', null, { params })
     return res.data
   },
 }

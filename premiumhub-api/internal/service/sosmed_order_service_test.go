@@ -13,9 +13,14 @@ import (
 )
 
 type fakeSosmedJAPOrderProvider struct {
-	inputs []JAPAddOrderInput
-	res    *JAPAddOrderResponse
-	err    error
+	inputs             []JAPAddOrderInput
+	res                *JAPAddOrderResponse
+	err                error
+	statusInputs       []string
+	statusRes          *JAPOrderStatusResponse
+	statusErr          error
+	statusByOrderID    map[string]*JAPOrderStatusResponse
+	statusErrByOrderID map[string]error
 }
 
 func (f *fakeSosmedJAPOrderProvider) AddOrder(_ context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error) {
@@ -27,6 +32,27 @@ func (f *fakeSosmedJAPOrderProvider) AddOrder(_ context.Context, input JAPAddOrd
 		return f.res, nil
 	}
 	return &JAPAddOrderResponse{Order: "991122"}, nil
+}
+
+func (f *fakeSosmedJAPOrderProvider) GetOrderStatus(_ context.Context, orderID string) (*JAPOrderStatusResponse, error) {
+	f.statusInputs = append(f.statusInputs, orderID)
+	if f.statusErrByOrderID != nil {
+		if err := f.statusErrByOrderID[orderID]; err != nil {
+			return nil, err
+		}
+	}
+	if f.statusErr != nil {
+		return nil, f.statusErr
+	}
+	if f.statusByOrderID != nil {
+		if res := f.statusByOrderID[orderID]; res != nil {
+			return res, nil
+		}
+	}
+	if f.statusRes != nil {
+		return f.statusRes, nil
+	}
+	return &JAPOrderStatusResponse{Status: "In Progress"}, nil
 }
 
 func TestSosmedOrderService_CreateAndConfirm(t *testing.T) {
@@ -435,5 +461,246 @@ func TestSosmedOrderService_CreateWalletPaidInsufficientBalance(t *testing.T) {
 	}
 	if orderCount != 0 {
 		t.Fatalf("expected no order created, got %d", orderCount)
+	}
+}
+
+func TestSosmedOrderService_AdminSyncProviderStatus(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+	); err != nil {
+		t.Fatalf("migrate sync models: %v", err)
+	}
+
+	admin := &model.User{
+		ID:       uuid.New(),
+		Name:     "Admin Sync Sosmed",
+		Email:    "admin-sync-sosmed@example.com",
+		Password: "hashed",
+		Role:     "admin",
+		IsActive: true,
+	}
+	if err := db.Create(admin).Error; err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "instagram-followers-6331",
+		Title:             "Instagram Followers Hemat",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     19000,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            admin.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://instagram.com/example",
+		Quantity:          1,
+		UnitPrice:         19000,
+		TotalPrice:        19000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusProcessing,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderOrderID:   "JAP-7788",
+		ProviderStatus:    "submitted",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{
+		statusRes: &JAPOrderStatusResponse{
+			Status:     "Completed",
+			Charge:     "0.27819",
+			StartCount: "3572",
+			Remains:    "0",
+			Currency:   "USD",
+		},
+	}
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetJAPOrderProvider(fakeJAP)
+
+	detail, err := orderSvc.AdminSyncProviderStatus(context.Background(), order.ID, admin.ID)
+	if err != nil {
+		t.Fatalf("admin sync provider status: %v", err)
+	}
+
+	if len(fakeJAP.statusInputs) != 1 || fakeJAP.statusInputs[0] != "JAP-7788" {
+		t.Fatalf("unexpected status inputs: %+v", fakeJAP.statusInputs)
+	}
+	if detail.Order.OrderStatus != sosmedOrderStatusSuccess {
+		t.Fatalf("expected success order after sync, got %s", detail.Order.OrderStatus)
+	}
+	if detail.Order.ProviderStatus != "Completed" {
+		t.Fatalf("expected provider status Completed, got %q", detail.Order.ProviderStatus)
+	}
+	if detail.Order.ProviderSyncedAt == nil {
+		t.Fatalf("provider_synced_at should be filled")
+	}
+
+	var eventCount int64
+	if err := db.Model(&model.SosmedOrderEvent{}).
+		Where("order_id = ?", order.ID).
+		Count(&eventCount).Error; err != nil {
+		t.Fatalf("count sync events: %v", err)
+	}
+	if eventCount != 1 {
+		t.Fatalf("expected 1 sync event, got %d", eventCount)
+	}
+}
+
+func TestSosmedOrderService_AdminSyncProcessingProviderOrders(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+	); err != nil {
+		t.Fatalf("migrate bulk sync models: %v", err)
+	}
+
+	admin := &model.User{
+		ID:       uuid.New(),
+		Name:     "Admin Bulk Sync Sosmed",
+		Email:    "admin-bulk-sync-sosmed@example.com",
+		Password: "hashed",
+		Role:     "admin",
+		IsActive: true,
+	}
+	if err := db.Create(admin).Error; err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "instagram-followers-6331",
+		Title:             "Instagram Followers Hemat",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     19000,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	orderCompleted := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            admin.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://instagram.com/completed",
+		Quantity:          1,
+		UnitPrice:         19000,
+		TotalPrice:        19000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusProcessing,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderOrderID:   "JAP-2001",
+		ProviderStatus:    "submitted",
+	}
+	orderSame := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            admin.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://instagram.com/same",
+		Quantity:          1,
+		UnitPrice:         19000,
+		TotalPrice:        19000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusProcessing,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderOrderID:   "JAP-2002",
+		ProviderStatus:    "In Progress",
+	}
+	orderFailed := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            admin.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://instagram.com/failed",
+		Quantity:          1,
+		UnitPrice:         19000,
+		TotalPrice:        19000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusProcessing,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderOrderID:   "JAP-2003",
+		ProviderStatus:    "submitted",
+	}
+	for _, order := range []*model.SosmedOrder{orderCompleted, orderSame, orderFailed} {
+		if err := db.Create(order).Error; err != nil {
+			t.Fatalf("create bulk sync order %s: %v", order.ProviderOrderID, err)
+		}
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{
+		statusByOrderID: map[string]*JAPOrderStatusResponse{
+			"JAP-2001": {Status: "Completed"},
+			"JAP-2002": {Status: "In Progress"},
+		},
+		statusErrByOrderID: map[string]error{
+			"JAP-2003": errors.New("provider timeout"),
+		},
+	}
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetJAPOrderProvider(fakeJAP)
+
+	result, err := orderSvc.AdminSyncProcessingProviderOrders(context.Background(), admin.ID, 10)
+	if err != nil {
+		t.Fatalf("admin bulk sync provider: %v", err)
+	}
+
+	if result.Requested != 3 || result.Synced != 2 || result.Updated != 1 || result.Skipped != 1 || result.Failed != 1 {
+		t.Fatalf("unexpected bulk sync summary: %+v", result)
+	}
+	if len(result.Items) != 3 {
+		t.Fatalf("expected 3 bulk sync items, got %d", len(result.Items))
+	}
+
+	var completedAfter model.SosmedOrder
+	if err := db.First(&completedAfter, "id = ?", orderCompleted.ID).Error; err != nil {
+		t.Fatalf("load completed order: %v", err)
+	}
+	if completedAfter.OrderStatus != sosmedOrderStatusSuccess {
+		t.Fatalf("expected completed order -> success, got %s", completedAfter.OrderStatus)
+	}
+
+	var failedAfter model.SosmedOrder
+	if err := db.First(&failedAfter, "id = ?", orderFailed.ID).Error; err != nil {
+		t.Fatalf("load failed sync order: %v", err)
+	}
+	if !strings.Contains(failedAfter.ProviderError, "provider timeout") {
+		t.Fatalf("expected provider error stored, got %q", failedAfter.ProviderError)
+	}
+	if failedAfter.ProviderSyncedAt == nil {
+		t.Fatalf("failed sync should still store provider_synced_at")
 	}
 }

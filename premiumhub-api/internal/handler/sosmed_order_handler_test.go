@@ -33,6 +33,10 @@ func (f *fakeHandlerJAPOrderProvider) AddOrder(_ context.Context, input service.
 	return &service.JAPAddOrderResponse{Order: "JAP-SMOKE-1001"}, nil
 }
 
+func (f *fakeHandlerJAPOrderProvider) GetOrderStatus(_ context.Context, _ string) (*service.JAPOrderStatusResponse, error) {
+	return &service.JAPOrderStatusResponse{Status: "In Progress"}, nil
+}
+
 type handlerSmokeEnvelope struct {
 	Message string                    `json:"message"`
 	Data    handlerSmokeOrderResponse `json:"data"`
