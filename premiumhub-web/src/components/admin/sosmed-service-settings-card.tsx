@@ -167,6 +167,19 @@ function formatJAPBalance(value: AdminJAPBalance | null) {
   })}`
 }
 
+function formatProviderRate(raw?: string) {
+  const value = raw?.trim()
+  if (!value) return '-'
+
+  const parsed = Number(value.replace(',', '.'))
+  if (!Number.isFinite(parsed)) return value
+
+  return parsed.toLocaleString('en-US', {
+    maximumFractionDigits: 6,
+    minimumFractionDigits: 0,
+  })
+}
+
 function formatAdminTimestamp(value: Date | null) {
   if (!value) return '-'
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
@@ -1279,6 +1292,8 @@ export default function SosmedServiceSettingsCard() {
         const spread = resellerPer1K !== null && checkoutPrice > 0
           ? checkoutPrice - resellerPer1K
           : null
+        const supplierCurrency = detailTarget.provider_currency?.trim() || 'USD'
+        const supplierRate = detailTarget.provider_rate?.trim()
         const detailStatus = statusLabel(detailTarget)
 
         return (
@@ -1390,28 +1405,75 @@ export default function SosmedServiceSettingsCard() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div className="card" style={{ padding: 10 }}>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>Harga Reseller Start</div>
-                    <div style={{ fontWeight: 700 }}>{detailTarget.price_start || '-'}</div>
-                    <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>{detailTarget.price_per_1k || '-'}</div>
+                <div
+                  className="card"
+                  style={{
+                    padding: 12,
+                    borderColor: '#FED7AA',
+                    background: 'linear-gradient(135deg, #FFF7ED 0%, #FFFFFF 72%)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontWeight: 800 }}>Harga & Margin JAP</div>
+                      <div style={{ marginTop: 2, fontSize: 12, color: 'var(--muted)' }}>
+                        Ringkasan modal supplier, harga jual, dan profit estimasi per 1K.
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                      Basis hitung: 1 paket = 1.000 unit
+                    </div>
                   </div>
-                  <div className="card" style={{ padding: 10 }}>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>Harga Checkout</div>
-                    <div style={{ fontWeight: 700 }}>{formatRupiah(checkoutPrice)}</div>
-                    <div
-                      style={{
-                        marginTop: 4,
-                        fontSize: 12,
-                        color:
-                          spread === null
-                            ? 'var(--muted)'
-                            : spread >= 0
-                              ? 'var(--green, #047857)'
-                              : 'var(--red, #DC2626)',
-                      }}
-                    >
-                      Spread vs reseller: {spread === null ? '-' : `${spread >= 0 ? '+' : '-'}${formatRupiah(Math.abs(spread))}`}
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                      gap: 8,
+                      marginTop: 10,
+                    }}
+                  >
+                    <div className="card" style={{ padding: 10, background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Harga JAP Supplier</div>
+                      <div style={{ marginTop: 3, fontWeight: 800 }}>
+                        {supplierRate ? `${supplierCurrency} ${formatProviderRate(supplierRate)}` : '-'}
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>per 1K dari provider</div>
+                    </div>
+
+                    <div className="card" style={{ padding: 10, background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Estimasi Modal Rupiah</div>
+                      <div style={{ marginTop: 3, fontWeight: 800 }}>
+                        {resellerPer1K === null ? '-' : formatRupiah(resellerPer1K)}
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
+                        {detailTarget.price_per_1k || detailTarget.price_start || 'per 1K setelah kurs'}
+                      </div>
+                    </div>
+
+                    <div className="card" style={{ padding: 10, background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Harga Jual Checkout</div>
+                      <div style={{ marginTop: 3, fontWeight: 800 }}>{checkoutPrice > 0 ? formatRupiah(checkoutPrice) : '-'}</div>
+                      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>per 1K dibayar user</div>
+                    </div>
+
+                    <div className="card" style={{ padding: 10, background: '#fff' }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Estimasi Profit</div>
+                      <div
+                        style={{
+                          marginTop: 3,
+                          fontWeight: 900,
+                          color:
+                            spread === null
+                              ? 'var(--muted)'
+                              : spread >= 0
+                                ? 'var(--green, #047857)'
+                                : 'var(--red, #DC2626)',
+                        }}
+                      >
+                        {spread === null ? '-' : `${spread >= 0 ? '+' : '-'}${formatRupiah(Math.abs(spread))}`}
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>per 1K setelah modal</div>
                     </div>
                   </div>
                 </div>
