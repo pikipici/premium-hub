@@ -154,6 +154,14 @@ func sosmedOrderWalletRefundRef(orderID uuid.UUID) string {
 	return fmt.Sprintf("sosmed_order:%s:refund", orderID.String())
 }
 
+func sosmedOrderWalletRetryChargeRef(orderID uuid.UUID, attempt int64) string {
+	return fmt.Sprintf("sosmed_order:%s:retry:%d:charge", orderID.String(), attempt)
+}
+
+func sosmedOrderWalletRetryRefundRef(orderID uuid.UUID, attempt int64) string {
+	return fmt.Sprintf("sosmed_order:%s:retry:%d:refund", orderID.String(), attempt)
+}
+
 func (s *SosmedOrderService) buildDetail(order *model.SosmedOrder) (*SosmedOrderDetail, error) {
 	events, err := s.repo.ListEventsByOrder(order.ID)
 	if err != nil {
@@ -800,6 +808,14 @@ func (s *SosmedOrderService) AdminList(status string, page, limit int) ([]model.
 	return s.repo.AdminList(normalizeSosmedOrderStatus(status), page, limit)
 }
 
+func (s *SosmedOrderService) AdminGetByID(orderID uuid.UUID) (*SosmedOrderDetail, error) {
+	order, err := s.repo.FindByID(orderID)
+	if err != nil {
+		return nil, errors.New("order sosmed tidak ditemukan")
+	}
+	return s.buildDetail(order)
+}
+
 func (s *SosmedOrderService) AdminUpdateStatus(orderID uuid.UUID, actorID uuid.UUID, input AdminUpdateSosmedOrderStatusInput) (*SosmedOrderDetail, error) {
 	toStatus := normalizeSosmedOrderStatus(input.ToStatus)
 	if !isValidSosmedOrderStatus(toStatus) {
@@ -925,4 +941,311 @@ func (s *SosmedOrderService) AdminSyncProcessingProviderOrders(ctx context.Conte
 	}
 
 	return result, nil
+}
+
+type AdminRetrySosmedProviderInput struct {
+	Reason string `json:"reason"`
+}
+
+func (s *SosmedOrderService) AdminRetryProviderOrder(ctx context.Context, orderID uuid.UUID, actorID uuid.UUID, input AdminRetrySosmedProviderInput) (*SosmedOrderDetail, error) {
+	if s.walletRepo == nil {
+		return nil, errors.New("wallet repo belum siap")
+	}
+	if s.japOrderProvider == nil {
+		return nil, errors.New("konfigurasi JAP order provider belum siap")
+	}
+
+	var chargeRef string
+	var retryAttempt int64
+	err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		var order model.SosmedOrder
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&order, "id = ?", orderID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("order sosmed tidak ditemukan")
+			}
+			return errors.New("gagal memuat order sosmed")
+		}
+
+		if !isJAPSosmedOrder(&order) {
+			return errors.New("order ini bukan order supplier JAP")
+		}
+		if strings.TrimSpace(order.ProviderOrderID) != "" {
+			return errors.New("order sudah punya provider order id, gunakan sync provider")
+		}
+		if normalizeSosmedOrderStatus(order.OrderStatus) != sosmedOrderStatusFailed {
+			return errors.New("hanya order gagal yang bisa diretry")
+		}
+		if !strings.EqualFold(strings.TrimSpace(order.PaymentMethod), "wallet") {
+			return errors.New("retry provider saat ini hanya mendukung pembayaran wallet")
+		}
+		if strings.TrimSpace(order.TargetLink) == "" {
+			return errors.New("target link/username kosong")
+		}
+		if order.TotalPrice <= 0 {
+			return errors.New("nominal retry tidak valid")
+		}
+
+		previousStatus := order.OrderStatus
+		shouldCharge := order.PaymentStatus != "paid"
+		if shouldCharge {
+			var retryCount int64
+			pattern := fmt.Sprintf("sosmed_order:%s:retry:%%:charge", order.ID.String())
+			if err := tx.Model(&model.WalletLedger{}).
+				Where("reference LIKE ?", pattern).
+				Count(&retryCount).Error; err != nil {
+				return errors.New("gagal cek attempt retry wallet")
+			}
+
+			retryAttempt = retryCount + 1
+			chargeRef = sosmedOrderWalletRetryChargeRef(order.ID, retryAttempt)
+			if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, chargeRef); err == nil {
+				return errors.New("ledger retry wallet sudah ada")
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("gagal cek ledger retry wallet")
+			}
+
+			user, err := s.walletRepo.LockUserByIDTx(tx, order.UserID)
+			if err != nil {
+				return errors.New("user tidak ditemukan")
+			}
+			if !user.IsActive {
+				return errors.New("akun user diblokir")
+			}
+			if user.WalletBalance < order.TotalPrice {
+				return errors.New("saldo wallet user tidak cukup untuk retry")
+			}
+
+			before := user.WalletBalance
+			after := before - order.TotalPrice
+			user.WalletBalance = after
+			if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+				return errors.New("gagal update saldo wallet retry")
+			}
+
+			ledger := &model.WalletLedger{
+				ID:            uuid.New(),
+				UserID:        user.ID,
+				Type:          "debit",
+				Category:      "sosmed_purchase",
+				Amount:        order.TotalPrice,
+				BalanceBefore: before,
+				BalanceAfter:  after,
+				Reference:     chargeRef,
+				Description:   fmt.Sprintf("Retry admin layanan sosmed order %s via wallet", shortSosmedWalletRef(order.ID.String())),
+			}
+			if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
+				return errors.New("gagal menulis ledger retry wallet")
+			}
+		}
+
+		order.PaymentStatus = "paid"
+		order.OrderStatus = sosmedOrderStatusProcessing
+		order.ProviderStatus = "retrying"
+		order.ProviderError = ""
+		if err := tx.Save(&order).Error; err != nil {
+			return errors.New("gagal update order retry")
+		}
+
+		reason := "retry kirim order ke JAP oleh admin"
+		if trimmed := strings.TrimSpace(input.Reason); trimmed != "" {
+			reason = fmt.Sprintf("%s: %s", reason, trimmed)
+		}
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: previousStatus,
+			ToStatus:   sosmedOrderStatusProcessing,
+			Reason:     reason,
+			ActorType:  "admin",
+			ActorID:    &actorID,
+			CreatedAt:  time.Now(),
+		}
+		if err := tx.Create(event).Error; err != nil {
+			return errors.New("gagal mencatat event retry")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.submitRetryJAPOrder(ctx, orderID, actorID, chargeRef, retryAttempt); err != nil {
+		return nil, err
+	}
+
+	stored, err := s.repo.FindByID(orderID)
+	if err != nil {
+		return nil, errors.New("gagal memuat order sosmed")
+	}
+	return s.buildDetail(stored)
+}
+
+func (s *SosmedOrderService) submitRetryJAPOrder(ctx context.Context, orderID uuid.UUID, actorID uuid.UUID, chargeRef string, retryAttempt int64) error {
+	order, err := s.repo.FindByID(orderID)
+	if err != nil {
+		return errors.New("order sosmed tidak ditemukan")
+	}
+	if !isJAPSosmedOrder(order) {
+		return nil
+	}
+
+	providerQuantity := order.Quantity * 1000
+	requestPayload := map[string]any{
+		"provider":      "jap",
+		"action":        "add",
+		"service":       order.ProviderServiceID,
+		"link":          order.TargetLink,
+		"quantity":      providerQuantity,
+		"local_order":   order.ID.String(),
+		"service_code":  order.ServiceCode,
+		"retry_attempt": retryAttempt,
+		"admin_retry":   true,
+	}
+	rawRequest, _ := json.Marshal(requestPayload)
+
+	res, err := s.japOrderProvider.AddOrder(ctx, JAPAddOrderInput{
+		ServiceID: order.ProviderServiceID,
+		Link:      order.TargetLink,
+		Quantity:  providerQuantity,
+	})
+	if err != nil {
+		return s.failAndRefundWalletRetryOrder(orderID, chargeRef, retryAttempt, fmt.Sprintf("retry gagal kirim order ke JAP: %v", err), string(rawRequest), actorID)
+	}
+
+	providerOrderID := strings.TrimSpace(string(res.Order))
+	if providerOrderID == "" {
+		return s.failAndRefundWalletRetryOrder(orderID, chargeRef, retryAttempt, "retry response JAP tidak berisi provider order id", string(rawRequest), actorID)
+	}
+
+	responsePayload := map[string]any{
+		"request":           requestPayload,
+		"provider_order_id": providerOrderID,
+	}
+	rawPayload, _ := json.Marshal(responsePayload)
+
+	now := time.Now()
+	previousStatus := order.OrderStatus
+	order.ProviderOrderID = providerOrderID
+	order.ProviderStatus = "submitted"
+	order.ProviderPayload = truncateSosmedProviderText(string(rawPayload), 4000)
+	order.ProviderError = ""
+	order.OrderStatus = sosmedOrderStatusProcessing
+	order.PaymentStatus = "paid"
+	if err := s.repo.Update(order); err != nil {
+		return errors.New("gagal menyimpan retry provider order JAP")
+	}
+
+	event := &model.SosmedOrderEvent{
+		OrderID:    order.ID,
+		FromStatus: previousStatus,
+		ToStatus:   sosmedOrderStatusProcessing,
+		Reason:     fmt.Sprintf("retry order dikirim ke JAP #%s", providerOrderID),
+		ActorType:  "admin",
+		ActorID:    &actorID,
+		CreatedAt:  now,
+	}
+	if err := s.repo.CreateEvent(event); err != nil {
+		return errors.New("gagal mencatat event retry provider")
+	}
+
+	return nil
+}
+
+func (s *SosmedOrderService) failAndRefundWalletRetryOrder(orderID uuid.UUID, chargeRef string, retryAttempt int64, providerError, providerPayload string, actorID uuid.UUID) error {
+	refunded := false
+	err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		var order model.SosmedOrder
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&order, "id = ?", orderID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("order sosmed tidak ditemukan")
+			}
+			return errors.New("gagal memuat order sosmed")
+		}
+
+		previousStatus := order.OrderStatus
+		order.ProviderStatus = "failed"
+		order.ProviderError = truncateSosmedProviderText(providerError, 2000)
+		order.ProviderPayload = truncateSosmedProviderText(providerPayload, 4000)
+		order.OrderStatus = sosmedOrderStatusFailed
+
+		if strings.TrimSpace(chargeRef) != "" {
+			refundRef := sosmedOrderWalletRetryRefundRef(order.ID, retryAttempt)
+			if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, refundRef); err == nil {
+				order.PaymentStatus = "failed"
+				if err := tx.Save(&order).Error; err != nil {
+					return errors.New("gagal update order retry")
+				}
+				return nil
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("gagal cek ledger refund retry")
+			}
+
+			chargeLedger, err := s.walletRepo.FindLedgerByReferenceTx(tx, chargeRef)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return errors.New("ledger debit retry wallet tidak ditemukan")
+				}
+				return errors.New("gagal cek ledger debit retry wallet")
+			}
+
+			user, err := s.walletRepo.LockUserByIDTx(tx, order.UserID)
+			if err != nil {
+				return errors.New("user tidak ditemukan")
+			}
+
+			before := user.WalletBalance
+			after := before + chargeLedger.Amount
+			user.WalletBalance = after
+			if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+				return errors.New("gagal refund saldo retry")
+			}
+
+			ledger := &model.WalletLedger{
+				ID:            uuid.New(),
+				UserID:        user.ID,
+				Type:          "credit",
+				Category:      "sosmed_refund",
+				Amount:        chargeLedger.Amount,
+				BalanceBefore: before,
+				BalanceAfter:  after,
+				Reference:     refundRef,
+				Description:   fmt.Sprintf("Refund otomatis retry order sosmed %s karena gagal dikirim ke supplier", shortSosmedWalletRef(order.ID.String())),
+			}
+			if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
+				return errors.New("gagal menulis ledger refund retry")
+			}
+
+			order.PaymentStatus = "failed"
+			refunded = true
+		}
+
+		if err := tx.Save(&order).Error; err != nil {
+			return errors.New("gagal update order retry gagal")
+		}
+
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: previousStatus,
+			ToStatus:   sosmedOrderStatusFailed,
+			Reason:     truncateSosmedProviderText(providerError, 1000),
+			ActorType:  "admin",
+			ActorID:    &actorID,
+			CreatedAt:  time.Now(),
+		}
+		if err := tx.Create(event).Error; err != nil {
+			return errors.New("gagal mencatat event retry gagal")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if refunded {
+		return errors.New("retry gagal dikirim ke supplier, saldo wallet sudah direfund")
+	}
+	return errors.New(providerError)
 }

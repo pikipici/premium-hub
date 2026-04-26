@@ -116,6 +116,22 @@ func (h *SosmedOrderHandler) AdminList(c *gin.Context) {
 	})
 }
 
+func (h *SosmedOrderHandler) AdminGetByID(c *gin.Context) {
+	orderID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+
+	detail, err := h.svc.AdminGetByID(orderID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "OK", detail)
+}
+
 func (h *SosmedOrderHandler) AdminUpdateStatus(c *gin.Context) {
 	adminID := c.MustGet("user_id").(uuid.UUID)
 	orderID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
@@ -167,4 +183,27 @@ func (h *SosmedOrderHandler) AdminSyncProcessingProviders(c *gin.Context) {
 	}
 
 	response.Success(c, "Sync provider selesai", result)
+}
+
+func (h *SosmedOrderHandler) AdminRetryProvider(c *gin.Context) {
+	adminID := c.MustGet("user_id").(uuid.UUID)
+	orderID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+
+	var input service.AdminRetrySosmedProviderInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	detail, err := h.svc.AdminRetryProviderOrder(c.Request.Context(), orderID, adminID, input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Retry provider berhasil dikirim", detail)
 }

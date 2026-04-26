@@ -704,3 +704,200 @@ func TestSosmedOrderService_AdminSyncProcessingProviderOrders(t *testing.T) {
 		t.Fatalf("failed sync should still store provider_synced_at")
 	}
 }
+
+func TestSosmedOrderService_AdminRetryProviderOrderDebitsWalletAndSubmits(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.WalletLedger{},
+	); err != nil {
+		t.Fatalf("migrate retry models: %v", err)
+	}
+
+	admin := &model.User{ID: uuid.New(), Name: "Admin Retry", Email: "admin-retry@example.com", Password: "hashed", Role: "admin", IsActive: true}
+	buyer := &model.User{ID: uuid.New(), Name: "Buyer Retry", Email: "buyer-retry@example.com", Password: "hashed", Role: "user", IsActive: true, WalletBalance: 50000}
+	if err := db.Create(admin).Error; err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "instagram-followers-6331",
+		Title:             "Instagram Followers Hemat",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     19000,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            buyer.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://instagram.com/retry",
+		Quantity:          2,
+		UnitPrice:         19000,
+		TotalPrice:        38000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "failed",
+		OrderStatus:       sosmedOrderStatusFailed,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderStatus:    "failed",
+		ProviderError:     "first submit failed",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create failed order: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{res: &JAPAddOrderResponse{Order: "JAP-RETRY-7788"}}
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(fakeJAP)
+
+	detail, err := orderSvc.AdminRetryProviderOrder(context.Background(), order.ID, admin.ID, AdminRetrySosmedProviderInput{
+		Reason: "retry test",
+	})
+	if err != nil {
+		t.Fatalf("admin retry provider order: %v", err)
+	}
+
+	if len(fakeJAP.inputs) != 1 {
+		t.Fatalf("expected 1 JAP add call, got %d", len(fakeJAP.inputs))
+	}
+	if fakeJAP.inputs[0].ServiceID != "6331" || fakeJAP.inputs[0].Quantity != 2000 {
+		t.Fatalf("unexpected JAP retry input: %+v", fakeJAP.inputs[0])
+	}
+	if detail.Order.ProviderOrderID != "JAP-RETRY-7788" || detail.Order.OrderStatus != sosmedOrderStatusProcessing || detail.Order.PaymentStatus != "paid" {
+		t.Fatalf("unexpected retry order state: %+v", detail.Order)
+	}
+
+	var buyerAfter model.User
+	if err := db.First(&buyerAfter, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("load buyer after retry: %v", err)
+	}
+	if buyerAfter.WalletBalance != 12000 {
+		t.Fatalf("expected wallet balance 12000, got %d", buyerAfter.WalletBalance)
+	}
+
+	var retryChargeCount int64
+	if err := db.Model(&model.WalletLedger{}).
+		Where("reference = ?", sosmedOrderWalletRetryChargeRef(order.ID, 1)).
+		Count(&retryChargeCount).Error; err != nil {
+		t.Fatalf("count retry charge: %v", err)
+	}
+	if retryChargeCount != 1 {
+		t.Fatalf("expected 1 retry charge ledger, got %d", retryChargeCount)
+	}
+}
+
+func TestSosmedOrderService_AdminRetryProviderOrderRefundsOnFailure(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.WalletLedger{},
+	); err != nil {
+		t.Fatalf("migrate retry failure models: %v", err)
+	}
+
+	admin := &model.User{ID: uuid.New(), Name: "Admin Retry Fail", Email: "admin-retry-fail@example.com", Password: "hashed", Role: "admin", IsActive: true}
+	buyer := &model.User{ID: uuid.New(), Name: "Buyer Retry Fail", Email: "buyer-retry-fail@example.com", Password: "hashed", Role: "user", IsActive: true, WalletBalance: 50000}
+	if err := db.Create(admin).Error; err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "instagram-followers-6331",
+		Title:             "Instagram Followers Hemat",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     19000,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            buyer.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://instagram.com/retry-fail",
+		Quantity:          1,
+		UnitPrice:         19000,
+		TotalPrice:        19000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "failed",
+		OrderStatus:       sosmedOrderStatusFailed,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderStatus:    "failed",
+		ProviderError:     "first submit failed",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create failed order: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{err: errors.New("JAP retry timeout")}
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(fakeJAP)
+
+	_, err := orderSvc.AdminRetryProviderOrder(context.Background(), order.ID, admin.ID, AdminRetrySosmedProviderInput{
+		Reason: "retry failure test",
+	})
+	if err == nil || !strings.Contains(err.Error(), "saldo wallet sudah direfund") {
+		t.Fatalf("expected retry refund error, got: %v", err)
+	}
+
+	var buyerAfter model.User
+	if err := db.First(&buyerAfter, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("load buyer after retry failure: %v", err)
+	}
+	if buyerAfter.WalletBalance != 50000 {
+		t.Fatalf("expected wallet balance restored to 50000, got %d", buyerAfter.WalletBalance)
+	}
+
+	var orderAfter model.SosmedOrder
+	if err := db.First(&orderAfter, "id = ?", order.ID).Error; err != nil {
+		t.Fatalf("load order after retry failure: %v", err)
+	}
+	if orderAfter.PaymentStatus != "failed" || orderAfter.OrderStatus != sosmedOrderStatusFailed || orderAfter.ProviderOrderID != "" {
+		t.Fatalf("unexpected retry failure order state: %+v", orderAfter)
+	}
+	if !strings.Contains(orderAfter.ProviderError, "JAP retry timeout") {
+		t.Fatalf("expected provider error stored, got %q", orderAfter.ProviderError)
+	}
+
+	var retryRefundCount int64
+	if err := db.Model(&model.WalletLedger{}).
+		Where("reference = ?", sosmedOrderWalletRetryRefundRef(order.ID, 1)).
+		Count(&retryRefundCount).Error; err != nil {
+		t.Fatalf("count retry refund: %v", err)
+	}
+	if retryRefundCount != 1 {
+		t.Fatalf("expected 1 retry refund ledger, got %d", retryRefundCount)
+	}
+}

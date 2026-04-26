@@ -20,6 +20,10 @@ export interface AdminUpdateSosmedOrderStatusPayload {
   internal_note?: string
 }
 
+export interface AdminRetrySosmedProviderPayload {
+  reason?: string
+}
+
 export interface AdminSyncSosmedProviderResultItem {
   order_id: string
   service_code: string
@@ -90,6 +94,11 @@ export const sosmedOrderService = {
     return res.data
   },
 
+  adminGetByID: async (id: string) => {
+    const res = await api.get<ApiResponse<SosmedOrderDetail>>(`/admin/sosmed/orders/${id}`)
+    return res.data
+  },
+
   adminUpdateStatus: async (id: string, payload: AdminUpdateSosmedOrderStatusPayload) => {
     const res = await api.patch<ApiResponse<SosmedOrderDetail>>(`/admin/sosmed/orders/${id}/status`, payload)
     return res.data
@@ -102,6 +111,11 @@ export const sosmedOrderService = {
 
   adminSyncProcessingProviders: async (params?: { limit?: number }) => {
     const res = await api.post<ApiResponse<AdminSyncSosmedProviderResult>>('/admin/sosmed/orders/sync-provider', null, { params })
+    return res.data
+  },
+
+  adminRetryProvider: async (id: string, payload: AdminRetrySosmedProviderPayload) => {
+    const res = await api.post<ApiResponse<SosmedOrderDetail>>(`/admin/sosmed/orders/${id}/retry-provider`, payload)
     return res.data
   },
 }

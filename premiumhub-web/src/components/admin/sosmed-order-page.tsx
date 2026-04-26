@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { sosmedOrderService } from '@/services/sosmedOrderService'
-import type { SosmedOrder } from '@/types/sosmedOrder'
+import type { SosmedOrder, SosmedOrderDetail } from '@/types/sosmedOrder'
 
 const PAGE_LIMIT = 20
 
@@ -75,12 +75,23 @@ function nextStatusActions(order: SosmedOrder) {
   return []
 }
 
+function canRetryProvider(order: SosmedOrder) {
+  return (
+    order.order_status === 'failed' &&
+    order.payment_method === 'wallet' &&
+    order.provider_code === 'jap' &&
+    !order.provider_order_id
+  )
+}
+
 export default function SosmedOrderPage() {
   const [items, setItems] = useState<SosmedOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [detail, setDetail] = useState<SosmedOrderDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
@@ -187,6 +198,48 @@ export default function SosmedOrderPage() {
       await loadData()
     } catch {
       setError('Gagal sync massal provider')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openDetail = async (order: SosmedOrder) => {
+    setDetailLoading(true)
+    setError('')
+
+    try {
+      const res = await sosmedOrderService.adminGetByID(order.id)
+      if (!res.success || !res.data) {
+        setError(res.message || 'Gagal memuat detail order sosmed')
+        return
+      }
+      setDetail(res.data)
+    } catch {
+      setError('Gagal memuat detail order sosmed')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const retryProvider = async (order: SosmedOrder) => {
+    const reason = window.prompt('Alasan retry provider', order.provider_error || '') || ''
+    setSaving(true)
+    setError('')
+
+    try {
+      const res = await sosmedOrderService.adminRetryProvider(order.id, { reason })
+      if (!res.success) {
+        setError(res.message || 'Gagal retry provider order sosmed')
+        return
+      }
+
+      setNotice(`Retry provider order ${order.id.slice(0, 8)} berhasil dikirim`)
+      if (detail?.order.id === order.id && res.data) {
+        setDetail(res.data)
+      }
+      await loadData()
+    } catch {
+      setError('Gagal retry provider order sosmed')
     } finally {
       setSaving(false)
     }
@@ -301,6 +354,14 @@ export default function SosmedOrderPage() {
                         <td>{formatDate(order.created_at)}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button
+                              className="action-btn"
+                              type="button"
+                              disabled={saving || detailLoading}
+                              onClick={() => void openDetail(order)}
+                            >
+                              Detail
+                            </button>
                             {order.provider_code === 'jap' && order.provider_order_id ? (
                               <button
                                 className="action-btn"
@@ -311,9 +372,17 @@ export default function SosmedOrderPage() {
                                 Sync Provider
                               </button>
                             ) : null}
-                            {actions.length === 0 ? (
-                              <span style={{ fontSize: 11, color: 'var(--muted)' }}>Tidak ada aksi</span>
-                            ) : (
+                            {canRetryProvider(order) ? (
+                              <button
+                                className="action-btn"
+                                type="button"
+                                disabled={saving}
+                                onClick={() => void retryProvider(order)}
+                              >
+                                Retry Provider
+                              </button>
+                            ) : null}
+                            {actions.length === 0 ? null : (
                               actions.map((action) => (
                                 <button
                                   key={`${order.id}-${action.status}`}
@@ -364,6 +433,114 @@ export default function SosmedOrderPage() {
           </div>
         ) : null}
       </div>
+
+      {detail ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 18,
+            background: 'rgba(10,10,10,0.42)',
+          }}
+          onClick={() => setDetail(null)}
+        >
+          <div
+            style={{
+              width: 'min(760px, 100%)',
+              maxHeight: '88vh',
+              overflow: 'auto',
+              borderRadius: 8,
+              background: '#fff',
+              border: '1px solid var(--border)',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={{ padding: 18, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <h3 style={{ margin: 0 }}>Detail Order Sosmed</h3>
+                <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>{detail.order.id}</div>
+              </div>
+              <button className="action-btn" type="button" onClick={() => setDetail(null)}>Tutup</button>
+            </div>
+
+            <div style={{ padding: 18, display: 'grid', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Layanan</div>
+                  <div style={{ fontWeight: 700 }}>{detail.order.service_title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detail.order.service_code}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status</div>
+                  <div><span className={`status ${statusLabel(detail.order.order_status).className}`}>{statusLabel(detail.order.order_status).label}</span></div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>{detail.order.payment_status} via {detail.order.payment_method || '-'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Provider</div>
+                  <div style={{ fontWeight: 700 }}>{(detail.order.provider_code || '-').toUpperCase()}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detail.order.provider_order_id || 'Belum ada provider order id'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Total</div>
+                  <div style={{ fontWeight: 700 }}>{formatRupiah(detail.order.total_price)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detail.order.quantity} paket x {formatRupiah(detail.order.unit_price)}</div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>Target</div>
+                <div style={{ wordBreak: 'break-all' }}>{detail.order.target_link || '-'}</div>
+              </div>
+
+              {detail.order.provider_error ? (
+                <div style={{ padding: 12, borderRadius: 8, background: '#FFF1F2', color: 'var(--red)', fontSize: 13 }}>
+                  {detail.order.provider_error}
+                </div>
+              ) : null}
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {detail.order.provider_code === 'jap' && detail.order.provider_order_id ? (
+                  <button className="action-btn" type="button" disabled={saving} onClick={() => void syncProvider(detail.order)}>
+                    Sync Provider
+                  </button>
+                ) : null}
+                {canRetryProvider(detail.order) ? (
+                  <button className="action-btn" type="button" disabled={saving} onClick={() => void retryProvider(detail.order)}>
+                    Retry Provider
+                  </button>
+                ) : null}
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 10px' }}>Timeline</h4>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {detail.events.length === 0 ? (
+                    <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada event.</div>
+                  ) : (
+                    detail.events.map((event) => (
+                      <div key={event.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                          <div style={{ fontWeight: 700 }}>{event.from_status || '-'} → {event.to_status || '-'}</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{formatDate(event.created_at)}</div>
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 13 }}>{event.reason || '-'}</div>
+                        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Actor: {event.actor_type}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

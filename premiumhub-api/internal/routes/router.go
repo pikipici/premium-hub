@@ -307,8 +307,10 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	admin.GET("/sosmed/orders", sosmedOrderHandler.AdminList)
 	admin.POST("/sosmed/orders/sync-provider", sosmedOrderHandler.AdminSyncProcessingProviders)
+	admin.GET("/sosmed/orders/:id", sosmedOrderHandler.AdminGetByID)
 	admin.PATCH("/sosmed/orders/:id/status", sosmedOrderHandler.AdminUpdateStatus)
 	admin.POST("/sosmed/orders/:id/sync-provider", sosmedOrderHandler.AdminSyncProvider)
+	admin.POST("/sosmed/orders/:id/retry-provider", sosmedOrderHandler.AdminRetryProvider)
 
 	admin.GET("/claims", claimHandler.AdminList)
 	admin.PUT("/claims/:id/approve", claimHandler.Approve)
