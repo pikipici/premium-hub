@@ -84,6 +84,28 @@ function canRetryProvider(order: SosmedOrder) {
   )
 }
 
+function canTriggerRefill(order: SosmedOrder) {
+  if (!order.refill_eligible) return false
+  if (order.order_status !== 'success') return false
+  if (!order.provider_order_id || order.provider_code !== 'jap') return false
+  const status = (order.refill_status || 'none').toLowerCase()
+  if (status === 'requested' || status === 'processing') return false
+  return true
+}
+
+function refillStatusLabel(status?: string) {
+  const s = (status || 'none').toLowerCase()
+  switch (s) {
+    case 'none': return { text: 'Belum Diklaim', color: 'var(--muted)' }
+    case 'requested': return { text: 'Requested', color: '#2563eb' }
+    case 'processing': return { text: 'Processing', color: '#2563eb' }
+    case 'completed': return { text: 'Selesai', color: '#16a34a' }
+    case 'failed': return { text: 'Gagal', color: 'var(--red)' }
+    case 'rejected': return { text: 'Ditolak', color: 'var(--red)' }
+    default: return { text: s, color: 'var(--muted)' }
+  }
+}
+
 export default function SosmedOrderPage() {
   const [items, setItems] = useState<SosmedOrder[]>([])
   const [loading, setLoading] = useState(true)
@@ -262,6 +284,32 @@ export default function SosmedOrderPage() {
     }
   }
 
+  const triggerRefill = async (order: SosmedOrder) => {
+    const confirmed = window.confirm(`Trigger refill untuk order ${order.id.slice(0, 8)}?`)
+    if (!confirmed) return
+
+    setSaving(true)
+    setError('')
+
+    try {
+      const res = await sosmedOrderService.adminTriggerRefill(order.id)
+      if (!res.success) {
+        setError(res.message || 'Gagal trigger refill')
+        return
+      }
+
+      setNotice(`Refill order ${order.id.slice(0, 8)} berhasil dikirim ke supplier`)
+      if (detail?.order.id === order.id && res.data) {
+        setDetail(res.data)
+      }
+      await loadData()
+    } catch {
+      setError('Gagal trigger refill')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="page">
       <div className="card">
@@ -410,6 +458,11 @@ export default function SosmedOrderPage() {
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                             Sync: {order.provider_synced_at ? formatDate(order.provider_synced_at) : '-'}
                           </div>
+                          {order.refill_eligible ? (
+                            <div style={{ marginTop: 4, fontSize: 11, color: refillStatusLabel(order.refill_status).color, fontWeight: 600 }}>
+                              Refill: {refillStatusLabel(order.refill_status).text}
+                            </div>
+                          ) : null}
                           {order.provider_error ? (
                             <div style={{ marginTop: 4, fontSize: 11, color: 'var(--red)' }}>
                               {order.provider_error}
@@ -435,6 +488,16 @@ export default function SosmedOrderPage() {
                                 onClick={() => void syncProvider(order)}
                               >
                                 Sync Provider
+                              </button>
+                            ) : null}
+                            {canTriggerRefill(order) ? (
+                              <button
+                                className="action-btn"
+                                type="button"
+                                disabled={saving}
+                                onClick={() => void triggerRefill(order)}
+                              >
+                                Trigger Refill
                               </button>
                             ) : null}
                             {canRetryProvider(order) ? (
@@ -563,6 +626,44 @@ export default function SosmedOrderPage() {
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>Target</div>
                 <div style={{ wordBreak: 'break-all' }}>{detail.order.target_link || '-'}</div>
               </div>
+
+              {detail.order.refill_eligible ? (
+                <div style={{ padding: 14, borderRadius: 8, border: '1px solid var(--border)', background: '#faf5ff' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Garansi Refill</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status</div>
+                      <div style={{ fontWeight: 700, color: refillStatusLabel(detail.order.refill_status).color }}>
+                        {refillStatusLabel(detail.order.refill_status).text}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Periode</div>
+                      <div style={{ fontWeight: 600 }}>{detail.order.refill_period_days || '-'} Hari</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Deadline</div>
+                      <div style={{ fontWeight: 600 }}>{detail.order.refill_deadline ? formatDate(detail.order.refill_deadline) : '-'}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Diklaim</div>
+                      <div style={{ fontWeight: 600 }}>{detail.order.refill_requested_at ? formatDate(detail.order.refill_requested_at) : '-'}</div>
+                    </div>
+                  </div>
+                  {detail.order.refill_provider_error ? (
+                    <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: '#FFF1F2', color: 'var(--red)', fontSize: 12 }}>
+                      {detail.order.refill_provider_error}
+                    </div>
+                  ) : null}
+                  {canTriggerRefill(detail.order) ? (
+                    <div style={{ marginTop: 10 }}>
+                      <button className="action-btn" type="button" disabled={saving} onClick={() => void triggerRefill(detail.order)}>
+                        Trigger Refill
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               {detail.order.provider_error ? (
                 <div style={{ padding: 12, borderRadius: 8, background: '#FFF1F2', color: 'var(--red)', fontSize: 13 }}>

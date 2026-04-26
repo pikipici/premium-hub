@@ -423,6 +423,46 @@ func formatSosmedRefillValue(raw string) string {
 	return strings.TrimSpace(value)
 }
 
+// parseSosmedRefillPeriodDays extracts the number of days from a formatted
+// refill string stored in SosmedService.Refill. Returns 0 if the service
+// does not offer a refill period.
+//
+// Supported formats:
+//   - "30 Hari" → 30
+//   - "Otomatis 30 Hari" → 30
+//   - "Seumur Layanan" → 365 (conventional ceiling)
+//   - "Stabil (Non Drop)" → 0 (no explicit refill period)
+//   - "Tidak Ada", "-", "N/A" → 0
+var sosmedRefillParseDayPattern = regexp.MustCompile(`([0-9]{1,4})\s*[Hh]ari`)
+
+func parseSosmedRefillPeriodDays(refillText string) int {
+	value := strings.TrimSpace(refillText)
+	if value == "" {
+		return 0
+	}
+
+	normalized := strings.ToLower(strings.Join(strings.Fields(value), " "))
+	switch normalized {
+	case "-", "n/a", "na", "no", "none", "tidak", "tidak ada":
+		return 0
+	case "seumur layanan":
+		return 365
+	}
+
+	if strings.Contains(normalized, "non drop") || strings.Contains(normalized, "nondrop") {
+		return 0
+	}
+
+	if match := sosmedRefillParseDayPattern.FindStringSubmatch(value); len(match) == 2 {
+		days, err := strconv.Atoi(strings.TrimSpace(match[1]))
+		if err == nil && days > 0 {
+			return days
+		}
+	}
+
+	return 0
+}
+
 func formatSosmedETAValue(raw string) string {
 	value := strings.TrimSpace(raw)
 	if value == "" {

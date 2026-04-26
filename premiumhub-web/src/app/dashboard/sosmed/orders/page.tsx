@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, RefreshCcw } from 'lucide-react'
+import { Loader2, RefreshCcw, RotateCcw } from 'lucide-react'
 
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
@@ -29,10 +29,41 @@ function statusMeta(order: SosmedOrder) {
   return { label: 'Menunggu Bayar', className: 'bg-amber-100 text-amber-700 border-amber-200' }
 }
 
+function refillMeta(order: SosmedOrder) {
+  if (!order.refill_eligible) return null
+
+  const status = (order.refill_status || 'none').toLowerCase()
+  const deadlineStr = order.refill_deadline
+  const isExpired = deadlineStr ? new Date(deadlineStr) < new Date() : false
+
+  if (status === 'requested' || status === 'processing') {
+    return { label: 'Refill Diproses', className: 'bg-sky-50 text-sky-600 border-sky-200', canClaim: false }
+  }
+  if (status === 'completed') {
+    return { label: 'Refill Selesai', className: 'bg-emerald-50 text-emerald-600 border-emerald-200', canClaim: false }
+  }
+  if (isExpired) {
+    return { label: 'Refill Expired', className: 'bg-gray-50 text-gray-500 border-gray-200', canClaim: false }
+  }
+
+  // Eligible & can claim (status is none or failed)
+  const canClaim = order.order_status === 'success' && !isExpired
+  if (status === 'failed') {
+    return { label: 'Refill Gagal', className: 'bg-red-50 text-red-600 border-red-200', canClaim }
+  }
+  return { label: `Refill ${order.refill_period_days || ''}${order.refill_period_days ? ' Hari' : ''}`, className: 'bg-violet-50 text-violet-600 border-violet-200', canClaim }
+}
+
 function formatDate(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}
+
+function formatDeadline(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(date)
 }
 
 export default function DashboardSosmedOrdersPage() {
@@ -42,6 +73,7 @@ export default function DashboardSosmedOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [refillLoading, setRefillLoading] = useState<string | null>(null)
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
 
@@ -95,6 +127,29 @@ export default function DashboardSosmedOrdersPage() {
     }
   }
 
+  const handleRefill = async (order: SosmedOrder) => {
+    const confirmed = window.confirm(
+      `Klaim refill untuk order "${order.service_title}"?\n\nRefill akan dikirim ke supplier untuk link:\n${order.target_link || '-'}`
+    )
+    if (!confirmed) return
+
+    setRefillLoading(order.id)
+    setError('')
+
+    try {
+      const res = await sosmedOrderService.requestRefill(order.id)
+      if (!res.success) {
+        setError(res.message || 'Gagal mengklaim refill')
+        return
+      }
+      await loadOrders(true)
+    } catch {
+      setError('Gagal mengklaim refill')
+    } finally {
+      setRefillLoading(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -142,6 +197,7 @@ export default function DashboardSosmedOrdersPage() {
         <section className="space-y-2">
           {orders.map((order) => {
             const status = statusMeta(order)
+            const refill = refillMeta(order)
 
             return (
               <article
@@ -155,22 +211,54 @@ export default function DashboardSosmedOrdersPage() {
                       <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${status.className}`}>
                         {status.label}
                       </span>
+                      {refill ? (
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${refill.className}`}>
+                          {refill.label}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-1 text-xs text-[#888]">{formatDate(order.created_at)}</p>
                     <p className="mt-2 text-sm font-semibold text-[#141414]">{order.service_title}</p>
                     <p className="text-xs text-[#666]">Target: {order.target_link || '-'}</p>
+
+                    {/* Refill info row */}
+                    {refill && order.refill_deadline ? (
+                      <p className="mt-1 text-[11px] text-[#888]">
+                        Garansi refill sampai: <span className="font-semibold">{formatDeadline(order.refill_deadline)}</span>
+                        {order.refill_provider_error ? (
+                          <span className="ml-2 text-red-500">• {order.refill_provider_error}</span>
+                        ) : null}
+                      </p>
+                    ) : null}
                   </div>
 
-                  <div className="text-left md:text-right">
+                  <div className="flex flex-col items-start gap-2 md:items-end">
                     <div className="text-sm font-bold text-[#141414]">{formatRupiah(order.total_price)}</div>
                     <div className="text-xs text-[#666]">Payment: {order.payment_status}</div>
+
                     {order.order_status === 'pending_payment' ? (
                       <button
                         type="button"
                         onClick={() => void handleCancel(order)}
-                        className="mt-2 rounded-lg border border-red-200 px-3 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                        className="rounded-lg border border-red-200 px-3 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
                       >
                         Batalkan
+                      </button>
+                    ) : null}
+
+                    {refill?.canClaim ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleRefill(order)}
+                        disabled={refillLoading === order.id}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-60"
+                      >
+                        {refillLoading === order.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-3 w-3" />
+                        )}
+                        Klaim Refill
                       </button>
                     ) : null}
                   </div>

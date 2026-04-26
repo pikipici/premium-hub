@@ -22,6 +22,8 @@ type fakeSosmedJAPOrderProvider struct {
 	statusErr          error
 	statusByOrderID    map[string]*JAPOrderStatusResponse
 	statusErrByOrderID map[string]error
+	refillInputs       []string
+	refillErr          error
 }
 
 func (f *fakeSosmedJAPOrderProvider) AddOrder(_ context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error) {
@@ -54,6 +56,11 @@ func (f *fakeSosmedJAPOrderProvider) GetOrderStatus(_ context.Context, orderID s
 		return f.statusRes, nil
 	}
 	return &JAPOrderStatusResponse{Status: "In Progress"}, nil
+}
+
+func (f *fakeSosmedJAPOrderProvider) RequestRefill(_ context.Context, orderID string) error {
+	f.refillInputs = append(f.refillInputs, orderID)
+	return f.refillErr
 }
 
 func TestSosmedOrderService_CreateAndConfirm(t *testing.T) {

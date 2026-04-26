@@ -20,6 +20,7 @@ type JAPClient interface {
 	GetServices(ctx context.Context) ([]JAPServiceItem, error)
 	AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error)
 	GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error)
+	RequestRefill(ctx context.Context, orderID string) error
 }
 
 type JAPBalanceResponse struct {
@@ -231,6 +232,31 @@ func (c *japHTTPClient) GetOrderStatus(ctx context.Context, orderID string) (*JA
 	}
 
 	return &out, nil
+}
+
+func (c *japHTTPClient) RequestRefill(ctx context.Context, orderID string) error {
+	extra := url.Values{}
+	extra.Set("order", strings.TrimSpace(orderID))
+
+	raw, err := c.request(ctx, "refill", extra)
+	if err != nil {
+		return err
+	}
+
+	// JAP returns either a success payload or an error message.
+	// Check if the response contains an error field.
+	if msg := extractJAPProviderMessage(raw); msg != "" {
+		normalizedMsg := strings.ToLower(msg)
+		// Some JAP error responses come as {"error":"..."} with HTTP 200.
+		if strings.Contains(normalizedMsg, "error") ||
+			strings.Contains(normalizedMsg, "incorrect") ||
+			strings.Contains(normalizedMsg, "not found") ||
+			strings.Contains(normalizedMsg, "not eligible") {
+			return &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+		}
+	}
+
+	return nil
 }
 
 func (c *japHTTPClient) request(ctx context.Context, action string, extra url.Values) ([]byte, error) {

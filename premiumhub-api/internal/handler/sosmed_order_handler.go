@@ -219,3 +219,37 @@ func (h *SosmedOrderHandler) AdminRetryProvider(c *gin.Context) {
 
 	response.Success(c, "Retry provider berhasil dikirim", detail)
 }
+
+func (h *SosmedOrderHandler) RequestRefill(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	orderID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+
+	detail, err := h.svc.UserRequestRefill(c.Request.Context(), orderID, userID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Permintaan refill berhasil dikirim ke supplier", detail)
+}
+
+func (h *SosmedOrderHandler) AdminTriggerRefill(c *gin.Context) {
+	adminID := c.MustGet("user_id").(uuid.UUID)
+	orderID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+
+	detail, err := h.svc.AdminTriggerRefill(c.Request.Context(), orderID, adminID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Refill admin berhasil dikirim ke supplier", detail)
+}

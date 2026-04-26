@@ -25,6 +25,15 @@ export interface SosmedOrder {
   provider_payload?: string
   provider_error?: string
   provider_synced_at?: string
+  refill_eligible?: boolean
+  refill_period_days?: number
+  refill_deadline?: string
+  refill_status?: string
+  refill_provider_order_id?: string
+  refill_provider_status?: string
+  refill_provider_error?: string
+  refill_requested_at?: string
+  refill_completed_at?: string
   notes?: string
   paid_at?: string
   expires_at?: string

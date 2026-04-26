@@ -80,6 +80,11 @@ export const sosmedOrderService = {
     return res.data
   },
 
+  requestRefill: async (id: string) => {
+    const res = await api.post<ApiResponse<SosmedOrderDetail>>(`/sosmed/orders/${id}/refill`)
+    return res.data
+  },
+
   createPayment: async (payload: CreateSosmedPaymentPayload) => {
     const res = await api.post<ApiResponse<{
       order_id: string
@@ -136,6 +141,11 @@ export const sosmedOrderService = {
 
   adminRetryProvider: async (id: string, payload: AdminRetrySosmedProviderPayload) => {
     const res = await api.post<ApiResponse<SosmedOrderDetail>>(`/admin/sosmed/orders/${id}/retry-provider`, payload)
+    return res.data
+  },
+
+  adminTriggerRefill: async (id: string) => {
+    const res = await api.post<ApiResponse<SosmedOrderDetail>>(`/admin/sosmed/orders/${id}/refill`)
     return res.data
   },
 }

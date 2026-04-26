@@ -197,6 +197,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/sosmed/orders", sosmedOrderHandler.List)
 	protected.GET("/sosmed/orders/:id", sosmedOrderHandler.GetByID)
 	protected.DELETE("/sosmed/orders/:id", sosmedOrderHandler.Cancel)
+	protected.POST("/sosmed/orders/:id/refill", sosmedOrderHandler.RequestRefill)
 
 	protected.GET("/activities/history", activityHandler.List)
 	protected.GET("/me/sidebar-menu", userSidebarMenuSettingHandler.List)
@@ -318,6 +319,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.PATCH("/sosmed/orders/:id/status", sosmedOrderHandler.AdminUpdateStatus)
 	admin.POST("/sosmed/orders/:id/sync-provider", sosmedOrderHandler.AdminSyncProvider)
 	admin.POST("/sosmed/orders/:id/retry-provider", sosmedOrderHandler.AdminRetryProvider)
+	admin.POST("/sosmed/orders/:id/refill", sosmedOrderHandler.AdminTriggerRefill)
 
 	admin.GET("/claims", claimHandler.AdminList)
 	admin.PUT("/claims/:id/approve", claimHandler.Approve)

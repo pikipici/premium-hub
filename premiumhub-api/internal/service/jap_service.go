@@ -91,6 +91,22 @@ func (s *JAPService) GetOrderStatus(ctx context.Context, orderID string) (*JAPOr
 	return res, nil
 }
 
+func (s *JAPService) RequestRefill(ctx context.Context, orderID string) error {
+	if err := s.ensureConfigured(); err != nil {
+		return err
+	}
+
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return errors.New("provider order id JAP wajib diisi untuk refill")
+	}
+
+	if err := s.client.RequestRefill(ctx, orderID); err != nil {
+		return s.normalizeProviderErr(err)
+	}
+	return nil
+}
+
 func (s *JAPService) ensureConfigured() error {
 	if s == nil || s.cfg == nil {
 		return errors.New("konfigurasi JAP belum siap")
