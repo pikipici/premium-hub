@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { productCategoryService } from '@/services/productCategoryService'
 import {
   sosmedService,
+  type AdminJAPBalance,
   type AdminSosmedImportJAPPreviewResult,
   type AdminSosmedResellerRepricePayload,
   type AdminSosmedServicePayload,
@@ -150,6 +151,27 @@ function formatRupiah(value: number) {
   return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
 }
 
+function formatJAPBalance(value: AdminJAPBalance | null) {
+  if (!value) return '-'
+
+  const currency = value.currency?.trim() || 'USD'
+  const rawBalance = value.balance?.trim() || '0'
+  const parsed = Number(rawBalance)
+  if (!Number.isFinite(parsed)) {
+    return `${currency} ${rawBalance}`
+  }
+
+  return `${currency} ${parsed.toLocaleString('en-US', {
+    maximumFractionDigits: 6,
+    minimumFractionDigits: 0,
+  })}`
+}
+
+function formatAdminTimestamp(value: Date | null) {
+  if (!value) return '-'
+  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
+}
+
 function extractIDRAmount(raw?: string) {
   if (!raw) return null
 
@@ -200,6 +222,10 @@ export default function SosmedServiceSettingsCard() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [japBalance, setJAPBalance] = useState<AdminJAPBalance | null>(null)
+  const [japBalanceLoading, setJAPBalanceLoading] = useState(false)
+  const [japBalanceError, setJAPBalanceError] = useState('')
+  const [japBalanceFetchedAt, setJAPBalanceFetchedAt] = useState<Date | null>(null)
 
   const [resellerFXMode, setResellerFXMode] = useState<ResellerFXMode>('live')
   const [resellerFXRate, setResellerFXRate] = useState('17000')
@@ -261,6 +287,28 @@ export default function SosmedServiceSettingsCard() {
     (importJAPPreview.not_found || []).length === 0 &&
     unsupportedJAPPreviewItems.length === 0
 
+  const loadJAPBalance = useCallback(async () => {
+    setJAPBalanceLoading(true)
+    setJAPBalanceError('')
+
+    try {
+      const res = await sosmedService.adminGetJAPBalance()
+      if (!res.success || !res.data) {
+        setJAPBalance(null)
+        setJAPBalanceError(res.message || 'Gagal memuat saldo JAP')
+        return
+      }
+
+      setJAPBalance(res.data)
+      setJAPBalanceFetchedAt(new Date())
+    } catch (err) {
+      setJAPBalance(null)
+      setJAPBalanceError(mapErrorMessage(err, 'Gagal memuat saldo JAP'))
+    } finally {
+      setJAPBalanceLoading(false)
+    }
+  }, [])
+
   const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -292,6 +340,10 @@ export default function SosmedServiceSettingsCard() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  useEffect(() => {
+    void loadJAPBalance()
+  }, [loadJAPBalance])
 
   useEffect(() => {
     if (!formOpen && !confirmOpen && !detailTarget && !importJAPOpen) return
@@ -627,6 +679,105 @@ export default function SosmedServiceSettingsCard() {
 
   return (
     <>
+      <div className="card" style={{ marginBottom: 12, overflow: 'hidden' }}>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h2>Saldo JustAnotherPanel</h2>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              Saldo supplier live buat order sosmed yang dikirim ke JAP.
+            </div>
+          </div>
+
+          <button
+            className="action-btn"
+            type="button"
+            disabled={japBalanceLoading}
+            onClick={() => void loadJAPBalance()}
+          >
+            {japBalanceLoading ? 'Memuat...' : 'Refresh Saldo'}
+          </button>
+        </div>
+
+        <div style={{ padding: '0 18px 18px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 12,
+              alignItems: 'stretch',
+            }}
+          >
+            <div
+              style={{
+                borderRadius: 14,
+                padding: 18,
+                background: '#141414',
+                color: '#fff',
+                minHeight: 112,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Supplier Balance
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 30, fontWeight: 900, letterSpacing: -0.6 }}>
+                    {japBalanceLoading && !japBalance ? 'Mengambil...' : formatJAPBalance(japBalance)}
+                  </div>
+                </div>
+                <span
+                  style={{
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    borderRadius: 999,
+                    padding: '5px 10px',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    background: japBalanceError ? 'rgba(239,68,68,0.16)' : 'rgba(34,197,94,0.14)',
+                    color: japBalanceError ? '#fecaca' : '#bbf7d0',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {japBalanceError ? 'Perlu Cek' : 'Live'}
+                </span>
+              </div>
+
+              <div style={{ marginTop: 14, fontSize: 12, color: 'rgba(255,255,255,0.64)' }}>
+                Terakhir update: {formatAdminTimestamp(japBalanceFetchedAt)}
+              </div>
+            </div>
+
+            <div
+              style={{
+                border: '1px solid var(--line, #E5E7EB)',
+                borderRadius: 14,
+                padding: 16,
+                background: japBalanceError ? '#fff7ed' : '#f8fafc',
+              }}
+            >
+              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                Status Koneksi
+              </div>
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 14,
+                  fontWeight: 800,
+                  color: japBalanceError ? '#9a3412' : '#166534',
+                }}
+              >
+                {japBalanceError ? 'Gagal ambil saldo' : 'JAP tersambung'}
+              </div>
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)', lineHeight: 1.45 }}>
+                {japBalanceError || 'Key dan endpoint JAP kebaca. Saldo ini read-only, aman buat dicek kapan aja.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div>

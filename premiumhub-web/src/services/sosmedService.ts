@@ -145,6 +145,11 @@ export interface AdminSosmedImportJAPResult {
   items: SosmedService[]
 }
 
+export interface AdminJAPBalance {
+  balance: string
+  currency: string
+}
+
 export const sosmedService = {
   list: async () => {
     const res = await api.get<ApiResponse<SosmedService[]>>('/public/sosmed/services')
@@ -153,6 +158,11 @@ export const sosmedService = {
 
   adminList: async (params?: { include_inactive?: boolean }) => {
     const res = await api.get<ApiResponse<SosmedService[]>>('/admin/sosmed/services', { params })
+    return res.data
+  },
+
+  adminGetJAPBalance: async () => {
+    const res = await api.get<ApiResponse<AdminJAPBalance>>('/admin/sosmed/provider/jap/balance')
     return res.data
   },
 
