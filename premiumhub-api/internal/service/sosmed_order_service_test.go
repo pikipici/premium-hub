@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
@@ -702,6 +703,109 @@ func TestSosmedOrderService_AdminSyncProcessingProviderOrders(t *testing.T) {
 	}
 	if failedAfter.ProviderSyncedAt == nil {
 		t.Fatalf("failed sync should still store provider_synced_at")
+	}
+}
+
+func TestSosmedOrderService_AdminOpsSummary(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+	); err != nil {
+		t.Fatalf("migrate ops summary models: %v", err)
+	}
+
+	buyer := &model.User{ID: uuid.New(), Name: "Buyer Ops", Email: "buyer-ops@example.com", Password: "hashed", Role: "user", IsActive: true}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "instagram-followers-6331",
+		Title:             "Instagram Followers Hemat",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     19000,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	now := time.Now()
+	baseOrder := func(status string) model.SosmedOrder {
+		return model.SosmedOrder{
+			ID:                uuid.New(),
+			UserID:            buyer.ID,
+			ServiceID:         serviceItem.ID,
+			ServiceCode:       serviceItem.Code,
+			ServiceTitle:      serviceItem.Title,
+			TargetLink:        "https://instagram.com/ops",
+			Quantity:          1,
+			UnitPrice:         19000,
+			TotalPrice:        19000,
+			PaymentMethod:     "wallet",
+			PaymentStatus:     "paid",
+			OrderStatus:       status,
+			ProviderCode:      "jap",
+			ProviderServiceID: "6331",
+		}
+	}
+
+	syncableFresh := baseOrder(sosmedOrderStatusProcessing)
+	syncableFresh.ProviderOrderID = "JAP-FRESH"
+	syncableFresh.ProviderSyncedAt = &now
+
+	syncableStale := baseOrder(sosmedOrderStatusProcessing)
+	syncableStale.ProviderOrderID = "JAP-STALE"
+
+	missingProviderID := baseOrder(sosmedOrderStatusProcessing)
+
+	retryable := baseOrder(sosmedOrderStatusFailed)
+	retryable.PaymentStatus = "failed"
+	retryable.ProviderStatus = "failed"
+	retryable.ProviderError = "first submit failed"
+
+	successOrder := baseOrder(sosmedOrderStatusSuccess)
+	successOrder.ProviderOrderID = "JAP-DONE"
+
+	pendingOrder := baseOrder(sosmedOrderStatusPendingPayment)
+	pendingOrder.PaymentStatus = "pending"
+	pendingOrder.PaymentMethod = ""
+	pendingOrder.ProviderCode = ""
+	pendingOrder.ProviderServiceID = ""
+
+	for _, order := range []model.SosmedOrder{
+		syncableFresh,
+		syncableStale,
+		missingProviderID,
+		retryable,
+		successOrder,
+		pendingOrder,
+	} {
+		item := order
+		if err := db.Create(&item).Error; err != nil {
+			t.Fatalf("create summary order: %v", err)
+		}
+	}
+
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil)
+	summary, err := orderSvc.AdminOpsSummary(30)
+	if err != nil {
+		t.Fatalf("admin ops summary: %v", err)
+	}
+
+	if summary.Total != 6 || summary.PendingPayment != 1 || summary.Processing != 3 || summary.Success != 1 || summary.Failed != 1 {
+		t.Fatalf("unexpected status totals: %+v", summary)
+	}
+	if summary.Syncable != 2 || summary.StaleSync != 1 || summary.MissingProviderOrderID != 1 {
+		t.Fatalf("unexpected provider ops totals: %+v", summary)
+	}
+	if summary.Retryable != 1 || summary.ProviderErrors != 1 || summary.StaleSyncMinutes != 30 {
+		t.Fatalf("unexpected retry/error totals: %+v", summary)
 	}
 }
 

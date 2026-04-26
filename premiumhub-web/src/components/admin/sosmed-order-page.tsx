@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { sosmedOrderService } from '@/services/sosmedOrderService'
+import { sosmedOrderService, type AdminSosmedOpsSummary } from '@/services/sosmedOrderService'
 import type { SosmedOrder, SosmedOrderDetail } from '@/types/sosmedOrder'
 
 const PAGE_LIMIT = 20
@@ -92,31 +92,48 @@ export default function SosmedOrderPage() {
   const [notice, setNotice] = useState('')
   const [detail, setDetail] = useState<SosmedOrderDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [opsSummary, setOpsSummary] = useState<AdminSosmedOpsSummary | null>(null)
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_LIMIT)), [total])
+  const opsRiskCount = opsSummary
+    ? opsSummary.retryable + opsSummary.missing_provider_order_id + opsSummary.stale_sync + opsSummary.provider_errors
+    : 0
 
   const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
 
     try {
-      const res = await sosmedOrderService.adminList({
-        status: statusFilter === 'all' ? undefined : statusFilter,
-        page,
-        limit: PAGE_LIMIT,
-      })
+      const [listResult, summaryResult] = await Promise.allSettled([
+        sosmedOrderService.adminList({
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          page,
+          limit: PAGE_LIMIT,
+        }),
+        sosmedOrderService.adminOpsSummary({ stale_minutes: 30 }),
+      ])
 
-      if (!res.success) {
-        setError(res.message || 'Gagal memuat order sosmed')
+      if (listResult.status === 'rejected') {
+        throw listResult.reason
+      }
+
+      if (!listResult.value.success) {
+        setError(listResult.value.message || 'Gagal memuat order sosmed')
         return
       }
 
-      setItems(res.data || [])
-      setTotal(res.meta?.total ?? (res.data || []).length)
+      setItems(listResult.value.data || [])
+      setTotal(listResult.value.meta?.total ?? (listResult.value.data || []).length)
+
+      if (summaryResult.status === 'fulfilled' && summaryResult.value.success) {
+        setOpsSummary(summaryResult.value.data || null)
+      } else {
+        setOpsSummary(null)
+      }
     } catch {
       setError('Gagal memuat order sosmed')
     } finally {
@@ -265,6 +282,54 @@ export default function SosmedOrderPage() {
             </button>
           </div>
         </div>
+
+        {opsSummary ? (
+          <div style={{ padding: '0 18px 14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+              {[
+                { label: 'Total Order', value: opsSummary.total, hint: 'Semua order sosmed' },
+                { label: 'Diproses', value: opsSummary.processing, hint: 'Masih berjalan' },
+                { label: 'Perlu Sync', value: opsSummary.stale_sync, hint: `Belum sync ${opsSummary.stale_sync_minutes} menit` },
+                { label: 'Retryable', value: opsSummary.retryable, hint: 'Gagal tanpa provider ID' },
+                { label: 'Provider Kosong', value: opsSummary.missing_provider_order_id, hint: 'Paid tapi belum submit' },
+                { label: 'Provider Error', value: opsSummary.provider_errors, hint: 'Ada pesan error' },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
+                    padding: 12,
+                    background: '#fff',
+                  }}
+                >
+                  <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                    {item.label}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 24, fontWeight: 800 }}>{item.value}</div>
+                  <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>{item.hint}</div>
+                </div>
+              ))}
+            </div>
+
+            <div
+              style={{
+                marginTop: 10,
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: opsRiskCount > 0 ? '1px solid #fed7aa' : '1px solid #bbf7d0',
+                background: opsRiskCount > 0 ? '#fff7ed' : '#f0fdf4',
+                color: opsRiskCount > 0 ? '#9a3412' : '#166534',
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              {opsRiskCount > 0
+                ? `${opsRiskCount} sinyal perlu dicek: sync provider, retry order gagal, atau submit JAP yang belum punya provider order id.`
+                : 'Operasional sosmed aman: belum ada sinyal order nyangkut dari ringkasan saat ini.'}
+            </div>
+          </div>
+        ) : null}
 
         <div style={{ padding: '0 18px 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {FILTERS.map((filter) => (

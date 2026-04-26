@@ -116,6 +116,18 @@ func (h *SosmedOrderHandler) AdminList(c *gin.Context) {
 	})
 }
 
+func (h *SosmedOrderHandler) AdminOpsSummary(c *gin.Context) {
+	staleMinutes, _ := strconv.Atoi(c.DefaultQuery("stale_minutes", "30"))
+
+	summary, err := h.svc.AdminOpsSummary(staleMinutes)
+	if err != nil {
+		response.InternalError(c)
+		return
+	}
+
+	response.Success(c, "OK", summary)
+}
+
 func (h *SosmedOrderHandler) AdminGetByID(c *gin.Context) {
 	orderID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {

@@ -44,6 +44,20 @@ export interface AdminSyncSosmedProviderResult {
   items?: AdminSyncSosmedProviderResultItem[]
 }
 
+export interface AdminSosmedOpsSummary {
+  total: number
+  pending_payment: number
+  processing: number
+  success: number
+  failed: number
+  retryable: number
+  syncable: number
+  stale_sync: number
+  missing_provider_order_id: number
+  provider_errors: number
+  stale_sync_minutes: number
+}
+
 export const sosmedOrderService = {
   create: async (payload: CreateSosmedOrderPayload) => {
     const res = await api.post<ApiResponse<SosmedOrderDetail>>('/sosmed/orders', payload)
@@ -91,6 +105,11 @@ export const sosmedOrderService = {
 
   adminList: async (params?: { status?: string; page?: number; limit?: number }) => {
     const res = await api.get<ApiResponse<SosmedOrder[]>>('/admin/sosmed/orders', { params })
+    return res.data
+  },
+
+  adminOpsSummary: async (params?: { stale_minutes?: number }) => {
+    const res = await api.get<ApiResponse<AdminSosmedOpsSummary>>('/admin/sosmed/orders/ops-summary', { params })
     return res.data
   },
 

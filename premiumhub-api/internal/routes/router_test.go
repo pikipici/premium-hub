@@ -153,8 +153,17 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/orders") {
 		t.Fatalf("admin sosmed order list route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/orders/ops-summary") {
+		t.Fatalf("admin sosmed order ops summary route should exist")
+	}
+	if !hasRoute(routes, "POST", "/api/v1/admin/sosmed/orders/sync-provider") {
+		t.Fatalf("admin sosmed order bulk provider sync route should exist")
+	}
 	if !hasRoute(routes, "PATCH", "/api/v1/admin/sosmed/orders/:id/status") {
 		t.Fatalf("admin sosmed order status update route should exist")
+	}
+	if !hasRoute(routes, "POST", "/api/v1/admin/sosmed/orders/:id/retry-provider") {
+		t.Fatalf("admin sosmed order retry provider route should exist")
 	}
 	if !hasRoute(routes, "POST", "/api/v1/admin/wallet/topups/:id/recheck") {
 		t.Fatalf("admin recheck route should exist")

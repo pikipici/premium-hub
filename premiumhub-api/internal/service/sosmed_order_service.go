@@ -24,6 +24,9 @@ const (
 	sosmedOrderStatusFailed         = "failed"
 	sosmedOrderStatusCanceled       = "canceled"
 	sosmedOrderStatusExpired        = "expired"
+
+	defaultSosmedOpsStaleSyncMinutes = 30
+	maxSosmedOpsStaleSyncMinutes     = 1440
 )
 
 var sosmedAdminTransitionMatrix = map[string]map[string]bool{
@@ -808,6 +811,23 @@ func (s *SosmedOrderService) AdminList(status string, page, limit int) ([]model.
 	return s.repo.AdminList(normalizeSosmedOrderStatus(status), page, limit)
 }
 
+func (s *SosmedOrderService) AdminOpsSummary(staleMinutes int) (*repository.SosmedOrderOpsSummary, error) {
+	if staleMinutes <= 0 {
+		staleMinutes = defaultSosmedOpsStaleSyncMinutes
+	}
+	if staleMinutes > maxSosmedOpsStaleSyncMinutes {
+		staleMinutes = maxSosmedOpsStaleSyncMinutes
+	}
+
+	staleBefore := time.Now().Add(-time.Duration(staleMinutes) * time.Minute)
+	summary, err := s.repo.AdminOpsSummary(staleBefore)
+	if err != nil {
+		return nil, errors.New("gagal memuat ringkasan operasional order sosmed")
+	}
+	summary.StaleSyncMinutes = staleMinutes
+	return summary, nil
+}
+
 func (s *SosmedOrderService) AdminGetByID(orderID uuid.UUID) (*SosmedOrderDetail, error) {
 	order, err := s.repo.FindByID(orderID)
 	if err != nil {
@@ -1088,6 +1108,21 @@ func (s *SosmedOrderService) submitRetryJAPOrder(ctx context.Context, orderID uu
 	}
 	if !isJAPSosmedOrder(order) {
 		return nil
+	}
+	if strings.TrimSpace(order.ProviderOrderID) != "" {
+		return errors.New("retry dibatalkan: order sudah punya provider order id, gunakan sync provider")
+	}
+	if normalizeSosmedOrderStatus(order.OrderStatus) != sosmedOrderStatusProcessing {
+		return errors.New("retry dibatalkan: order tidak lagi dalam status processing")
+	}
+	if order.PaymentStatus != "paid" {
+		return errors.New("retry dibatalkan: pembayaran order belum paid")
+	}
+	if strings.TrimSpace(order.TargetLink) == "" {
+		return s.failAndRefundWalletRetryOrder(orderID, chargeRef, retryAttempt, "retry dibatalkan: target link/username kosong", "", actorID)
+	}
+	if order.Quantity <= 0 {
+		return s.failAndRefundWalletRetryOrder(orderID, chargeRef, retryAttempt, "retry dibatalkan: quantity order tidak valid", "", actorID)
 	}
 
 	providerQuantity := order.Quantity * 1000
