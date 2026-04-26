@@ -95,7 +95,9 @@ function SosmedCheckoutSuccessContent() {
           <div className="rounded-2xl border border-[#D6F5DF] bg-[#ECFFF2] p-6 text-center">
             <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-600" />
             <h1 className="text-2xl font-extrabold text-[#141414]">Pembayaran Wallet Berhasil</h1>
-            <p className="mt-2 text-sm text-[#3A7A4A]">Order sosmed lu udah masuk dan dikirim otomatis ke supplier.</p>
+            <p className="mt-2 text-sm text-[#3A7A4A]">
+              Yeayy !! Pembelian kamu berhasil, Order kamu akan segera di proses, Mohon menunggu 🙏🙏
+            </p>
           </div>
 
           {loading ? (
