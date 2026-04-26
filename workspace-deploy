@@ -132,6 +132,8 @@ FORCE_FULL_BUILD="${FORCE_FULL_BUILD:-0}"
 FORCE_FE_BUILD="${FORCE_FE_BUILD:-0}"
 FORCE_BE_BUILD="${FORCE_BE_BUILD:-0}"
 FORCE_NPM_CI="${FORCE_NPM_CI:-0}"
+RUN_SOSMED_WALLET_SMOKE_TEST="${RUN_SOSMED_WALLET_SMOKE_TEST:-0}"
+SOSMED_WALLET_SMOKE_TEST_PATTERN="${SOSMED_WALLET_SMOKE_TEST_PATTERN:-TestCreateSosmedOrderWalletJAP(Smoke|RefundSmoke)}"
 
 # Workspace service runtime mode
 # - API: auto|go-run|binary
@@ -281,6 +283,17 @@ has_changed_exact() {
   grep -qFx "${path}" "${CHANGED_FILES_TMP}"
 }
 
+has_backend_runtime_changes() {
+  awk '
+    /^premiumhub-api\// {
+      if ($0 ~ /(^premiumhub-api\/testdata\/)|(^premiumhub-api\/.*\/testdata\/)/) { next }
+      if ($0 ~ /_test\.go$/) { next }
+      found=1
+    }
+    END { exit(found ? 0 : 1) }
+  ' "${CHANGED_FILES_TMP}"
+}
+
 is_worktree_dirty() {
   if ! git diff --quiet || ! git diff --cached --quiet; then
     return 0
@@ -372,6 +385,14 @@ warn_if_local_branch_not_pushed() {
     return 0
   fi
 
+  if ! git -C "${SCRIPT_ROOT}" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if ! git -C "${SCRIPT_ROOT}" fetch --quiet origin "${BRANCH}" >/dev/null 2>&1; then
+    log_warn "Gagal refresh origin/${BRANCH} sebelum cek ahead/behind. Status warning mungkin stale."
+  fi
+
   counts="$(git -C "${SCRIPT_ROOT}" rev-list --left-right --count "HEAD...@{upstream}" 2>/dev/null || true)"
   if [[ -z "${counts}" ]]; then
     return 0
@@ -404,6 +425,8 @@ run_remote_deploy() {
     "FORCE_FE_BUILD"
     "FORCE_BE_BUILD"
     "FORCE_NPM_CI"
+    "RUN_SOSMED_WALLET_SMOKE_TEST"
+    "SOSMED_WALLET_SMOKE_TEST_PATTERN"
     "WORKSPACE_API_RUN_MODE"
     "WORKSPACE_WEB_RUN_MODE"
     "FE_HEALTH_URL"
@@ -657,6 +680,7 @@ fi
 
 SHOULD_BUILD_FE=1
 SHOULD_BUILD_BE=1
+SHOULD_RESTART_SERVICES=1
 NEEDS_NPM_CI=1
 PLAN_REASON="default-full"
 
@@ -675,7 +699,11 @@ else
     SHOULD_BUILD_FE=1
   fi
   if has_changed_prefix "premiumhub-api"; then
-    SHOULD_BUILD_BE=1
+    if has_backend_runtime_changes; then
+      SHOULD_BUILD_BE=1
+    else
+      log_info "Backend delta hanya file test/testdata -> skip BE build"
+    fi
   fi
 fi
 
@@ -704,6 +732,11 @@ if [[ "${SHOULD_BUILD_BE}" == "0" && "${EXPECT_BE_BINARY_ARTIFACT}" == "1" && ! 
   SHOULD_BUILD_BE=1
 fi
 
+SHOULD_RESTART_SERVICES=0
+if [[ "${SHOULD_BUILD_FE}" == "1" || "${SHOULD_BUILD_BE}" == "1" ]]; then
+  SHOULD_RESTART_SERVICES=1
+fi
+
 NEEDS_NPM_CI=0
 NPM_CI_REASON="skip (deps unchanged)"
 if [[ "${SHOULD_BUILD_FE}" == "1" ]]; then
@@ -730,6 +763,7 @@ fi
 
 log_info "Plan reason: ${PLAN_REASON}"
 log_info "Build plan: FE=${SHOULD_BUILD_FE}, BE=${SHOULD_BUILD_BE}, npm_ci=${NEEDS_NPM_CI} (${NPM_CI_REASON})"
+log_info "Runtime actions: restart_services=${SHOULD_RESTART_SERVICES}, sosmed_wallet_smoke_test=${RUN_SOSMED_WALLET_SMOKE_TEST}"
 log_info "Service alignment: web_mode=${WORKSPACE_WEB_RUN_MODE} expect_fe_artifact=${EXPECT_FE_BUILD_ARTIFACT}, api_mode=${WORKSPACE_API_RUN_MODE} expect_be_artifact=${EXPECT_BE_BINARY_ARTIFACT}"
 
 if is_worktree_dirty; then
@@ -808,20 +842,38 @@ else
   log_info "Skipping BE binary artifact check (api mode go-run)"
 fi
 
+if is_truthy "${RUN_SOSMED_WALLET_SMOKE_TEST}"; then
+  if [[ "${CGO_ENABLED:-1}" == "0" ]]; then
+    log_warn "Skipping optional sosmed wallet smoke test karena CGO_ENABLED=0"
+  else
+    log_info "Running optional sosmed wallet smoke test (${SOSMED_WALLET_SMOKE_TEST_PATTERN})..."
+    (
+      cd "${BACKEND_DIR}"
+      go test ./internal/handler -run "${SOSMED_WALLET_SMOKE_TEST_PATTERN}" -count=1
+    )
+  fi
+else
+  log_info "Skipping optional sosmed wallet smoke test (RUN_SOSMED_WALLET_SMOKE_TEST=0)"
+fi
+
 step_done "SMOKE TEST"
 
 # ---------- Restart Workspace Services ----------
-step_start "RESTART WORKSPACE SERVICES"
-for svc in "${SERVICES[@]}"; do
-  log_info "Restarting ${svc} ..."
-  systemctl --user restart "${svc}"
-  systemctl --user is-active --quiet "${svc}"
-  log_ok "${svc} is active"
-done
-step_done "RESTART WORKSPACE SERVICES"
+if [[ "${SHOULD_RESTART_SERVICES}" == "1" ]]; then
+  step_start "RESTART WORKSPACE SERVICES"
+  for svc in "${SERVICES[@]}"; do
+    log_info "Restarting ${svc} ..."
+    systemctl --user restart "${svc}"
+    systemctl --user is-active --quiet "${svc}"
+    log_ok "${svc} is active"
+  done
+  step_done "RESTART WORKSPACE SERVICES"
+else
+  log_info "RESTART WORKSPACE SERVICES skipped (no runtime artifact/source changes detected)"
+fi
 
-# ---------- Post-restart health check ----------
-step_start "POST-RESTART HEALTHCHECK"
+# ---------- Workspace health check ----------
+step_start "WORKSPACE HEALTHCHECK"
 
 log_info "Checking frontend endpoint: ${FE_HEALTH_URL}"
 wait_for_http "${FE_HEALTH_URL}" "Workspace Frontend" 20 1
@@ -829,7 +881,7 @@ wait_for_http "${FE_HEALTH_URL}" "Workspace Frontend" 20 1
 log_info "Checking backend health endpoint: ${BE_HEALTH_URL}"
 wait_for_http "${BE_HEALTH_URL}" "Workspace Backend(healthz)" 10 1
 
-step_done "POST-RESTART HEALTHCHECK"
+step_done "WORKSPACE HEALTHCHECK"
 
 # ---------- Save deterministic baseline ----------
 step_start "SAVE DEPLOY BASELINE"
