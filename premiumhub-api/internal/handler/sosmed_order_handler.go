@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -252,4 +253,33 @@ func (h *SosmedOrderHandler) AdminTriggerRefill(c *gin.Context) {
 	}
 
 	response.Success(c, "Refill admin berhasil dikirim ke supplier", detail)
+}
+
+func (h *SosmedOrderHandler) AdminBackfillRefill(c *gin.Context) {
+	adminID := c.MustGet("user_id").(uuid.UUID)
+	orderID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+
+	detail, err := h.svc.AdminBackfillRefill(orderID, adminID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Backfill refill berhasil", detail)
+}
+
+func (h *SosmedOrderHandler) AdminBackfillAllRefill(c *gin.Context) {
+	adminID := c.MustGet("user_id").(uuid.UUID)
+
+	result, err := h.svc.AdminBackfillAllRefill(adminID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, fmt.Sprintf("Backfill selesai: %d scanned, %d updated, %d skipped, %d errors", result.Scanned, result.Updated, result.Skipped, result.Errors), result)
 }

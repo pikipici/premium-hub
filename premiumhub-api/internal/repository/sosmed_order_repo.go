@@ -32,6 +32,10 @@ func NewSosmedOrderRepo(db *gorm.DB) *SosmedOrderRepo {
 	return &SosmedOrderRepo{db: db}
 }
 
+func (r *SosmedOrderRepo) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *SosmedOrderRepo) Create(order *model.SosmedOrder) error {
 	return r.db.Create(order).Error
 }

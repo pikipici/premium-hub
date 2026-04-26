@@ -320,6 +320,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/sosmed/orders/:id/sync-provider", sosmedOrderHandler.AdminSyncProvider)
 	admin.POST("/sosmed/orders/:id/retry-provider", sosmedOrderHandler.AdminRetryProvider)
 	admin.POST("/sosmed/orders/:id/refill", sosmedOrderHandler.AdminTriggerRefill)
+	admin.POST("/sosmed/orders/:id/backfill-refill", sosmedOrderHandler.AdminBackfillRefill)
+	admin.POST("/sosmed/orders/backfill-refill", sosmedOrderHandler.AdminBackfillAllRefill)
 
 	admin.GET("/claims", claimHandler.AdminList)
 	admin.PUT("/claims/:id/approve", claimHandler.Approve)

@@ -990,6 +990,112 @@ func (s *SosmedOrderService) AdminTriggerRefill(ctx context.Context, orderID, ad
 	return s.buildDetail(stored)
 }
 
+// AdminBackfillRefill re-populates refill metadata for an existing order from
+// its associated SosmedService. Useful for orders created before the refill
+// system was deployed.
+func (s *SosmedOrderService) AdminBackfillRefill(orderID, adminID uuid.UUID) (*SosmedOrderDetail, error) {
+	order, err := s.repo.FindByID(orderID)
+	if err != nil {
+		return nil, errors.New("order sosmed tidak ditemukan")
+	}
+
+	if s.serviceRepo == nil {
+		return nil, errors.New("service repo belum dikonfigurasi")
+	}
+
+	svc, err := s.serviceRepo.FindByID(order.ServiceID)
+	if err != nil {
+		return nil, errors.New("layanan sosmed tidak ditemukan, tidak bisa backfill refill")
+	}
+
+	// Re-populate refill fields from the service catalog.
+	populateSosmedOrderRefill(order, svc)
+
+	if err := s.repo.Update(order); err != nil {
+		return nil, errors.New("gagal menyimpan backfill refill")
+	}
+
+	event := &model.SosmedOrderEvent{
+		OrderID:    order.ID,
+		FromStatus: order.OrderStatus,
+		ToStatus:   order.OrderStatus,
+		Reason:     fmt.Sprintf("admin backfill refill: eligible=%v, period=%d hari", order.RefillEligible, order.RefillPeriodDays),
+		ActorType:  "admin",
+		ActorID:    &adminID,
+		CreatedAt:  time.Now(),
+	}
+	_ = s.repo.CreateEvent(event)
+
+	stored, err := s.repo.FindByID(order.ID)
+	if err != nil {
+		return nil, errors.New("gagal memuat order sosmed")
+	}
+	return s.buildDetail(stored)
+}
+
+// AdminBackfillRefillResult holds counters for a bulk backfill operation.
+type AdminBackfillRefillResult struct {
+	Scanned  int `json:"scanned"`
+	Updated  int `json:"updated"`
+	Skipped  int `json:"skipped"`
+	Errors   int `json:"errors"`
+}
+
+// AdminBackfillAllRefill scans success JAP orders that currently have
+// refill_eligible=false and re-populates their refill fields from the catalog.
+func (s *SosmedOrderService) AdminBackfillAllRefill(adminID uuid.UUID) (*AdminBackfillRefillResult, error) {
+	if s.serviceRepo == nil {
+		return nil, errors.New("service repo belum dikonfigurasi")
+	}
+
+	// Find success orders that haven't been backfilled yet.
+	var orders []model.SosmedOrder
+	if err := s.repo.DB().
+		Where("order_status = ? AND refill_eligible = ? AND provider_code = ?", sosmedOrderStatusSuccess, false, "jap").
+		Find(&orders).Error; err != nil {
+		return nil, errors.New("gagal memuat order untuk backfill")
+	}
+
+	result := &AdminBackfillRefillResult{Scanned: len(orders)}
+
+	for i := range orders {
+		order := &orders[i]
+
+		svc, err := s.serviceRepo.FindByID(order.ServiceID)
+		if err != nil {
+			result.Errors++
+			continue
+		}
+
+		populateSosmedOrderRefill(order, svc)
+
+		if !order.RefillEligible {
+			result.Skipped++
+			continue
+		}
+
+		if err := s.repo.Update(order); err != nil {
+			result.Errors++
+			continue
+		}
+
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: order.OrderStatus,
+			ToStatus:   order.OrderStatus,
+			Reason:     fmt.Sprintf("bulk backfill refill: eligible=%v, period=%d hari", order.RefillEligible, order.RefillPeriodDays),
+			ActorType:  "admin",
+			ActorID:    &adminID,
+			CreatedAt:  time.Now(),
+		}
+		_ = s.repo.CreateEvent(event)
+
+		result.Updated++
+	}
+
+	return result, nil
+}
+
 func (s *SosmedOrderService) ConfirmPayment(orderID uuid.UUID) error {
 	order, err := s.repo.FindByID(orderID)
 	if err != nil {
