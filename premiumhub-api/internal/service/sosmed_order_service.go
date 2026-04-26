@@ -75,10 +75,11 @@ func (s *SosmedOrderService) SetJAPOrderProvider(provider SosmedJAPOrderProvider
 }
 
 type CreateSosmedOrderInput struct {
-	ServiceID  string `json:"service_id" binding:"required"`
-	TargetLink string `json:"target_link"`
-	Quantity   int64  `json:"quantity"`
-	Notes      string `json:"notes"`
+	ServiceID             string `json:"service_id" binding:"required"`
+	TargetLink            string `json:"target_link"`
+	Quantity              int64  `json:"quantity"`
+	Notes                 string `json:"notes"`
+	TargetPublicConfirmed bool   `json:"target_public_confirmed"`
 }
 
 type AdminUpdateSosmedOrderStatusInput struct {
@@ -202,6 +203,9 @@ func (s *SosmedOrderService) Create(ctx context.Context, userID uuid.UUID, input
 	targetLink := normalizeSosmedOrderTargetLink(input.TargetLink)
 	if targetLink == "" {
 		return nil, errors.New("target link/username wajib diisi")
+	}
+	if !input.TargetPublicConfirmed {
+		return nil, errors.New("konfirmasi dulu kalau akun/link target sudah public, aktif, dan tidak akan diubah sampai order selesai")
 	}
 
 	totalPriceFloat := float64(sosmedService.CheckoutPrice) * float64(quantity)

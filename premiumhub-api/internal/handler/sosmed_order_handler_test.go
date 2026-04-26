@@ -125,7 +125,7 @@ func TestCreateSosmedOrderWalletJAPSmoke(t *testing.T) {
 	})
 	router.POST("/api/v1/sosmed/orders", NewSosmedOrderHandler(orderSvc).Create)
 
-	body := `{"service_id":"` + serviceRow.ID.String() + `","target_link":"https://instagram.com/example","quantity":2,"notes":"smoke test wallet jap"}`
+	body := `{"service_id":"` + serviceRow.ID.String() + `","target_link":"https://instagram.com/example","quantity":2,"notes":"smoke test wallet jap","target_public_confirmed":true}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/sosmed/orders", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -242,7 +242,7 @@ func TestCreateSosmedOrderWalletJAPRefundSmoke(t *testing.T) {
 	})
 	router.POST("/api/v1/sosmed/orders", NewSosmedOrderHandler(orderSvc).Create)
 
-	body := `{"service_id":"` + serviceRow.ID.String() + `","target_link":"https://instagram.com/example","quantity":1,"notes":"smoke test refund jap"}`
+	body := `{"service_id":"` + serviceRow.ID.String() + `","target_link":"https://instagram.com/example","quantity":1,"notes":"smoke test refund jap","target_public_confirmed":true}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/sosmed/orders", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()

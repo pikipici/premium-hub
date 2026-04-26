@@ -7,6 +7,7 @@ export interface CreateSosmedOrderPayload {
   target_link?: string
   quantity?: number
   notes?: string
+  target_public_confirmed?: boolean
 }
 
 export interface CreateSosmedPaymentPayload {

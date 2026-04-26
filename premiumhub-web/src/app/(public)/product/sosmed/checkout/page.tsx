@@ -57,6 +57,7 @@ function SosmedCheckoutContent() {
   const [targetLink, setTargetLink] = useState('')
   const [packageQuantity, setPackageQuantity] = useState(1)
   const [notes, setNotes] = useState('')
+  const [targetPublicConfirmed, setTargetPublicConfirmed] = useState(false)
   const [loadingService, setLoadingService] = useState(true)
   const [loadingWallet, setLoadingWallet] = useState(true)
   const [walletBalance, setWalletBalance] = useState<number | null>(null)
@@ -69,6 +70,7 @@ function SosmedCheckoutContent() {
   const estimatedUnits = useMemo(() => packageQuantity * 1000, [packageQuantity])
   const walletBalanceAfter = walletBalance === null ? null : walletBalance - totalPrice
   const walletEnough = walletBalance === null || walletBalanceAfter === null || walletBalanceAfter >= 0
+  const canSubmit = walletEnough && targetPublicConfirmed
 
   useEffect(() => {
     if (!authReady) return
@@ -160,6 +162,11 @@ function SosmedCheckoutContent() {
       return
     }
 
+    if (!targetPublicConfirmed) {
+      setError('Cek dulu syarat targetnya, lalu centang konfirmasi sebelum bayar.')
+      return
+    }
+
     const normalizedQuantity = clampSosmedPackageQuantity(packageQuantity)
     if (normalizedQuantity !== packageQuantity) {
       setPackageQuantity(normalizedQuantity)
@@ -174,6 +181,7 @@ function SosmedCheckoutContent() {
         target_link: targetLink.trim(),
         quantity: normalizedQuantity,
         notes: notes.trim(),
+        target_public_confirmed: targetPublicConfirmed,
       })
       if (!orderRes.success) {
         setError(orderRes.message || 'Gagal membuat order sosmed')
@@ -316,6 +324,38 @@ function SosmedCheckoutContent() {
             </div>
           </div>
 
+          <div className="mb-6 rounded-2xl border border-[#FED7AA] bg-[#FFF7ED] p-5">
+            <div className="flex gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#FF5733]">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-extrabold text-[#141414]">Cek dulu sebelum bayar</h3>
+                <p className="mt-1 text-sm leading-relaxed text-[#666]">
+                  Biar order lancar, pastiin target bisa diakses supplier selama proses jalan.
+                </p>
+                <div className="mt-3 grid gap-2 text-xs font-semibold text-[#7C2D12] sm:grid-cols-2">
+                  <div className="rounded-xl border border-[#FDBA74] bg-white/75 px-3 py-2">Akun/link target public</div>
+                  <div className="rounded-xl border border-[#FDBA74] bg-white/75 px-3 py-2">Username/link tidak diganti</div>
+                  <div className="rounded-xl border border-[#FDBA74] bg-white/75 px-3 py-2">Target tidak dihapus/private</div>
+                  <div className="rounded-xl border border-[#FDBA74] bg-white/75 px-3 py-2">Hindari order dobel sebelum selesai</div>
+                </div>
+
+                <label className="mt-4 flex cursor-pointer gap-3 rounded-xl border border-[#FDBA74] bg-white px-3 py-3 text-sm font-semibold text-[#141414]">
+                  <input
+                    checked={targetPublicConfirmed}
+                    onChange={(event) => setTargetPublicConfirmed(event.target.checked)}
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 accent-[#FF5733]"
+                  />
+                  <span>
+                    Gue pastikan akun/link target sudah public, aktif, dan tidak akan gue ubah sampai order selesai.
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6 space-y-3">
             <h3 className="text-sm font-bold mb-1">Pembayaran Wallet</h3>
 
@@ -381,10 +421,14 @@ function SosmedCheckoutContent() {
 
           <button
             onClick={handleCheckout}
-            disabled={submitting || !walletEnough}
+            disabled={submitting || !canSubmit}
             className="w-full py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm"
           >
-            {submitting ? 'Memproses Order...' : `Bayar Pakai Wallet ${formatRupiah(totalPrice)}`}
+            {submitting
+              ? 'Memproses Order...'
+              : !targetPublicConfirmed
+                ? 'Centang Konfirmasi Target Dulu'
+                : `Bayar Pakai Wallet ${formatRupiah(totalPrice)}`}
           </button>
 
           <p className="text-xs text-center text-[#888] mt-4">

@@ -125,11 +125,21 @@ func TestSosmedOrderService_CreateAndConfirm(t *testing.T) {
 	notifRepo := repository.NewNotificationRepo(db)
 	orderSvc := NewSosmedOrderService(orderRepo, sosmedServiceRepo, notifRepo)
 
-	detail, err := orderSvc.Create(context.Background(), buyer.ID, CreateSosmedOrderInput{
+	_, err = orderSvc.Create(context.Background(), buyer.ID, CreateSosmedOrderInput{
 		ServiceID:  createdService.ID.String(),
 		TargetLink: "https://instagram.com/example",
-		Quantity:   2,
-		Notes:      "Campaign launch",
+		Quantity:   1,
+	})
+	if err == nil || !strings.Contains(err.Error(), "konfirmasi dulu") {
+		t.Fatalf("expected target public confirmation error, got: %v", err)
+	}
+
+	detail, err := orderSvc.Create(context.Background(), buyer.ID, CreateSosmedOrderInput{
+		ServiceID:             createdService.ID.String(),
+		TargetLink:            "https://instagram.com/example",
+		Quantity:              2,
+		Notes:                 "Campaign launch",
+		TargetPublicConfirmed: true,
 	})
 	if err != nil {
 		t.Fatalf("create sosmed order: %v", err)
@@ -208,8 +218,9 @@ func TestSosmedOrderService_CancelValidation(t *testing.T) {
 
 	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), sosmedServiceRepo, nil)
 	created, err := orderSvc.Create(context.Background(), buyer.ID, CreateSosmedOrderInput{
-		ServiceID:  serviceItem.ID.String(),
-		TargetLink: "https://instagram.com/example",
+		ServiceID:             serviceItem.ID.String(),
+		TargetLink:            "https://instagram.com/example",
+		TargetPublicConfirmed: true,
 	})
 	if err != nil {
 		t.Fatalf("create order: %v", err)
@@ -279,9 +290,10 @@ func TestSosmedOrderService_CreateWalletPaidJAPOrder(t *testing.T) {
 		SetJAPOrderProvider(fakeJAP)
 
 	detail, err := orderSvc.Create(context.Background(), buyer.ID, CreateSosmedOrderInput{
-		ServiceID:  serviceItem.ID.String(),
-		TargetLink: "https://instagram.com/example",
-		Quantity:   5,
+		ServiceID:             serviceItem.ID.String(),
+		TargetLink:            "https://instagram.com/example",
+		Quantity:              5,
+		TargetPublicConfirmed: true,
 	})
 	if err != nil {
 		t.Fatalf("create wallet paid JAP order: %v", err)
@@ -367,9 +379,10 @@ func TestSosmedOrderService_CreateWalletPaidJAPFailureRefunds(t *testing.T) {
 		SetJAPOrderProvider(fakeJAP)
 
 	_, err := orderSvc.Create(context.Background(), buyer.ID, CreateSosmedOrderInput{
-		ServiceID:  serviceItem.ID.String(),
-		TargetLink: "https://instagram.com/example",
-		Quantity:   1,
+		ServiceID:             serviceItem.ID.String(),
+		TargetLink:            "https://instagram.com/example",
+		Quantity:              1,
+		TargetPublicConfirmed: true,
 	})
 	if err == nil || !strings.Contains(err.Error(), "saldo wallet sudah direfund") {
 		t.Fatalf("expected refunded provider error, got: %v", err)
@@ -445,9 +458,10 @@ func TestSosmedOrderService_CreateWalletPaidInsufficientBalance(t *testing.T) {
 		SetJAPOrderProvider(fakeJAP)
 
 	_, err := orderSvc.Create(context.Background(), buyer.ID, CreateSosmedOrderInput{
-		ServiceID:  serviceItem.ID.String(),
-		TargetLink: "https://instagram.com/example",
-		Quantity:   1,
+		ServiceID:             serviceItem.ID.String(),
+		TargetLink:            "https://instagram.com/example",
+		Quantity:              1,
+		TargetPublicConfirmed: true,
 	})
 	if err == nil || !strings.Contains(err.Error(), "saldo wallet tidak cukup") {
 		t.Fatalf("expected insufficient wallet error, got: %v", err)
