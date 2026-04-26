@@ -45,6 +45,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	nokosLandingRepo := repository.NewNokosLandingSummaryRepo(db)
 	convertRepo := repository.NewConvertRepo(db)
 	maintenanceRuleRepo := repository.NewMaintenanceRuleRepo(db)
+	userSidebarMenuSettingRepo := repository.NewUserSidebarMenuSettingRepo(db)
 	activityRepo := repository.NewActivityRepo(db)
 
 	stockCredentialKey := strings.TrimSpace(cfg.StockCredentialKey)
@@ -89,6 +90,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	nokosLandingSvc := service.NewNokosLandingSummaryService(cfg, nokosLandingRepo, nil, nil)
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
 	maintenanceSvc := service.NewMaintenanceService(maintenanceRuleRepo)
+	userSidebarMenuSettingSvc := service.NewUserSidebarMenuSettingService(userSidebarMenuSettingRepo)
 	activitySvc := service.NewActivityService(activityRepo)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
@@ -126,6 +128,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	sosmedOrderHandler := handler.NewSosmedOrderHandler(sosmedOrderSvc)
 	sosmedPaymentHandler := handler.NewSosmedPaymentHandler(sosmedPaymentSvc)
 	maintenanceHandler := handler.NewMaintenanceHandler(maintenanceSvc)
+	userSidebarMenuSettingHandler := handler.NewUserSidebarMenuSettingHandler(userSidebarMenuSettingSvc)
 	activityHandler := handler.NewActivityHandler(activitySvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
@@ -196,6 +199,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.DELETE("/sosmed/orders/:id", sosmedOrderHandler.Cancel)
 
 	protected.GET("/activities/history", activityHandler.List)
+	protected.GET("/me/sidebar-menu", userSidebarMenuSettingHandler.List)
 
 	protected.POST("/payment/create", paymentHandler.Create)
 	protected.GET("/payment/status/:orderId", paymentHandler.GetStatus)
@@ -294,6 +298,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/maintenance/rules", maintenanceHandler.AdminCreate)
 	admin.PUT("/maintenance/rules/:id", maintenanceHandler.AdminUpdate)
 	admin.DELETE("/maintenance/rules/:id", maintenanceHandler.AdminDelete)
+	admin.GET("/settings/user-sidebar-menu", userSidebarMenuSettingHandler.List)
+	admin.PUT("/settings/user-sidebar-menu", userSidebarMenuSettingHandler.AdminUpdate)
 
 	admin.GET("/stocks", stockHandler.List)
 	admin.POST("/stocks", stockHandler.Create)

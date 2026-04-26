@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import MaintenanceSettingsCard from '@/components/admin/maintenance-settings-card'
 import ProductCategorySettingsCard from '@/components/admin/product-category-settings-card'
+import UserSidebarMenuSettingsCard from '@/components/admin/user-sidebar-menu-settings-card'
 import {
   accountTypeService,
   type AdminAccountTypePayload,
@@ -437,6 +438,7 @@ export default function PengaturanPage() {
       </div>
 
       <ProductCategorySettingsCard />
+      <UserSidebarMenuSettingsCard />
       <MaintenanceSettingsCard />
 
       {formOpen && (

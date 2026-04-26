@@ -26,6 +26,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.AccountType{},
 		&model.ProductCategory{},
 		&model.MaintenanceRule{},
+		&model.UserSidebarMenuSetting{},
 		&model.Product{},
 		&model.SosmedService{},
 		&model.SosmedOrder{},
@@ -62,12 +63,60 @@ func InitDB(cfg *Config) *gorm.DB {
 		log.Fatal("DB sosmed service defaults:", err)
 	}
 
+	if err := ensureDefaultUserSidebarMenuSettings(db); err != nil {
+		log.Fatal("DB user sidebar menu defaults:", err)
+	}
+
 	if err := applyPaymentSchemaCleanup(db); err != nil {
 		log.Fatal("DB payment migration:", err)
 	}
 
 	log.Println("DB connected & migrated")
 	return db
+}
+
+func ensureDefaultUserSidebarMenuSettings(db *gorm.DB) error {
+	defaults := []model.UserSidebarMenuSetting{
+		{Key: "convert_history", Label: "Riwayat Convert", Href: "/dashboard/convert/orders", SortOrder: 30, IsVisible: false, IsSystem: true},
+		{Key: "active_accounts", Label: "Akun Aktif", Href: "/dashboard/akun-aktif", SortOrder: 60, IsVisible: false, IsSystem: true},
+		{Key: "order_history", Label: "Riwayat Order", Href: "/dashboard/riwayat-order", SortOrder: 70, IsVisible: false, IsSystem: true},
+		{Key: "warranty_claim", Label: "Klaim Garansi", Href: "/dashboard/klaim-garansi", SortOrder: 80, IsVisible: false, IsSystem: true},
+	}
+
+	for _, item := range defaults {
+		var existing model.UserSidebarMenuSetting
+		err := db.Where("key = ?", item.Key).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if createErr := db.Create(&item).Error; createErr != nil {
+				return createErr
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		updates := map[string]interface{}{}
+		if strings.TrimSpace(existing.Label) == "" || existing.Label != item.Label {
+			updates["label"] = item.Label
+		}
+		if strings.TrimSpace(existing.Href) == "" || existing.Href != item.Href {
+			updates["href"] = item.Href
+		}
+		if existing.SortOrder == 0 || existing.SortOrder != item.SortOrder {
+			updates["sort_order"] = item.SortOrder
+		}
+		if !existing.IsSystem {
+			updates["is_system"] = true
+		}
+		if len(updates) > 0 {
+			if updateErr := db.Model(&existing).Updates(updates).Error; updateErr != nil {
+				return updateErr
+			}
+		}
+	}
+
+	return nil
 }
 
 func ensureDefaultAccountTypes(db *gorm.DB) error {

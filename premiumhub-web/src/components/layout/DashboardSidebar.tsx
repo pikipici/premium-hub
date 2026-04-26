@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { ComponentType } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import {
   Bell,
@@ -18,6 +20,11 @@ import {
   Wallet,
 } from 'lucide-react'
 
+import {
+  userSidebarMenuSettingService,
+  type UserSidebarMenuSettingKey,
+} from '@/services/userSidebarMenuSettingService'
+
 type DashboardSidebarProps = {
   collapsed?: boolean
   onToggle?: () => void
@@ -26,18 +33,61 @@ type DashboardSidebarProps = {
 const MENU = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/wallet', icon: Wallet, label: 'Wallet' },
-  { href: '/dashboard/convert/orders', icon: RefreshCw, label: 'Riwayat Convert' },
+  { href: '/dashboard/convert/orders', icon: RefreshCw, label: 'Riwayat Convert', settingKey: 'convert_history' },
   { href: '/dashboard/sosmed/orders', icon: Megaphone, label: 'Order Sosmed' },
   { href: '/dashboard/nokos', icon: Smartphone, label: 'Nomor Virtual' },
-  { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Akun Aktif' },
-  { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order' },
-  { href: '/dashboard/klaim-garansi', icon: ShieldCheck, label: 'Klaim Garansi' },
+  { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Akun Aktif', settingKey: 'active_accounts' },
+  { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order', settingKey: 'order_history' },
+  { href: '/dashboard/klaim-garansi', icon: ShieldCheck, label: 'Klaim Garansi', settingKey: 'warranty_claim' },
   { href: '/dashboard/notifikasi', icon: Bell, label: 'Notifikasi' },
-]
+] satisfies Array<{
+  href: string
+  icon: ComponentType<{ className?: string }>
+  label: string
+  settingKey?: UserSidebarMenuSettingKey
+}>
 
 export default function DashboardSidebar({ collapsed = false, onToggle }: DashboardSidebarProps) {
   const pathname = usePathname()
   const { logout } = useAuthStore()
+  const [visibleByKey, setVisibleByKey] =
+    useState<Partial<Record<UserSidebarMenuSettingKey, boolean>> | null>()
+
+  useEffect(() => {
+    let alive = true
+
+    const loadVisibility = async () => {
+      try {
+        const res = await userSidebarMenuSettingService.list()
+        if (!alive || !res.success) return
+
+        setVisibleByKey(
+          (res.data || []).reduce<Partial<Record<UserSidebarMenuSettingKey, boolean>>>((acc, item) => {
+            acc[item.key] = item.is_visible
+            return acc
+          }, {})
+        )
+      } catch {
+        if (alive) setVisibleByKey(null)
+      }
+    }
+
+    void loadVisibility()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const menuItems = useMemo(
+    () =>
+      MENU.filter((item) => {
+        if (!item.settingKey) return true
+        if (visibleByKey === undefined) return false
+        if (visibleByKey === null) return true
+        return visibleByKey[item.settingKey] !== false
+      }),
+    [visibleByKey]
+  )
 
   return (
     <aside
@@ -69,7 +119,7 @@ export default function DashboardSidebar({ collapsed = false, onToggle }: Dashbo
       </div>
 
       <nav className="flex-1 space-y-1">
-        {MENU.map((item) => {
+        {menuItems.map((item) => {
           const active =
             item.href === '/dashboard'
               ? pathname === item.href

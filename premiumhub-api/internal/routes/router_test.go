@@ -66,6 +66,9 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "GET", "/api/v1/maintenance/evaluate") {
 		t.Fatalf("maintenance evaluate route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/me/sidebar-menu") {
+		t.Fatalf("user sidebar menu route should exist")
+	}
 	if !hasRoute(routes, "GET", "/api/v1/admin/account-types") {
 		t.Fatalf("admin account type list route should exist")
 	}
@@ -89,6 +92,12 @@ func TestSetupProductionRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "DELETE", "/api/v1/admin/product-categories/:id") {
 		t.Fatalf("admin product category delete route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/admin/settings/user-sidebar-menu") {
+		t.Fatalf("admin user sidebar menu setting list route should exist")
+	}
+	if !hasRoute(routes, "PUT", "/api/v1/admin/settings/user-sidebar-menu") {
+		t.Fatalf("admin user sidebar menu setting update route should exist")
 	}
 	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/services") {
 		t.Fatalf("admin sosmed service list route should exist")
