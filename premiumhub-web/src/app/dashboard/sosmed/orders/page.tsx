@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, RefreshCcw, RotateCcw } from 'lucide-react'
+import { CheckCircle2, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw } from 'lucide-react'
 
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
@@ -70,6 +70,95 @@ function formatDeadline(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(date)
+}
+
+function shortOrderID(id: string) {
+  return id ? `#${id.slice(0, 8).toUpperCase()}` : '#ORDER'
+}
+
+function compactTarget(value?: string) {
+  const trimmed = value?.trim()
+  if (!trimmed) return '-'
+
+  return trimmed
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/$/, '')
+}
+
+function paymentLabel(value: SosmedOrder['payment_status']) {
+  switch (value) {
+    case 'paid':
+      return 'Paid'
+    case 'pending':
+      return 'Menunggu Bayar'
+    case 'failed':
+      return 'Gagal Bayar'
+    case 'expired':
+      return 'Expired'
+    default:
+      return value || '-'
+  }
+}
+
+function progressSteps(order: SosmedOrder) {
+  const paid = order.payment_status === 'paid'
+  const processing = order.order_status === 'processing'
+  const success = order.order_status === 'success'
+  const failed = order.order_status === 'failed' || order.order_status === 'canceled' || order.order_status === 'expired'
+
+  return [
+    {
+      key: 'paid',
+      label: 'Dibayar',
+      done: paid,
+      active: !paid && !failed,
+    },
+    {
+      key: 'process',
+      label: 'Diproses',
+      done: success,
+      active: paid && processing,
+    },
+    {
+      key: 'done',
+      label: success ? 'Selesai' : failed ? 'Tertahan' : 'Selesai',
+      done: success,
+      active: failed,
+      danger: failed,
+    },
+  ]
+}
+
+function refillTitle(status?: string) {
+  const value = (status || 'none').toLowerCase()
+  if (value === 'requested' || value === 'processing') return 'Refill Sedang Diproses'
+  if (value === 'completed') return 'Refill Sudah Selesai'
+  if (value === 'failed') return 'Refill Belum Berhasil'
+  if (value === 'rejected') return 'Refill Ditolak Supplier'
+  return 'Garansi Refill Aktif'
+}
+
+function refillDescription(order: SosmedOrder) {
+  const status = (order.refill_status || 'none').toLowerCase()
+  if (status === 'requested' || status === 'processing') {
+    return 'Permintaan refill udah masuk ke supplier. Tinggal tunggu prosesnya jalan.'
+  }
+  if (status === 'completed') {
+    return order.refill_completed_at
+      ? `Selesai diproses pada ${formatDate(order.refill_completed_at)}.`
+      : 'Refill udah selesai diproses.'
+  }
+  if (status === 'failed') {
+    return 'Refill belum berhasil dikirim. Lu bisa coba klaim ulang kalau tombolnya masih aktif.'
+  }
+  if (status === 'rejected') {
+    return 'Supplier menolak refill ini. Kalau perlu, hubungi admin buat dicek manual.'
+  }
+  if (!order.refill_deadline) {
+    return 'Garansi refill perlu dicek admin dulu sebelum bisa diklaim.'
+  }
+  return `Bisa klaim sampai ${formatDeadline(order.refill_deadline)}.`
 }
 
 export default function DashboardSosmedOrdersPage() {
@@ -204,16 +293,30 @@ export default function DashboardSosmedOrdersPage() {
           {orders.map((order) => {
             const status = statusMeta(order)
             const refill = refillMeta(order)
+            const steps = progressSteps(order)
+            const target = compactTarget(order.target_link)
 
             return (
               <article
                 key={order.id}
-                className="rounded-2xl border border-[#EBEBEB] bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
+                className="overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white shadow-[0_10px_35px_rgba(20,20,20,0.03)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(20,20,20,0.06)]"
               >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-black text-[#141414]">{order.id}</span>
+                <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                  <div className="min-w-0 space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-[#141414] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
+                            {shortOrderID(order.id)}
+                          </span>
+                          <span className="text-xs font-semibold text-[#888]">{formatDate(order.created_at)}</span>
+                        </div>
+                        <h2 className="mt-2 text-base font-black leading-tight text-[#141414] sm:text-lg">
+                          {order.service_title}
+                        </h2>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
                       <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${status.className}`}>
                         {status.label}
                       </span>
@@ -222,52 +325,131 @@ export default function DashboardSosmedOrdersPage() {
                           {refill.label}
                         </span>
                       ) : null}
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-[#888]">{formatDate(order.created_at)}</p>
-                    <p className="mt-2 text-sm font-semibold text-[#141414]">{order.service_title}</p>
-                    <p className="text-xs text-[#666]">Target: {order.target_link || '-'}</p>
 
-                    {/* Refill info row */}
-                    {refill && order.refill_deadline ? (
-                      <p className="mt-1 text-[11px] text-[#888]">
-                        Garansi refill sampai: <span className="font-semibold">{formatDeadline(order.refill_deadline)}</span>
-                        {order.refill_provider_error ? (
-                          <span className="ml-2 text-red-500">• Refill belum berhasil dikirim. Coba lagi nanti atau hubungi admin.</span>
-                        ) : null}
-                      </p>
+                    <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-[#EFEFEA] bg-[#FAFAF8] px-3 py-2 text-xs text-[#555]">
+                      <Link2 className="h-3.5 w-3.5 shrink-0 text-[#FF5733]" />
+                      <span className="min-w-0 truncate">
+                        Target: <span className="font-bold text-[#141414]">{target}</span>
+                      </span>
+                    </div>
+
+                    <div className="rounded-2xl border border-[#EFEFEA] bg-[#FCFCFA] px-4 py-3">
+                      <div className="grid grid-cols-3 items-start gap-2">
+                        {steps.map((step, index) => (
+                          <div key={step.key} className="relative min-w-0">
+                            {index < steps.length - 1 ? (
+                              <div
+                                className={`absolute left-[calc(50%+14px)] right-[calc(-50%+14px)] top-4 h-0.5 ${
+                                  step.done ? 'bg-emerald-300' : 'bg-[#E8E8E2]'
+                                }`}
+                              />
+                            ) : null}
+
+                            <div className="relative z-10 flex flex-col items-center gap-1.5 text-center">
+                              <span
+                                className={`grid h-8 w-8 place-items-center rounded-full border text-xs ${
+                                  step.done
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+                                    : step.danger
+                                      ? 'border-red-200 bg-red-50 text-red-600'
+                                      : step.active
+                                        ? 'border-[#FFB29F] bg-[#FFF3EF] text-[#FF5733]'
+                                        : 'border-[#E5E5E0] bg-white text-[#AAA]'
+                                }`}
+                              >
+                                {step.done ? (
+                                  <CheckCircle2 className="h-4 w-4" />
+                                ) : step.active ? (
+                                  <Clock3 className="h-4 w-4" />
+                                ) : (
+                                  <CircleDashed className="h-4 w-4" />
+                                )}
+                              </span>
+                              <span
+                                className={`text-[11px] font-bold ${
+                                  step.done
+                                    ? 'text-emerald-700'
+                                    : step.danger
+                                      ? 'text-red-600'
+                                      : step.active
+                                        ? 'text-[#FF5733]'
+                                        : 'text-[#999]'
+                                }`}
+                              >
+                                {step.label}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {refill ? (
+                      <div
+                        className={`rounded-2xl border px-3.5 py-3 ${
+                          refill.canClaim
+                            ? 'border-violet-200 bg-violet-50'
+                            : order.refill_status === 'completed'
+                              ? 'border-emerald-200 bg-emerald-50'
+                              : order.refill_status === 'failed' || order.refill_status === 'rejected'
+                                ? 'border-red-200 bg-red-50'
+                                : 'border-sky-200 bg-sky-50'
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="text-xs font-black text-[#141414]">{refillTitle(order.refill_status)}</div>
+                            <p className="mt-1 text-[11px] leading-relaxed text-[#666]">{refillDescription(order)}</p>
+                          </div>
+
+                          {refill.canClaim ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleRefill(order)}
+                              disabled={refillLoading === order.id}
+                              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-[11px] font-black text-white shadow-sm hover:bg-violet-700 disabled:opacity-60"
+                            >
+                              {refillLoading === order.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-3 w-3" />
+                              )}
+                              Klaim Refill
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
                     ) : null}
                   </div>
 
-                  <div className="flex flex-col items-start gap-2 md:items-end">
-                    <div className="text-sm font-bold text-[#141414]">{formatRupiah(order.total_price)}</div>
-                    <div className="text-xs text-[#666]">Payment: {order.payment_status}</div>
+                  <aside className="flex flex-col justify-between rounded-2xl border border-[#EFEFEA] bg-[#FAFAF8] p-4 lg:items-end">
+                    <div className="space-y-1 lg:text-right">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#999]">Total Bayar</div>
+                      <div className="text-xl font-black text-[#141414]">{formatRupiah(order.total_price)}</div>
+                      <div className="text-xs font-semibold text-[#666]">{paymentLabel(order.payment_status)} via {order.payment_method || '-'}</div>
+                    </div>
 
-                    {order.order_status === 'pending_payment' ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleCancel(order)}
-                        className="rounded-lg border border-red-200 px-3 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                    <div className="mt-4 flex flex-wrap gap-2 lg:justify-end">
+                      <Link
+                        href="/product/sosmed"
+                        className="rounded-xl border border-[#DDD] bg-white px-3 py-2 text-[11px] font-black text-[#141414] hover:bg-[#F7F7F5]"
                       >
-                        Batalkan
-                      </button>
-                    ) : null}
+                        Order Lagi
+                      </Link>
 
-                    {refill?.canClaim ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleRefill(order)}
-                        disabled={refillLoading === order.id}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-60"
-                      >
-                        {refillLoading === order.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <RotateCcw className="h-3 w-3" />
-                        )}
-                        Klaim Refill
-                      </button>
-                    ) : null}
-                  </div>
+                      {order.order_status === 'pending_payment' ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleCancel(order)}
+                          className="rounded-xl border border-red-200 bg-white px-3 py-2 text-[11px] font-black text-red-600 hover:bg-red-50"
+                        >
+                          Batalkan
+                        </button>
+                      ) : null}
+                    </div>
+                  </aside>
                 </div>
               </article>
             )
