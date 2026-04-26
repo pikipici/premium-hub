@@ -42,8 +42,14 @@ function refillMeta(order: SosmedOrder) {
   if (status === 'completed') {
     return { label: 'Refill Selesai', className: 'bg-emerald-50 text-emerald-600 border-emerald-200', canClaim: false }
   }
+  if (status === 'rejected') {
+    return { label: 'Refill Ditolak', className: 'bg-red-50 text-red-600 border-red-200', canClaim: false }
+  }
   if (isExpired) {
     return { label: 'Refill Expired', className: 'bg-gray-50 text-gray-500 border-gray-200', canClaim: false }
+  }
+  if (!deadlineStr) {
+    return { label: 'Refill Perlu Dicek Admin', className: 'bg-amber-50 text-amber-600 border-amber-200', canClaim: false }
   }
 
   // Eligible & can claim (status is none or failed)
@@ -226,7 +232,7 @@ export default function DashboardSosmedOrdersPage() {
                       <p className="mt-1 text-[11px] text-[#888]">
                         Garansi refill sampai: <span className="font-semibold">{formatDeadline(order.refill_deadline)}</span>
                         {order.refill_provider_error ? (
-                          <span className="ml-2 text-red-500">• {order.refill_provider_error}</span>
+                          <span className="ml-2 text-red-500">• Refill belum berhasil dikirim. Coba lagi nanti atau hubungi admin.</span>
                         ) : null}
                       </p>
                     ) : null}

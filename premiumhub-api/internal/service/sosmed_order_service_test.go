@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 )
 
 type fakeSosmedJAPOrderProvider struct {
+	mu                 sync.Mutex
 	inputs             []JAPAddOrderInput
 	res                *JAPAddOrderResponse
 	err                error
@@ -23,7 +25,13 @@ type fakeSosmedJAPOrderProvider struct {
 	statusByOrderID    map[string]*JAPOrderStatusResponse
 	statusErrByOrderID map[string]error
 	refillInputs       []string
+	refillRes          *JAPRefillResponse
 	refillErr          error
+	refillStarted      chan struct{}
+	refillRelease      chan struct{}
+	refillStatusInputs []string
+	refillStatusRes    *JAPRefillStatusResponse
+	refillStatusErr    error
 }
 
 func (f *fakeSosmedJAPOrderProvider) AddOrder(_ context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error) {
@@ -58,9 +66,45 @@ func (f *fakeSosmedJAPOrderProvider) GetOrderStatus(_ context.Context, orderID s
 	return &JAPOrderStatusResponse{Status: "In Progress"}, nil
 }
 
-func (f *fakeSosmedJAPOrderProvider) RequestRefill(_ context.Context, orderID string) error {
+func (f *fakeSosmedJAPOrderProvider) RequestRefill(_ context.Context, orderID string) (*JAPRefillResponse, error) {
+	f.mu.Lock()
 	f.refillInputs = append(f.refillInputs, orderID)
-	return f.refillErr
+	started := f.refillStarted
+	f.refillStarted = nil
+	release := f.refillRelease
+	res := f.refillRes
+	err := f.refillErr
+	f.mu.Unlock()
+
+	if started != nil {
+		close(started)
+	}
+	if release != nil {
+		<-release
+	}
+	if err != nil {
+		return nil, err
+	}
+	if res != nil {
+		return res, nil
+	}
+	return &JAPRefillResponse{Refill: "REFILL-1001"}, nil
+}
+
+func (f *fakeSosmedJAPOrderProvider) GetRefillStatus(_ context.Context, refillID string) (*JAPRefillStatusResponse, error) {
+	f.mu.Lock()
+	f.refillStatusInputs = append(f.refillStatusInputs, refillID)
+	res := f.refillStatusRes
+	err := f.refillStatusErr
+	f.mu.Unlock()
+
+	if err != nil {
+		return nil, err
+	}
+	if res != nil {
+		return res, nil
+	}
+	return &JAPRefillStatusResponse{Status: "Processing"}, nil
 }
 
 func TestSosmedOrderService_CreateAndConfirm(t *testing.T) {

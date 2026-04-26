@@ -11,6 +11,7 @@ import (
 	"premiumhub-api/internal/repository"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // --- Pure logic tests (no DB, runs everywhere) ---
@@ -43,9 +44,9 @@ func TestParseSosmedRefillPeriodDays(t *testing.T) {
 		{"  30  Hari  ", 30},
 
 		// Raw provider values (before formatting)
-		{"Auto-Refill 30D", 0},  // no "Hari" pattern
-		{"auto refill 30d", 0},  // no "Hari" pattern
-		{"30D", 0},              // no "Hari" pattern
+		{"Auto-Refill 30D", 30},
+		{"auto refill 30d", 30},
+		{"30D", 30},
 	}
 
 	for _, tc := range cases {
@@ -131,6 +132,27 @@ func TestPopulateSosmedOrderRefill(t *testing.T) {
 
 // --- DB-backed service tests (require CGO/sqlite, run on rdpkhorur) ---
 
+func seedSosmedRefillService(t *testing.T, db *gorm.DB, id uuid.UUID) *model.SosmedService {
+	t.Helper()
+
+	serviceItem := &model.SosmedService{
+		ID:                      id,
+		CategoryCode:            "followers",
+		Code:                    "instagram-followers-6331",
+		Title:                   "Instagram Followers Hemat",
+		ProviderCode:            "jap",
+		ProviderServiceID:       "6331",
+		CheckoutPrice:           19000,
+		IsActive:                true,
+		Refill:                  "30 Hari",
+		ProviderRefillSupported: true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	return serviceItem
+}
+
 func TestSosmedOrderService_UserRequestRefill(t *testing.T) {
 	db := setupCoreDB(t)
 	if err := db.AutoMigrate(
@@ -158,21 +180,7 @@ func TestSosmedOrderService_UserRequestRefill(t *testing.T) {
 		t.Fatalf("create other: %v", err)
 	}
 
-	serviceItem := &model.SosmedService{
-		ID:                    uuid.New(),
-		CategoryCode:          "followers",
-		Code:                  "instagram-followers-6331",
-		Title:                 "Instagram Followers Hemat",
-		ProviderCode:          "jap",
-		ProviderServiceID:     "6331",
-		CheckoutPrice:         19000,
-		IsActive:              true,
-		Refill:                "30 Hari",
-		ProviderRefillSupported: true,
-	}
-	if err := db.Create(serviceItem).Error; err != nil {
-		t.Fatalf("create service: %v", err)
-	}
+	serviceItem := seedSosmedRefillService(t, db, uuid.New())
 
 	deadline := time.Now().Add(30 * 24 * time.Hour)
 	order := &model.SosmedOrder{
@@ -222,6 +230,12 @@ func TestSosmedOrderService_UserRequestRefill(t *testing.T) {
 	if detail.Order.RefillStatus != "requested" {
 		t.Fatalf("expected refill_status=requested, got %s", detail.Order.RefillStatus)
 	}
+	if detail.Order.RefillProviderOrderID != "REFILL-1001" {
+		t.Fatalf("expected refill provider id REFILL-1001, got %q", detail.Order.RefillProviderOrderID)
+	}
+	if detail.Order.RefillProviderStatus != "submitted" {
+		t.Fatalf("expected refill provider status submitted, got %q", detail.Order.RefillProviderStatus)
+	}
 	if detail.Order.RefillRequestedAt == nil {
 		t.Fatal("expected refill_requested_at to be set")
 	}
@@ -258,6 +272,95 @@ func TestSosmedOrderService_UserRequestRefill(t *testing.T) {
 	}
 }
 
+func TestSosmedOrderService_UserRequestRefillLocksBeforeProviderCall(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+	); err != nil {
+		t.Fatalf("migrate refill lock models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID: uuid.New(), Name: "Refill Lock Buyer", Email: "refill-lock@example.com",
+		Password: "hashed", Role: "user", IsActive: true,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := seedSosmedRefillService(t, db, uuid.New())
+	deadline := time.Now().Add(30 * 24 * time.Hour)
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            buyer.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://instagram.com/example",
+		Quantity:          1,
+		UnitPrice:         19000,
+		TotalPrice:        19000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusSuccess,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderOrderID:   "JAP-REFILL-LOCK-001",
+		ProviderStatus:    "Completed",
+		RefillEligible:    true,
+		RefillPeriodDays:  30,
+		RefillDeadline:    &deadline,
+		RefillStatus:      "none",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	fakeJAP := &fakeSosmedJAPOrderProvider{
+		refillStarted: started,
+		refillRelease: release,
+	}
+	orderSvc := NewSosmedOrderService(
+		repository.NewSosmedOrderRepo(db),
+		repository.NewSosmedServiceRepo(db),
+		nil,
+	).SetJAPOrderProvider(fakeJAP)
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := orderSvc.UserRequestRefill(context.Background(), order.ID, buyer.ID)
+		done <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for first refill request to reach provider")
+	}
+
+	_, err := orderSvc.UserRequestRefill(context.Background(), order.ID, buyer.ID)
+	if err == nil || !strings.Contains(err.Error(), "sedang diproses") {
+		t.Fatalf("expected second request to be blocked while first is in-flight, got: %v", err)
+	}
+
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatalf("first refill request failed: %v", err)
+	}
+
+	fakeJAP.mu.Lock()
+	callCount := len(fakeJAP.refillInputs)
+	fakeJAP.mu.Unlock()
+	if callCount != 1 {
+		t.Fatalf("expected exactly 1 provider refill call, got %d", callCount)
+	}
+}
+
 func TestSosmedOrderService_UserRequestRefillFailure(t *testing.T) {
 	db := setupCoreDB(t)
 	if err := db.AutoMigrate(
@@ -277,13 +380,14 @@ func TestSosmedOrderService_UserRequestRefillFailure(t *testing.T) {
 		t.Fatalf("create buyer: %v", err)
 	}
 
+	serviceItem := seedSosmedRefillService(t, db, uuid.New())
 	deadline := time.Now().Add(30 * 24 * time.Hour)
 	order := &model.SosmedOrder{
 		ID:                uuid.New(),
 		UserID:            buyer.ID,
-		ServiceID:         uuid.New(),
-		ServiceCode:       "instagram-followers-6331",
-		ServiceTitle:      "Instagram Followers Hemat",
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
 		TargetLink:        "https://instagram.com/example",
 		Quantity:          1,
 		UnitPrice:         19000,
@@ -336,6 +440,7 @@ func TestSosmedOrderService_UserRequestRefillValidation(t *testing.T) {
 	db := setupCoreDB(t)
 	if err := db.AutoMigrate(
 		&model.User{},
+		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
 	); err != nil {
@@ -351,10 +456,11 @@ func TestSosmedOrderService_UserRequestRefillValidation(t *testing.T) {
 	}
 
 	fakeJAP := &fakeSosmedJAPOrderProvider{}
+	serviceItem := seedSosmedRefillService(t, db, uuid.New())
 
 	t.Run("not eligible", func(t *testing.T) {
 		order := &model.SosmedOrder{
-			ID: uuid.New(), UserID: buyer.ID, ServiceID: uuid.New(),
+			ID: uuid.New(), UserID: buyer.ID, ServiceID: serviceItem.ID,
 			ServiceCode: "test", ServiceTitle: "test", TargetLink: "https://x.com/a",
 			Quantity: 1, UnitPrice: 1000, TotalPrice: 1000,
 			PaymentMethod: "wallet", PaymentStatus: "paid", OrderStatus: sosmedOrderStatusSuccess,
@@ -373,7 +479,7 @@ func TestSosmedOrderService_UserRequestRefillValidation(t *testing.T) {
 
 	t.Run("not success status", func(t *testing.T) {
 		order := &model.SosmedOrder{
-			ID: uuid.New(), UserID: buyer.ID, ServiceID: uuid.New(),
+			ID: uuid.New(), UserID: buyer.ID, ServiceID: serviceItem.ID,
 			ServiceCode: "test", ServiceTitle: "test", TargetLink: "https://x.com/a",
 			Quantity: 1, UnitPrice: 1000, TotalPrice: 1000,
 			PaymentMethod: "wallet", PaymentStatus: "paid", OrderStatus: sosmedOrderStatusProcessing,
@@ -393,7 +499,7 @@ func TestSosmedOrderService_UserRequestRefillValidation(t *testing.T) {
 	t.Run("expired deadline", func(t *testing.T) {
 		expired := time.Now().Add(-24 * time.Hour)
 		order := &model.SosmedOrder{
-			ID: uuid.New(), UserID: buyer.ID, ServiceID: uuid.New(),
+			ID: uuid.New(), UserID: buyer.ID, ServiceID: serviceItem.ID,
 			ServiceCode: "test", ServiceTitle: "test", TargetLink: "https://x.com/a",
 			Quantity: 1, UnitPrice: 1000, TotalPrice: 1000,
 			PaymentMethod: "wallet", PaymentStatus: "paid", OrderStatus: sosmedOrderStatusSuccess,
@@ -438,14 +544,15 @@ func TestSosmedOrderService_AdminTriggerRefill(t *testing.T) {
 		t.Fatalf("create admin: %v", err)
 	}
 
+	serviceItem := seedSosmedRefillService(t, db, uuid.New())
 	// Admin can trigger refill even for expired orders (no deadline check).
 	expired := time.Now().Add(-24 * time.Hour)
 	order := &model.SosmedOrder{
 		ID:                uuid.New(),
 		UserID:            buyer.ID,
-		ServiceID:         uuid.New(),
-		ServiceCode:       "instagram-followers-6331",
-		ServiceTitle:      "Instagram Followers Hemat",
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
 		TargetLink:        "https://instagram.com/example",
 		Quantity:          1,
 		UnitPrice:         19000,
@@ -480,6 +587,9 @@ func TestSosmedOrderService_AdminTriggerRefill(t *testing.T) {
 	if detail.Order.RefillStatus != "requested" {
 		t.Fatalf("expected refill_status=requested, got %s", detail.Order.RefillStatus)
 	}
+	if detail.Order.RefillProviderOrderID != "REFILL-1001" {
+		t.Fatalf("expected refill provider id REFILL-1001, got %q", detail.Order.RefillProviderOrderID)
+	}
 	if len(fakeJAP.refillInputs) != 1 || fakeJAP.refillInputs[0] != "JAP-ADMIN-REFILL-001" {
 		t.Fatalf("unexpected refill inputs: %+v", fakeJAP.refillInputs)
 	}
@@ -507,5 +617,87 @@ func TestSosmedOrderService_AdminTriggerRefill(t *testing.T) {
 	}
 	if len(notifs) < 1 {
 		t.Fatal("expected at least 1 notification for the order owner")
+	}
+}
+
+func TestSosmedOrderService_AdminSyncProviderStatusSyncsRefill(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+	); err != nil {
+		t.Fatalf("migrate refill sync models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID: uuid.New(), Name: "Refill Sync Owner", Email: "refill-sync@example.com",
+		Password: "hashed", Role: "user", IsActive: true,
+	}
+	adminID := uuid.New()
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := seedSosmedRefillService(t, db, uuid.New())
+	deadline := time.Now().Add(30 * 24 * time.Hour)
+	order := &model.SosmedOrder{
+		ID:                    uuid.New(),
+		UserID:                buyer.ID,
+		ServiceID:             serviceItem.ID,
+		ServiceCode:           serviceItem.Code,
+		ServiceTitle:          serviceItem.Title,
+		TargetLink:            "https://instagram.com/example",
+		Quantity:              1,
+		UnitPrice:             19000,
+		TotalPrice:            19000,
+		PaymentMethod:         "wallet",
+		PaymentStatus:         "paid",
+		OrderStatus:           sosmedOrderStatusSuccess,
+		ProviderCode:          "jap",
+		ProviderServiceID:     "6331",
+		ProviderOrderID:       "JAP-REFILL-SYNC-001",
+		ProviderStatus:        "Completed",
+		RefillEligible:        true,
+		RefillPeriodDays:      30,
+		RefillDeadline:        &deadline,
+		RefillStatus:          sosmedRefillStatusRequested,
+		RefillProviderOrderID: "REFILL-SYNC-001",
+		RefillProviderStatus:  "Processing",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{
+		statusRes:       &JAPOrderStatusResponse{Status: "Completed"},
+		refillStatusRes: &JAPRefillStatusResponse{Status: "Completed"},
+	}
+	orderSvc := NewSosmedOrderService(
+		repository.NewSosmedOrderRepo(db),
+		repository.NewSosmedServiceRepo(db),
+		nil,
+	).SetJAPOrderProvider(fakeJAP)
+
+	detail, err := orderSvc.AdminSyncProviderStatus(context.Background(), order.ID, adminID)
+	if err != nil {
+		t.Fatalf("sync provider refill: %v", err)
+	}
+	if detail.Order.RefillStatus != sosmedRefillStatusCompleted {
+		t.Fatalf("expected refill completed, got %s", detail.Order.RefillStatus)
+	}
+	if detail.Order.RefillCompletedAt == nil {
+		t.Fatal("expected refill completed timestamp")
+	}
+	if detail.Order.RefillProviderStatus != "Completed" {
+		t.Fatalf("expected provider refill status Completed, got %q", detail.Order.RefillProviderStatus)
+	}
+
+	fakeJAP.mu.Lock()
+	refillStatusInputs := append([]string(nil), fakeJAP.refillStatusInputs...)
+	fakeJAP.mu.Unlock()
+	if len(refillStatusInputs) != 1 || refillStatusInputs[0] != "REFILL-SYNC-001" {
+		t.Fatalf("unexpected refill status inputs: %+v", refillStatusInputs)
 	}
 }

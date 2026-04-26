@@ -177,6 +177,94 @@ func TestJAPClientGetOrderStatus(t *testing.T) {
 	}
 }
 
+func TestJAPClientRequestRefill(t *testing.T) {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST request, got %s", r.Method)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		assertJAPFormValue(t, r.Form, "key", "secret-key")
+		assertJAPFormValue(t, r.Form, "action", "refill")
+		assertJAPFormValue(t, r.Form, "order", "991122")
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"refill": 776655}`))
+	}))
+	defer server.Close()
+
+	client := NewJAPClient(&config.Config{
+		JAPAPIURL:         server.URL,
+		JAPAPIKey:         "secret-key",
+		JAPHTTPTimeoutSec: "5",
+	})
+
+	res, err := client.RequestRefill(context.Background(), "991122")
+	if err != nil {
+		t.Fatalf("request refill: %v", err)
+	}
+	if res.Refill != "776655" {
+		t.Fatalf("expected refill id 776655, got %q", res.Refill)
+	}
+}
+
+func TestJAPClientGetRefillStatus(t *testing.T) {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST request, got %s", r.Method)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		assertJAPFormValue(t, r.Form, "key", "secret-key")
+		assertJAPFormValue(t, r.Form, "action", "refill_status")
+		assertJAPFormValue(t, r.Form, "refill", "776655")
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"Completed"}`))
+	}))
+	defer server.Close()
+
+	client := NewJAPClient(&config.Config{
+		JAPAPIURL:         server.URL,
+		JAPAPIKey:         "secret-key",
+		JAPHTTPTimeoutSec: "5",
+	})
+
+	res, err := client.GetRefillStatus(context.Background(), "776655")
+	if err != nil {
+		t.Fatalf("get refill status: %v", err)
+	}
+	if res.Status != "Completed" {
+		t.Fatalf("expected status Completed, got %q", res.Status)
+	}
+}
+
+func TestJAPClientRequestRefillErrorPayload(t *testing.T) {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":"Incorrect order ID"}`))
+	}))
+	defer server.Close()
+
+	client := NewJAPClient(&config.Config{
+		JAPAPIURL:         server.URL,
+		JAPAPIKey:         "secret-key",
+		JAPHTTPTimeoutSec: "5",
+	})
+
+	if _, err := client.RequestRefill(context.Background(), "991122"); err == nil {
+		t.Fatalf("expected refill error")
+	}
+}
+
 func TestJAPClientRequiresAPIKey(t *testing.T) {
 	client := NewJAPClient(&config.Config{
 		JAPAPIURL:         "https://justanotherpanel.com/api/v2",

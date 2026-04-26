@@ -433,7 +433,10 @@ func formatSosmedRefillValue(raw string) string {
 //   - "Seumur Layanan" → 365 (conventional ceiling)
 //   - "Stabil (Non Drop)" → 0 (no explicit refill period)
 //   - "Tidak Ada", "-", "N/A" → 0
-var sosmedRefillParseDayPattern = regexp.MustCompile(`([0-9]{1,4})\s*[Hh]ari`)
+var (
+	sosmedRefillParseDayPattern    = regexp.MustCompile(`([0-9]{1,4})\s*[Hh]ari`)
+	sosmedRefillParseRawDayPattern = regexp.MustCompile(`(?i)(?:auto[-\s]*refill\s*)?([0-9]{1,4})\s*(?:d|days?)\b`)
+)
 
 func parseSosmedRefillPeriodDays(refillText string) int {
 	value := strings.TrimSpace(refillText)
@@ -454,6 +457,12 @@ func parseSosmedRefillPeriodDays(refillText string) int {
 	}
 
 	if match := sosmedRefillParseDayPattern.FindStringSubmatch(value); len(match) == 2 {
+		days, err := strconv.Atoi(strings.TrimSpace(match[1]))
+		if err == nil && days > 0 {
+			return days
+		}
+	}
+	if match := sosmedRefillParseRawDayPattern.FindStringSubmatch(value); len(match) == 2 {
 		days, err := strconv.Atoi(strings.TrimSpace(match[1]))
 		if err == nil && days > 0 {
 			return days

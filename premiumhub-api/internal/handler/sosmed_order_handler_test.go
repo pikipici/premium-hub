@@ -37,8 +37,12 @@ func (f *fakeHandlerJAPOrderProvider) GetOrderStatus(_ context.Context, _ string
 	return &service.JAPOrderStatusResponse{Status: "In Progress"}, nil
 }
 
-func (f *fakeHandlerJAPOrderProvider) RequestRefill(_ context.Context, _ string) error {
-	return nil
+func (f *fakeHandlerJAPOrderProvider) RequestRefill(_ context.Context, _ string) (*service.JAPRefillResponse, error) {
+	return &service.JAPRefillResponse{Refill: "REFILL-SMOKE-1001"}, nil
+}
+
+func (f *fakeHandlerJAPOrderProvider) GetRefillStatus(_ context.Context, _ string) (*service.JAPRefillStatusResponse, error) {
+	return &service.JAPRefillStatusResponse{Status: "Processing"}, nil
 }
 
 type handlerSmokeEnvelope struct {

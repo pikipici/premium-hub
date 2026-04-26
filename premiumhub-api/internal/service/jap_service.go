@@ -91,20 +91,38 @@ func (s *JAPService) GetOrderStatus(ctx context.Context, orderID string) (*JAPOr
 	return res, nil
 }
 
-func (s *JAPService) RequestRefill(ctx context.Context, orderID string) error {
+func (s *JAPService) RequestRefill(ctx context.Context, orderID string) (*JAPRefillResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
-		return err
+		return nil, err
 	}
 
 	orderID = strings.TrimSpace(orderID)
 	if orderID == "" {
-		return errors.New("provider order id JAP wajib diisi untuk refill")
+		return nil, errors.New("provider order id JAP wajib diisi untuk refill")
 	}
 
-	if err := s.client.RequestRefill(ctx, orderID); err != nil {
-		return s.normalizeProviderErr(err)
+	res, err := s.client.RequestRefill(ctx, orderID)
+	if err != nil {
+		return nil, s.normalizeProviderErr(err)
 	}
-	return nil
+	return res, nil
+}
+
+func (s *JAPService) GetRefillStatus(ctx context.Context, refillID string) (*JAPRefillStatusResponse, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
+
+	refillID = strings.TrimSpace(refillID)
+	if refillID == "" {
+		return nil, errors.New("provider refill id JAP wajib diisi")
+	}
+
+	res, err := s.client.GetRefillStatus(ctx, refillID)
+	if err != nil {
+		return nil, s.normalizeProviderErr(err)
+	}
+	return res, nil
 }
 
 func (s *JAPService) ensureConfigured() error {

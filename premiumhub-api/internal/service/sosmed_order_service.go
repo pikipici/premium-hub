@@ -25,6 +25,13 @@ const (
 	sosmedOrderStatusCanceled       = "canceled"
 	sosmedOrderStatusExpired        = "expired"
 
+	sosmedRefillStatusNone       = "none"
+	sosmedRefillStatusRequested  = "requested"
+	sosmedRefillStatusProcessing = "processing"
+	sosmedRefillStatusCompleted  = "completed"
+	sosmedRefillStatusFailed     = "failed"
+	sosmedRefillStatusRejected   = "rejected"
+
 	defaultSosmedOpsStaleSyncMinutes = 30
 	maxSosmedOpsStaleSyncMinutes     = 1440
 )
@@ -54,7 +61,8 @@ type SosmedOrderService struct {
 type SosmedJAPOrderProvider interface {
 	AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error)
 	GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error)
-	RequestRefill(ctx context.Context, orderID string) error
+	RequestRefill(ctx context.Context, orderID string) (*JAPRefillResponse, error)
+	GetRefillStatus(ctx context.Context, refillID string) (*JAPRefillStatusResponse, error)
 }
 
 func NewSosmedOrderService(
@@ -116,6 +124,38 @@ type SosmedOrderDetail struct {
 
 func normalizeSosmedOrderStatus(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func normalizeSosmedRefillStatus(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return sosmedRefillStatusNone
+	}
+	return normalized
+}
+
+func isActiveSosmedRefillStatus(value string) bool {
+	switch normalizeSosmedRefillStatus(value) {
+	case sosmedRefillStatusRequested, sosmedRefillStatusProcessing:
+		return true
+	default:
+		return false
+	}
+}
+
+func mapSosmedJAPRefillStatus(value string) string {
+	switch normalizeSosmedProviderStatus(value) {
+	case "completed", "complete", "success", "delivered", "done":
+		return sosmedRefillStatusCompleted
+	case "rejected", "reject":
+		return sosmedRefillStatusRejected
+	case "failed", "fail", "canceled", "cancelled", "error":
+		return sosmedRefillStatusFailed
+	case "pending", "processing", "in progress", "inprogress", "queued", "queue", "active", "refilling":
+		return sosmedRefillStatusProcessing
+	default:
+		return sosmedRefillStatusProcessing
+	}
 }
 
 func isValidSosmedOrderStatus(value string) bool {
@@ -427,7 +467,7 @@ func populateSosmedOrderRefill(order *model.SosmedOrder, svc *model.SosmedServic
 	eligible := svc.ProviderRefillSupported || periodDays > 0
 
 	order.RefillEligible = eligible
-	order.RefillStatus = "none"
+	order.RefillStatus = sosmedRefillStatusNone
 
 	if eligible && periodDays > 0 {
 		order.RefillPeriodDays = periodDays
@@ -703,6 +743,8 @@ func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *mo
 	providerStatus := strings.TrimSpace(providerRes.Status)
 	previousOrderStatus := normalizeSosmedOrderStatus(order.OrderStatus)
 	previousProviderStatus := strings.TrimSpace(order.ProviderStatus)
+	previousRefillStatus := normalizeSosmedRefillStatus(order.RefillStatus)
+	previousRefillProviderStatus := strings.TrimSpace(order.RefillProviderStatus)
 	nextOrderStatus := mapSosmedProviderOrderStatus(previousOrderStatus, providerStatus)
 
 	order.ProviderStatus = providerStatus
@@ -710,6 +752,28 @@ func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *mo
 	order.ProviderError = ""
 	order.ProviderSyncedAt = &syncedAt
 	order.OrderStatus = nextOrderStatus
+
+	refillChanged := false
+	refillSyncErrText := ""
+	if isActiveSosmedRefillStatus(order.RefillStatus) && strings.TrimSpace(order.RefillProviderOrderID) != "" {
+		refillRes, refillErr := s.japOrderProvider.GetRefillStatus(ctx, order.RefillProviderOrderID)
+		if refillErr != nil {
+			refillSyncErrText = truncateSosmedProviderText(refillErr.Error(), 1000)
+			order.RefillProviderError = truncateSosmedProviderText(refillErr.Error(), 2000)
+		} else {
+			nextRefillProviderStatus := strings.TrimSpace(refillRes.Status)
+			nextRefillStatus := mapSosmedJAPRefillStatus(nextRefillProviderStatus)
+
+			order.RefillProviderStatus = nextRefillProviderStatus
+			order.RefillProviderError = ""
+			order.RefillStatus = nextRefillStatus
+			if nextRefillStatus == sosmedRefillStatusCompleted && order.RefillCompletedAt == nil {
+				order.RefillCompletedAt = &syncedAt
+			}
+
+			refillChanged = previousRefillStatus != nextRefillStatus || previousRefillProviderStatus != nextRefillProviderStatus
+		}
+	}
 
 	if err := s.repo.Update(order); err != nil {
 		return nil, false, errors.New("gagal menyimpan sync status provider")
@@ -737,12 +801,34 @@ func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *mo
 		}
 	}
 
+	if refillChanged || refillSyncErrText != "" {
+		reason := "sync refill JAP"
+		if refillSyncErrText != "" {
+			reason = fmt.Sprintf("%s gagal: %s", reason, refillSyncErrText)
+		} else {
+			reason = fmt.Sprintf("%s: provider status %s, refill jadi %s", reason, humanizeSosmedProviderStatus(order.RefillProviderStatus), order.RefillStatus)
+		}
+
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: previousRefillStatus,
+			ToStatus:   order.RefillStatus,
+			Reason:     reason,
+			ActorType:  strings.TrimSpace(actorType),
+			ActorID:    actorID,
+			CreatedAt:  syncedAt,
+		}
+		if err := s.repo.CreateEvent(event); err != nil {
+			return nil, false, errors.New("gagal mencatat event sync refill")
+		}
+	}
+
 	stored, err := s.repo.FindByID(order.ID)
 	if err != nil {
 		return nil, false, errors.New("gagal memuat order sosmed hasil sync")
 	}
 
-	return stored, statusChanged || providerChanged, nil
+	return stored, statusChanged || providerChanged || refillChanged, nil
 }
 
 func (s *SosmedOrderService) GetByID(id, userID uuid.UUID) (*SosmedOrderDetail, error) {
@@ -796,198 +882,251 @@ func (s *SosmedOrderService) Cancel(id, userID uuid.UUID) error {
 	return nil
 }
 
-func (s *SosmedOrderService) UserRequestRefill(ctx context.Context, orderID, userID uuid.UUID) (*SosmedOrderDetail, error) {
-	order, err := s.repo.FindByID(orderID)
-	if err != nil {
-		return nil, errors.New("order sosmed tidak ditemukan")
-	}
-	if order.UserID != userID {
-		return nil, errors.New("akses ditolak")
+type sosmedRefillRequestOptions struct {
+	orderID         uuid.UUID
+	actorID         uuid.UUID
+	actorType       string
+	ownerID         *uuid.UUID
+	enforceDeadline bool
+}
+
+func (s *SosmedOrderService) reserveSosmedRefillRequest(ctx context.Context, opts sosmedRefillRequestOptions) (*model.SosmedOrder, error) {
+	if s.repo == nil {
+		return nil, errors.New("repo order sosmed belum siap")
 	}
 
-	// Validate eligibility.
-	if !order.RefillEligible {
-		return nil, errors.New("order ini tidak memiliki garansi refill")
-	}
-	if order.OrderStatus != sosmedOrderStatusSuccess {
-		return nil, errors.New("refill hanya bisa diklaim untuk order yang sudah sukses")
-	}
-	if order.RefillDeadline != nil && time.Now().After(*order.RefillDeadline) {
-		return nil, errors.New("periode garansi refill sudah habis")
-	}
-
-	// Block if there's an active refill request.
-	refillStatus := strings.TrimSpace(strings.ToLower(order.RefillStatus))
-	if refillStatus == "requested" || refillStatus == "processing" {
-		return nil, errors.New("refill sedang diproses, tunggu sampai selesai")
-	}
-
-	// Require a provider order ID to call JAP refill.
-	providerOrderID := strings.TrimSpace(order.ProviderOrderID)
-	if providerOrderID == "" {
-		return nil, errors.New("order belum memiliki provider order ID untuk refill")
-	}
-	if !isJAPSosmedOrder(order) {
-		return nil, errors.New("refill hanya tersedia untuk order supplier JAP")
-	}
-	if s.japOrderProvider == nil {
-		return nil, errors.New("konfigurasi JAP provider belum siap")
-	}
-
-	// Call JAP action=refill.
 	now := time.Now()
-	if err := s.japOrderProvider.RequestRefill(ctx, providerOrderID); err != nil {
-		// Store the error but don't crash — the user can retry later.
-		order.RefillStatus = "failed"
-		order.RefillProviderError = truncateSosmedProviderText(err.Error(), 2000)
+	var order model.SosmedOrder
+	db := s.repo.DB()
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Preload("User").
+			Preload("Service").
+			First(&order, "id = ?", opts.orderID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("order sosmed tidak ditemukan")
+			}
+			return errors.New("gagal memuat order sosmed")
+		}
+
+		if opts.ownerID != nil && order.UserID != *opts.ownerID {
+			return errors.New("akses ditolak")
+		}
+		if !order.RefillEligible {
+			return errors.New("order ini tidak memiliki garansi refill")
+		}
+		if order.OrderStatus != sosmedOrderStatusSuccess {
+			return errors.New("refill hanya bisa diklaim untuk order yang sudah sukses")
+		}
+		if opts.enforceDeadline {
+			if order.RefillDeadline == nil || order.RefillPeriodDays <= 0 {
+				return errors.New("periode garansi refill belum dikonfigurasi, hubungi admin")
+			}
+			if now.After(*order.RefillDeadline) {
+				return errors.New("periode garansi refill sudah habis")
+			}
+		}
+		if isActiveSosmedRefillStatus(order.RefillStatus) {
+			return errors.New("refill sedang diproses, tunggu sampai selesai")
+		}
+
+		providerOrderID := strings.TrimSpace(order.ProviderOrderID)
+		if providerOrderID == "" {
+			return errors.New("order belum memiliki provider order ID untuk refill")
+		}
+		if !isJAPSosmedOrder(&order) {
+			return errors.New("refill hanya tersedia untuk order supplier JAP")
+		}
+
+		previousRefillStatus := normalizeSosmedRefillStatus(order.RefillStatus)
+		order.RefillStatus = sosmedRefillStatusProcessing
+		order.RefillProviderStatus = "queued"
+		order.RefillProviderError = ""
 		order.RefillRequestedAt = &now
-		if saveErr := s.repo.Update(order); saveErr != nil {
-			return nil, errors.New("gagal menyimpan status refill")
+		if err := tx.Save(&order).Error; err != nil {
+			return errors.New("gagal mengunci status refill")
 		}
 
 		event := &model.SosmedOrderEvent{
 			OrderID:    order.ID,
-			FromStatus: order.OrderStatus,
-			ToStatus:   order.OrderStatus,
-			Reason:     fmt.Sprintf("refill gagal dikirim ke JAP: %v", err),
-			ActorType:  "user",
-			ActorID:    &userID,
+			FromStatus: previousRefillStatus,
+			ToStatus:   sosmedRefillStatusProcessing,
+			Reason:     fmt.Sprintf("refill dikunci untuk dikirim ke JAP #%s", providerOrderID),
+			ActorType:  strings.TrimSpace(opts.actorType),
+			ActorID:    &opts.actorID,
 			CreatedAt:  now,
 		}
-		_ = s.repo.CreateEvent(event)
+		if err := tx.Create(event).Error; err != nil {
+			return errors.New("gagal mencatat event kunci refill")
+		}
 
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return &order, nil
+}
+
+func (s *SosmedOrderService) finalizeSosmedRefillRequest(
+	ctx context.Context,
+	orderID uuid.UUID,
+	actorID uuid.UUID,
+	actorType string,
+	nextStatus string,
+	refillID string,
+	providerStatus string,
+	providerError string,
+	reason string,
+) (*model.SosmedOrder, error) {
+	now := time.Now()
+	var order model.SosmedOrder
+	db := s.repo.DB()
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Preload("User").
+			Preload("Service").
+			First(&order, "id = ?", orderID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("order sosmed tidak ditemukan")
+			}
+			return errors.New("gagal memuat order sosmed")
+		}
+
+		previousRefillStatus := normalizeSosmedRefillStatus(order.RefillStatus)
+		order.RefillStatus = normalizeSosmedRefillStatus(nextStatus)
+		order.RefillProviderOrderID = strings.TrimSpace(refillID)
+		order.RefillProviderStatus = strings.TrimSpace(providerStatus)
+		order.RefillProviderError = truncateSosmedProviderText(providerError, 2000)
+		if order.RefillRequestedAt == nil {
+			order.RefillRequestedAt = &now
+		}
+		if order.RefillStatus == sosmedRefillStatusCompleted && order.RefillCompletedAt == nil {
+			order.RefillCompletedAt = &now
+		}
+
+		if err := tx.Save(&order).Error; err != nil {
+			return errors.New("gagal menyimpan status refill")
+		}
+
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: previousRefillStatus,
+			ToStatus:   order.RefillStatus,
+			Reason:     strings.TrimSpace(reason),
+			ActorType:  strings.TrimSpace(actorType),
+			ActorID:    &actorID,
+			CreatedAt:  now,
+		}
+		if event.Reason == "" {
+			event.Reason = fmt.Sprintf("status refill berubah ke %s", order.RefillStatus)
+		}
+		if err := tx.Create(event).Error; err != nil {
+			return errors.New("gagal mencatat event refill")
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return &order, nil
+}
+
+func (s *SosmedOrderService) requestSosmedRefill(ctx context.Context, opts sosmedRefillRequestOptions) (*SosmedOrderDetail, error) {
+	if s.japOrderProvider == nil {
+		return nil, errors.New("konfigurasi JAP provider belum siap")
+	}
+
+	order, err := s.reserveSosmedRefillRequest(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	providerOrderID := strings.TrimSpace(order.ProviderOrderID)
+	refillRes, err := s.japOrderProvider.RequestRefill(ctx, providerOrderID)
+	if err != nil {
+		reason := fmt.Sprintf("refill gagal dikirim ke JAP: %v", err)
+		if opts.actorType == "admin" {
+			reason = fmt.Sprintf("admin refill gagal dikirim ke JAP: %v", err)
+		}
+		_, _ = s.finalizeSosmedRefillRequest(ctx, order.ID, opts.actorID, opts.actorType, sosmedRefillStatusFailed, "", "failed", err.Error(), reason)
+		if opts.actorType == "user" {
+			return nil, errors.New("gagal mengirim refill ke supplier, coba lagi nanti atau hubungi admin")
+		}
 		return nil, fmt.Errorf("gagal mengirim refill ke supplier: %v", err)
 	}
 
-	// Success — update refill tracking.
-	order.RefillStatus = "requested"
-	order.RefillProviderError = ""
-	order.RefillRequestedAt = &now
-	if err := s.repo.Update(order); err != nil {
-		return nil, errors.New("gagal menyimpan status refill")
+	refillID := ""
+	if refillRes != nil {
+		refillID = strings.TrimSpace(string(refillRes.Refill))
 	}
-
-	event := &model.SosmedOrderEvent{
-		OrderID:    order.ID,
-		FromStatus: order.OrderStatus,
-		ToStatus:   order.OrderStatus,
-		Reason:     fmt.Sprintf("refill diklaim oleh user ke JAP #%s", providerOrderID),
-		ActorType:  "user",
-		ActorID:    &userID,
-		CreatedAt:  now,
-	}
-	if err := s.repo.CreateEvent(event); err != nil {
-		return nil, errors.New("gagal mencatat event refill")
-	}
-
-	// Notify the user.
-	if s.notifRepo != nil {
-		notif := &model.Notification{
-			UserID:  userID,
-			Title:   "Klaim Refill Dikirim",
-			Message: fmt.Sprintf("Permintaan refill untuk order %s sudah dikirim ke supplier. Proses refill sedang berjalan.", shortSosmedWalletRef(orderID.String())),
-			Type:    "order",
+	if refillID == "" {
+		err := errors.New("response refill JAP tidak berisi refill id")
+		_, _ = s.finalizeSosmedRefillRequest(ctx, order.ID, opts.actorID, opts.actorType, sosmedRefillStatusFailed, "", "failed", err.Error(), err.Error())
+		if opts.actorType == "user" {
+			return nil, errors.New("gagal mengirim refill ke supplier, coba lagi nanti atau hubungi admin")
 		}
-		_ = s.notifRepo.Create(notif)
+		return nil, err
 	}
 
-	stored, err := s.repo.FindByID(order.ID)
+	reason := fmt.Sprintf("refill diklaim oleh user ke JAP #%s, refill #%s", providerOrderID, refillID)
+	if opts.actorType == "admin" {
+		reason = fmt.Sprintf("refill di-trigger admin ke JAP #%s, refill #%s", providerOrderID, refillID)
+	}
+	stored, err := s.finalizeSosmedRefillRequest(ctx, order.ID, opts.actorID, opts.actorType, sosmedRefillStatusRequested, refillID, "submitted", "", reason)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.notifRepo != nil {
+		title := "Klaim Refill Dikirim"
+		message := fmt.Sprintf("Permintaan refill untuk order %s sudah dikirim ke supplier. Proses refill sedang berjalan.", shortSosmedWalletRef(order.ID.String()))
+		if opts.actorType == "admin" {
+			title = "Refill Dikirim oleh Admin"
+			message = fmt.Sprintf("Permintaan refill untuk order %s sudah dikirim oleh admin ke supplier.", shortSosmedWalletRef(order.ID.String()))
+		}
+		_ = s.notifRepo.Create(&model.Notification{
+			UserID:  stored.UserID,
+			Title:   title,
+			Message: message,
+			Type:    "order",
+		})
+	}
+
+	fresh, err := s.repo.FindByID(stored.ID)
 	if err != nil {
 		return nil, errors.New("gagal memuat order sosmed")
 	}
-	return s.buildDetail(stored)
+	return s.buildDetail(fresh)
+}
+
+func (s *SosmedOrderService) UserRequestRefill(ctx context.Context, orderID, userID uuid.UUID) (*SosmedOrderDetail, error) {
+	ownerID := userID
+	return s.requestSosmedRefill(ctx, sosmedRefillRequestOptions{
+		orderID:         orderID,
+		actorID:         userID,
+		actorType:       "user",
+		ownerID:         &ownerID,
+		enforceDeadline: true,
+	})
 }
 
 func (s *SosmedOrderService) AdminTriggerRefill(ctx context.Context, orderID, adminID uuid.UUID) (*SosmedOrderDetail, error) {
-	order, err := s.repo.FindByID(orderID)
-	if err != nil {
-		return nil, errors.New("order sosmed tidak ditemukan")
-	}
-
-	// Admin can trigger even if not the order owner, but still check basic eligibility.
-	if !order.RefillEligible {
-		return nil, errors.New("order ini tidak memiliki garansi refill")
-	}
-	if order.OrderStatus != sosmedOrderStatusSuccess {
-		return nil, errors.New("refill hanya bisa diklaim untuk order yang sudah sukses")
-	}
-
-	// Block if there's an active refill request.
-	refillStatus := strings.TrimSpace(strings.ToLower(order.RefillStatus))
-	if refillStatus == "requested" || refillStatus == "processing" {
-		return nil, errors.New("refill sedang diproses, tunggu sampai selesai")
-	}
-
-	providerOrderID := strings.TrimSpace(order.ProviderOrderID)
-	if providerOrderID == "" {
-		return nil, errors.New("order belum memiliki provider order ID untuk refill")
-	}
-	if !isJAPSosmedOrder(order) {
-		return nil, errors.New("refill hanya tersedia untuk order supplier JAP")
-	}
-	if s.japOrderProvider == nil {
-		return nil, errors.New("konfigurasi JAP provider belum siap")
-	}
-
-	now := time.Now()
-	if err := s.japOrderProvider.RequestRefill(ctx, providerOrderID); err != nil {
-		order.RefillStatus = "failed"
-		order.RefillProviderError = truncateSosmedProviderText(err.Error(), 2000)
-		order.RefillRequestedAt = &now
-		if saveErr := s.repo.Update(order); saveErr != nil {
-			return nil, errors.New("gagal menyimpan status refill")
-		}
-
-		event := &model.SosmedOrderEvent{
-			OrderID:    order.ID,
-			FromStatus: order.OrderStatus,
-			ToStatus:   order.OrderStatus,
-			Reason:     fmt.Sprintf("admin refill gagal dikirim ke JAP: %v", err),
-			ActorType:  "admin",
-			ActorID:    &adminID,
-			CreatedAt:  now,
-		}
-		_ = s.repo.CreateEvent(event)
-
-		return nil, fmt.Errorf("gagal mengirim refill ke supplier: %v", err)
-	}
-
-	order.RefillStatus = "requested"
-	order.RefillProviderError = ""
-	order.RefillRequestedAt = &now
-	if err := s.repo.Update(order); err != nil {
-		return nil, errors.New("gagal menyimpan status refill")
-	}
-
-	event := &model.SosmedOrderEvent{
-		OrderID:    order.ID,
-		FromStatus: order.OrderStatus,
-		ToStatus:   order.OrderStatus,
-		Reason:     fmt.Sprintf("refill di-trigger admin ke JAP #%s", providerOrderID),
-		ActorType:  "admin",
-		ActorID:    &adminID,
-		CreatedAt:  now,
-	}
-	if err := s.repo.CreateEvent(event); err != nil {
-		return nil, errors.New("gagal mencatat event refill admin")
-	}
-
-	// Notify the order owner.
-	if s.notifRepo != nil {
-		notif := &model.Notification{
-			UserID:  order.UserID,
-			Title:   "Refill Dikirim oleh Admin",
-			Message: fmt.Sprintf("Permintaan refill untuk order %s sudah dikirim oleh admin ke supplier.", shortSosmedWalletRef(orderID.String())),
-			Type:    "order",
-		}
-		_ = s.notifRepo.Create(notif)
-	}
-
-	stored, err := s.repo.FindByID(order.ID)
-	if err != nil {
-		return nil, errors.New("gagal memuat order sosmed")
-	}
-	return s.buildDetail(stored)
+	return s.requestSosmedRefill(ctx, sosmedRefillRequestOptions{
+		orderID:         orderID,
+		actorID:         adminID,
+		actorType:       "admin",
+		enforceDeadline: false,
+	})
 }
 
 // AdminBackfillRefill re-populates refill metadata for an existing order from
@@ -1008,7 +1147,6 @@ func (s *SosmedOrderService) AdminBackfillRefill(orderID, adminID uuid.UUID) (*S
 		return nil, errors.New("layanan sosmed tidak ditemukan, tidak bisa backfill refill")
 	}
 
-	// Re-populate refill fields from the service catalog.
 	populateSosmedOrderRefill(order, svc)
 
 	if err := s.repo.Update(order); err != nil {
@@ -1035,10 +1173,10 @@ func (s *SosmedOrderService) AdminBackfillRefill(orderID, adminID uuid.UUID) (*S
 
 // AdminBackfillRefillResult holds counters for a bulk backfill operation.
 type AdminBackfillRefillResult struct {
-	Scanned  int `json:"scanned"`
-	Updated  int `json:"updated"`
-	Skipped  int `json:"skipped"`
-	Errors   int `json:"errors"`
+	Scanned int `json:"scanned"`
+	Updated int `json:"updated"`
+	Skipped int `json:"skipped"`
+	Errors  int `json:"errors"`
 }
 
 // AdminBackfillAllRefill scans success JAP orders that currently have
@@ -1048,7 +1186,6 @@ func (s *SosmedOrderService) AdminBackfillAllRefill(adminID uuid.UUID) (*AdminBa
 		return nil, errors.New("service repo belum dikonfigurasi")
 	}
 
-	// Find success orders that haven't been backfilled yet.
 	var orders []model.SosmedOrder
 	if err := s.repo.DB().
 		Where("order_status = ? AND refill_eligible = ? AND provider_code = ?", sosmedOrderStatusSuccess, false, "jap").

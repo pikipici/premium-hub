@@ -108,7 +108,7 @@ func (r *SosmedOrderRepo) FindSyncableProviderOrders(providerCode string, limit 
 		Where("provider_code = ?", strings.TrimSpace(providerCode)).
 		Where("provider_order_id IS NOT NULL AND provider_order_id <> ''").
 		Where("payment_status = ?", "paid").
-		Where("order_status = ?", "processing").
+		Where("(order_status = ? OR refill_status IN ?)", "processing", []string{"requested", "processing"}).
 		Order("updated_at ASC")
 
 	if limit > 0 {

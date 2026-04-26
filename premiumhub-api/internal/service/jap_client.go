@@ -20,7 +20,8 @@ type JAPClient interface {
 	GetServices(ctx context.Context) ([]JAPServiceItem, error)
 	AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error)
 	GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error)
-	RequestRefill(ctx context.Context, orderID string) error
+	RequestRefill(ctx context.Context, orderID string) (*JAPRefillResponse, error)
+	GetRefillStatus(ctx context.Context, refillID string) (*JAPRefillStatusResponse, error)
 }
 
 type JAPBalanceResponse struct {
@@ -101,6 +102,14 @@ type JAPOrderStatusResponse struct {
 	Status     string           `json:"status"`
 	Remains    JAPFlexibleValue `json:"remains"`
 	Currency   string           `json:"currency"`
+}
+
+type JAPRefillResponse struct {
+	Refill JAPFlexibleValue `json:"refill"`
+}
+
+type JAPRefillStatusResponse struct {
+	Status string `json:"status"`
 }
 
 type JAPAPIError struct {
@@ -234,29 +243,66 @@ func (c *japHTTPClient) GetOrderStatus(ctx context.Context, orderID string) (*JA
 	return &out, nil
 }
 
-func (c *japHTTPClient) RequestRefill(ctx context.Context, orderID string) error {
+func (c *japHTTPClient) RequestRefill(ctx context.Context, orderID string) (*JAPRefillResponse, error) {
 	extra := url.Values{}
 	extra.Set("order", strings.TrimSpace(orderID))
 
 	raw, err := c.request(ctx, "refill", extra)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// JAP returns either a success payload or an error message.
-	// Check if the response contains an error field.
-	if msg := extractJAPProviderMessage(raw); msg != "" {
-		normalizedMsg := strings.ToLower(msg)
-		// Some JAP error responses come as {"error":"..."} with HTTP 200.
-		if strings.Contains(normalizedMsg, "error") ||
-			strings.Contains(normalizedMsg, "incorrect") ||
-			strings.Contains(normalizedMsg, "not found") ||
-			strings.Contains(normalizedMsg, "not eligible") {
-			return &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+	if msg := extractJAPProviderMessage(raw); isJAPProviderErrorMessage(msg) {
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+	}
+	if msg := extractJAPNestedProviderMessage(raw, "refill"); msg != "" {
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+	}
+
+	var out JAPRefillResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response refill JAP tidak valid", Retryable: true}
+	}
+	if strings.TrimSpace(string(out.Refill)) == "" {
+		if msg := extractJAPProviderMessage(raw); msg != "" {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
 		}
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response refill JAP tidak berisi refill id", Retryable: true}
 	}
 
-	return nil
+	return &out, nil
+}
+
+func (c *japHTTPClient) GetRefillStatus(ctx context.Context, refillID string) (*JAPRefillStatusResponse, error) {
+	extra := url.Values{}
+	extra.Set("refill", strings.TrimSpace(refillID))
+
+	raw, err := c.request(ctx, "refill_status", extra)
+	if err != nil {
+		return nil, err
+	}
+
+	var out JAPRefillStatusResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		if msg := extractJAPNestedProviderMessage(raw, "status"); msg != "" {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+		}
+		if msg := extractJAPProviderMessage(raw); msg != "" {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+		}
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response status refill JAP tidak valid", Retryable: true}
+	}
+	if strings.TrimSpace(out.Status) == "" {
+		if msg := extractJAPNestedProviderMessage(raw, "status"); msg != "" {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+		}
+		if msg := extractJAPProviderMessage(raw); msg != "" {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+		}
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response status refill JAP kosong", Retryable: true}
+	}
+
+	return &out, nil
 }
 
 func (c *japHTTPClient) request(ctx context.Context, action string, extra url.Values) ([]byte, error) {
@@ -336,4 +382,43 @@ func extractJAPProviderMessage(raw []byte) string {
 	}
 
 	return ""
+}
+
+func extractJAPNestedProviderMessage(raw []byte, key string) string {
+	if strings.TrimSpace(key) == "" || !looksLikeJSON(strings.TrimSpace(string(raw))) {
+		return ""
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+
+	nested, ok := payload[key].(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	for _, nestedKey := range []string{"error", "message", "msg", "detail"} {
+		if value, ok := nested[nestedKey]; ok {
+			if text := strings.TrimSpace(fmt.Sprint(value)); text != "" && text != "<nil>" {
+				return text
+			}
+		}
+	}
+
+	return ""
+}
+
+func isJAPProviderErrorMessage(msg string) bool {
+	normalizedMsg := strings.ToLower(strings.TrimSpace(msg))
+	if normalizedMsg == "" {
+		return false
+	}
+
+	return strings.Contains(normalizedMsg, "error") ||
+		strings.Contains(normalizedMsg, "incorrect") ||
+		strings.Contains(normalizedMsg, "not found") ||
+		strings.Contains(normalizedMsg, "not eligible") ||
+		strings.Contains(normalizedMsg, "rejected")
 }

@@ -649,6 +649,18 @@ export default function SosmedOrderPage() {
                       <div style={{ fontSize: 11, color: 'var(--muted)' }}>Diklaim</div>
                       <div style={{ fontWeight: 600 }}>{detail.order.refill_requested_at ? formatDate(detail.order.refill_requested_at) : '-'}</div>
                     </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Refill ID JAP</div>
+                      <div style={{ fontWeight: 600 }}>{detail.order.refill_provider_order_id || '-'}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status JAP</div>
+                      <div style={{ fontWeight: 600 }}>{formatProviderStatus(detail.order.refill_provider_status)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Selesai</div>
+                      <div style={{ fontWeight: 600 }}>{detail.order.refill_completed_at ? formatDate(detail.order.refill_completed_at) : '-'}</div>
+                    </div>
                   </div>
                   {detail.order.refill_provider_error ? (
                     <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: '#FFF1F2', color: 'var(--red)', fontSize: 12 }}>
