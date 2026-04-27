@@ -7,6 +7,7 @@ import {
   ArrowRight,
   CheckCircle2,
   CircleAlert,
+  Copy,
   Loader2,
   RefreshCcw,
   Search,
@@ -18,6 +19,7 @@ import {
 import { fiveSimService } from '@/services/fiveSimService'
 import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
+import { createToastState, startToastAutoDismiss, type ToastState, type ToastTone } from './toast-logic'
 import type {
   FiveSimCountriesPayload,
   FiveSimMutateResponse,
@@ -561,8 +563,7 @@ export default function NomorVirtualPage() {
   const [selectedPrice, setSelectedPrice] = useState<PriceOption | null>(null)
 
   const [buying, setBuying] = useState(false)
-  const [bannerError, setBannerError] = useState('')
-  const [bannerInfo, setBannerInfo] = useState('')
+  const [toast, setToast] = useState<ToastState | null>(null)
   const [insufficientByServer, setInsufficientByServer] = useState(false)
 
   const [orders, setOrders] = useState<FiveSimOrder[]>([])
@@ -715,6 +716,22 @@ export default function NomorVirtualPage() {
   const liveCanCancel = liveIsOpenStatus && liveSMSItems.length === 0
   const liveClosedOrderMessage = liveOrderStatus === 'FINISHED' ? 'Order selesai.' : 'Order dibatalkan.'
 
+  const pushToast = useCallback((tone: ToastTone, message: string) => {
+    const sanitized = sanitizeNokosUserMessage(message)
+    const nextToast = createToastState(tone, sanitized)
+    if (!nextToast) return
+    setToast(nextToast)
+  }, [])
+
+  const clearToast = useCallback(() => {
+    setToast(null)
+  }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    return startToastAutoDismiss(toast.id, setToast, 3200)
+  }, [toast])
+
   const refreshWalletBalance = useCallback(async () => {
     setWalletLoading(true)
     try {
@@ -744,39 +761,39 @@ export default function NomorVirtualPage() {
     try {
       const res = await fiveSimService.getCountries()
       if (!res.success) {
-        setBannerError(sanitizeNokosUserMessage(res.message || 'Gagal memuat daftar negara'))
+        pushToast('error', res.message || 'Gagal memuat daftar negara')
         return
       }
       setCountries(parseCountries(res.data))
     } catch (error: unknown) {
-      setBannerError(resolveErrorMessage(error, 'Gagal memuat daftar negara'))
+      pushToast('error', resolveErrorMessage(error, 'Gagal memuat daftar negara'))
     } finally {
       setCountriesLoading(false)
     }
-  }, [])
+  }, [pushToast])
 
   const loadProducts = useCallback(async (countryKey: string) => {
     setProductsLoading(true)
     try {
       const res = await fiveSimService.getProducts({ country: countryKey, operator: DEFAULT_OPERATOR })
       if (!res.success) {
-        setBannerError(sanitizeNokosUserMessage(res.message || 'Gagal memuat layanan'))
+        pushToast('error', res.message || 'Gagal memuat layanan')
         return
       }
       setProducts(parseProducts(res.data))
     } catch (error: unknown) {
-      setBannerError(resolveErrorMessage(error, 'Gagal memuat layanan'))
+      pushToast('error', resolveErrorMessage(error, 'Gagal memuat layanan'))
     } finally {
       setProductsLoading(false)
     }
-  }, [])
+  }, [pushToast])
 
   const loadPrices = useCallback(async (countryKey: string, productKey: string) => {
     setPricesLoading(true)
     try {
       const res = await fiveSimService.getPrices({ country: countryKey, product: productKey })
       if (!res.success) {
-        setBannerError(sanitizeNokosUserMessage(res.message || 'Gagal memuat harga operator'))
+        pushToast('error', res.message || 'Gagal memuat harga operator')
         return
       }
       setPriceOptions(
@@ -789,18 +806,18 @@ export default function NomorVirtualPage() {
         )
       )
     } catch (error: unknown) {
-      setBannerError(resolveErrorMessage(error, 'Gagal memuat harga operator'))
+      pushToast('error', resolveErrorMessage(error, 'Gagal memuat harga operator'))
     } finally {
       setPricesLoading(false)
     }
-  }, [walletMinDebit, walletMultiplier])
+  }, [pushToast, walletMinDebit, walletMultiplier])
 
   const loadOrders = useCallback(async (page: number) => {
     setOrdersLoading(true)
     try {
       const res = await fiveSimService.listOrders({ page, limit: ORDER_PAGE_LIMIT })
       if (!res.success) {
-        setBannerError(sanitizeNokosUserMessage(res.message || 'Gagal memuat riwayat order'))
+        pushToast('error', res.message || 'Gagal memuat riwayat order')
         return
       }
 
@@ -808,11 +825,11 @@ export default function NomorVirtualPage() {
       setOrdersTotal(res.meta?.total ?? res.data.length)
       setOrdersTotalPages(res.meta?.total_pages ?? 1)
     } catch (error: unknown) {
-      setBannerError(resolveErrorMessage(error, 'Gagal memuat riwayat order'))
+      pushToast('error', resolveErrorMessage(error, 'Gagal memuat riwayat order'))
     } finally {
       setOrdersLoading(false)
     }
-  }, [])
+  }, [pushToast])
 
   useEffect(() => {
     void loadCountries()
@@ -885,11 +902,6 @@ export default function NomorVirtualPage() {
     void loadOrders(ordersPage)
   }, [loadOrders, mainTab, ordersPage])
 
-  const clearBanner = () => {
-    setBannerError('')
-    setBannerInfo('')
-  }
-
   const resetCatalogSelection = () => {
     setSelectedCountry(null)
     setSelectedProduct(null)
@@ -902,8 +914,8 @@ export default function NomorVirtualPage() {
 
   const applyMutateSuccess = useCallback(
     async (payload: FiveSimMutateResponse, infoMessage: string) => {
-      setBannerError('')
-      setBannerInfo(sanitizeNokosUserMessage(infoMessage))
+      clearToast()
+      pushToast('success', infoMessage)
       setInsufficientByServer(false)
 
       const updatedOrder = payload.local_order
@@ -931,13 +943,13 @@ export default function NomorVirtualPage() {
       setOrdersPage(1)
       await Promise.all([loadOrders(1), refreshWalletBalance()])
     },
-    [loadOrders, refreshWalletBalance]
+    [clearToast, loadOrders, pushToast, refreshWalletBalance]
   )
 
   const handleActivationBuy = async () => {
     if (!selectedCountry || !selectedProduct || !selectedPrice) return
 
-    clearBanner()
+    clearToast()
     setBuying(true)
 
     try {
@@ -953,7 +965,7 @@ export default function NomorVirtualPage() {
 
       if (!res.success) {
         const message = sanitizeNokosUserMessage(res.message || 'Gagal membeli nomor activation')
-        setBannerError(message)
+        pushToast('error', message)
         setInsufficientByServer(isInsufficientBalance(message))
         return
       }
@@ -962,7 +974,7 @@ export default function NomorVirtualPage() {
       resetCatalogSelection()
     } catch (error: unknown) {
       const message = resolveErrorMessage(error, 'Gagal membeli nomor activation')
-      setBannerError(message)
+      pushToast('error', message)
       setInsufficientByServer(isInsufficientBalance(message))
     } finally {
       setBuying(false)
@@ -977,8 +989,7 @@ export default function NomorVirtualPage() {
     const actionKey = `${action}:${order.provider_order_id}`
     setActionLoading((prev) => ({ ...prev, [actionKey]: true }))
     if (!options?.silentSuccess) {
-      setBannerError('')
-      setBannerInfo('')
+      clearToast()
     }
 
     try {
@@ -992,12 +1003,12 @@ export default function NomorVirtualPage() {
               : await fiveSimService.banOrder(order.provider_order_id)
 
       if (!response.success) {
-        setBannerError(sanitizeNokosUserMessage(response.message || 'Gagal memproses aksi order'))
+        pushToast('error', response.message || 'Gagal memproses aksi order')
         return false
       }
 
       if (!options?.silentSuccess) {
-        setBannerInfo(sanitizeNokosUserMessage(response.message || 'Aksi order berhasil'))
+        pushToast('success', response.message || 'Aksi order berhasil')
       }
 
       const updatedOrder = response.data.local_order
@@ -1023,12 +1034,12 @@ export default function NomorVirtualPage() {
 
       return true
     } catch (error: unknown) {
-      setBannerError(resolveErrorMessage(error, 'Gagal memproses aksi order'))
+      pushToast('error', resolveErrorMessage(error, 'Gagal memproses aksi order'))
       return false
     } finally {
       setActionLoading((prev) => ({ ...prev, [actionKey]: false }))
     }
-  }, [refreshWalletBalance])
+  }, [clearToast, pushToast, refreshWalletBalance])
 
   const toggleSMSInbox = async (order: FiveSimOrder) => {
     const current = smsStateByOrder[order.provider_order_id]
@@ -1111,9 +1122,9 @@ export default function NomorVirtualPage() {
 
     try {
       await navigator.clipboard.writeText(code)
-      setBannerInfo(`Kode OTP ${code} disalin`)
+      pushToast('success', `Kode OTP ${code} disalin`)
     } catch {
-      setBannerError('Gagal menyalin kode OTP')
+      pushToast('error', 'Gagal menyalin kode OTP')
     }
   }
 
@@ -1150,26 +1161,6 @@ export default function NomorVirtualPage() {
           </div>
         </div>
       </section>
-
-      {bannerError ? (
-        <div className="bg-red-50 border border-red-100 text-red-700 rounded-xl px-4 py-3 text-sm inline-flex items-start gap-2">
-          <CircleAlert className="w-4 h-4 mt-0.5" />
-          <div className="flex-1">{bannerError}</div>
-          <button type="button" className="text-red-400 hover:text-red-600" onClick={() => setBannerError('')}>
-            ×
-          </button>
-        </div>
-      ) : null}
-
-      {bannerInfo ? (
-        <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl px-4 py-3 text-sm inline-flex items-start gap-2">
-          <CheckCircle2 className="w-4 h-4 mt-0.5" />
-          <div className="flex-1">{bannerInfo}</div>
-          <button type="button" className="text-emerald-400 hover:text-emerald-600" onClick={() => setBannerInfo('')}>
-            ×
-          </button>
-        </div>
-      ) : null}
 
       <div className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-[#EBEBEB] bg-white p-2">
         <button
@@ -1245,7 +1236,7 @@ export default function NomorVirtualPage() {
                         key={country.key}
                         type="button"
                         onClick={() => {
-                          clearBanner()
+                          clearToast()
                           setSelectedCountry(country)
                           setSelectedProduct(null)
                           setSelectedPrice(null)
@@ -1326,7 +1317,7 @@ export default function NomorVirtualPage() {
                         key={product.key}
                         type="button"
                         onClick={() => {
-                          clearBanner()
+                          clearToast()
                           setSelectedProduct(product)
                           setSelectedPrice(null)
                           setPriceOptions([])
@@ -1393,7 +1384,7 @@ export default function NomorVirtualPage() {
                           key={`${priceOption.operator}-${priceOption.walletDebit}-${index}`}
                           type="button"
                           onClick={() => {
-                            clearBanner()
+                            clearToast()
                             setSelectedPrice(priceOption)
                             setInsufficientByServer(false)
                           }}
@@ -1452,12 +1443,6 @@ export default function NomorVirtualPage() {
                     </p>
                   </div>
 
-                  {bannerError && activationReady ? (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">
-                      {bannerError}
-                    </div>
-                  ) : null}
-
                   {(likelyInsufficient || insufficientByServer) && activationReady ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
                       Saldo wallet kemungkinan tidak cukup. Estimasi debit transaksi ini {formatWalletRupiah(estimatedDebit)}.
@@ -1505,7 +1490,20 @@ export default function NomorVirtualPage() {
                         <div className="text-xs text-[#666] space-y-1">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[#888]">Nomor</span>
-                            <span className="font-semibold text-[#141414] text-right break-all">{liveOrder.phone || '-'}</span>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="font-semibold text-[#141414] text-right break-all">{liveOrder.phone || '-'}</span>
+                              {liveOrder.phone ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void copyCode(liveOrder.phone)}
+                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[#EBEBEB] text-[#555] hover:bg-[#F7F7F5]"
+                                  title={`Salin nomor ${liveOrder.phone}`}
+                                  aria-label="Salin nomor"
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[#888]">Layanan</span>
@@ -1919,6 +1917,33 @@ export default function NomorVirtualPage() {
           </div>
         </div>
       )}
+
+      <div
+        className={`fixed bottom-4 right-4 z-[90] w-[min(92vw,360px)] transition-all duration-200 ${
+          toast ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0 pointer-events-none'
+        }`}
+      >
+        <div
+          className={`rounded-xl border px-4 py-3 shadow-lg ${
+            toast?.tone === 'error'
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            {toast?.tone === 'error' ? <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
+            <p className="flex-1 text-sm leading-relaxed">{toast?.message || ''}</p>
+            <button
+              type="button"
+              className={toast?.tone === 'error' ? 'text-red-400 hover:text-red-600' : 'text-emerald-400 hover:text-emerald-600'}
+              onClick={clearToast}
+              aria-label="Tutup notifikasi"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
