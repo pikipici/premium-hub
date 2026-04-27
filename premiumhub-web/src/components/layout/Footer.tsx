@@ -89,7 +89,7 @@ export default function Footer() {
               <span className="text-xl font-extrabold">Digi<span className="text-[#FF5733]">Market</span></span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
-              Platform marketplace akun premium terpercaya dengan garansi 30 hari.
+              Platform nomor virtual OTP dan jasa untuk bantu naikin follower, viewer, dan engagement akun media sosial Termurah dan Terpercaya No. 1 di Indonesia.
             </p>
           </div>
 
