@@ -115,6 +115,21 @@ const otpCards: OtpCard[] = [
     after: 'may only be used once to verify mobile number.',
   },
   {
+    app: 'LINE',
+    iconSrc: '/icons/apps/line.svg',
+    iconClassName: 'bg-[#06C755] text-white',
+    before: 'Please enter',
+    code: '493425',
+    after: 'into LINE within the next 30 mins.',
+  },
+  {
+    app: 'Proton',
+    iconSrc: '/icons/apps/proton.svg',
+    iconClassName: 'bg-[#6D4AFF] text-white',
+    before: 'Your Proton verification code is:',
+    code: '287911',
+  },
+  {
     app: 'AliExpress',
     iconSrc: '/icons/apps/aliexpress.svg',
     iconClassName: 'bg-[#E62E04] text-white',
@@ -153,6 +168,14 @@ const otpCards: OtpCard[] = [
     before: 'Steam Guard code:',
     code: '91456',
     after: 'enter this in the Steam app.',
+  },
+  {
+    app: 'Tinder',
+    iconSrc: '/icons/apps/tinder.svg',
+    iconClassName: 'bg-[#FF4458] text-white',
+    before: 'Your code is',
+    code: '449940',
+    after: "Don't share it with anyone.",
   },
   {
     app: 'Alipay / Alibaba / 1688',
