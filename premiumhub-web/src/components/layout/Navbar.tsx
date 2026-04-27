@@ -18,6 +18,13 @@ import {
 } from 'lucide-react'
 
 import WalletBadge from '@/components/shared/WalletBadge'
+import {
+  getNavbarMenuMemoryCache,
+  NAVBAR_MENU_CACHE_EVENT,
+  normalizeNavbarMenuItems,
+  readNavbarMenuCache,
+  writeNavbarMenuCache,
+} from '@/lib/navbarMenuCache'
 import { authService } from '@/services/authService'
 import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
 import { useAuthStore } from '@/store/authStore'
@@ -62,7 +69,7 @@ export default function Navbar() {
     account: false,
     admin: false,
   })
-  const [navItems, setNavItems] = useState<PublicNavItem[]>(PUBLIC_NAV_ITEMS)
+  const [navItems, setNavItems] = useState<PublicNavItem[]>(() => getNavbarMenuMemoryCache() || [])
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -108,20 +115,29 @@ export default function Navbar() {
     let cancelled = false
 
     const loadNavbarMenu = async () => {
+      const cachedItems = readNavbarMenuCache()
+      if (cachedItems !== null) {
+        setNavItems(cachedItems)
+      }
+
       try {
         const res = await navbarMenuSettingService.publicList()
-        if (cancelled || !res.success) return
+        if (cancelled) return
+        if (!res.success) {
+          if (readNavbarMenuCache() === null) {
+            setNavItems(PUBLIC_NAV_ITEMS)
+          }
+          return
+        }
 
-        const visibleItems = (res.data || [])
-          .map((item) => ({
-            href: item.href,
-            label: item.label,
-          }))
-          .filter((item) => item.href.trim() && item.label.trim())
+        const visibleItems = normalizeNavbarMenuItems(res.data || [])
 
+        writeNavbarMenuCache(visibleItems)
         setNavItems(visibleItems)
       } catch {
-        // Keep the default menu when the public setting endpoint is temporarily unavailable.
+        if (!cancelled && readNavbarMenuCache() === null) {
+          setNavItems(PUBLIC_NAV_ITEMS)
+        }
       }
     }
 
@@ -129,6 +145,20 @@ export default function Navbar() {
 
     return () => {
       cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleNavbarMenuCacheUpdate = () => {
+      const cachedItems = readNavbarMenuCache()
+      if (cachedItems !== null) {
+        setNavItems(cachedItems)
+      }
+    }
+
+    window.addEventListener(NAVBAR_MENU_CACHE_EVENT, handleNavbarMenuCacheUpdate)
+    return () => {
+      window.removeEventListener(NAVBAR_MENU_CACHE_EVENT, handleNavbarMenuCacheUpdate)
     }
   }, [])
 

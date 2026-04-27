@@ -3,6 +3,7 @@
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 
+import { normalizeNavbarMenuItems, writeNavbarMenuCache } from '@/lib/navbarMenuCache'
 import {
   navbarMenuSettingService,
   type NavbarMenuSetting,
@@ -62,6 +63,7 @@ export default function NavbarMenuSettingsCard() {
       }
 
       setItems(res.data || [])
+      writeNavbarMenuCache(normalizeNavbarMenuItems(res.data || [], { visibleOnly: true }))
       setNotice(`${item.label} ${nextVisible ? 'ditampilkan' : 'disembunyikan'} dari navbar.`)
     } catch (err) {
       setError(mapErrorMessage(err, 'Gagal update setting navbar'))
