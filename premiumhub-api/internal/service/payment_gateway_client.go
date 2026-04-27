@@ -140,11 +140,11 @@ func isLikelyDuitkuPaymentMethod(method string) bool {
 func NormalizePaymentGatewayStatus(raw string) string {
 	status := strings.ToUpper(strings.TrimSpace(raw))
 	switch status {
-	case "00", "SUCCESS", "PAID", "COMPLETED":
+	case "0", "00", "SUCCESS", "PAID", "COMPLETED":
 		return "COMPLETED"
-	case "01", "PENDING", "WAITING", "PROCESS", "PROCESSING":
+	case "1", "01", "PENDING", "WAITING", "PROCESS", "PROCESSING":
 		return "PENDING"
-	case "02", "CANCEL", "CANCELED", "CANCELLED", "DENY", "FAILED", "FAILURE":
+	case "2", "02", "CANCEL", "CANCELED", "CANCELLED", "DENY", "FAILED", "FAILURE":
 		return "FAILED"
 	case "EXPIRE", "EXPIRED":
 		return "EXPIRED"

@@ -55,8 +55,8 @@ type duitkuInquiryResponse struct {
 	AppURL        string       `json:"appUrl"`
 	AppURLLegacy  string       `json:"AppUrl"`
 	Amount        duitkuAmount `json:"amount"`
-	StatusCode    string       `json:"statusCode"`
-	StatusMessage string       `json:"statusMessage"`
+	StatusCode    duitkuString `json:"statusCode"`
+	StatusMessage duitkuString `json:"statusMessage"`
 }
 
 type duitkuStatusRequest struct {
@@ -70,8 +70,8 @@ type duitkuStatusResponse struct {
 	Reference       string       `json:"reference"`
 	Amount          duitkuAmount `json:"amount"`
 	Fee             duitkuAmount `json:"fee"`
-	StatusCode      string       `json:"statusCode"`
-	StatusMessage   string       `json:"statusMessage"`
+	StatusCode      duitkuString `json:"statusCode"`
+	StatusMessage   duitkuString `json:"statusMessage"`
 }
 
 type duitkuPaymentMethodRequest struct {
@@ -103,6 +103,10 @@ func (a *duitkuAmount) UnmarshalJSON(raw []byte) error {
 		return nil
 	}
 	text = strings.Trim(text, `"`)
+	if text == "" {
+		*a = 0
+		return nil
+	}
 	if strings.Contains(text, ".") {
 		text = strings.SplitN(text, ".", 2)[0]
 	}
@@ -112,6 +116,29 @@ func (a *duitkuAmount) UnmarshalJSON(raw []byte) error {
 	}
 	*a = duitkuAmount(n)
 	return nil
+}
+
+type duitkuString string
+
+func (s *duitkuString) UnmarshalJSON(raw []byte) error {
+	text := strings.TrimSpace(string(raw))
+	if text == "" || text == "null" {
+		*s = ""
+		return nil
+	}
+
+	var parsed string
+	if err := json.Unmarshal(raw, &parsed); err == nil {
+		*s = duitkuString(strings.TrimSpace(parsed))
+		return nil
+	}
+
+	*s = duitkuString(strings.Trim(text, `"`))
+	return nil
+}
+
+func (s duitkuString) String() string {
+	return string(s)
 }
 
 func NewDuitkuClient(cfg *config.Config) PaymentGatewayClient {
@@ -225,6 +252,14 @@ func (c *duitkuHTTPClient) CreateTransaction(ctx context.Context, input GatewayC
 	if err := json.Unmarshal(respBody, &parsed); err != nil {
 		return nil, respBody, fmt.Errorf("response duitku inquiry tidak valid")
 	}
+	statusCode := strings.TrimSpace(parsed.StatusCode.String())
+	if statusCode != "" && !isDuitkuInquirySuccess(statusCode) {
+		message := strings.TrimSpace(parsed.StatusMessage.String())
+		if message == "" {
+			message = statusCode
+		}
+		return nil, respBody, fmt.Errorf("duitku inquiry gagal: %s", message)
+	}
 	if strings.TrimSpace(parsed.Reference) == "" {
 		return nil, respBody, fmt.Errorf("duitku inquiry mengembalikan reference kosong")
 	}
@@ -314,8 +349,17 @@ func (c *duitkuHTTPClient) TransactionDetail(ctx context.Context, merchantOrderI
 		OrderID:   orderOut,
 		Reference: strings.TrimSpace(parsed.Reference),
 		Amount:    amountOut,
-		Status:    NormalizePaymentGatewayStatus(parsed.StatusCode),
+		Status:    NormalizePaymentGatewayStatus(parsed.StatusCode.String()),
 	}, respBody, nil
+}
+
+func isDuitkuInquirySuccess(statusCode string) bool {
+	switch NormalizePaymentGatewayStatus(statusCode) {
+	case "COMPLETED":
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *duitkuHTTPClient) ListPaymentMethods(ctx context.Context, amount int64) ([]GatewayPaymentMethod, []byte, error) {

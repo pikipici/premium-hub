@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"premiumhub-api/config"
@@ -96,6 +97,53 @@ func TestDuitkuClientCreateTransaction(t *testing.T) {
 	}
 	if result.Reference != "DUT-REF-1" || result.PaymentNumber != "000201010212" || result.TotalPayment != 25000 {
 		t.Fatalf("unexpected create result: %+v", result)
+	}
+}
+
+func TestDuitkuClientCreateTransactionProviderFailureWithEmptyAmount(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/webapi/api/merchant/v2/inquiry" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"merchantCode": "D123",
+			"reference": "DUT-REF-FAIL",
+			"paymentUrl": "",
+			"amount": "",
+			"statusCode": -100,
+			"statusMessage": "Failed to generate Payment URL Dana"
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewDuitkuClient(&config.Config{
+		DuitkuBaseURL:        server.URL,
+		DuitkuMerchantCode:   "D123",
+		DuitkuAPIKey:         "secret",
+		DuitkuHTTPTimeoutSec: "5",
+	})
+
+	_, _, err := client.CreateTransaction(context.Background(), GatewayCreateTransactionInput{
+		PaymentMethod:       "DA",
+		OrderID:             "ORD-FAIL",
+		Amount:              10000,
+		ProductDetails:      "Top up saldo",
+		CustomerName:        "Buyer Test",
+		Email:               "buyer@example.com",
+		CallbackURL:         "https://api.example.test/webhook",
+		ReturnURL:           "https://app.example.test/wallet",
+		ExpiryPeriodMinutes: 20,
+	})
+	if err == nil {
+		t.Fatalf("expected provider failure")
+	}
+	if !strings.Contains(err.Error(), "duitku inquiry gagal: Failed to generate Payment URL Dana") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(err.Error(), "response duitku inquiry tidak valid") {
+		t.Fatalf("error should surface provider failure, got: %v", err)
 	}
 }
 
