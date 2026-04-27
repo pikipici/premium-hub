@@ -344,6 +344,7 @@ export default function LandingPage() {
       label: hasLiveSummary ? `${formatCompact(sentTotalAllTime)}+ Terkirim` : 'Penjualan: memuat...',
     },
   ].filter((item) => !item.hidden)
+  const trustGridColsClass = trustItems.length >= 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
 
   const nokosDashboardHref = '/dashboard/nokos'
   const registerNokosHref = `/register?next=${encodeURIComponent(nokosDashboardHref)}`
@@ -438,9 +439,9 @@ export default function LandingPage() {
         </section>
 
         <section className="hidden border-y border-[#EBEBEB] bg-[#F7F7F5] md:block">
-          <div className="mx-auto grid w-full max-w-7xl grid-cols-3 gap-5 px-6 py-4 lg:grid-cols-5 lg:px-10">
+          <div className={`mx-auto grid w-full max-w-7xl grid-cols-3 gap-5 px-6 py-4 ${trustGridColsClass} lg:px-10`}>
             {trustItems.map((item) => (
-              <div key={item.key} className="flex items-center gap-2 text-sm font-semibold text-[#2a2a2a]">
+              <div key={item.key} className="flex items-center gap-2 text-sm font-semibold text-[#2a2a2a] lg:justify-center">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#EBEBEB] bg-white text-[#FF5733]">
                   {item.icon}
                 </span>
