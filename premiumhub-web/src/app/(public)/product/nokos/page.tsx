@@ -107,6 +107,22 @@ const otpCards: OtpCard[] = [
     code: '8732',
   },
   {
+    app: 'WeChat',
+    iconSrc: '/icons/apps/wechat.svg',
+    iconClassName: 'bg-[#07C160] text-white',
+    before: 'Verification code',
+    code: '003835',
+    after: 'may only be used once to verify mobile number.',
+  },
+  {
+    app: 'AliExpress',
+    iconSrc: '/icons/apps/aliexpress.svg',
+    iconClassName: 'bg-[#E62E04] text-white',
+    before: 'Verification code:',
+    code: '561318',
+    after: 'Valid for 5 minutes.',
+  },
+  {
     app: 'Viber',
     iconSrc: '/icons/apps/viber.svg',
     iconClassName: 'bg-[#7360F2] text-white',
