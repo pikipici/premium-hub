@@ -99,6 +99,12 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "PUT", "/api/v1/admin/settings/user-sidebar-menu") {
 		t.Fatalf("admin user sidebar menu setting update route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/admin/settings/navbar-menu") {
+		t.Fatalf("admin navbar menu setting list route should exist")
+	}
+	if !hasRoute(routes, "PUT", "/api/v1/admin/settings/navbar-menu") {
+		t.Fatalf("admin navbar menu setting update route should exist")
+	}
 	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/services") {
 		t.Fatalf("admin sosmed service list route should exist")
 	}
@@ -137,6 +143,9 @@ func TestSetupProductionRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "GET", "/api/v1/public/nokos/countries") {
 		t.Fatalf("public nokos countries route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/public/navbar-menu") {
+		t.Fatalf("public navbar menu route should exist")
 	}
 	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/services") {
 		t.Fatalf("public sosmed services route should exist")
@@ -237,6 +246,9 @@ func TestSetupDevelopmentPaymentRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "GET", "/api/v1/public/nokos/countries") {
 		t.Fatalf("public nokos countries route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/public/navbar-menu") {
+		t.Fatalf("public navbar menu route should exist")
 	}
 	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/services") {
 		t.Fatalf("public sosmed services route should exist")

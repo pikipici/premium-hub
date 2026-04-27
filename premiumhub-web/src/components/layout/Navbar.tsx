@@ -19,6 +19,7 @@ import {
 
 import WalletBadge from '@/components/shared/WalletBadge'
 import { authService } from '@/services/authService'
+import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
 import { useAuthStore } from '@/store/authStore'
 
 type PublicNavItem = {
@@ -61,6 +62,7 @@ export default function Navbar() {
     account: false,
     admin: false,
   })
+  const [navItems, setNavItems] = useState<PublicNavItem[]>(PUBLIC_NAV_ITEMS)
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -101,6 +103,34 @@ export default function Navbar() {
     setOpen(false)
     setAccountMenuOpen(false)
   }, [pathname])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadNavbarMenu = async () => {
+      try {
+        const res = await navbarMenuSettingService.publicList()
+        if (cancelled || !res.success) return
+
+        const visibleItems = (res.data || [])
+          .map((item) => ({
+            href: item.href,
+            label: item.label,
+          }))
+          .filter((item) => item.href.trim() && item.label.trim())
+
+        setNavItems(visibleItems)
+      } catch {
+        // Keep the default menu when the public setting endpoint is temporarily unavailable.
+      }
+    }
+
+    void loadNavbarMenu()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -189,7 +219,7 @@ export default function Navbar() {
 
             <div className="hidden min-w-0 items-center justify-center md:flex">
               <div className="flex h-11 items-center gap-1">
-                {PUBLIC_NAV_ITEMS.map((item) => {
+                {navItems.map((item) => {
                   const active = isActivePath(pathname, item.href)
                   return (
                     <Link
@@ -343,23 +373,48 @@ export default function Navbar() {
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
               <div className="space-y-3 pb-6">
-                {isAdminUser ? (
-                  <section>
-                    <button
-                      type="button"
-                      onClick={() => toggleMobileSection('nav')}
-                      aria-expanded={mobileSectionsOpen.nav}
-                      className="flex w-full items-center justify-between rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5"
-                    >
-                      <span className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Navigasi</span>
-                      <ChevronDown
-                        className={`h-4 w-4 text-[#888] transition-transform ${mobileSectionsOpen.nav ? 'rotate-180' : ''}`}
-                      />
-                    </button>
+                {navItems.length > 0 ? (
+                  isAdminUser ? (
+                    <section>
+                      <button
+                        type="button"
+                        onClick={() => toggleMobileSection('nav')}
+                        aria-expanded={mobileSectionsOpen.nav}
+                        className="flex w-full items-center justify-between rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-3 py-2.5"
+                      >
+                        <span className="text-[11px] font-bold uppercase tracking-wide text-[#666]">Navigasi</span>
+                        <ChevronDown
+                          className={`h-4 w-4 text-[#888] transition-transform ${mobileSectionsOpen.nav ? 'rotate-180' : ''}`}
+                        />
+                      </button>
 
-                    {mobileSectionsOpen.nav ? (
+                      {mobileSectionsOpen.nav ? (
+                        <div className="mt-2 space-y-2">
+                          {navItems.map((item) => {
+                            const active = isActivePath(pathname, item.href)
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                                  active
+                                    ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
+                                    : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
+                                }`}
+                                onClick={() => setOpen(false)}
+                              >
+                                <span>{item.label}</span>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      ) : null}
+                    </section>
+                  ) : (
+                    <section>
+                      <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-[#666]">Navigasi</p>
                       <div className="mt-2 space-y-2">
-                        {PUBLIC_NAV_ITEMS.map((item) => {
+                        {navItems.map((item) => {
                           const active = isActivePath(pathname, item.href)
                           return (
                             <Link
@@ -377,32 +432,9 @@ export default function Navbar() {
                           )
                         })}
                       </div>
-                    ) : null}
-                  </section>
-                ) : (
-                  <section>
-                    <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-[#666]">Navigasi</p>
-                    <div className="mt-2 space-y-2">
-                      {PUBLIC_NAV_ITEMS.map((item) => {
-                        const active = isActivePath(pathname, item.href)
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
-                              active
-                                ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
-                                : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
-                            }`}
-                            onClick={() => setOpen(false)}
-                          >
-                            <span>{item.label}</span>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  </section>
-                )}
+                    </section>
+                  )
+                ) : null}
 
                 {showAuthenticated ? (
                   isAdminUser ? (

@@ -4,6 +4,7 @@ import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 
 import MaintenanceSettingsCard from '@/components/admin/maintenance-settings-card'
+import NavbarMenuSettingsCard from '@/components/admin/navbar-menu-settings-card'
 import ProductCategorySettingsCard from '@/components/admin/product-category-settings-card'
 import UserSidebarMenuSettingsCard from '@/components/admin/user-sidebar-menu-settings-card'
 import {
@@ -438,6 +439,7 @@ export default function PengaturanPage() {
       </div>
 
       <ProductCategorySettingsCard />
+      <NavbarMenuSettingsCard />
       <UserSidebarMenuSettingsCard />
       <MaintenanceSettingsCard />
 

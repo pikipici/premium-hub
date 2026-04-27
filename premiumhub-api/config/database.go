@@ -27,6 +27,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.ProductCategory{},
 		&model.MaintenanceRule{},
 		&model.UserSidebarMenuSetting{},
+		&model.NavbarMenuSetting{},
 		&model.Product{},
 		&model.SosmedService{},
 		&model.SosmedOrder{},
@@ -67,6 +68,10 @@ func InitDB(cfg *Config) *gorm.DB {
 		log.Fatal("DB user sidebar menu defaults:", err)
 	}
 
+	if err := ensureDefaultNavbarMenuSettings(db); err != nil {
+		log.Fatal("DB navbar menu defaults:", err)
+	}
+
 	if err := applyPaymentSchemaCleanup(db); err != nil {
 		log.Fatal("DB payment migration:", err)
 	}
@@ -85,6 +90,50 @@ func ensureDefaultUserSidebarMenuSettings(db *gorm.DB) error {
 
 	for _, item := range defaults {
 		var existing model.UserSidebarMenuSetting
+		err := db.Where("key = ?", item.Key).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if createErr := db.Create(&item).Error; createErr != nil {
+				return createErr
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		updates := map[string]interface{}{}
+		if strings.TrimSpace(existing.Label) == "" || existing.Label != item.Label {
+			updates["label"] = item.Label
+		}
+		if strings.TrimSpace(existing.Href) == "" || existing.Href != item.Href {
+			updates["href"] = item.Href
+		}
+		if existing.SortOrder == 0 || existing.SortOrder != item.SortOrder {
+			updates["sort_order"] = item.SortOrder
+		}
+		if !existing.IsSystem {
+			updates["is_system"] = true
+		}
+		if len(updates) > 0 {
+			if updateErr := db.Model(&existing).Updates(updates).Error; updateErr != nil {
+				return updateErr
+			}
+		}
+	}
+
+	return nil
+}
+
+func ensureDefaultNavbarMenuSettings(db *gorm.DB) error {
+	defaults := []model.NavbarMenuSetting{
+		{Key: "apps", Label: "Apps", Href: "/product/prem-apps", SortOrder: 10, IsVisible: true, IsSystem: true},
+		{Key: "convert_asset", Label: "Convert Aset", Href: "/product/convert", SortOrder: 20, IsVisible: true, IsSystem: true},
+		{Key: "nomor_virtual", Label: "Nomor Virtual", Href: "/product/nokos", SortOrder: 30, IsVisible: true, IsSystem: true},
+		{Key: "sosmed", Label: "Sosmed", Href: "/product/sosmed", SortOrder: 40, IsVisible: true, IsSystem: true},
+	}
+
+	for _, item := range defaults {
+		var existing model.NavbarMenuSetting
 		err := db.Where("key = ?", item.Key).First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			if createErr := db.Create(&item).Error; createErr != nil {

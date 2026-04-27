@@ -46,6 +46,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	convertRepo := repository.NewConvertRepo(db)
 	maintenanceRuleRepo := repository.NewMaintenanceRuleRepo(db)
 	userSidebarMenuSettingRepo := repository.NewUserSidebarMenuSettingRepo(db)
+	navbarMenuSettingRepo := repository.NewNavbarMenuSettingRepo(db)
 	activityRepo := repository.NewActivityRepo(db)
 
 	stockCredentialKey := strings.TrimSpace(cfg.StockCredentialKey)
@@ -91,6 +92,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	convertSvc := service.NewConvertService(userRepo, convertRepo)
 	maintenanceSvc := service.NewMaintenanceService(maintenanceRuleRepo)
 	userSidebarMenuSettingSvc := service.NewUserSidebarMenuSettingService(userSidebarMenuSettingRepo)
+	navbarMenuSettingSvc := service.NewNavbarMenuSettingService(navbarMenuSettingRepo)
 	activitySvc := service.NewActivityService(activityRepo)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
@@ -129,6 +131,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	sosmedPaymentHandler := handler.NewSosmedPaymentHandler(sosmedPaymentSvc)
 	maintenanceHandler := handler.NewMaintenanceHandler(maintenanceSvc)
 	userSidebarMenuSettingHandler := handler.NewUserSidebarMenuSettingHandler(userSidebarMenuSettingSvc)
+	navbarMenuSettingHandler := handler.NewNavbarMenuSettingHandler(navbarMenuSettingSvc)
 	activityHandler := handler.NewActivityHandler(activitySvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
@@ -156,6 +159,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.POST("/payment/webhook", paymentHandler.Webhook)
 	api.GET("/public/nokos/landing-summary", nokosPublicHandler.GetLandingSummary)
 	api.GET("/public/nokos/countries", nokosPublicHandler.GetCountries)
+	api.GET("/public/navbar-menu", navbarMenuSettingHandler.PublicList)
 	api.GET("/public/sosmed/services", sosmedServiceHandler.PublicList)
 	api.GET(
 		"/convert/track/:token",
@@ -301,6 +305,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.DELETE("/maintenance/rules/:id", maintenanceHandler.AdminDelete)
 	admin.GET("/settings/user-sidebar-menu", userSidebarMenuSettingHandler.List)
 	admin.PUT("/settings/user-sidebar-menu", userSidebarMenuSettingHandler.AdminUpdate)
+	admin.GET("/settings/navbar-menu", navbarMenuSettingHandler.AdminList)
+	admin.PUT("/settings/navbar-menu", navbarMenuSettingHandler.AdminUpdate)
 
 	admin.GET("/stocks", stockHandler.List)
 	admin.POST("/stocks", stockHandler.Create)
