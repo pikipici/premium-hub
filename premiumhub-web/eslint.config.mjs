@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party icon source mirrors (not part of app lint scope):
+    "vendor/**",
   ]),
 ]);
 
