@@ -1575,8 +1575,6 @@ export default function NomorVirtualPage() {
                             {liveIsOpenStatus ? (
                               <div className="space-y-1">
                                 <p>Belum ada OTP masuk dari {liveServiceDisplay}.</p>
-                                <p>Lanjut di {liveServiceDisplay}: masukkan nomor di atas lalu tekan Kirim Kode / Send OTP.</p>
-                                <p>Setelah request, OTP akan muncul otomatis di sini. Kalau belum muncul, klik “Saya Sudah Request OTP”.</p>
                               </div>
                             ) : (
                               'Belum ada SMS OTP tercatat untuk order ini.'
