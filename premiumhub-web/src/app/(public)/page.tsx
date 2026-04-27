@@ -89,7 +89,7 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#FF5733]" />
-                  OTP masuk realtime ke dashboard
+                  OTP masuk ga pake lama
                 </li>
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#FF5733]" />
