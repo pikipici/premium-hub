@@ -85,6 +85,28 @@ const otpCards: OtpCard[] = [
     after: 'Enter it to continue sign-in.',
   },
   {
+    app: 'Taobao',
+    iconSrc: '/icons/apps/taobao.svg',
+    iconClassName: 'bg-[#FF4400] text-white',
+    before: 'Verification code:',
+    code: '561318',
+    after: 'Valid for 5 minutes.',
+  },
+  {
+    app: 'eBay',
+    iconSrc: '/icons/apps/ebay.svg',
+    iconClassName: 'bg-[#E53238] text-white',
+    before: 'Your one-time eBay PIN is',
+    code: '8905',
+  },
+  {
+    app: 'Amazon',
+    iconSrc: '/icons/apps/amazon.svg',
+    iconClassName: 'bg-[#232F3E] text-white',
+    before: 'Your Amazon Web Services (AWS) verification code is:',
+    code: '8732',
+  },
+  {
     app: 'Viber',
     iconSrc: '/icons/apps/viber.svg',
     iconClassName: 'bg-[#7360F2] text-white',
