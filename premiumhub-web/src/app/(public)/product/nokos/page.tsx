@@ -210,18 +210,38 @@ const otpCards: OtpCard[] = [
   },
 ]
 
+const monoBadgeIconSrcs = new Set<string>([
+  '/icons/apps/openai.svg',
+  '/icons/apps/proton.svg',
+])
+
+const monoBadgeInvertIconSrcs = new Set<string>([
+  '/icons/apps/openai.svg',
+])
+
 function OtpPreviewCard({ card }: { card: OtpCard }) {
+  const useMonoBadge = card.iconSrc ? monoBadgeIconSrcs.has(card.iconSrc) : false
+  const useMonoBadgeInvert = card.iconSrc ? monoBadgeInvertIconSrcs.has(card.iconSrc) : false
+
+  const iconContainerClassName = useMonoBadge
+    ? `flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${card.iconClassName}`
+    : 'flex h-10 w-10 shrink-0 items-center justify-center'
+
+  const iconImageClassName = useMonoBadge
+    ? `h-[20px] w-[20px] object-contain${useMonoBadgeInvert ? ' brightness-0 invert' : ''}`
+    : 'h-[26px] w-[26px] object-contain'
+
   return (
     <article className="rounded-2xl border border-[#f5f5f5] bg-white p-4 shadow-[0_8px_32px_rgba(20,20,20,0.10)] transition hover:-translate-y-0.5">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+        <div className={iconContainerClassName}>
           {card.iconSrc ? (
             <Image
               src={card.iconSrc}
               alt={`${card.app} logo`}
               width={26}
               height={26}
-              className="h-[26px] w-[26px] object-contain"
+              className={iconImageClassName}
             />
           ) : (
             <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.iconClassName}`}>
