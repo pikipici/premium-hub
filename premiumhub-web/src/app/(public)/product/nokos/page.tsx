@@ -466,7 +466,7 @@ export default function LandingPage() {
               Empat langkah mudah — dari daftar sampai OTP masuk ke dashboard kamu.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[#888]">
-              Tidak perlu verifikasi ribet. Mulai dalam hitungan menit.
+              Tidak perlu langkah ribet. Mulai dalam hitungan menit.
             </p>
           </div>
 
