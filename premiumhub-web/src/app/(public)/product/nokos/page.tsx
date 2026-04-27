@@ -23,7 +23,6 @@ type OtpCard = {
   iconSrc?: string
   iconText?: string
   iconClassName: string
-  iconImageClassName?: string
   before: string
   code: string
   after?: string
@@ -198,7 +197,6 @@ const otpCards: OtpCard[] = [
     app: 'OpenAI',
     iconSrc: '/icons/apps/openai.svg',
     iconClassName: 'bg-[#111827] text-white',
-    iconImageClassName: 'brightness-0 invert',
     before: 'OpenAI confirmation code:',
     code: '447 908',
     after: 'Complete sign-in to continue.',
@@ -216,17 +214,19 @@ function OtpPreviewCard({ card }: { card: OtpCard }) {
   return (
     <article className="rounded-2xl border border-[#f5f5f5] bg-white p-4 shadow-[0_8px_32px_rgba(20,20,20,0.10)] transition hover:-translate-y-0.5">
       <div className="flex items-start gap-3">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${card.iconClassName}`}>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center">
           {card.iconSrc ? (
             <Image
               src={card.iconSrc}
               alt={`${card.app} logo`}
-              width={18}
-              height={18}
-              className={`h-[18px] w-[18px] object-contain ${card.iconImageClassName ?? ''}`}
+              width={26}
+              height={26}
+              className="h-[26px] w-[26px] object-contain"
             />
           ) : (
-            <span className="text-[11px] font-extrabold uppercase tracking-wide">{card.iconText ?? card.app.slice(0, 2)}</span>
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.iconClassName}`}>
+              <span className="text-[11px] font-extrabold uppercase tracking-wide">{card.iconText ?? card.app.slice(0, 2)}</span>
+            </div>
           )}
         </div>
         <div>
