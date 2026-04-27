@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw } from 'lucide-react'
+import { CheckCircle2, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw, X } from 'lucide-react'
 
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
@@ -135,14 +135,14 @@ function refillTitle(status?: string) {
   if (value === 'requested' || value === 'processing') return 'Refill Sedang Diproses'
   if (value === 'completed') return 'Refill Sudah Selesai'
   if (value === 'failed') return 'Refill Belum Berhasil'
-  if (value === 'rejected') return 'Refill Ditolak Supplier'
+  if (value === 'rejected') return 'Refill Ditolak Sistem'
   return 'Garansi Refill Aktif'
 }
 
 function refillDescription(order: SosmedOrder) {
   const status = (order.refill_status || 'none').toLowerCase()
   if (status === 'requested' || status === 'processing') {
-    return 'Permintaan refill udah masuk ke supplier. Tinggal tunggu prosesnya jalan.'
+    return 'Permintaan refill udah masuk ke sistem. Tinggal tunggu prosesnya jalan.'
   }
   if (status === 'completed') {
     return order.refill_completed_at
@@ -153,7 +153,7 @@ function refillDescription(order: SosmedOrder) {
     return 'Refill belum berhasil dikirim. Lu bisa coba klaim ulang kalau tombolnya masih aktif.'
   }
   if (status === 'rejected') {
-    return 'Supplier menolak refill ini. Kalau perlu, hubungi admin buat dicek manual.'
+    return 'Sistem menolak refill ini. Kalau perlu, hubungi admin buat dicek manual.'
   }
   if (!order.refill_deadline) {
     return 'Garansi refill perlu dicek admin dulu sebelum bisa diklaim.'
@@ -169,6 +169,8 @@ export default function DashboardSosmedOrdersPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [refillLoading, setRefillLoading] = useState<string | null>(null)
+  const [refillTarget, setRefillTarget] = useState<SosmedOrder | null>(null)
+  const [refillAgreement, setRefillAgreement] = useState(false)
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
 
@@ -199,6 +201,17 @@ export default function DashboardSosmedOrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
 
+  useEffect(() => {
+    if (!refillTarget) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [refillTarget])
+
   const handleCancel = async (order: SosmedOrder) => {
     if (order.order_status !== 'pending_payment') return
 
@@ -222,11 +235,21 @@ export default function DashboardSosmedOrdersPage() {
     }
   }
 
-  const handleRefill = async (order: SosmedOrder) => {
-    const confirmed = window.confirm(
-      `Klaim refill untuk order "${order.service_title}"?\n\nRefill akan dikirim ke supplier untuk link:\n${order.target_link || '-'}`
-    )
-    if (!confirmed) return
+  const openRefillModal = (order: SosmedOrder) => {
+    setError('')
+    setRefillAgreement(false)
+    setRefillTarget(order)
+  }
+
+  const closeRefillModal = (force = false) => {
+    if (!force && refillTarget && refillLoading === refillTarget.id) return
+    setRefillTarget(null)
+    setRefillAgreement(false)
+  }
+
+  const submitRefill = async () => {
+    const order = refillTarget
+    if (!order || !refillAgreement) return
 
     setRefillLoading(order.id)
     setError('')
@@ -238,6 +261,7 @@ export default function DashboardSosmedOrdersPage() {
         return
       }
       await loadOrders(true)
+      closeRefillModal(true)
     } catch {
       setError('Gagal mengklaim refill')
     } finally {
@@ -407,7 +431,7 @@ export default function DashboardSosmedOrdersPage() {
                           {refill.canClaim ? (
                             <button
                               type="button"
-                              onClick={() => void handleRefill(order)}
+                              onClick={() => openRefillModal(order)}
                               disabled={refillLoading === order.id}
                               className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-[11px] font-black text-white shadow-sm hover:bg-violet-700 disabled:opacity-60"
                             >
@@ -488,6 +512,91 @@ export default function DashboardSosmedOrdersPage() {
             </div>
           </div>
         </section>
+      ) : null}
+
+      {refillTarget ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-sm">
+          <section className="w-full max-w-lg overflow-hidden rounded-3xl border border-[#E7DCF8] bg-white shadow-[0_24px_80px_rgba(28,18,44,0.25)]">
+            <div className="flex items-start justify-between gap-3 border-b border-[#F0EAF8] bg-gradient-to-br from-violet-50 via-white to-orange-50 px-5 py-4">
+              <div>
+                <div className="inline-flex rounded-full border border-violet-200 bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-violet-700">
+                  Garansi Refill
+                </div>
+                <h2 className="mt-3 text-xl font-black text-[#141414]">Klaim Refill?</h2>
+                <p className="mt-1 text-sm leading-relaxed text-[#666]">
+                  Sebelum lanjut, pastiin target kamu masih memenuhi syarat biar sistem bisa proses refill dengan lancar.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => closeRefillModal()}
+                disabled={refillLoading === refillTarget.id}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#E9E2F4] bg-white text-[#555] hover:bg-[#FAFAF8] disabled:opacity-60"
+                aria-label="Tutup modal refill"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div className="rounded-2xl border border-[#EFEFEA] bg-[#FAFAF8] p-3">
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#999]">Order</div>
+                <div className="mt-1 text-sm font-black text-[#141414]">{refillTarget.service_title}</div>
+                <div className="mt-2 flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs text-[#666]">
+                  <Link2 className="h-3.5 w-3.5 shrink-0 text-[#FF5733]" />
+                  <span className="min-w-0 truncate">{compactTarget(refillTarget.target_link)}</span>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                {[
+                  'Akun/link target masih public, bukan private.',
+                  'Link atau username target tidak diganti, dihapus, atau salah input.',
+                  'Jangan order layanan followers lain ke target yang sama selama refill diproses.',
+                  `Refill cuma berlaku selama masa garansi${refillTarget.refill_deadline ? ` sampai ${formatDeadline(refillTarget.refill_deadline)}` : ''}.`,
+                  'Sistem bisa menolak refill kalau target tidak memenuhi syarat.',
+                ].map((item) => (
+                  <div key={item} className="flex gap-2 rounded-2xl border border-[#F0EAF8] bg-white px-3 py-2.5 text-xs leading-relaxed text-[#555]">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-3 text-xs font-semibold leading-relaxed text-violet-900">
+                <input
+                  type="checkbox"
+                  checked={refillAgreement}
+                  onChange={(event) => setRefillAgreement(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-violet-600"
+                />
+                <span>Saya sudah cek target dan paham syarat refill.</span>
+              </label>
+            </div>
+
+            <div className="grid gap-2 border-t border-[#F0EAF8] bg-[#FCFBFF] px-5 py-4 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => closeRefillModal()}
+                disabled={refillLoading === refillTarget.id}
+                className="rounded-2xl border border-[#DDD] bg-white px-4 py-3 text-sm font-black text-[#141414] hover:bg-[#F7F7F5] disabled:opacity-60"
+              >
+                Batal dulu
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void submitRefill()}
+                disabled={!refillAgreement || refillLoading === refillTarget.id}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {refillLoading === refillTarget.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                Saya paham, klaim refill
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
     </div>
   )
