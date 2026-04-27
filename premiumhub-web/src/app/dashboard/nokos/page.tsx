@@ -713,6 +713,7 @@ export default function NomorVirtualPage() {
   const liveIsOpenStatus = isOpenOrderStatus(liveOrderStatus)
   const liveCanFinish = liveIsOpenStatus
   const liveCanCancel = liveIsOpenStatus && liveSMSItems.length === 0
+  const liveClosedOrderMessage = liveOrderStatus === 'FINISHED' ? 'Order selesai.' : 'Order dibatalkan.'
 
   const refreshWalletBalance = useCallback(async () => {
     setWalletLoading(true)
@@ -1538,7 +1539,7 @@ export default function NomorVirtualPage() {
                           </div>
                         ) : (
                           <p className="text-[11px] text-[#888] pt-1 border-t border-[#EBEBEB]">
-                            Order ini sudah final. Monitor realtime dihentikan otomatis.
+                            {liveClosedOrderMessage}
                           </p>
                         )}
                       </div>
