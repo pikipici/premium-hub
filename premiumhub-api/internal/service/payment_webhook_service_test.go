@@ -62,7 +62,7 @@ func (s *stubWalletWebhookLookup) FindTopupByGatewayRef(_ string, gatewayRef str
 		return nil, s.err
 	}
 	if s.records != nil && s.records[gatewayRef] {
-		return &model.WalletTopup{GatewayRef: gatewayRef, Provider: "pakasir"}, nil
+		return &model.WalletTopup{GatewayRef: gatewayRef, Provider: "duitku"}, nil
 	}
 	return nil, gorm.ErrRecordNotFound
 }
@@ -94,21 +94,21 @@ func (s *stubSosmedWebhookHandler) HandleWebhook(input WebhookInput) error {
 type stubWalletWebhookHandler struct {
 	err       error
 	calls     int
-	lastInput WalletPakasirWebhookInput
+	lastInput WalletGatewayWebhookInput
 }
 
-func (s *stubWalletWebhookHandler) HandlePakasirWebhook(_ context.Context, input WalletPakasirWebhookInput) error {
+func (s *stubWalletWebhookHandler) HandleGatewayWebhook(_ context.Context, input WalletGatewayWebhookInput) error {
 	s.calls++
 	s.lastInput = input
 	return s.err
 }
 
-func TestPakasirWebhookService_RouteByPrefixOrder(t *testing.T) {
+func TestPaymentWebhookService_RouteByPrefixOrder(t *testing.T) {
 	orderHandler := &stubOrderWebhookHandler{}
 	sosmedHandler := &stubSosmedWebhookHandler{}
 	walletHandler := &stubWalletWebhookHandler{}
 
-	svc := &PakasirWebhookService{
+	svc := &PaymentWebhookService{
 		orderHandler:  orderHandler,
 		sosmedHandler: sosmedHandler,
 		walletHandler: walletHandler,
@@ -129,12 +129,12 @@ func TestPakasirWebhookService_RouteByPrefixOrder(t *testing.T) {
 	}
 }
 
-func TestPakasirWebhookService_RouteByPrefixSosmed(t *testing.T) {
+func TestPaymentWebhookService_RouteByPrefixSosmed(t *testing.T) {
 	orderHandler := &stubOrderWebhookHandler{}
 	sosmedHandler := &stubSosmedWebhookHandler{}
 	walletHandler := &stubWalletWebhookHandler{}
 
-	svc := &PakasirWebhookService{
+	svc := &PaymentWebhookService{
 		orderHandler:  orderHandler,
 		sosmedHandler: sosmedHandler,
 		walletHandler: walletHandler,
@@ -155,18 +155,18 @@ func TestPakasirWebhookService_RouteByPrefixSosmed(t *testing.T) {
 	}
 }
 
-func TestPakasirWebhookService_RouteByPrefixWallet(t *testing.T) {
+func TestPaymentWebhookService_RouteByPrefixWallet(t *testing.T) {
 	orderHandler := &stubOrderWebhookHandler{}
 	sosmedHandler := &stubSosmedWebhookHandler{}
 	walletHandler := &stubWalletWebhookHandler{}
 
-	svc := &PakasirWebhookService{
+	svc := &PaymentWebhookService{
 		orderHandler:  orderHandler,
 		sosmedHandler: sosmedHandler,
 		walletHandler: walletHandler,
 	}
 
-	input := WebhookInput{OrderID: "wlt-abc", Status: "completed", Amount: 10000, PaymentMethod: "qris"}
+	input := WebhookInput{OrderID: "wlt-abc", Status: "completed", Amount: 10000, PaymentMethod: "SP"}
 	if err := svc.Handle(context.Background(), input); err != nil {
 		t.Fatalf("handle webhook: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestPakasirWebhookService_RouteByPrefixWallet(t *testing.T) {
 	}
 }
 
-func TestPakasirWebhookService_FallbackLookupOrderSosmedWallet(t *testing.T) {
+func TestPaymentWebhookService_FallbackLookupOrderSosmedWallet(t *testing.T) {
 	orderLookup := &stubOrderWebhookLookup{records: map[string]bool{"X-ORDER": true}}
 	sosmedLookup := &stubSosmedWebhookLookup{records: map[string]bool{"X-SOSMED": true}}
 	walletLookup := &stubWalletWebhookLookup{records: map[string]bool{"X-WALLET": true}}
@@ -192,7 +192,7 @@ func TestPakasirWebhookService_FallbackLookupOrderSosmedWallet(t *testing.T) {
 	sosmedHandler := &stubSosmedWebhookHandler{}
 	walletHandler := &stubWalletWebhookHandler{}
 
-	svc := &PakasirWebhookService{
+	svc := &PaymentWebhookService{
 		orderLookup:   orderLookup,
 		sosmedLookup:  sosmedLookup,
 		walletLookup:  walletLookup,
@@ -223,8 +223,8 @@ func TestPakasirWebhookService_FallbackLookupOrderSosmedWallet(t *testing.T) {
 	}
 }
 
-func TestPakasirWebhookService_UnknownOrderIDAck(t *testing.T) {
-	svc := &PakasirWebhookService{
+func TestPaymentWebhookService_UnknownOrderIDAck(t *testing.T) {
+	svc := &PaymentWebhookService{
 		orderLookup:   &stubOrderWebhookLookup{},
 		sosmedLookup:  &stubSosmedWebhookLookup{},
 		walletLookup:  &stubWalletWebhookLookup{},
@@ -238,10 +238,10 @@ func TestPakasirWebhookService_UnknownOrderIDAck(t *testing.T) {
 	}
 }
 
-func TestPakasirWebhookService_ErrorPropagation(t *testing.T) {
+func TestPaymentWebhookService_ErrorPropagation(t *testing.T) {
 	t.Run("order handler error", func(t *testing.T) {
 		expected := errors.New("order failed")
-		svc := &PakasirWebhookService{orderHandler: &stubOrderWebhookHandler{err: expected}}
+		svc := &PaymentWebhookService{orderHandler: &stubOrderWebhookHandler{err: expected}}
 		err := svc.Handle(context.Background(), WebhookInput{OrderID: "ORD-1", Status: "completed"})
 		if !errors.Is(err, expected) {
 			t.Fatalf("expected %v, got %v", expected, err)
@@ -250,7 +250,7 @@ func TestPakasirWebhookService_ErrorPropagation(t *testing.T) {
 
 	t.Run("sosmed handler error", func(t *testing.T) {
 		expected := errors.New("sosmed failed")
-		svc := &PakasirWebhookService{sosmedHandler: &stubSosmedWebhookHandler{err: expected}}
+		svc := &PaymentWebhookService{sosmedHandler: &stubSosmedWebhookHandler{err: expected}}
 		err := svc.Handle(context.Background(), WebhookInput{OrderID: "SSM-1", Status: "completed"})
 		if !errors.Is(err, expected) {
 			t.Fatalf("expected %v, got %v", expected, err)
@@ -259,7 +259,7 @@ func TestPakasirWebhookService_ErrorPropagation(t *testing.T) {
 
 	t.Run("wallet handler error", func(t *testing.T) {
 		expected := errors.New("wallet failed")
-		svc := &PakasirWebhookService{walletHandler: &stubWalletWebhookHandler{err: expected}}
+		svc := &PaymentWebhookService{walletHandler: &stubWalletWebhookHandler{err: expected}}
 		err := svc.Handle(context.Background(), WebhookInput{OrderID: "WLT-1", Status: "completed"})
 		if !errors.Is(err, expected) {
 			t.Fatalf("expected %v, got %v", expected, err)
@@ -268,7 +268,7 @@ func TestPakasirWebhookService_ErrorPropagation(t *testing.T) {
 
 	t.Run("order lookup error", func(t *testing.T) {
 		expected := errors.New("db order error")
-		svc := &PakasirWebhookService{
+		svc := &PaymentWebhookService{
 			orderLookup:  &stubOrderWebhookLookup{err: expected},
 			sosmedLookup: &stubSosmedWebhookLookup{},
 			walletLookup: &stubWalletWebhookLookup{},
@@ -281,7 +281,7 @@ func TestPakasirWebhookService_ErrorPropagation(t *testing.T) {
 
 	t.Run("sosmed lookup error", func(t *testing.T) {
 		expected := errors.New("db sosmed error")
-		svc := &PakasirWebhookService{
+		svc := &PaymentWebhookService{
 			orderLookup:  &stubOrderWebhookLookup{},
 			sosmedLookup: &stubSosmedWebhookLookup{err: expected},
 			walletLookup: &stubWalletWebhookLookup{},
@@ -294,7 +294,7 @@ func TestPakasirWebhookService_ErrorPropagation(t *testing.T) {
 
 	t.Run("wallet lookup error", func(t *testing.T) {
 		expected := errors.New("db wallet error")
-		svc := &PakasirWebhookService{
+		svc := &PaymentWebhookService{
 			orderLookup:  &stubOrderWebhookLookup{},
 			sosmedLookup: &stubSosmedWebhookLookup{},
 			walletLookup: &stubWalletWebhookLookup{err: expected},
@@ -306,9 +306,9 @@ func TestPakasirWebhookService_ErrorPropagation(t *testing.T) {
 	})
 }
 
-func TestPakasirWebhookService_ValidationAndNilHandlers(t *testing.T) {
+func TestPaymentWebhookService_ValidationAndNilHandlers(t *testing.T) {
 	t.Run("missing order id", func(t *testing.T) {
-		svc := &PakasirWebhookService{}
+		svc := &PaymentWebhookService{}
 		err := svc.Handle(context.Background(), WebhookInput{})
 		if err == nil || err.Error() != "order_id wajib diisi" {
 			t.Fatalf("expected order_id validation error, got: %v", err)
@@ -316,7 +316,7 @@ func TestPakasirWebhookService_ValidationAndNilHandlers(t *testing.T) {
 	})
 
 	t.Run("missing order handler on ORD prefix", func(t *testing.T) {
-		svc := &PakasirWebhookService{}
+		svc := &PaymentWebhookService{}
 		err := svc.Handle(context.Background(), WebhookInput{OrderID: "ORD-77"})
 		if err == nil || err.Error() != "order webhook handler belum diinisialisasi" {
 			t.Fatalf("expected missing order handler error, got: %v", err)
@@ -324,7 +324,7 @@ func TestPakasirWebhookService_ValidationAndNilHandlers(t *testing.T) {
 	})
 
 	t.Run("missing sosmed handler on SSM prefix", func(t *testing.T) {
-		svc := &PakasirWebhookService{}
+		svc := &PaymentWebhookService{}
 		err := svc.Handle(context.Background(), WebhookInput{OrderID: "SSM-77"})
 		if err == nil || err.Error() != "sosmed webhook handler belum diinisialisasi" {
 			t.Fatalf("expected missing sosmed handler error, got: %v", err)
@@ -332,7 +332,7 @@ func TestPakasirWebhookService_ValidationAndNilHandlers(t *testing.T) {
 	})
 
 	t.Run("missing wallet handler on WLT prefix", func(t *testing.T) {
-		svc := &PakasirWebhookService{}
+		svc := &PaymentWebhookService{}
 		err := svc.Handle(context.Background(), WebhookInput{OrderID: "WLT-77"})
 		if err == nil || err.Error() != "wallet webhook handler belum diinisialisasi" {
 			t.Fatalf("expected missing wallet handler error, got: %v", err)

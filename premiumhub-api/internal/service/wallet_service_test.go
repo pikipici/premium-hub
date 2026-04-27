@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type fakePakasirWalletClient struct {
+type fakeGatewayWalletClient struct {
 	lastID      int
 	createHits  int
 	detailHits  int
@@ -28,8 +28,8 @@ type fakePakasirWalletClient struct {
 	completedAt map[string]*time.Time
 }
 
-func newFakePakasirWalletClient() *fakePakasirWalletClient {
-	return &fakePakasirWalletClient{
+func newFakeGatewayWalletClient() *fakeGatewayWalletClient {
+	return &fakeGatewayWalletClient{
 		statusMap:   map[string]string{},
 		detailErr:   map[string]error{},
 		methodMap:   map[string]string{},
@@ -38,31 +38,37 @@ func newFakePakasirWalletClient() *fakePakasirWalletClient {
 	}
 }
 
-func (f *fakePakasirWalletClient) CreateTransaction(_ context.Context, method, orderID string, amount int64) (*PakasirCreateResult, []byte, error) {
+func (f *fakeGatewayWalletClient) CreateTransaction(_ context.Context, input GatewayCreateTransactionInput) (*GatewayCreateResult, []byte, error) {
 	if f.createErr != nil {
 		return nil, nil, f.createErr
 	}
 	f.createHits++
 	f.lastID++
+	orderID := input.OrderID
 	if strings.TrimSpace(orderID) == "" {
 		orderID = fmt.Sprintf("WLT-%d", f.lastID)
+	}
+	method := NormalizePaymentGatewayMethod(input.PaymentMethod)
+	if method == "" {
+		method = defaultDuitkuPaymentMethod
 	}
 	if _, ok := f.statusMap[orderID]; !ok {
 		f.statusMap[orderID] = "PENDING"
 	}
 	f.methodMap[orderID] = method
-	f.amountMap[orderID] = amount
-	return &PakasirCreateResult{
+	f.amountMap[orderID] = input.Amount
+	return &GatewayCreateResult{
 		OrderID:       orderID,
+		Reference:     "DUT-" + orderID,
 		PaymentMethod: method,
 		PaymentNumber: "000201...",
-		Amount:        amount,
-		TotalPayment:  amount + 3000,
+		Amount:        input.Amount,
+		TotalPayment:  input.Amount + 3000,
 		ExpiredAt:     time.Now().UTC().Add(15 * time.Minute),
 	}, []byte(`{"ok":true}`), nil
 }
 
-func (f *fakePakasirWalletClient) TransactionDetail(_ context.Context, orderID string, amount int64) (*PakasirDetailResult, []byte, error) {
+func (f *fakeGatewayWalletClient) TransactionDetail(_ context.Context, orderID string, amount int64) (*GatewayDetailResult, []byte, error) {
 	f.detailHits++
 	if err := f.detailErr[orderID]; err != nil {
 		return nil, nil, err
@@ -73,25 +79,25 @@ func (f *fakePakasirWalletClient) TransactionDetail(_ context.Context, orderID s
 	}
 	method := f.methodMap[orderID]
 	if method == "" {
-		method = "qris"
+		method = defaultDuitkuPaymentMethod
 	}
 	if amount <= 0 {
 		amount = f.amountMap[orderID]
 	}
-	return &PakasirDetailResult{
+	return &GatewayDetailResult{
 		OrderID:       orderID,
 		Amount:        amount,
-		Status:        NormalizePakasirStatus(status),
+		Status:        NormalizePaymentGatewayStatus(status),
 		PaymentMethod: method,
 		CompletedAt:   f.completedAt[orderID],
 	}, []byte(`{"ok":true}`), nil
 }
 
-func (f *fakePakasirWalletClient) TransactionCancel(_ context.Context, _ string, _ int64) ([]byte, error) {
-	return []byte(`{"ok":true}`), nil
+func (f *fakeGatewayWalletClient) ListPaymentMethods(_ context.Context, _ int64) ([]GatewayPaymentMethod, []byte, error) {
+	return []GatewayPaymentMethod{{Method: "SP", Name: "QRIS"}}, []byte(`{"ok":true}`), nil
 }
 
-func setupWalletService(t *testing.T) (*WalletService, *gorm.DB, *fakePakasirWalletClient, *model.User) {
+func setupWalletService(t *testing.T) (*WalletService, *gorm.DB, *fakeGatewayWalletClient, *model.User) {
 	t.Helper()
 
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", uuid.NewString())
@@ -129,12 +135,13 @@ func setupWalletService(t *testing.T) (*WalletService, *gorm.DB, *fakePakasirWal
 
 	cfg := &config.Config{
 		WalletTopupExpiryMinutes: "15",
-		PakasirProject:           "premiumhub",
-		PakasirAPIKey:            "PK_test",
-		PakasirBaseURL:           "https://app.pakasir.com",
-		PakasirHTTPTimeoutSec:    "12",
+		DuitkuMerchantCode:       "premiumhub",
+		DuitkuAPIKey:             "DK_test",
+		DuitkuBaseURL:            "https://passport.duitku.com",
+		DuitkuHTTPTimeoutSec:     "12",
+		FrontendURL:              "https://example.com",
 	}
-	fake := newFakePakasirWalletClient()
+	fake := newFakeGatewayWalletClient()
 	walletSvc := NewWalletService(
 		cfg,
 		repository.NewUserRepo(db),
@@ -230,7 +237,7 @@ func TestWalletCreateTopupIdempotent(t *testing.T) {
 	first, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{
 		Amount:         50000,
 		IdempotencyKey: "req-12345",
-		PaymentMethod:  "qris",
+		PaymentMethod:  "SP",
 	})
 	if err != nil {
 		t.Fatalf("create topup first: %v", err)
@@ -238,8 +245,8 @@ func TestWalletCreateTopupIdempotent(t *testing.T) {
 	if first.Status != "pending" {
 		t.Fatalf("expected pending, got %s", first.Status)
 	}
-	if first.Provider != "pakasir" {
-		t.Fatalf("expected provider pakasir, got %s", first.Provider)
+	if first.Provider != "duitku" {
+		t.Fatalf("expected provider duitku, got %s", first.Provider)
 	}
 	if strings.TrimSpace(first.GatewayRef) == "" {
 		t.Fatalf("gateway ref should not be empty")
@@ -248,7 +255,7 @@ func TestWalletCreateTopupIdempotent(t *testing.T) {
 	second, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{
 		Amount:         50000,
 		IdempotencyKey: "req-12345",
-		PaymentMethod:  "qris",
+		PaymentMethod:  "SP",
 	})
 	if err != nil {
 		t.Fatalf("create topup second: %v", err)
@@ -258,7 +265,7 @@ func TestWalletCreateTopupIdempotent(t *testing.T) {
 		t.Fatalf("idempotency failed: %s != %s", first.ID, second.ID)
 	}
 	if fake.createHits != 1 {
-		t.Fatalf("pakasir create should run once, got %d", fake.createHits)
+		t.Fatalf("gateway create should run once, got %d", fake.createHits)
 	}
 }
 
@@ -288,7 +295,7 @@ func TestWalletCreateTopupValidationAndBlockedUser(t *testing.T) {
 func TestWalletCheckTopupSuccessCreditsOnce(t *testing.T) {
 	svc, db, fake, user := setupWalletService(t)
 
-	topup, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{Amount: 10000, PaymentMethod: "qris"})
+	topup, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{Amount: 10000, PaymentMethod: "SP"})
 	if err != nil {
 		t.Fatalf("create topup: %v", err)
 	}
@@ -336,14 +343,14 @@ func TestWalletCheckTopupSuccessCreditsOnce(t *testing.T) {
 func TestWalletHandleWebhook(t *testing.T) {
 	svc, db, fake, user := setupWalletService(t)
 
-	topup, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{Amount: 12000, PaymentMethod: "qris"})
+	topup, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{Amount: 12000, PaymentMethod: "SP"})
 	if err != nil {
 		t.Fatalf("create topup: %v", err)
 	}
 
 	fake.statusMap[topup.GatewayRef] = "COMPLETED"
 
-	if err := svc.HandlePakasirWebhook(context.Background(), WalletPakasirWebhookInput{
+	if err := svc.HandleGatewayWebhook(context.Background(), WalletGatewayWebhookInput{
 		OrderID: topup.GatewayRef,
 		Project: "wrong-project",
 		Status:  "COMPLETED",
@@ -357,11 +364,13 @@ func TestWalletHandleWebhook(t *testing.T) {
 		t.Fatalf("expected no credit on mismatch project")
 	}
 
-	if err := svc.HandlePakasirWebhook(context.Background(), WalletPakasirWebhookInput{
-		OrderID: topup.GatewayRef,
-		Project: "premiumhub",
-		Status:  "COMPLETED",
-		Amount:  12000,
+	successSig := BuildDuitkuCallbackSignature("premiumhub", 12000, topup.GatewayRef, "DK_test")
+	if err := svc.HandleGatewayWebhook(context.Background(), WalletGatewayWebhookInput{
+		OrderID:   topup.GatewayRef,
+		Project:   "premiumhub",
+		Status:    "COMPLETED",
+		Amount:    12000,
+		Signature: successSig,
 	}); err != nil {
 		t.Fatalf("webhook success expected: %v", err)
 	}
@@ -375,18 +384,20 @@ func TestWalletHandleWebhook(t *testing.T) {
 func TestWalletHandleWebhookAcceptsPayableAmount(t *testing.T) {
 	svc, db, fake, user := setupWalletService(t)
 
-	topup, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{Amount: 10000, PaymentMethod: "qris"})
+	topup, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{Amount: 10000, PaymentMethod: "SP"})
 	if err != nil {
 		t.Fatalf("create topup: %v", err)
 	}
 
 	fake.statusMap[topup.GatewayRef] = "COMPLETED"
 
-	if err := svc.HandlePakasirWebhook(context.Background(), WalletPakasirWebhookInput{
-		OrderID: topup.GatewayRef,
-		Project: "premiumhub",
-		Status:  "COMPLETED",
-		Amount:  topup.PayableAmount,
+	payableSig := BuildDuitkuCallbackSignature("premiumhub", topup.PayableAmount, topup.GatewayRef, "DK_test")
+	if err := svc.HandleGatewayWebhook(context.Background(), WalletGatewayWebhookInput{
+		OrderID:   topup.GatewayRef,
+		Project:   "premiumhub",
+		Status:    "COMPLETED",
+		Amount:    topup.PayableAmount,
+		Signature: payableSig,
 	}); err != nil {
 		t.Fatalf("webhook with payable amount should be accepted: %v", err)
 	}
@@ -533,7 +544,7 @@ func TestWalletListLedgerSanitizesInternalCopy(t *testing.T) {
 			BalanceBefore: 0,
 			BalanceAfter:  10000,
 			Reference:     "wallet_topup:dea9538f-e42e-4b47-8d46-98dd460f9ef2",
-			Description:   "Topup wallet via Pakasir (WLT-123)",
+			Description:   "Topup wallet via Duitku (WLT-123)",
 		},
 		{
 			ID:            uuid.New(),

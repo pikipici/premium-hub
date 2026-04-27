@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
-import { Building2, Copy, Download, QrCode } from 'lucide-react'
+import { Building2, Copy, Download, ExternalLink, QrCode } from 'lucide-react'
 import QRCode from 'qrcode'
 
-type PakasirPaymentDisplayProps = {
+type GatewayPaymentDisplayProps = {
   paymentMethod?: string
   paymentNumber?: string
+  paymentUrl?: string
+  appUrl?: string
   className?: string
 }
 
@@ -16,32 +18,62 @@ type QRState = {
   error: string
 }
 
-const normalizeMethod = (value?: string) => (value || '').trim().toLowerCase()
+const qrisMethods = new Set(['SP', 'NQ', 'GQ', 'SQ'])
+const vaMethods = new Set(['BC', 'M2', 'VA', 'I1', 'B1', 'BT', 'A1', 'AG', 'NC', 'BR', 'S1', 'DM', 'BV'])
+
+const methodAliases: Record<string, string> = {
+  QRIS: 'SP',
+  QR: 'SP',
+  BRI_VA: 'BR',
+  BRIVA: 'BR',
+  BNI_VA: 'I1',
+  PERMATA_VA: 'BT',
+  BCA_VA: 'BC',
+  MANDIRI_VA: 'M2',
+  CIMB_NIAGA_VA: 'B1',
+  BNC_VA: 'NC',
+  BSI_VA: 'BV',
+}
+
+const methodLabels: Record<string, string> = {
+  SP: 'QRIS',
+  NQ: 'QRIS Nobu',
+  GQ: 'QRIS Gudang Voucher',
+  SQ: 'QRIS ShopeePay',
+  BR: 'BRI Virtual Account',
+  I1: 'BNI Virtual Account',
+  BT: 'Permata Virtual Account',
+  BC: 'BCA Virtual Account',
+  M2: 'Mandiri Virtual Account',
+  VA: 'Maybank Virtual Account',
+  B1: 'CIMB Niaga Virtual Account',
+  NC: 'BNC Virtual Account',
+  BV: 'BSI Virtual Account',
+  A1: 'ATM Bersama',
+  AG: 'Artha Graha Virtual Account',
+}
+
+const normalizeMethod = (value?: string) => {
+  const raw = (value || '').trim().toUpperCase().replace(/[-\s]+/g, '_')
+  return methodAliases[raw] || raw
+}
 
 const methodLabel = (value?: string) => {
   const method = normalizeMethod(value)
-  switch (method) {
-    case 'qris':
-      return 'QRIS'
-    case 'bri_va':
-      return 'BRI Virtual Account'
-    case 'bni_va':
-      return 'BNI Virtual Account'
-    case 'permata_va':
-      return 'Permata Virtual Account'
-    default:
-      return method ? method.toUpperCase() : 'Payment Number'
-  }
+  return methodLabels[method] || (method ? method.replace(/_/g, ' ') : 'Payment Number')
 }
 
-export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, className }: PakasirPaymentDisplayProps) {
+const isHttpURL = (value: string) => /^https?:\/\//i.test(value.trim())
+
+export default function GatewayPaymentDisplay({ paymentMethod, paymentNumber, paymentUrl, appUrl, className }: GatewayPaymentDisplayProps) {
   const [copied, setCopied] = useState(false)
   const [qrState, setQrState] = useState<QRState>({ source: '', dataUrl: '', error: '' })
 
   const normalizedMethod = useMemo(() => normalizeMethod(paymentMethod), [paymentMethod])
-  const isQris = normalizedMethod === 'qris'
-  const isVA = normalizedMethod.endsWith('_va')
+  const isQris = qrisMethods.has(normalizedMethod)
+  const isVA = vaMethods.has(normalizedMethod)
   const value = (paymentNumber || '').trim()
+  const actionUrl = (appUrl || paymentUrl || (isHttpURL(value) ? value : '')).trim()
 
   useEffect(() => {
     if (!isQris || !value) return
@@ -77,7 +109,7 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
   const qrError = isQris && qrState.source === value ? qrState.error : ''
 
   const handleCopy = async () => {
-    if (!value) return
+    if (!value || isHttpURL(value)) return
     await navigator.clipboard.writeText(value)
     setCopied(true)
     setTimeout(() => setCopied(false), 1600)
@@ -87,7 +119,7 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
     <div className={`rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3 ${className || ''}`}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="text-xs text-[#777] font-semibold">{methodLabel(normalizedMethod)}</div>
-        {value && !isQris ? (
+        {value && !isQris && !isHttpURL(value) ? (
           <button
             type="button"
             onClick={handleCopy}
@@ -99,9 +131,9 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
         ) : null}
       </div>
 
-      {!value ? (
-        <div className="text-sm text-[#999]">Payment number belum tersedia.</div>
-      ) : isQris ? (
+      {!value && !actionUrl ? (
+        <div className="text-sm text-[#999]">Kode pembayaran belum tersedia.</div>
+      ) : isQris && value ? (
         <div className="space-y-3">
           <div className="rounded-lg border border-[#EBEBEB] bg-white p-3 flex items-center justify-center min-h-[180px]">
             {qrDataUrl ? (
@@ -128,7 +160,7 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
             </a>
           ) : null}
         </div>
-      ) : isVA ? (
+      ) : isVA && value && !isHttpURL(value) ? (
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1 text-xs text-[#777]">
             <Building2 className="w-3.5 h-3.5" />
@@ -138,6 +170,16 @@ export default function PakasirPaymentDisplay({ paymentMethod, paymentNumber, cl
             {value}
           </div>
         </div>
+      ) : actionUrl ? (
+        <a
+          href={actionUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#141414] px-4 py-3 text-sm font-bold text-white hover:opacity-90"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Buka Halaman Pembayaran
+        </a>
       ) : (
         <div className="font-mono text-xs break-all text-[#141414]">{value}</div>
       )}

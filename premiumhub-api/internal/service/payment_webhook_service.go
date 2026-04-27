@@ -33,12 +33,12 @@ type sosmedWebhookHandler interface {
 }
 
 type walletWebhookHandler interface {
-	HandlePakasirWebhook(ctx context.Context, input WalletPakasirWebhookInput) error
+	HandleGatewayWebhook(ctx context.Context, input WalletGatewayWebhookInput) error
 }
 
-// PakasirWebhookService menangani 1 endpoint webhook untuk banyak flow
-// (order checkout apps + order sosmed + wallet topup) dengan routing by order_id / lookup DB.
-type PakasirWebhookService struct {
+// PaymentWebhookService routes one gateway callback endpoint to premium order,
+// sosmed order, or wallet topup flows.
+type PaymentWebhookService struct {
 	orderLookup   orderWebhookLookup
 	sosmedLookup  sosmedWebhookLookup
 	walletLookup  walletWebhookLookup
@@ -47,15 +47,15 @@ type PakasirWebhookService struct {
 	walletHandler walletWebhookHandler
 }
 
-func NewPakasirWebhookService(
+func NewPaymentWebhookService(
 	orderRepo *repository.OrderRepo,
 	sosmedOrderRepo *repository.SosmedOrderRepo,
 	walletRepo *repository.WalletRepo,
 	paymentSvc *PaymentService,
 	sosmedPaymentSvc *SosmedPaymentService,
 	walletSvc *WalletService,
-) *PakasirWebhookService {
-	return &PakasirWebhookService{
+) *PaymentWebhookService {
+	return &PaymentWebhookService{
 		orderLookup:   orderRepo,
 		sosmedLookup:  sosmedOrderRepo,
 		walletLookup:  walletRepo,
@@ -65,35 +65,35 @@ func NewPakasirWebhookService(
 	}
 }
 
-func (s *PakasirWebhookService) Handle(ctx context.Context, input WebhookInput) error {
+func (s *PaymentWebhookService) Handle(ctx context.Context, input WebhookInput) error {
 	orderID := strings.TrimSpace(input.OrderID)
 	if orderID == "" {
 		return errors.New("order_id wajib diisi")
 	}
 
-	log.Printf("[pakasir-webhook] received order_id=%s status=%s project=%s", orderID, strings.TrimSpace(input.Status), strings.TrimSpace(input.Project))
+	log.Printf("[payment-webhook] received order_id=%s status=%s project=%s", orderID, strings.TrimSpace(input.Status), strings.TrimSpace(input.Project))
 
 	upperID := strings.ToUpper(orderID)
 	if strings.HasPrefix(upperID, "ORD-") {
 		if s.orderHandler == nil {
 			return errors.New("order webhook handler belum diinisialisasi")
 		}
-		log.Printf("[pakasir-webhook] route=order by_prefix order_id=%s", orderID)
+		log.Printf("[payment-webhook] route=order by_prefix order_id=%s", orderID)
 		return s.orderHandler.HandleWebhook(input)
 	}
 	if strings.HasPrefix(upperID, "SSM-") {
 		if s.sosmedHandler == nil {
 			return errors.New("sosmed webhook handler belum diinisialisasi")
 		}
-		log.Printf("[pakasir-webhook] route=sosmed by_prefix order_id=%s", orderID)
+		log.Printf("[payment-webhook] route=sosmed by_prefix order_id=%s", orderID)
 		return s.sosmedHandler.HandleWebhook(input)
 	}
 	if strings.HasPrefix(upperID, "WLT-") {
 		if s.walletHandler == nil {
 			return errors.New("wallet webhook handler belum diinisialisasi")
 		}
-		log.Printf("[pakasir-webhook] route=wallet by_prefix order_id=%s", orderID)
-		return s.walletHandler.HandlePakasirWebhook(ctx, toWalletWebhookInput(input))
+		log.Printf("[payment-webhook] route=wallet by_prefix order_id=%s", orderID)
+		return s.walletHandler.HandleGatewayWebhook(ctx, toWalletWebhookInput(input))
 	}
 
 	// Fallback akurat: resolve dari data existing, bukan tebak prefix.
@@ -102,10 +102,10 @@ func (s *PakasirWebhookService) Handle(ctx context.Context, input WebhookInput) 
 			if s.orderHandler == nil {
 				return errors.New("order webhook handler belum diinisialisasi")
 			}
-			log.Printf("[pakasir-webhook] route=order by_lookup order_id=%s", orderID)
+			log.Printf("[payment-webhook] route=order by_lookup order_id=%s", orderID)
 			return s.orderHandler.HandleWebhook(input)
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("[pakasir-webhook] lookup_error target=order order_id=%s err=%v", orderID, err)
+			log.Printf("[payment-webhook] lookup_error target=order order_id=%s err=%v", orderID, err)
 			return err
 		}
 	}
@@ -115,39 +115,41 @@ func (s *PakasirWebhookService) Handle(ctx context.Context, input WebhookInput) 
 			if s.sosmedHandler == nil {
 				return errors.New("sosmed webhook handler belum diinisialisasi")
 			}
-			log.Printf("[pakasir-webhook] route=sosmed by_lookup order_id=%s", orderID)
+			log.Printf("[payment-webhook] route=sosmed by_lookup order_id=%s", orderID)
 			return s.sosmedHandler.HandleWebhook(input)
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("[pakasir-webhook] lookup_error target=sosmed order_id=%s err=%v", orderID, err)
+			log.Printf("[payment-webhook] lookup_error target=sosmed order_id=%s err=%v", orderID, err)
 			return err
 		}
 	}
 
 	if s.walletLookup != nil {
-		if _, err := s.walletLookup.FindTopupByGatewayRef("pakasir", orderID); err == nil {
+		if _, err := s.walletLookup.FindTopupByGatewayRef("duitku", orderID); err == nil {
 			if s.walletHandler == nil {
 				return errors.New("wallet webhook handler belum diinisialisasi")
 			}
-			log.Printf("[pakasir-webhook] route=wallet by_lookup order_id=%s", orderID)
-			return s.walletHandler.HandlePakasirWebhook(ctx, toWalletWebhookInput(input))
+			log.Printf("[payment-webhook] route=wallet by_lookup order_id=%s", orderID)
+			return s.walletHandler.HandleGatewayWebhook(ctx, toWalletWebhookInput(input))
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("[pakasir-webhook] lookup_error target=wallet order_id=%s err=%v", orderID, err)
+			log.Printf("[payment-webhook] lookup_error target=wallet order_id=%s err=%v", orderID, err)
 			return err
 		}
 	}
 
 	// Unknown order_id: ack supaya provider tidak retry tanpa henti.
-	log.Printf("[pakasir-webhook] route=unknown ack order_id=%s", orderID)
+	log.Printf("[payment-webhook] route=unknown ack order_id=%s", orderID)
 	return nil
 }
 
-func toWalletWebhookInput(input WebhookInput) WalletPakasirWebhookInput {
-	return WalletPakasirWebhookInput{
+func toWalletWebhookInput(input WebhookInput) WalletGatewayWebhookInput {
+	return WalletGatewayWebhookInput{
 		Amount:        input.Amount,
 		OrderID:       input.OrderID,
 		Project:       input.Project,
 		Status:        input.Status,
 		PaymentMethod: input.PaymentMethod,
 		CompletedAt:   input.CompletedAt,
+		Reference:     input.Reference,
+		Signature:     input.Signature,
 	}
 }

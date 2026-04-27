@@ -51,40 +51,27 @@ func (f *fakeNokosFiveSimClient) GetProviderOrderHistory(_ context.Context, cate
 	return map[string]any{"Data": []any{}}, nil
 }
 
-type fakeNokosPakasirClient struct {
+type fakeNokosGatewayClient struct {
 	activeMethods map[string]bool
-	createErr     map[string]error
-	createCalls   []string
-	cancelCalls   int
+	listErr       error
+	listCalls     int
 }
 
-func (f *fakeNokosPakasirClient) CreateTransaction(_ context.Context, method, orderID string, amount int64) (*PakasirCreateResult, []byte, error) {
-	f.createCalls = append(f.createCalls, method)
-	if f.createErr != nil {
-		if err, ok := f.createErr[method]; ok && err != nil {
-			return nil, nil, err
+func (f *fakeNokosGatewayClient) ListPaymentMethods(_ context.Context, _ int64) ([]GatewayPaymentMethod, []byte, error) {
+	f.listCalls++
+	if f.listErr != nil {
+		return nil, nil, f.listErr
+	}
+	methods := []GatewayPaymentMethod{}
+	for method, active := range f.activeMethods {
+		if active {
+			methods = append(methods, GatewayPaymentMethod{Method: method, Name: method})
 		}
 	}
-	if f.activeMethods != nil {
-		if ok := f.activeMethods[method]; !ok {
-			return nil, nil, errors.New("method unavailable")
-		}
-	}
-	return &PakasirCreateResult{
-		OrderID:       orderID,
-		PaymentMethod: method,
-		Amount:        amount,
-		TotalPayment:  amount,
-		ExpiredAt:     time.Now().UTC().Add(15 * time.Minute),
-	}, []byte(`{"ok":true}`), nil
+	return methods, []byte(`{"ok":true}`), nil
 }
 
-func (f *fakeNokosPakasirClient) TransactionCancel(_ context.Context, _ string, _ int64) ([]byte, error) {
-	f.cancelCalls++
-	return []byte(`{"ok":true}`), nil
-}
-
-func setupNokosLandingService(t *testing.T) (*NokosLandingSummaryService, *repository.NokosLandingSummaryRepo, *gorm.DB, *fakeNokosFiveSimClient, *fakeNokosPakasirClient) {
+func setupNokosLandingService(t *testing.T) (*NokosLandingSummaryService, *repository.NokosLandingSummaryRepo, *gorm.DB, *fakeNokosFiveSimClient, *fakeNokosGatewayClient) {
 	t.Helper()
 
 	dsn := fmt.Sprintf("file:%d?mode=memory&cache=shared", time.Now().UnixNano())
@@ -98,22 +85,22 @@ func setupNokosLandingService(t *testing.T) (*NokosLandingSummaryService, *repos
 
 	repo := repository.NewNokosLandingSummaryRepo(db)
 	fiveSim := &fakeNokosFiveSimClient{}
-	pakasir := &fakeNokosPakasirClient{}
+	gateway := &fakeNokosGatewayClient{}
 	cfg := &config.Config{
-		PakasirProject:                "digimarket",
-		PakasirAPIKey:                 "PK_test",
-		NokosLandingMethodCandidates:  "qris,bri_va,bni_va,permata_va",
+		DuitkuMerchantCode:            "digimarket",
+		DuitkuAPIKey:                  "DK_test",
+		NokosLandingMethodCandidates:  "SP,BR,I1,BT",
 		NokosLandingMethodProbeAmount: "10000",
 		NokosLandingStaleAfter:        "30m",
 		NokosLandingSyncTimeout:       "25s",
 	}
 
-	svc := NewNokosLandingSummaryService(cfg, repo, fiveSim, pakasir)
-	return svc, repo, db, fiveSim, pakasir
+	svc := NewNokosLandingSummaryService(cfg, repo, fiveSim, gateway)
+	return svc, repo, db, fiveSim, gateway
 }
 
 func TestNokosLandingSummarySync_UsesProviderDataAndFiltersStatuses(t *testing.T) {
-	svc, repo, _, fiveSim, pakasir := setupNokosLandingService(t)
+	svc, repo, _, fiveSim, gateway := setupNokosLandingService(t)
 
 	fiveSim.countries = map[string]any{
 		"indonesia":    map[string]any{"iso": "ID"},
@@ -140,9 +127,9 @@ func TestNokosLandingSummarySync_UsesProviderDataAndFiltersStatuses(t *testing.T
 			},
 		},
 	}
-	pakasir.activeMethods = map[string]bool{
-		"qris":   true,
-		"bni_va": true,
+	gateway.activeMethods = map[string]bool{
+		"SP": true,
+		"I1": true,
 	}
 
 	if err := svc.Sync(context.Background()); err != nil {
@@ -170,7 +157,7 @@ func TestNokosLandingSummarySync_UsesProviderDataAndFiltersStatuses(t *testing.T
 		t.Fatalf("sent_total_all_time mismatch: got %d want 35", row.SentTotalAllTime)
 	}
 
-	expectedMethods := []string{"qris", "bni_va"}
+	expectedMethods := []string{"SP", "I1"}
 	if !reflect.DeepEqual(row.PaymentMethods, expectedMethods) {
 		t.Fatalf("payment methods mismatch: got %v want %v", row.PaymentMethods, expectedMethods)
 	}
@@ -180,7 +167,7 @@ func TestNokosLandingSummarySync_UsesProviderDataAndFiltersStatuses(t *testing.T
 }
 
 func TestNokosLandingSummaryGetPublicSummary_OnDemandSyncWhenMissing(t *testing.T) {
-	svc, _, _, fiveSim, pakasir := setupNokosLandingService(t)
+	svc, _, _, fiveSim, gateway := setupNokosLandingService(t)
 	fiveSim.countries = map[string]any{
 		"indonesia": map[string]any{"iso": "ID"},
 	}
@@ -188,7 +175,7 @@ func TestNokosLandingSummaryGetPublicSummary_OnDemandSyncWhenMissing(t *testing.
 		"activation": {0: {"Statuses": map[string]any{"FINISHED": 12}}},
 		"hosting":    {0: {"Statuses": map[string]any{"RECEIVED": 8}}},
 	}
-	pakasir.activeMethods = map[string]bool{"qris": true}
+	gateway.activeMethods = map[string]bool{"SP": true}
 
 	res, err := svc.GetPublicSummary(context.Background())
 	if err != nil {
@@ -207,7 +194,7 @@ func TestNokosLandingSummaryGetPublicSummary_OnDemandSyncWhenMissing(t *testing.
 }
 
 func TestNokosLandingSummaryGetPublicCountries(t *testing.T) {
-	svc, _, _, fiveSim, pakasir := setupNokosLandingService(t)
+	svc, _, _, fiveSim, gateway := setupNokosLandingService(t)
 	fiveSim.countries = map[string]any{
 		"indonesia": map[string]any{"iso": map[string]any{"id": 1}, "prefix": map[string]any{"+62": 1}, "text_en": "Indonesia"},
 		"japan":     map[string]any{"iso": map[string]any{"jp": 1}, "prefix": map[string]any{"+81": 1}, "text_en": "Japan"},
@@ -216,7 +203,7 @@ func TestNokosLandingSummaryGetPublicCountries(t *testing.T) {
 		"activation": {0: {"Statuses": map[string]any{"FINISHED": 2}}},
 		"hosting":    {0: {"Statuses": map[string]any{"FINISHED": 1}}},
 	}
-	pakasir.activeMethods = map[string]bool{"qris": true}
+	gateway.activeMethods = map[string]bool{"SP": true}
 
 	res, err := svc.GetPublicCountries(context.Background())
 	if err != nil {
@@ -235,13 +222,13 @@ func TestNokosLandingSummaryGetPublicCountries(t *testing.T) {
 }
 
 func TestNokosLandingSummarySync_DegradedWhenPartialFailure(t *testing.T) {
-	svc, repo, _, fiveSim, pakasir := setupNokosLandingService(t)
+	svc, repo, _, fiveSim, gateway := setupNokosLandingService(t)
 	fiveSim.countriesErr = errors.New("provider down")
 	fiveSim.history = map[string]map[int]map[string]any{
 		"activation": {0: {"Statuses": map[string]any{"FINISHED": 1}}},
 		"hosting":    {0: {"Statuses": map[string]any{"FINISHED": 2}}},
 	}
-	pakasir.activeMethods = map[string]bool{"qris": true}
+	gateway.activeMethods = map[string]bool{"SP": true}
 
 	if err := svc.Sync(context.Background()); err != nil {
 		t.Fatalf("sync: %v", err)
@@ -263,7 +250,7 @@ func TestNokosLandingSummarySync_DegradedWhenPartialFailure(t *testing.T) {
 }
 
 func TestNokosLandingSummarySync_FallbackToPageScanWhenStatusesMissing(t *testing.T) {
-	svc, repo, _, fiveSim, pakasir := setupNokosLandingService(t)
+	svc, repo, _, fiveSim, gateway := setupNokosLandingService(t)
 	fiveSim.countries = map[string]any{"indonesia": map[string]any{"iso": "ID"}}
 	fiveSim.history = map[string]map[int]map[string]any{
 		"activation": {
@@ -284,7 +271,7 @@ func TestNokosLandingSummarySync_FallbackToPageScanWhenStatusesMissing(t *testin
 			1: {"Data": []any{}},
 		},
 	}
-	pakasir.activeMethods = map[string]bool{"qris": true}
+	gateway.activeMethods = map[string]bool{"SP": true}
 
 	if err := svc.Sync(context.Background()); err != nil {
 		t.Fatalf("sync: %v", err)

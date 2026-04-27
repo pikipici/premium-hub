@@ -91,7 +91,10 @@ export const sosmedOrderService = {
       provider: string
       payment_method: string
       payment_number: string
+      payment_url?: string
+      app_url?: string
       gateway_order_id: string
+      gateway_reference?: string
       amount: number
       total_payment: number
       expires_at?: string

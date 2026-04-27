@@ -1,8 +1,8 @@
-# Wallet Topup API Contract (Pakasir)
+# Wallet Topup API Contract (Duitku)
 
 Tanggal update: 2026-04-10 (UTC)
 
-Dokumen ini jadi kontrak backend untuk integrasi wallet topup berbasis **Pakasir**.
+Dokumen ini jadi kontrak backend untuk integrasi wallet topup berbasis **Duitku**.
 
 ## Auth
 
@@ -33,7 +33,7 @@ Body:
 ```json
 {
   "amount": 50000,
-  "payment_method": "qris",
+  "payment_method": "SP",
   "idempotency_key": "topup-20260410-001"
 }
 ```
@@ -42,10 +42,10 @@ Aturan:
 - minimal `amount` = `10000`
 - jika `idempotency_key` sama untuk user yang sama, backend mengembalikan invoice lama (tidak buat invoice baru)
 - `payment_method` yang didukung backend saat ini:
-  - `qris`
-  - `bri_va`
-  - `bni_va`
-  - `permata_va`
+  - `SP` = QRIS
+  - `BR` = BRI VA
+  - `I1` = BNI VA
+  - `BT` = Permata VA
 
 Response `201`:
 
@@ -55,9 +55,9 @@ Response `201`:
   "message": "Invoice topup dibuat",
   "data": {
     "id": "uuid",
-    "provider": "pakasir",
+    "provider": "duitku",
     "gateway_ref": "WLT-ABC123...",
-    "payment_method": "qris",
+    "payment_method": "SP",
     "payment_number": "000201...",
     "requested_amount": 50000,
     "payable_amount": 53000,
@@ -89,7 +89,7 @@ Response `201`:
 `POST /api/v1/wallet/topups/:id/check`
 
 Fungsi:
-- backend cek status terbaru ke Pakasir (`transactiondetail`)
+- backend cek status terbaru ke Duitku (`transactionStatus`)
 - jika `success`, saldo wallet dikredit **sekali saja** (idempotent settlement)
 
 ### 6) Riwayat ledger wallet
@@ -107,35 +107,34 @@ Contoh item ledger topup:
   "balance_before": 10000,
   "balance_after": 60000,
   "reference": "wallet_topup:<topup_id>",
-  "description": "Topup wallet via Pakasir (WLT-ABC123...)",
+  "description": "Topup wallet via Duitku (WLT-ABC123...)",
   "created_at": "..."
 }
 ```
 
 ## Endpoint Webhook Provider
 
-### Webhook topup Pakasir (shared endpoint)
+### Webhook topup Duitku (shared endpoint)
 
 `POST /api/v1/payment/webhook`
 
-Body expected (provider):
+Body expected dari Duitku (`application/x-www-form-urlencoded`):
 
-```json
-{
-  "order_id": "WLT-ABC123...",
-  "project": "premiumhub",
-  "status": "COMPLETED",
-  "amount": 50000,
-  "payment_method": "qris",
-  "completed_at": "2026-04-10T16:05:00Z"
-}
+```text
+merchantCode=D123
+merchantOrderId=WLT-ABC123...
+amount=50000
+paymentCode=SP
+resultCode=00
+reference=DUT-...
+signature=<md5 merchantCode+amount+merchantOrderId+apiKey>
 ```
 
 Behavior:
 - endpoint webhook dipakai bersama flow order + wallet
 - routing internal ditentukan dari `order_id` (prefix `WLT-` untuk wallet)
-- webhook divalidasi project + status
-- backend tetap verify ulang via `transactiondetail`
+- webhook divalidasi merchant code + signature + status
+- backend tetap verify ulang via `transactionStatus`
 - settlement tetap idempotent
 
 ## Endpoint Admin

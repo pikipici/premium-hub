@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import PakasirPaymentDisplay from '@/components/payment/PakasirPaymentDisplay'
+import GatewayPaymentDisplay from '@/components/payment/GatewayPaymentDisplay'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
 
@@ -38,7 +38,9 @@ function SosmedInvoiceContent() {
 
   const orderID = searchParams.get('id') || ''
   const paymentNumber = searchParams.get('paymentNumber') || ''
-  const paymentMethod = searchParams.get('paymentMethod') || 'qris'
+  const paymentMethod = searchParams.get('paymentMethod') || 'SP'
+  const paymentUrl = searchParams.get('paymentUrl') || ''
+  const appUrl = searchParams.get('appUrl') || ''
   const gatewayOrderID = searchParams.get('gatewayOrderId') || ''
   const amount = Number(searchParams.get('amount') || '0') || 0
   const expiresAt = parseExpiresAt(searchParams.get('expiresAt'))
@@ -131,9 +133,11 @@ function SosmedInvoiceContent() {
             </div>
           </div>
 
-          <PakasirPaymentDisplay
+          <GatewayPaymentDisplay
             paymentNumber={paymentNumber}
             paymentMethod={paymentMethod}
+            paymentUrl={paymentUrl}
+            appUrl={appUrl}
           />
 
           <div className="mt-4 rounded-xl border border-[#EBEBEB] bg-white px-4 py-3 text-xs text-[#666]">

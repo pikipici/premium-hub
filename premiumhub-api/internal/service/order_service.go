@@ -63,9 +63,12 @@ func (s *OrderService) Create(userID uuid.UUID, input CreateOrderInput) (*model.
 
 	paymentMethod := strings.ToLower(strings.TrimSpace(input.PaymentMethod))
 	if paymentMethod == "" {
-		paymentMethod = "pakasir"
+		paymentMethod = "duitku"
 	}
-	if paymentMethod != "pakasir" && paymentMethod != "wallet" {
+	if paymentMethod == "pakasir" {
+		paymentMethod = "duitku"
+	}
+	if paymentMethod != "duitku" && paymentMethod != "wallet" {
 		return nil, errors.New("metode pembayaran tidak didukung")
 	}
 

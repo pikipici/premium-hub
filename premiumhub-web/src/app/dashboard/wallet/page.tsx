@@ -15,10 +15,10 @@ const MIN_TOPUP = 10000
 const QUICK_AMOUNTS = [25000, 50000, 100000, 200000]
 
 const PAYMENT_METHODS = [
-  { key: 'qris', name: 'QRIS', icon: '⬛', fee: 'Sesuai channel' },
-  { key: 'bri_va', name: 'BRI VA', icon: '🏦', fee: 'Sesuai channel' },
-  { key: 'bni_va', name: 'BNI VA', icon: '🏦', fee: 'Sesuai channel' },
-  { key: 'permata_va', name: 'Permata VA', icon: '🏦', fee: 'Sesuai channel' },
+  { key: 'SP', name: 'QRIS', icon: 'QR', fee: 'Sesuai channel' },
+  { key: 'BR', name: 'BRI VA', icon: 'VA', fee: 'Sesuai channel' },
+  { key: 'I1', name: 'BNI VA', icon: 'VA', fee: 'Sesuai channel' },
+  { key: 'BT', name: 'Permata VA', icon: 'VA', fee: 'Sesuai channel' },
 ] as const
 
 type TxFilter = 'all' | 'topup' | 'purchase' | 'refund'
@@ -110,7 +110,7 @@ export default function WalletPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const [amount, setAmount] = useState<number>(QUICK_AMOUNTS[1])
-  const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHODS)[number]['key']>('qris')
+  const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHODS)[number]['key']>('SP')
   const [txFilter, setTxFilter] = useState<TxFilter>('all')
   const [error, setError] = useState('')
 
@@ -397,7 +397,7 @@ export default function WalletPage() {
                       {selected ? (
                         <span className="absolute right-1 top-1 h-3.5 w-3.5 rounded-full bg-[#141414] text-white text-[8px] leading-[14px] font-black">✓</span>
                       ) : null}
-                      <div className="text-lg leading-none mb-1">{method.icon}</div>
+                      <div className="text-[10px] leading-none mb-1 font-black tracking-wide">{method.icon}</div>
                       <div className="text-[10px] font-semibold text-[#141414] leading-tight">{method.name}</div>
                       <div className="text-[9px] text-green-700 font-semibold">{method.fee}</div>
                     </button>

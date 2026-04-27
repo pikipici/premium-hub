@@ -10,7 +10,7 @@ import { walletService } from '@/services/walletService'
 import type { WalletTopup } from '@/types/wallet'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
-import PakasirPaymentDisplay from '@/components/payment/PakasirPaymentDisplay'
+import GatewayPaymentDisplay from '@/components/payment/GatewayPaymentDisplay'
 
 function statusTone(status: WalletTopup['status']) {
   switch (status) {
@@ -238,7 +238,7 @@ function WalletTopupStatusContent() {
               <div className="text-xs text-[#888] mb-1">Status Pembayaran</div>
               <div className="font-bold capitalize">{topup.provider_status || topup.status}</div>
             </div>
-            <PakasirPaymentDisplay paymentMethod={topup.payment_method} paymentNumber={topup.payment_number} />
+            <GatewayPaymentDisplay paymentMethod={topup.payment_method} paymentNumber={topup.payment_number} />
           </div>
 
           {topup.status === 'pending' ? (

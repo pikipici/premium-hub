@@ -26,9 +26,8 @@ type nokosLandingFiveSimClient interface {
 	GetProviderOrderHistory(ctx context.Context, category string, limit, offset int, order string, reverse bool) (map[string]any, error)
 }
 
-type nokosLandingPakasirClient interface {
-	CreateTransaction(ctx context.Context, method, orderID string, amount int64) (*PakasirCreateResult, []byte, error)
-	TransactionCancel(ctx context.Context, orderID string, amount int64) ([]byte, error)
+type nokosLandingPaymentGatewayClient interface {
+	ListPaymentMethods(ctx context.Context, amount int64) ([]GatewayPaymentMethod, []byte, error)
 }
 
 type NokosLandingSummaryResponse struct {
@@ -54,7 +53,7 @@ type NokosLandingSummaryService struct {
 	cfg     *config.Config
 	repo    *repository.NokosLandingSummaryRepo
 	fiveSim nokosLandingFiveSimClient
-	pakasir nokosLandingPakasirClient
+	gateway nokosLandingPaymentGatewayClient
 
 	syncMu sync.Mutex
 }
@@ -63,19 +62,19 @@ func NewNokosLandingSummaryService(
 	cfg *config.Config,
 	repo *repository.NokosLandingSummaryRepo,
 	fiveSim nokosLandingFiveSimClient,
-	pakasir nokosLandingPakasirClient,
+	gateway nokosLandingPaymentGatewayClient,
 ) *NokosLandingSummaryService {
 	if fiveSim == nil {
 		fiveSim = NewFiveSimClient(cfg)
 	}
-	if pakasir == nil {
-		pakasir = NewPakasirClient(cfg)
+	if gateway == nil {
+		gateway = NewPaymentGatewayClient(cfg)
 	}
 	return &NokosLandingSummaryService{
 		cfg:     cfg,
 		repo:    repo,
 		fiveSim: fiveSim,
-		pakasir: pakasir,
+		gateway: gateway,
 	}
 }
 
@@ -285,46 +284,53 @@ func (s *NokosLandingSummaryService) fetchSentTotalByCategory(ctx context.Contex
 }
 
 func (s *NokosLandingSummaryService) fetchActivePaymentMethods(ctx context.Context) ([]string, error) {
-	if strings.TrimSpace(s.cfg.PakasirProject) == "" || strings.TrimSpace(s.cfg.PakasirAPIKey) == "" {
-		return []string{}, nil
-	}
-
-	candidates := parseMethodCandidates(s.cfg.NokosLandingMethodCandidates)
-	if len(candidates) == 0 {
+	if strings.TrimSpace(s.cfg.DuitkuMerchantCode) == "" || strings.TrimSpace(s.cfg.DuitkuAPIKey) == "" {
 		return []string{}, nil
 	}
 
 	probeAmount := int64(parseConvertWorkerPositiveInt(s.cfg.NokosLandingMethodProbeAmount, 10000))
-	active := make([]string, 0, len(candidates))
-	for _, method := range candidates {
-		probeOrderID := buildMethodProbeOrderID(method)
-		created, _, err := s.pakasir.CreateTransaction(ctx, method, probeOrderID, probeAmount)
-		if err != nil {
-			continue
-		}
-		active = append(active, method)
-
-		cancelAmount := created.Amount
-		if cancelAmount <= 0 {
-			cancelAmount = probeAmount
-		}
-		if _, cancelErr := s.pakasir.TransactionCancel(ctx, created.OrderID, cancelAmount); cancelErr != nil {
-			log.Printf("[nokos-landing] payment method probe cancel failed method=%s order_id=%s err=%v", method, created.OrderID, cancelErr)
-		}
+	methods, _, err := s.gateway.ListPaymentMethods(ctx, probeAmount)
+	if err != nil {
+		return nil, err
 	}
 
+	activeSet := make(map[string]struct{}, len(methods))
+	for _, method := range methods {
+		code := NormalizePaymentGatewayMethod(method.Method)
+		if code == "" {
+			continue
+		}
+		activeSet[code] = struct{}{}
+	}
+
+	candidates := parseMethodCandidates(s.cfg.NokosLandingMethodCandidates)
+	if len(candidates) == 0 {
+		active := make([]string, 0, len(activeSet))
+		for method := range activeSet {
+			active = append(active, method)
+		}
+		sort.Strings(active)
+		return active, nil
+	}
+
+	active := make([]string, 0, len(candidates))
+	for _, method := range candidates {
+		if _, ok := activeSet[method]; ok {
+			active = append(active, method)
+		}
+	}
 	return active, nil
 }
 
 func parseMethodCandidates(raw string) []string {
 	if strings.TrimSpace(raw) == "" {
-		raw = "qris,bri_va,bni_va,permata_va"
+		raw = "SP,BR,I1,BT"
 	}
 
 	seen := map[string]struct{}{}
 	out := make([]string, 0, 8)
 	for _, part := range strings.Split(raw, ",") {
-		method := NormalizePakasirPaymentMethod(part)
+		method := NormalizePaymentGatewayMethod(part)
 		if method == "" {
 			continue
 		}
@@ -335,18 +341,6 @@ func parseMethodCandidates(raw string) []string {
 		out = append(out, method)
 	}
 	return out
-}
-
-func buildMethodProbeOrderID(method string) string {
-	clean := strings.ToUpper(strings.ReplaceAll(method, "_", ""))
-	if len(clean) > 10 {
-		clean = clean[:10]
-	}
-	id := fmt.Sprintf("HLT-%s-%d", clean, time.Now().UTC().UnixNano()%1_000_000_000)
-	if len(id) > 40 {
-		id = id[:40]
-	}
-	return id
 }
 
 func sumStatusesCount(res map[string]any) (int64, bool) {

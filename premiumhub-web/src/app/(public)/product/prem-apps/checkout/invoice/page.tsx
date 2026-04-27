@@ -7,7 +7,7 @@ import { CheckCircle, RefreshCcw } from 'lucide-react'
 
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import PakasirPaymentDisplay from '@/components/payment/PakasirPaymentDisplay'
+import GatewayPaymentDisplay from '@/components/payment/GatewayPaymentDisplay'
 import { paymentService } from '@/services/paymentService'
 import { formatDate, formatRupiah } from '@/lib/utils'
 
@@ -26,6 +26,8 @@ function CheckoutInvoiceContent() {
   const orderId = search.get('id') || ''
   const paymentNumber = search.get('paymentNumber') || ''
   const paymentMethod = search.get('paymentMethod') || '-'
+  const paymentUrl = search.get('paymentUrl') || ''
+  const appUrl = search.get('appUrl') || ''
   const gatewayOrderId = search.get('gatewayOrderId') || '-'
   const expiresAt = search.get('expiresAt') || ''
   const amount = Number(search.get('amount') || 0)
@@ -92,7 +94,7 @@ function CheckoutInvoiceContent() {
               <span className="font-semibold">{expireText}</span>
             </div>
 
-            <PakasirPaymentDisplay paymentMethod={paymentMethod} paymentNumber={paymentNumber} />
+            <GatewayPaymentDisplay paymentMethod={paymentMethod} paymentNumber={paymentNumber} paymentUrl={paymentUrl} appUrl={appUrl} />
           </div>
 
           {error ? (

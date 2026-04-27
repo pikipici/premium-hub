@@ -23,7 +23,7 @@ Endpoint ini dipakai landing page `/product/nokos` untuk render metrik real data
     "source": "5sim",
     "countries_count": 102,
     "sent_total_all_time": 51420,
-    "payment_methods": ["qris", "bri_va", "bni_va"],
+    "payment_methods": ["SP", "BR", "I1"],
     "last_synced_at": "2026-04-12T14:20:11Z",
     "is_stale": false,
     "last_sync_status": "ok"
@@ -61,8 +61,9 @@ Contoh response countries:
   - total all-time order provider (kategori `activation + hosting`) dengan rule:
   - **exclude** status `canceled/cancelled` dan `banned/ban`.
 - `payment_methods`
-  - metode pembayaran aktif yang lolos probe gateway saat sinkronisasi.
+  - metode pembayaran aktif dari Duitku `getpaymentmethod` saat sinkronisasi.
   - metode yang down tidak dikembalikan (di-hide dari UI).
+  - kode utama: `SP` QRIS, `BR` BRI VA, `I1` BNI VA, `BT` Permata VA.
 
 ## Sinkronisasi
 

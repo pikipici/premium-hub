@@ -274,19 +274,27 @@ const formatCompact = (value: number) =>
 const formatNumber = (value: number) => new Intl.NumberFormat('id-ID').format(value)
 
 const paymentMethodLabel = (method: string) => {
-  const normalized = method.trim().toLowerCase()
+  const normalized = method.trim().toUpperCase().replace(/[-\s]+/g, '_')
   switch (normalized) {
-    case 'qris':
+    case 'SP':
+    case 'NQ':
+    case 'GQ':
+    case 'SQ':
+    case 'QRIS':
       return 'QRIS'
-    case 'bri_va':
+    case 'BR':
+    case 'BRI_VA':
       return 'BRI VA'
-    case 'bni_va':
+    case 'I1':
+    case 'BNI_VA':
       return 'BNI VA'
-    case 'permata_va':
+    case 'BT':
+    case 'PERMATA_VA':
       return 'Permata VA'
-    case 'cimb_niaga_va':
+    case 'B1':
+    case 'CIMB_NIAGA_VA':
       return 'CIMB VA'
-    case 'paypal':
+    case 'PAYPAL':
       return 'PayPal'
     default:
       return normalized.replaceAll('_', ' ').toUpperCase()

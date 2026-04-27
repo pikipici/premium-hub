@@ -868,7 +868,7 @@ func TestOrderService_AllBranches(t *testing.T) {
 	}
 }
 
-type fakePakasirOrderClient struct {
+type fakeGatewayOrderClient struct {
 	createHits    int
 	detailHits    int
 	statusByID    map[string]string
@@ -878,8 +878,8 @@ type fakePakasirOrderClient struct {
 	detailErrByID map[string]error
 }
 
-func newFakePakasirOrderClient() *fakePakasirOrderClient {
-	return &fakePakasirOrderClient{
+func newFakeGatewayOrderClient() *fakeGatewayOrderClient {
+	return &fakeGatewayOrderClient{
 		statusByID:    map[string]string{},
 		amountByID:    map[string]int64{},
 		methodByID:    map[string]string{},
@@ -887,30 +887,33 @@ func newFakePakasirOrderClient() *fakePakasirOrderClient {
 	}
 }
 
-func (f *fakePakasirOrderClient) CreateTransaction(_ context.Context, method, orderID string, amount int64) (*PakasirCreateResult, []byte, error) {
+func (f *fakeGatewayOrderClient) CreateTransaction(_ context.Context, input GatewayCreateTransactionInput) (*GatewayCreateResult, []byte, error) {
 	if f.createErr != nil {
 		return nil, nil, f.createErr
 	}
 	f.createHits++
+	method := NormalizePaymentGatewayMethod(input.PaymentMethod)
 	if method == "" {
-		method = "qris"
+		method = defaultDuitkuPaymentMethod
 	}
+	orderID := input.OrderID
 	if _, ok := f.statusByID[orderID]; !ok {
 		f.statusByID[orderID] = "PENDING"
 	}
-	f.amountByID[orderID] = amount
+	f.amountByID[orderID] = input.Amount
 	f.methodByID[orderID] = method
-	return &PakasirCreateResult{
+	return &GatewayCreateResult{
 		OrderID:       orderID,
+		Reference:     "DUT-" + orderID,
 		PaymentMethod: method,
 		PaymentNumber: "000201...",
-		Amount:        amount,
-		TotalPayment:  amount + 3000,
+		Amount:        input.Amount,
+		TotalPayment:  input.Amount + 3000,
 		ExpiredAt:     time.Now().UTC().Add(15 * time.Minute),
 	}, []byte(`{"ok":true}`), nil
 }
 
-func (f *fakePakasirOrderClient) TransactionDetail(_ context.Context, orderID string, amount int64) (*PakasirDetailResult, []byte, error) {
+func (f *fakeGatewayOrderClient) TransactionDetail(_ context.Context, orderID string, amount int64) (*GatewayDetailResult, []byte, error) {
 	f.detailHits++
 	if err := f.detailErrByID[orderID]; err != nil {
 		return nil, nil, err
@@ -926,18 +929,18 @@ func (f *fakePakasirOrderClient) TransactionDetail(_ context.Context, orderID st
 	}
 	method := f.methodByID[orderID]
 	if method == "" {
-		method = "qris"
+		method = defaultDuitkuPaymentMethod
 	}
-	return &PakasirDetailResult{
+	return &GatewayDetailResult{
 		OrderID:       orderID,
 		Amount:        amount,
-		Status:        NormalizePakasirStatus(status),
+		Status:        NormalizePaymentGatewayStatus(status),
 		PaymentMethod: method,
 	}, []byte(`{"ok":true}`), nil
 }
 
-func (f *fakePakasirOrderClient) TransactionCancel(_ context.Context, _ string, _ int64) ([]byte, error) {
-	return []byte(`{"ok":true}`), nil
+func (f *fakeGatewayOrderClient) ListPaymentMethods(_ context.Context, _ int64) ([]GatewayPaymentMethod, []byte, error) {
+	return []GatewayPaymentMethod{{Method: "SP", Name: "QRIS"}}, []byte(`{"ok":true}`), nil
 }
 
 func TestPaymentService_AllBranches(t *testing.T) {
@@ -954,10 +957,11 @@ func TestPaymentService_AllBranches(t *testing.T) {
 	notifRepo := repository.NewNotificationRepo(db)
 	orderSvc := NewOrderService(orderRepo, stockRepo, productRepo, notifRepo)
 
-	fake := newFakePakasirOrderClient()
+	fake := newFakeGatewayOrderClient()
 	cfg := &config.Config{
-		PakasirProject: "premiumhub",
-		PakasirAPIKey:  "PK_test",
+		DuitkuMerchantCode: "premiumhub",
+		DuitkuAPIKey:       "DK_test",
+		FrontendURL:        "https://example.com",
 	}
 	walletSvc := NewWalletService(cfg, userRepo, walletRepo, notifRepo, fake)
 	svc := NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, fake).SetWalletService(walletSvc)
@@ -1008,7 +1012,7 @@ func TestPaymentService_AllBranches(t *testing.T) {
 		t.Fatalf("wallet retry should be idempotent, got: %v", err)
 	}
 
-	createdTx, err := svc.CreateTransaction(user.ID, CreatePaymentInput{OrderID: pendingOrder.ID.String(), PaymentMethod: "qris"})
+	createdTx, err := svc.CreateTransaction(user.ID, CreatePaymentInput{OrderID: pendingOrder.ID.String(), PaymentMethod: "SP"})
 	if err != nil {
 		t.Fatalf("create transaction: %v", err)
 	}
@@ -1024,7 +1028,8 @@ func TestPaymentService_AllBranches(t *testing.T) {
 		t.Fatalf("gateway order data should be persisted")
 	}
 
-	if err := svc.HandleWebhook(WebhookInput{OrderID: "missing", Project: "premiumhub", Status: "COMPLETED"}); err == nil || !strings.Contains(err.Error(), "order tidak ditemukan") {
+	missingSig := BuildDuitkuCallbackSignature("premiumhub", 10000, "missing", "DK_test")
+	if err := svc.HandleWebhook(WebhookInput{OrderID: "missing", Project: "premiumhub", Status: "COMPLETED", Amount: 10000, Signature: missingSig}); err == nil || !strings.Contains(err.Error(), "order tidak ditemukan") {
 		t.Fatalf("expected webhook order not found, got: %v", err)
 	}
 
@@ -1035,10 +1040,11 @@ func TestPaymentService_AllBranches(t *testing.T) {
 	}
 	fake.statusByID["ORD-CAP-1"] = "COMPLETED"
 	fake.amountByID["ORD-CAP-1"] = captureOrder.TotalPrice
-	fake.methodByID["ORD-CAP-1"] = "qris"
+	fake.methodByID["ORD-CAP-1"] = "SP"
 
 	seedStock(t, db, product.ID, "shared", "available")
-	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-CAP-1", Project: "premiumhub", Status: "COMPLETED", PaymentMethod: "qris"}); err != nil {
+	captureSig := BuildDuitkuCallbackSignature("premiumhub", captureOrder.TotalPrice, "ORD-CAP-1", "DK_test")
+	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-CAP-1", Project: "premiumhub", Status: "COMPLETED", PaymentMethod: "SP", Amount: captureOrder.TotalPrice, Signature: captureSig}); err != nil {
 		t.Fatalf("webhook capture: %v", err)
 	}
 
@@ -1046,7 +1052,7 @@ func TestPaymentService_AllBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find capture updated: %v", err)
 	}
-	if captureUpdated.PaymentMethod != "qris" || captureUpdated.PaymentStatus != "paid" {
+	if captureUpdated.PaymentMethod != "SP" || captureUpdated.PaymentStatus != "paid" {
 		t.Fatalf("capture webhook did not confirm payment")
 	}
 
@@ -1057,7 +1063,8 @@ func TestPaymentService_AllBranches(t *testing.T) {
 	}
 	fake.statusByID["ORD-CAP-2"] = "COMPLETED"
 	fake.amountByID["ORD-CAP-2"] = captureNoStock.TotalPrice
-	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-CAP-2", Project: "premiumhub", Status: "COMPLETED"}); err == nil || !strings.Contains(err.Error(), "stok tidak tersedia") {
+	noStockSig := BuildDuitkuCallbackSignature("premiumhub", captureNoStock.TotalPrice, "ORD-CAP-2", "DK_test")
+	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-CAP-2", Project: "premiumhub", Status: "COMPLETED", Amount: captureNoStock.TotalPrice, Signature: noStockSig}); err == nil || !strings.Contains(err.Error(), "stok tidak tersedia") {
 		t.Fatalf("expected settlement confirm error, got: %v", err)
 	}
 
@@ -1068,7 +1075,8 @@ func TestPaymentService_AllBranches(t *testing.T) {
 	}
 	fake.statusByID["ORD-MIS-1"] = "COMPLETED"
 	fake.amountByID["ORD-MIS-1"] = amountMismatch.TotalPrice + 123
-	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-MIS-1", Project: "premiumhub", Status: "COMPLETED"}); err == nil || !strings.Contains(err.Error(), "nominal pembayaran tidak cocok") {
+	mismatchSig := BuildDuitkuCallbackSignature("premiumhub", amountMismatch.TotalPrice, "ORD-MIS-1", "DK_test")
+	if err := svc.HandleWebhook(WebhookInput{OrderID: "ORD-MIS-1", Project: "premiumhub", Status: "COMPLETED", Amount: amountMismatch.TotalPrice, Signature: mismatchSig}); err == nil || !strings.Contains(err.Error(), "nominal pembayaran tidak cocok") {
 		t.Fatalf("expected amount mismatch error, got: %v", err)
 	}
 

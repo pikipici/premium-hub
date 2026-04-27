@@ -26,7 +26,7 @@ type WalletService struct {
 	userRepo   *repository.UserRepo
 	walletRepo *repository.WalletRepo
 	notifRepo  *repository.NotificationRepo
-	pakasir    PakasirClient
+	gateway    PaymentGatewayClient
 }
 
 func NewWalletService(
@@ -34,10 +34,10 @@ func NewWalletService(
 	userRepo *repository.UserRepo,
 	walletRepo *repository.WalletRepo,
 	notifRepo *repository.NotificationRepo,
-	pakasir PakasirClient,
+	gateway PaymentGatewayClient,
 ) *WalletService {
-	if pakasir == nil {
-		pakasir = NewPakasirClient(cfg)
+	if gateway == nil {
+		gateway = NewPaymentGatewayClient(cfg)
 	}
 
 	return &WalletService{
@@ -45,7 +45,7 @@ func NewWalletService(
 		userRepo:   userRepo,
 		walletRepo: walletRepo,
 		notifRepo:  notifRepo,
-		pakasir:    pakasir,
+		gateway:    gateway,
 	}
 }
 
@@ -117,13 +117,15 @@ type WalletReconcileResult struct {
 	Errors  []string `json:"errors,omitempty"`
 }
 
-type WalletPakasirWebhookInput struct {
+type WalletGatewayWebhookInput struct {
 	Amount        int64  `json:"amount"`
 	OrderID       string `json:"order_id"`
 	Project       string `json:"project"`
 	Status        string `json:"status"`
 	PaymentMethod string `json:"payment_method"`
 	CompletedAt   string `json:"completed_at"`
+	Reference     string `json:"reference"`
+	Signature     string `json:"signature"`
 }
 
 func (s *WalletService) GetBalance(userID uuid.UUID) (*WalletBalanceResponse, error) {
@@ -306,18 +308,18 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 	return result, nil
 }
 
-func (s *WalletService) pakasirConfigured() bool {
-	if s == nil || s.cfg == nil || s.pakasir == nil {
+func (s *WalletService) gatewayConfigured() bool {
+	if s == nil {
 		return false
 	}
-	return strings.TrimSpace(s.cfg.PakasirProject) != "" && strings.TrimSpace(s.cfg.PakasirAPIKey) != ""
+	return gatewayConfigured(s.cfg, s.gateway)
 }
 
 func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input CreateTopupInput) (*WalletTopupResponse, error) {
 	if _, err := s.ensureActiveUser(userID); err != nil {
 		return nil, err
 	}
-	if !s.pakasirConfigured() {
+	if !s.gatewayConfigured() {
 		return nil, errors.New("gateway payment belum dikonfigurasi")
 	}
 
@@ -340,21 +342,37 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 		return nil, errors.New("gagal cek idempotency")
 	}
 
-	paymentMethod := NormalizePakasirPaymentMethod(input.PaymentMethod)
+	paymentMethod := NormalizePaymentGatewayMethod(input.PaymentMethod)
 	if paymentMethod == "" {
-		paymentMethod = "qris"
+		paymentMethod = defaultDuitkuPaymentMethod
 	}
-	providerOrderID := buildPakasirTopupReference(userID, idempotencyKey)
+	providerOrderID := buildGatewayTopupReference(userID, idempotencyKey)
 
 	rawReq, _ := json.Marshal(map[string]any{
 		"action":         "transactioncreate",
-		"provider":       "pakasir",
+		"provider":       "duitku",
 		"order_id":       providerOrderID,
 		"amount":         amount,
 		"payment_method": paymentMethod,
 	})
 
-	created, rawResp, err := s.pakasir.CreateTransaction(ctx, paymentMethod, providerOrderID, amount)
+	user, err := s.ensureActiveUser(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	created, rawResp, err := s.gateway.CreateTransaction(ctx, GatewayCreateTransactionInput{
+		PaymentMethod:       paymentMethod,
+		OrderID:             providerOrderID,
+		Amount:              amount,
+		ProductDetails:      "Top up saldo DigiMarket",
+		CustomerName:        user.Name,
+		Email:               user.Email,
+		PhoneNumber:         user.Phone,
+		CallbackURL:         defaultGatewayCallbackURL(s.cfg),
+		ReturnURL:           defaultGatewayReturnURL(s.cfg, "/dashboard/wallet"),
+		ExpiryPeriodMinutes: s.topupExpiryMinutes(),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("gagal membuat invoice topup: %w", err)
 	}
@@ -367,7 +385,7 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 	topup := &model.WalletTopup{
 		ID:              uuid.New(),
 		UserID:          userID,
-		Provider:        "pakasir",
+		Provider:        "duitku",
 		GatewayRef:      created.OrderID,
 		PaymentMethod:   created.PaymentMethod,
 		PaymentNumber:   created.PaymentNumber,
@@ -679,9 +697,9 @@ func (s *WalletService) ReconcilePending(ctx context.Context, limit int) (*Walle
 	return result, nil
 }
 
-func (s *WalletService) HandlePakasirWebhook(ctx context.Context, input WalletPakasirWebhookInput) error {
-	if !s.pakasirConfigured() {
-		return errors.New("pakasir belum dikonfigurasi")
+func (s *WalletService) HandleGatewayWebhook(ctx context.Context, input WalletGatewayWebhookInput) error {
+	if !s.gatewayConfigured() {
+		return errors.New("gateway payment belum dikonfigurasi")
 	}
 
 	orderID := strings.TrimSpace(input.OrderID)
@@ -689,22 +707,26 @@ func (s *WalletService) HandlePakasirWebhook(ctx context.Context, input WalletPa
 		return errors.New("order_id wajib diisi")
 	}
 
-	if cfgProject := strings.TrimSpace(s.cfg.PakasirProject); cfgProject != "" {
-		if project := strings.TrimSpace(input.Project); project != "" && !strings.EqualFold(project, cfgProject) {
-			log.Printf("[pakasir-webhook][wallet] ignored project_mismatch order_id=%s incoming=%s expected=%s", orderID, project, cfgProject)
+	if cfgMerchant := strings.TrimSpace(s.cfg.DuitkuMerchantCode); cfgMerchant != "" {
+		if merchant := strings.TrimSpace(input.Project); merchant != "" && !strings.EqualFold(merchant, cfgMerchant) {
+			log.Printf("[payment-webhook][wallet] ignored merchant_mismatch order_id=%s incoming=%s expected=%s", orderID, merchant, cfgMerchant)
 			return nil
 		}
 	}
 
-	if !IsPakasirPaidStatus(input.Status) {
-		log.Printf("[pakasir-webhook][wallet] ignored unpaid_status order_id=%s status=%s", orderID, strings.TrimSpace(input.Status))
+	if !ValidateDuitkuCallbackSignature(s.cfg.DuitkuMerchantCode, input.Amount, orderID, s.cfg.DuitkuAPIKey, input.Signature) {
+		return fmt.Errorf("signature callback tidak valid")
+	}
+
+	if !IsPaymentGatewayPaidStatus(input.Status) {
+		log.Printf("[payment-webhook][wallet] ignored unpaid_status order_id=%s status=%s", orderID, strings.TrimSpace(input.Status))
 		return nil
 	}
 
-	topup, err := s.walletRepo.FindTopupByGatewayRef("pakasir", orderID)
+	topup, err := s.walletRepo.FindTopupByGatewayRef("duitku", orderID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("[pakasir-webhook][wallet] ignored unknown_topup order_id=%s", orderID)
+			log.Printf("[payment-webhook][wallet] ignored unknown_topup order_id=%s", orderID)
 			return nil
 		}
 		return errors.New("gagal memuat topup")
@@ -715,13 +737,13 @@ func (s *WalletService) HandlePakasirWebhook(ctx context.Context, input WalletPa
 		payable := topup.PayableAmount
 		if requested > 0 && input.Amount != requested {
 			if payable <= 0 || input.Amount != payable {
-				log.Printf("[pakasir-webhook][wallet] amount_mismatch order_id=%s expected_requested=%d expected_payable=%d actual=%d", orderID, requested, payable, input.Amount)
+				log.Printf("[payment-webhook][wallet] amount_mismatch order_id=%s expected_requested=%d expected_payable=%d actual=%d", orderID, requested, payable, input.Amount)
 				return fmt.Errorf("nominal webhook tidak cocok")
 			}
 		}
 	}
 
-	log.Printf("[pakasir-webhook][wallet] checking order_id=%s topup_id=%s", orderID, topup.ID.String())
+	log.Printf("[payment-webhook][wallet] checking order_id=%s topup_id=%s", orderID, topup.ID.String())
 	return s.syncTopupStatus(ctx, topup)
 }
 
@@ -729,15 +751,15 @@ func (s *WalletService) syncTopupStatus(ctx context.Context, topup *model.Wallet
 	if topup.Status == "success" || topup.Status == "failed" || topup.Status == "expired" {
 		return nil
 	}
-	if !s.pakasirConfigured() {
-		return errors.New("pakasir belum dikonfigurasi")
+	if !s.gatewayConfigured() {
+		return errors.New("gateway payment belum dikonfigurasi")
 	}
 
 	amount := topup.RequestedAmount
 	if amount <= 0 {
 		amount = topup.PayableAmount
 	}
-	detail, raw, err := s.pakasir.TransactionDetail(ctx, topup.GatewayRef, amount)
+	detail, raw, err := s.gateway.TransactionDetail(ctx, topup.GatewayRef, amount)
 	if err != nil {
 		return fmt.Errorf("gagal cek status topup: %w", err)
 	}
@@ -818,7 +840,7 @@ func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, 
 			BalanceBefore: before,
 			BalanceAfter:  after,
 			Reference:     reference,
-			Description:   fmt.Sprintf("Topup wallet via Pakasir (%s)", topup.GatewayRef),
+			Description:   fmt.Sprintf("Topup wallet via Duitku (%s)", topup.GatewayRef),
 		}
 		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
 			return errors.New("gagal menulis ledger wallet")
@@ -915,7 +937,7 @@ func normalizeIdempotencyKey(key string) string {
 
 func mapProviderStatus(status string) string {
 	s := strings.ToLower(strings.TrimSpace(status))
-	s = strings.ToLower(NormalizePakasirStatus(s))
+	s = strings.ToLower(NormalizePaymentGatewayStatus(s))
 	switch s {
 	case "success", "settlement", "capture", "paid", "completed":
 		return "success"
@@ -953,6 +975,10 @@ func toTopupResponse(topup *model.WalletTopup) *WalletTopupResponse {
 }
 
 func (s *WalletService) topupExpiryDuration() time.Duration {
+	return time.Duration(s.topupExpiryMinutes()) * time.Minute
+}
+
+func (s *WalletService) topupExpiryMinutes() int {
 	minutes, err := strconv.Atoi(s.cfg.WalletTopupExpiryMinutes)
 	if err != nil || minutes <= 0 {
 		minutes = 15
@@ -960,10 +986,10 @@ func (s *WalletService) topupExpiryDuration() time.Duration {
 	if minutes > 120 {
 		minutes = 120
 	}
-	return time.Duration(minutes) * time.Minute
+	return minutes
 }
 
-func buildPakasirTopupReference(userID uuid.UUID, idempotencyKey string) string {
+func buildGatewayTopupReference(userID uuid.UUID, idempotencyKey string) string {
 	raw := userID.String() + ":" + strings.TrimSpace(idempotencyKey)
 	hash := sha1.Sum([]byte(raw))
 	token := strings.ToUpper(hex.EncodeToString(hash[:]))

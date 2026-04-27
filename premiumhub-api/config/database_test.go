@@ -43,7 +43,7 @@ func TestEnsureDefaultSosmedServicesSeedsEmptyDatabase(t *testing.T) {
 	}
 }
 
-func TestEnsureDefaultSosmedServicesSkipsWhenCatalogAlreadyManaged(t *testing.T) {
+func TestEnsureDefaultSosmedServicesKeepsCustomCatalogAndBackfillsDefaults(t *testing.T) {
 	db := openTestDB(t)
 
 	existing := &model.SosmedService{
@@ -65,15 +65,15 @@ func TestEnsureDefaultSosmedServicesSkipsWhenCatalogAlreadyManaged(t *testing.T)
 	if err := db.Model(&model.SosmedService{}).Count(&count).Error; err != nil {
 		t.Fatalf("count sosmed services: %v", err)
 	}
-	if count != 1 {
-		t.Fatalf("expected existing catalog to stay at 1 row, got %d", count)
+	if count != 6 {
+		t.Fatalf("expected custom service plus 5 defaults, got %d", count)
 	}
 
 	var defaults int64
 	if err := db.Model(&model.SosmedService{}).Where("code = ?", "ig-followers-id").Count(&defaults).Error; err != nil {
 		t.Fatalf("count default code: %v", err)
 	}
-	if defaults != 0 {
-		t.Fatalf("expected no default sosmed service to be recreated, got %d", defaults)
+	if defaults != 1 {
+		t.Fatalf("expected missing default sosmed service to be backfilled once, got %d", defaults)
 	}
 }

@@ -16,14 +16,14 @@ import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 
-type PakasirMethod = 'qris' | 'bri_va' | 'bni_va' | 'permata_va'
-type CheckoutMethod = 'pakasir' | 'wallet'
+type DuitkuMethod = 'SP' | 'BR' | 'I1' | 'BT'
+type CheckoutMethod = 'duitku' | 'wallet'
 
-const PAKASIR_METHOD_OPTIONS: Array<{ key: PakasirMethod; label: string; hint: string; icon: ReactNode }> = [
-  { key: 'qris', label: 'QRIS', hint: 'Scan QRIS dari aplikasi e-wallet atau m-banking', icon: <QrCode className="w-4 h-4" /> },
-  { key: 'bri_va', label: 'BRI Virtual Account', hint: 'Bayar via transfer VA BRI', icon: <Landmark className="w-4 h-4" /> },
-  { key: 'bni_va', label: 'BNI Virtual Account', hint: 'Bayar via transfer VA BNI', icon: <Landmark className="w-4 h-4" /> },
-  { key: 'permata_va', label: 'Permata Virtual Account', hint: 'Bayar via transfer VA Permata', icon: <Landmark className="w-4 h-4" /> },
+const DUITKU_METHOD_OPTIONS: Array<{ key: DuitkuMethod; label: string; hint: string; icon: ReactNode }> = [
+  { key: 'SP', label: 'QRIS', hint: 'Scan QRIS dari aplikasi e-wallet atau m-banking', icon: <QrCode className="w-4 h-4" /> },
+  { key: 'BR', label: 'BRI Virtual Account', hint: 'Bayar via transfer VA BRI', icon: <Landmark className="w-4 h-4" /> },
+  { key: 'I1', label: 'BNI Virtual Account', hint: 'Bayar via transfer VA BNI', icon: <Landmark className="w-4 h-4" /> },
+  { key: 'BT', label: 'Permata Virtual Account', hint: 'Bayar via transfer VA Permata', icon: <Landmark className="w-4 h-4" /> },
 ]
 
 export default function CheckoutPage() {
@@ -33,8 +33,8 @@ export default function CheckoutPage() {
   const { isAuthenticated, hasHydrated, isBootstrapped, walletBalance, setWalletBalance } = useAuthStore()
   const authReady = hasHydrated && isBootstrapped
 
-  const [checkoutMethod, setCheckoutMethod] = useState<CheckoutMethod>('pakasir')
-  const [pakasirMethod, setPakasirMethod] = useState<PakasirMethod>('qris')
+  const [checkoutMethod, setCheckoutMethod] = useState<CheckoutMethod>('duitku')
+  const [duitkuMethod, setDuitkuMethod] = useState<DuitkuMethod>('SP')
   const [walletLoading, setWalletLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [redirectingAfterCheckout, setRedirectingAfterCheckout] = useState(false)
@@ -106,7 +106,7 @@ export default function CheckoutPage() {
 
       const payRes = await paymentService.create({
         order_id: orderRes.data.id,
-        payment_method: checkoutMethod === 'wallet' ? 'wallet' : pakasirMethod,
+        payment_method: checkoutMethod === 'wallet' ? 'wallet' : duitkuMethod,
       })
       if (!payRes.success) {
         setError(payRes.message)
@@ -130,10 +130,12 @@ export default function CheckoutPage() {
       const query = new URLSearchParams({
         id: orderRes.data.id,
         paymentNumber: payment.payment_number || '',
-        paymentMethod: payment.payment_method || pakasirMethod,
+        paymentMethod: payment.payment_method || duitkuMethod,
         gatewayOrderId: payment.gateway_order_id || '',
         amount: String(payment.total_payment || payment.amount || item.price),
         expiresAt: payment.expires_at || '',
+        paymentUrl: payment.payment_url || '',
+        appUrl: payment.app_url || '',
       })
       router.push(`/product/prem-apps/checkout/invoice?${query.toString()}`)
     } catch (err: unknown) {
@@ -185,9 +187,9 @@ export default function CheckoutPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setCheckoutMethod('pakasir')}
+                onClick={() => setCheckoutMethod('duitku')}
                 className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                  checkoutMethod === 'pakasir' ? 'border-[#FF5733] bg-[#FFF3EF]' : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D8]'
+                  checkoutMethod === 'duitku' ? 'border-[#FF5733] bg-[#FFF3EF]' : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D8]'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -195,8 +197,8 @@ export default function CheckoutPage() {
                     <CreditCard className="w-5 h-5 text-[#141414]" />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold">Pakasir Gateway</div>
-                    <div className="text-xs text-[#888]">QRIS / Virtual Account otomatis via Pakasir</div>
+                    <div className="text-sm font-semibold">Duitku Gateway</div>
+                    <div className="text-xs text-[#888]">QRIS / Virtual Account otomatis via Duitku</div>
                   </div>
                 </div>
               </button>
@@ -222,17 +224,17 @@ export default function CheckoutPage() {
               </button>
             </div>
 
-            {checkoutMethod === 'pakasir' ? (
+            {checkoutMethod === 'duitku' ? (
               <div className="rounded-xl border border-[#EBEBEB] p-3 bg-[#FAFAF8] space-y-2">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-[#777]">Pilih channel Pakasir</div>
+                <div className="text-[11px] font-bold uppercase tracking-wide text-[#777]">Pilih channel pembayaran</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {PAKASIR_METHOD_OPTIONS.map((option) => (
+                  {DUITKU_METHOD_OPTIONS.map((option) => (
                     <button
                       key={option.key}
                       type="button"
-                      onClick={() => setPakasirMethod(option.key)}
+                      onClick={() => setDuitkuMethod(option.key)}
                       className={`rounded-lg border px-3 py-2 text-left transition-colors ${
-                        pakasirMethod === option.key
+                        duitkuMethod === option.key
                           ? 'border-[#141414] bg-white'
                           : 'border-[#E5E5E5] bg-white/70 hover:border-[#CFCFCF]'
                       }`}

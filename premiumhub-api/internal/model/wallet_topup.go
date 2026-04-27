@@ -10,7 +10,7 @@ import (
 type WalletTopup struct {
 	ID              uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	UserID          uuid.UUID  `gorm:"type:uuid;not null;index;uniqueIndex:idx_wallet_topups_user_idem" json:"user_id"`
-	Provider        string     `gorm:"size:30;not null;default:pakasir" json:"provider"`
+	Provider        string     `gorm:"size:30;not null;default:duitku" json:"provider"`
 	GatewayRef      string     `gorm:"size:120;uniqueIndex" json:"gateway_ref"`
 	PaymentMethod   string     `gorm:"size:40" json:"payment_method"`
 	PaymentNumber   string     `gorm:"type:text" json:"payment_number"`

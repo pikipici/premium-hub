@@ -6,7 +6,7 @@ import (
 )
 
 func TestConfigValidate(t *testing.T) {
-	t.Run("development allows missing pakasir creds", func(t *testing.T) {
+	t.Run("development allows missing duitku creds", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:              "development",
 			JWTSecret:           "super-secure-secret-value-32chars++",
@@ -143,7 +143,7 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
-	t.Run("production requires pakasir fields", func(t *testing.T) {
+	t.Run("production requires duitku fields", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:    "production",
 			JWTSecret: "super-secure-secret-value-32chars++",
@@ -155,9 +155,10 @@ func TestConfigValidate(t *testing.T) {
 
 		msg := err.Error()
 		for _, expected := range []string{
-			"PAKASIR_PROJECT",
-			"PAKASIR_API_KEY",
-			"PAKASIR_BASE_URL",
+			"DUITKU_MERCHANT_CODE",
+			"DUITKU_API_KEY",
+			"DUITKU_BASE_URL",
+			"DUITKU_CALLBACK_URL atau FRONTEND_URL",
 			"FIVESIM_API_KEY",
 		} {
 			if !strings.Contains(msg, expected) {
@@ -289,10 +290,11 @@ func TestConfigValidate(t *testing.T) {
 		cfg := &Config{
 			AppEnv:                            "Production",
 			JWTSecret:                         "super-secure-secret-value-32chars++",
-			PakasirProject:                    "premiumhub",
-			PakasirAPIKey:                     "PK_xxx",
-			PakasirBaseURL:                    "https://app.pakasir.com",
-			PakasirHTTPTimeoutSec:             "12",
+			DuitkuMerchantCode:                "D1234",
+			DuitkuAPIKey:                      "DK_xxx",
+			DuitkuBaseURL:                     "https://passport.duitku.com",
+			DuitkuHTTPTimeoutSec:              "12",
+			DuitkuCallbackURL:                 "https://api.example.com/api/v1/payment/webhook",
 			FiveSimAPIKey:                     "FS_xxx",
 			FiveSimHTTPTimeoutSec:             "15",
 			CookieSameSite:                    "strict",

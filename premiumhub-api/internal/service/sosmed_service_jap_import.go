@@ -240,8 +240,16 @@ func (s *SosmedServiceService) ImportSelectedFromJAP(ctx context.Context, input 
 			continue
 		}
 
+		shouldStayInactive := !draft.IsActive
 		if err := s.repo.Create(draft); err != nil {
 			return nil, errors.New("gagal membuat draft layanan JAP")
+		}
+		if shouldStayInactive && draft.IsActive {
+			// GORM default:true can hydrate zero bool to true on create; imported JAP rows must stay drafts.
+			draft.IsActive = false
+			if err := s.repo.Update(draft); err != nil {
+				return nil, errors.New("gagal menonaktifkan draft layanan JAP")
+			}
 		}
 		result.Created++
 		result.Items = append(result.Items, *draft)

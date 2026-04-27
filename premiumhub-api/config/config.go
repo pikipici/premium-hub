@@ -12,7 +12,8 @@ type Config struct {
 	AppPort, AppEnv                                                             string
 	DBHost, DBPort, DBUser, DBPassword, DBName                                  string
 	JWTSecret, JWTExpiry, RefreshTokenExpiry, StockCredentialKey                string
-	PakasirBaseURL, PakasirProject, PakasirAPIKey, PakasirHTTPTimeoutSec        string
+	DuitkuBaseURL, DuitkuMerchantCode, DuitkuAPIKey, DuitkuHTTPTimeoutSec       string
+	DuitkuCallbackURL, DuitkuReturnURL                                          string
 	JAPAPIURL, JAPAPIKey, JAPHTTPTimeoutSec                                     string
 	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                        string
 	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                         string
@@ -69,10 +70,12 @@ func Load() *Config {
 		JWTExpiry:                            e("JWT_EXPIRY", "24h"),
 		RefreshTokenExpiry:                   e("REFRESH_TOKEN_EXPIRY", "720h"),
 		StockCredentialKey:                   stockCredentialKey,
-		PakasirBaseURL:                       e("PAKASIR_BASE_URL", "https://app.pakasir.com"),
-		PakasirProject:                       e("PAKASIR_PROJECT", ""),
-		PakasirAPIKey:                        e("PAKASIR_API_KEY", ""),
-		PakasirHTTPTimeoutSec:                e("PAKASIR_HTTP_TIMEOUT_SEC", "12"),
+		DuitkuBaseURL:                        e("DUITKU_BASE_URL", "https://passport.duitku.com"),
+		DuitkuMerchantCode:                   e("DUITKU_MERCHANT_CODE", ""),
+		DuitkuAPIKey:                         e("DUITKU_API_KEY", ""),
+		DuitkuHTTPTimeoutSec:                 e("DUITKU_HTTP_TIMEOUT_SEC", "12"),
+		DuitkuCallbackURL:                    e("DUITKU_CALLBACK_URL", ""),
+		DuitkuReturnURL:                      e("DUITKU_RETURN_URL", ""),
 		JAPAPIURL:                            e("JAP_API_URL", "https://justanotherpanel.com/api/v2"),
 		JAPAPIKey:                            e("JAP_API_KEY", ""),
 		JAPHTTPTimeoutSec:                    e("JAP_HTTP_TIMEOUT_SEC", "15"),
@@ -96,7 +99,7 @@ func Load() *Config {
 		NokosLandingWorkerInterval:           e("NOKOS_LANDING_WORKER_INTERVAL", "10m"),
 		NokosLandingSyncTimeout:              e("NOKOS_LANDING_SYNC_TIMEOUT", "25s"),
 		NokosLandingStaleAfter:               e("NOKOS_LANDING_STALE_AFTER", "30m"),
-		NokosLandingMethodCandidates:         e("NOKOS_LANDING_METHOD_CANDIDATES", "qris,bri_va,bni_va,permata_va"),
+		NokosLandingMethodCandidates:         e("NOKOS_LANDING_METHOD_CANDIDATES", "SP,BR,I1,BT"),
 		NokosLandingMethodProbeAmount:        e("NOKOS_LANDING_METHOD_PROBE_AMOUNT", "10000"),
 		SMTPHost:                             e("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:                             e("SMTP_PORT", "587"),
