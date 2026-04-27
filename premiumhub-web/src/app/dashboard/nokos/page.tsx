@@ -1143,15 +1143,15 @@ export default function NomorVirtualPage() {
     return () => window.clearTimeout(timer)
   }, [actionLoading, liveOrder, liveOrderStatus, livePrimaryCode, mainTab, runOrderAction])
 
-  const copyCode = async (code?: string) => {
+  const copyCode = async (code?: string, kind: 'otp' | 'phone' = 'otp') => {
     if (!code) return
     if (typeof navigator === 'undefined' || !navigator.clipboard) return
 
     try {
       await navigator.clipboard.writeText(code)
-      pushToast('success', `Kode OTP ${code} disalin`)
+      pushToast('success', kind === 'phone' ? `Nomor ${code} disalin` : `Kode OTP ${code} disalin`)
     } catch {
-      pushToast('error', 'Gagal menyalin kode OTP')
+      pushToast('error', kind === 'phone' ? 'Gagal menyalin nomor' : 'Gagal menyalin kode OTP')
     }
   }
 
@@ -1522,7 +1522,7 @@ export default function NomorVirtualPage() {
                               {liveOrder.phone ? (
                                 <button
                                   type="button"
-                                  onClick={() => void copyCode(liveOrder.phone)}
+                                  onClick={() => void copyCode(liveOrder.phone, 'phone')}
                                   className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[#EBEBEB] text-[#555] hover:bg-[#F7F7F5]"
                                   title={`Salin nomor ${liveOrder.phone}`}
                                   aria-label="Salin nomor"
