@@ -1,8 +1,81 @@
+"use client"
+
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { ShoppingBag } from 'lucide-react'
+
+import { DEFAULT_PUBLIC_NAV_ITEMS, type PublicNavItem } from '@/lib/publicNavItems'
+import {
+  getNavbarMenuMemoryCache,
+  NAVBAR_MENU_CACHE_EVENT,
+  normalizeNavbarMenuItems,
+  readNavbarMenuCache,
+  writeNavbarMenuCache,
+} from '@/lib/navbarMenuCache'
+import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
+
+const FOOTER_PRODUCT_LABEL_BY_HREF: Record<string, string> = {
+  '/product/prem-apps': 'Apps Premium',
+  '/product/nokos': 'Nomor Virtual OTP',
+  '/product/sosmed': 'Sosmed SMM',
+  '/product/convert': 'Convert Aset',
+}
 
 export default function Footer() {
   const currentYear = new Date().getFullYear()
+  const [productNavItems, setProductNavItems] = useState<PublicNavItem[]>(
+    () => getNavbarMenuMemoryCache() || []
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadProductMenu = async () => {
+      const cachedItems = readNavbarMenuCache()
+      if (cachedItems !== null) {
+        setProductNavItems(cachedItems)
+      }
+
+      try {
+        const res = await navbarMenuSettingService.publicList()
+        if (cancelled) return
+        if (!res.success) {
+          if (readNavbarMenuCache() === null) {
+            setProductNavItems(DEFAULT_PUBLIC_NAV_ITEMS)
+          }
+          return
+        }
+
+        const visibleItems = normalizeNavbarMenuItems(res.data || [])
+        writeNavbarMenuCache(visibleItems)
+        setProductNavItems(visibleItems)
+      } catch {
+        if (!cancelled && readNavbarMenuCache() === null) {
+          setProductNavItems(DEFAULT_PUBLIC_NAV_ITEMS)
+        }
+      }
+    }
+
+    void loadProductMenu()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleNavbarMenuCacheUpdate = () => {
+      const cachedItems = readNavbarMenuCache()
+      if (cachedItems !== null) {
+        setProductNavItems(cachedItems)
+      }
+    }
+
+    window.addEventListener(NAVBAR_MENU_CACHE_EVENT, handleNavbarMenuCacheUpdate)
+    return () => {
+      window.removeEventListener(NAVBAR_MENU_CACHE_EVENT, handleNavbarMenuCacheUpdate)
+    }
+  }, [])
 
   return (
     <footer className="bg-[#141414] text-white mt-auto">
@@ -23,10 +96,15 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-sm">Produk</h4>
             <div className="space-y-2">
-              <Link href="/product/prem-apps" className="block text-sm text-gray-400 hover:text-white transition-colors">Apps Premium</Link>
-              <Link href="/product/nokos" className="block text-sm text-gray-400 hover:text-white transition-colors">Nomor Virtual OTP</Link>
-              <Link href="/product/sosmed" className="block text-sm text-gray-400 hover:text-white transition-colors">Sosmed SMM</Link>
-              <Link href="/product/convert" className="block text-sm text-gray-400 hover:text-white transition-colors">Convert Aset</Link>
+              {productNavItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="block text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  {FOOTER_PRODUCT_LABEL_BY_HREF[item.href] ?? item.label}
+                </Link>
+              ))}
             </div>
           </div>
 

@@ -19,6 +19,10 @@ import {
 
 import WalletBadge from '@/components/shared/WalletBadge'
 import {
+  DEFAULT_PUBLIC_NAV_ITEMS,
+  type PublicNavItem,
+} from '@/lib/publicNavItems'
+import {
   getNavbarMenuMemoryCache,
   NAVBAR_MENU_CACHE_EVENT,
   normalizeNavbarMenuItems,
@@ -29,19 +33,9 @@ import { authService } from '@/services/authService'
 import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
 import { useAuthStore } from '@/store/authStore'
 
-type PublicNavItem = {
-  href: string
-  label: string
-}
-
 type MobileSectionKey = 'nav' | 'account' | 'admin'
 
 type MobileSectionState = Record<MobileSectionKey, boolean>
-
-const PUBLIC_NAV_ITEMS: PublicNavItem[] = [
-  { href: '/product/nokos', label: 'Nomor Virtual' },
-  { href: '/product/sosmed', label: 'Sosmed' },
-]
 
 function isActivePath(pathname: string, href: string) {
   if (href === '/') return pathname === '/'
@@ -123,7 +117,7 @@ export default function Navbar() {
         if (cancelled) return
         if (!res.success) {
           if (readNavbarMenuCache() === null) {
-            setNavItems(PUBLIC_NAV_ITEMS)
+            setNavItems(DEFAULT_PUBLIC_NAV_ITEMS)
           }
           return
         }
@@ -134,7 +128,7 @@ export default function Navbar() {
         setNavItems(visibleItems)
       } catch {
         if (!cancelled && readNavbarMenuCache() === null) {
-          setNavItems(PUBLIC_NAV_ITEMS)
+          setNavItems(DEFAULT_PUBLIC_NAV_ITEMS)
         }
       }
     }
