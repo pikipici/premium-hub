@@ -23,6 +23,7 @@ type OtpCard = {
   iconSrc?: string
   iconText?: string
   iconClassName: string
+  iconImageClassName?: string
   before: string
   code: string
   after?: string
@@ -197,6 +198,7 @@ const otpCards: OtpCard[] = [
     app: 'OpenAI',
     iconSrc: '/icons/apps/openai.svg',
     iconClassName: 'bg-[#111827] text-white',
+    iconImageClassName: 'brightness-0 invert',
     before: 'OpenAI confirmation code:',
     code: '447 908',
     after: 'Complete sign-in to continue.',
@@ -221,7 +223,7 @@ function OtpPreviewCard({ card }: { card: OtpCard }) {
               alt={`${card.app} logo`}
               width={18}
               height={18}
-              className="h-[18px] w-[18px] brightness-0 invert"
+              className={`h-[18px] w-[18px] object-contain ${card.iconImageClassName ?? ''}`}
             />
           ) : (
             <span className="text-[11px] font-extrabold uppercase tracking-wide">{card.iconText ?? card.app.slice(0, 2)}</span>
