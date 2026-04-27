@@ -133,7 +133,7 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#2853A6]" />
-                  Refill tersedia di layanan tertentu
+                  Garansi 30 hari isi ulang jika drop
                 </li>
               </ul>
 
