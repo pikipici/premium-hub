@@ -6,20 +6,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, CircleAlert, Loader2, RefreshCcw, Sparkles } from 'lucide-react'
 
+import { FALLBACK_PAYMENT_METHODS, normalizePaymentMethodOptions, paymentMethodFeeLabel, paymentMethodIcon } from '@/lib/paymentMethods'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
-import type { WalletLedger, WalletTopup } from '@/types/wallet'
+import type { PaymentMethodOption, WalletLedger, WalletTopup } from '@/types/wallet'
 
 const MIN_TOPUP = 10000
 const QUICK_AMOUNTS = [25000, 50000, 100000, 200000]
-
-const PAYMENT_METHODS = [
-  { key: 'SP', name: 'QRIS', icon: 'QR', fee: 'Sesuai channel' },
-  { key: 'BR', name: 'BRI VA', icon: 'VA', fee: 'Sesuai channel' },
-  { key: 'I1', name: 'BNI VA', icon: 'VA', fee: 'Sesuai channel' },
-  { key: 'BT', name: 'Permata VA', icon: 'VA', fee: 'Sesuai channel' },
-] as const
 
 type TxFilter = 'all' | 'topup' | 'purchase' | 'refund'
 type LedgerGroup = 'topup' | 'purchase' | 'refund' | 'other'
@@ -104,13 +98,14 @@ export default function WalletPage() {
   const [balance, setBalance] = useState(0)
   const [topups, setTopups] = useState<WalletTopup[]>([])
   const [ledgers, setLedgers] = useState<WalletLedger[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>(FALLBACK_PAYMENT_METHODS)
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const [amount, setAmount] = useState<number>(QUICK_AMOUNTS[1])
-  const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHODS)[number]['key']>('SP')
+  const [paymentMethod, setPaymentMethod] = useState(FALLBACK_PAYMENT_METHODS[0].method)
   const [txFilter, setTxFilter] = useState<TxFilter>('all')
   const [error, setError] = useState('')
 
@@ -122,8 +117,8 @@ export default function WalletPage() {
   const estimatedBalance = useMemo(() => balance + selectedAmount, [balance, selectedAmount])
 
   const selectedPaymentMethodLabel = useMemo(
-    () => PAYMENT_METHODS.find((method) => method.key === paymentMethod)?.name || paymentMethod,
-    [paymentMethod]
+    () => paymentMethods.find((method) => method.method === paymentMethod)?.name || paymentMethod,
+    [paymentMethod, paymentMethods]
   )
 
   const walletBalanceHint = useMemo(() => {
@@ -217,6 +212,18 @@ export default function WalletPage() {
       }
       if (ledgerRes.success) {
         setLedgers(ledgerRes.data)
+      }
+
+      try {
+        const methodRes = await walletService.listPaymentMethods(MIN_TOPUP)
+        if (methodRes.success) {
+          const methods = normalizePaymentMethodOptions(methodRes.data)
+          setPaymentMethods(methods)
+          setPaymentMethod((current) => (methods.some((method) => method.method === current) ? current : methods[0].method))
+        }
+      } catch (err) {
+        console.error(err)
+        setPaymentMethods(FALLBACK_PAYMENT_METHODS)
       }
     } catch (err) {
       console.error(err)
@@ -380,15 +387,17 @@ export default function WalletPage() {
 
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wide text-[#888] mb-2">Metode Pembayaran</div>
-              <div className="grid grid-cols-3 gap-2">
-                {PAYMENT_METHODS.map((method) => {
-                  const selected = paymentMethod === method.key
+              <div className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
+                {paymentMethods.map((method) => {
+                  const selected = paymentMethod === method.method
+                  const icon = paymentMethodIcon(method.method)
                   return (
                     <button
-                      key={method.key}
+                      key={method.method}
                       type="button"
-                      onClick={() => setPaymentMethod(method.key)}
-                      className={`relative rounded-xl border px-1.5 py-2.5 transition-colors ${
+                      onClick={() => setPaymentMethod(method.method)}
+                      title={method.name}
+                      className={`relative min-h-[82px] rounded-xl border px-1.5 py-2.5 text-center transition-colors ${
                         selected
                           ? 'border-[#141414] bg-[#FAFAF8]'
                           : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D5]'
@@ -397,9 +406,16 @@ export default function WalletPage() {
                       {selected ? (
                         <span className="absolute right-1 top-1 h-3.5 w-3.5 rounded-full bg-[#141414] text-white text-[8px] leading-[14px] font-black">✓</span>
                       ) : null}
-                      <div className="text-[10px] leading-none mb-1 font-black tracking-wide">{method.icon}</div>
-                      <div className="text-[10px] font-semibold text-[#141414] leading-tight">{method.name}</div>
-                      <div className="text-[9px] text-green-700 font-semibold">{method.fee}</div>
+                      <div className="mb-1 flex h-6 items-center justify-center">
+                        {method.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={method.image} alt={method.name} className="max-h-6 max-w-12 object-contain" />
+                        ) : (
+                          <span className="text-[10px] leading-none font-black tracking-wide">{icon}</span>
+                        )}
+                      </div>
+                      <div className="truncate text-[10px] font-semibold leading-tight text-[#141414]">{method.name}</div>
+                      <div className="truncate text-[9px] font-semibold text-green-700">{paymentMethodFeeLabel(method.fee)}</div>
                     </button>
                   )
                 })}

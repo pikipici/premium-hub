@@ -69,7 +69,7 @@ var duitkuPaymentMethodSet = map[string]struct{}{
 	"AG": {}, "NC": {}, "BR": {}, "S1": {}, "DM": {}, "BV": {}, "FT": {}, "IR": {},
 	"OV": {}, "SA": {}, "LF": {}, "LA": {}, "DA": {}, "SL": {}, "OL": {}, "SP": {},
 	"NQ": {}, "GQ": {}, "SQ": {}, "DN": {}, "AT": {}, "JP": {}, "T1": {}, "T2": {},
-	"T3": {},
+	"T3": {}, "BQ": {}, "IQ": {}, "DQ": {}, "QD": {}, "LQ": {}, "A2": {},
 }
 
 var paymentMethodAliases = map[string]string{
@@ -94,6 +94,12 @@ var paymentMethodAliases = map[string]string{
 	"OVO":            "OV",
 	"SHOPEEPAY":      "SA",
 	"LINKAJA":        "LF",
+	"LINKAJA_QRIS":   "LQ",
+	"DANA_QRIS":      "DQ",
+	"DUITKU_QRIS":    "QD",
+	"BNC_QRIS":       "BQ",
+	"BNI_QRIS":       "IQ",
+	"POS_INDONESIA":  "A2",
 }
 
 func NewPaymentGatewayClient(cfg *config.Config) PaymentGatewayClient {
@@ -113,7 +119,22 @@ func NormalizePaymentGatewayMethod(raw string) string {
 	if _, ok := duitkuPaymentMethodSet[method]; ok {
 		return method
 	}
+	if isLikelyDuitkuPaymentMethod(method) {
+		return method
+	}
 	return ""
+}
+
+func isLikelyDuitkuPaymentMethod(method string) bool {
+	if len(method) != 2 {
+		return false
+	}
+	for _, char := range method {
+		if (char < 'A' || char > 'Z') && (char < '0' || char > '9') {
+			return false
+		}
+	}
+	return true
 }
 
 func NormalizePaymentGatewayStatus(raw string) string {

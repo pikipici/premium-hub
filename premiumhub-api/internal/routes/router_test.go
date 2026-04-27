@@ -238,6 +238,9 @@ func TestSetupDevelopmentPaymentRoutes(t *testing.T) {
 	if !hasRoute(routes, "POST", "/api/v1/payment/create") {
 		t.Fatalf("payment create route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/payment/methods") {
+		t.Fatalf("payment methods route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/payment/webhook") {
 		t.Fatalf("payment webhook route should exist")
 	}

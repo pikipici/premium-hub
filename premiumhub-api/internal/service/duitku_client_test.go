@@ -35,6 +35,7 @@ func TestDuitkuSignatureHelpersAndNormalization(t *testing.T) {
 		"BNI-VA":     "I1",
 		"permata va": "BT",
 		"SP":         "SP",
+		"zz":         "ZZ",
 	}
 	for raw, want := range cases {
 		if got := NormalizePaymentGatewayMethod(raw); got != want {

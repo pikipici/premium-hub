@@ -35,6 +35,25 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 	response.Success(c, "Transaksi dibuat", res)
 }
 
+func (h *PaymentHandler) ListMethods(c *gin.Context) {
+	amount := int64(10000)
+	if raw := strings.TrimSpace(c.Query("amount")); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed <= 0 {
+			response.BadRequest(c, "amount tidak valid")
+			return
+		}
+		amount = parsed
+	}
+
+	methods, err := h.paymentSvc.ListPaymentMethods(c.Request.Context(), amount)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "OK", methods)
+}
+
 func (h *PaymentHandler) Webhook(c *gin.Context) {
 	input, err := bindPaymentWebhookInput(c)
 	if err != nil {

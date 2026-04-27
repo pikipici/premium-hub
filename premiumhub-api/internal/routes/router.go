@@ -206,6 +206,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/activities/history", activityHandler.List)
 	protected.GET("/me/sidebar-menu", userSidebarMenuSettingHandler.List)
 
+	protected.GET("/payment/methods", paymentHandler.ListMethods)
 	protected.POST("/payment/create", paymentHandler.Create)
 	protected.GET("/payment/status/:orderId", paymentHandler.GetStatus)
 	protected.POST("/sosmed/payments", sosmedPaymentHandler.Create)

@@ -1,6 +1,6 @@
 import api from '@/lib/api'
 import type { ApiResponse } from '@/types/api'
-import type { Wallet, WalletBalance, WalletLedger, WalletListParams, WalletTopup } from '@/types/wallet'
+import type { PaymentMethodOption, Wallet, WalletBalance, WalletLedger, WalletListParams, WalletTopup } from '@/types/wallet'
 
 interface CreateTopupPayload {
   amount: number
@@ -32,6 +32,13 @@ export const walletService = {
         headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
       }
     )
+    return res.data
+  },
+
+  listPaymentMethods: async (amount?: number) => {
+    const res = await api.get<ApiResponse<PaymentMethodOption[]>>('/payment/methods', {
+      params: amount ? { amount } : undefined,
+    })
     return res.data
   },
 

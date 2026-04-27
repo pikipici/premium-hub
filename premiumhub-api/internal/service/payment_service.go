@@ -75,11 +75,61 @@ type PaymentResponse struct {
 	WalletBalanceAfter  *int64     `json:"wallet_balance_after,omitempty"`
 }
 
+type PaymentMethodResponse struct {
+	Method string `json:"method"`
+	Name   string `json:"name"`
+	Image  string `json:"image,omitempty"`
+	Fee    string `json:"fee,omitempty"`
+}
+
 func (s *PaymentService) gatewayConfigured() bool {
 	if s == nil {
 		return false
 	}
 	return gatewayConfigured(s.cfg, s.gateway)
+}
+
+func (s *PaymentService) ListPaymentMethods(ctx context.Context, amount int64) ([]PaymentMethodResponse, error) {
+	if !s.gatewayConfigured() {
+		return nil, fmt.Errorf("gateway payment belum dikonfigurasi")
+	}
+	if amount <= 0 {
+		amount = 10000
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+
+	methods, _, err := s.gateway.ListPaymentMethods(ctx, amount)
+	if err != nil {
+		return nil, fmt.Errorf("gagal memuat metode pembayaran: %w", err)
+	}
+
+	seen := make(map[string]struct{}, len(methods))
+	out := make([]PaymentMethodResponse, 0, len(methods))
+	for _, method := range methods {
+		code := NormalizePaymentGatewayMethod(method.Method)
+		if code == "" {
+			continue
+		}
+		if _, ok := seen[code]; ok {
+			continue
+		}
+		seen[code] = struct{}{}
+
+		name := strings.TrimSpace(method.Name)
+		if name == "" {
+			name = code
+		}
+		out = append(out, PaymentMethodResponse{
+			Method: code,
+			Name:   name,
+			Image:  strings.TrimSpace(method.Image),
+			Fee:    strings.TrimSpace(method.Fee),
+		})
+	}
+
+	return out, nil
 }
 
 func (s *PaymentService) CreateTransaction(userID uuid.UUID, input CreatePaymentInput) (*PaymentResponse, error) {

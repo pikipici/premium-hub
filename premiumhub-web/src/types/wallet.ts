@@ -15,6 +15,13 @@ export interface WalletBalance {
   fivesim_wallet_min_debit?: number
 }
 
+export interface PaymentMethodOption {
+  method: string
+  name: string
+  image?: string
+  fee?: string
+}
+
 export interface WalletTopup {
   id: string
   provider?: string
