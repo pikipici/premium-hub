@@ -1481,7 +1481,6 @@ export default function NomorVirtualPage() {
               <div className="rounded-2xl border border-[#EBEBEB] bg-white overflow-hidden">
                 <header className="border-b border-[#EBEBEB] px-4 py-3">
                   <h2 className="text-sm font-bold">Terima OTP Disini</h2>
-                  <p className="text-xs text-[#888] mt-0.5">Masukkan nomor ini di layanan tujuan lalu request OTP. Kodenya akan muncul otomatis di sini.</p>
                 </header>
 
                 <div className="p-4 space-y-3">
@@ -1520,7 +1519,7 @@ export default function NomorVirtualPage() {
                         {liveIsOpenStatus ? (
                           <div className="space-y-1.5 pt-1 border-t border-[#EBEBEB]">
                             <div className="flex items-center justify-between gap-2 text-[11px]">
-                              <span className="text-[#888]">SLA OTP</span>
+                              <span className="text-[#888]">Batas Waktu OTP</span>
                               <span className={`font-bold ${liveSLAExpired ? 'text-red-600' : 'text-[#141414]'}`}>
                                 {liveRemainingMs !== null ? formatCountdown(liveRemainingMs) : '--:--'}
                               </span>
@@ -1534,7 +1533,7 @@ export default function NomorVirtualPage() {
                             <p className="text-[11px] text-[#888]">
                               {liveSLAExpired
                                 ? 'Sudah lewat 15 menit. Sistem lanjut auto-handle sesuai status order.'
-                                : `Kalau OTP belum masuk, pastikan kamu sudah request kode di ${liveServiceDisplay}. Auto-cancel + refund jalan otomatis jika 15 menit tanpa SMS.`}
+                                : `OTP belum masuk? Request kode dulu di ${liveServiceDisplay}. Jika 15 menit tanpa SMS, order otomatis batal + refund.`}
                             </p>
                           </div>
                         ) : (
