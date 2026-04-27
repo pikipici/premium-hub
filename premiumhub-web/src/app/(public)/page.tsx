@@ -62,16 +62,11 @@ export default function HomePage() {
 
       <main className="bg-[#F7F7F5]">
         <section className="mx-auto w-full max-w-7xl px-4 pb-16 pt-12 sm:px-6 lg:px-8 lg:pb-20">
+          <h1 className="sr-only">Beli Nomor Virtual OTP dan Layanan SMM (Beli follower, viewer, likes, dan engage) dalam Satu Tempat.</h1>
           <header className="mx-auto mb-8 max-w-3xl text-center lg:mb-12">
             <p className="inline-flex items-center gap-2 rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-4 py-1.5 text-xs font-bold text-[#FF5733]">
               <Rocket className="h-3.5 w-3.5" />
               Pilih Layanan Sesuai Kebutuhan
-            </p>
-            <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-[#141414] md:text-4xl">
-              Satu halaman buat akses Nomor Virtual OTP dan Jasa SMM
-            </h1>
-            <p className="mt-3 text-sm leading-relaxed text-[#6B7280] md:text-base">
-              Ringkas, cepat, dan langsung ke produk yang kamu butuhkan.
             </p>
           </header>
 
