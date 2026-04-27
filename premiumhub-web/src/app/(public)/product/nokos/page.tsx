@@ -381,7 +381,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="mb-2 text-[15px] leading-relaxed text-[#888]">
-              Verifikasi akun tanpa nomor HP asli.{' '}
+              Verifikasi akun dengan nomor virtual.{' '}
               {hasLiveSummary ? `Tersedia untuk ${formatNumber(countriesCount)} negara.` : 'Data negara sedang dimuat...'}
             </p>
 
