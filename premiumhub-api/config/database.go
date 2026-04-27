@@ -126,8 +126,8 @@ func ensureDefaultUserSidebarMenuSettings(db *gorm.DB) error {
 
 func ensureDefaultNavbarMenuSettings(db *gorm.DB) error {
 	defaults := []model.NavbarMenuSetting{
-		{Key: "apps", Label: "Apps", Href: "/product/prem-apps", SortOrder: 10, IsVisible: true, IsSystem: true},
-		{Key: "convert_asset", Label: "Convert Aset", Href: "/product/convert", SortOrder: 20, IsVisible: true, IsSystem: true},
+		{Key: "apps", Label: "Apps", Href: "/product/prem-apps", SortOrder: 10, IsVisible: false, IsSystem: true},
+		{Key: "convert_asset", Label: "Convert Aset", Href: "/product/convert", SortOrder: 20, IsVisible: false, IsSystem: true},
 		{Key: "nomor_virtual", Label: "Nomor Virtual", Href: "/product/nokos", SortOrder: 30, IsVisible: true, IsSystem: true},
 		{Key: "sosmed", Label: "Sosmed", Href: "/product/sosmed", SortOrder: 40, IsVisible: true, IsSystem: true},
 	}

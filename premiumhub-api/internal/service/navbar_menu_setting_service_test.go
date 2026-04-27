@@ -28,15 +28,20 @@ func TestNavbarMenuSettingServiceListPublicAndUpdate(t *testing.T) {
 	if len(items) != 4 {
 		t.Fatalf("expected 4 defaults, got %d", len(items))
 	}
+	defaultState := map[string]bool{}
 	for _, item := range items {
-		if !item.IsVisible {
-			t.Fatalf("default navbar item %s should be visible", item.Key)
-		}
+		defaultState[item.Key] = item.IsVisible
+	}
+	if defaultState[NavbarMenuApps] || defaultState[NavbarMenuConvert] {
+		t.Fatalf("apps and convert navbar defaults should be hidden")
+	}
+	if !defaultState[NavbarMenuVirtual] || !defaultState[NavbarMenuSosmed] {
+		t.Fatalf("nomor virtual and sosmed navbar defaults should be visible")
 	}
 
-	hidden := false
+	visible := true
 	updated, err := svc.Update(UpdateNavbarMenuSettingsInput{
-		Items: []UpdateNavbarMenuSettingItem{{Key: NavbarMenuConvert, IsVisible: &hidden}},
+		Items: []UpdateNavbarMenuSettingItem{{Key: NavbarMenuConvert, IsVisible: &visible}},
 	})
 	if err != nil {
 		t.Fatalf("update navbar menu settings: %v", err)
@@ -45,11 +50,14 @@ func TestNavbarMenuSettingServiceListPublicAndUpdate(t *testing.T) {
 	for _, item := range updated {
 		state[item.Key] = item.IsVisible
 	}
-	if state[NavbarMenuConvert] {
-		t.Fatalf("convert navbar item should be hidden")
+	if !state[NavbarMenuConvert] {
+		t.Fatalf("convert navbar item should be visible after update")
 	}
-	if !state[NavbarMenuApps] || !state[NavbarMenuVirtual] || !state[NavbarMenuSosmed] {
-		t.Fatalf("other navbar defaults should stay visible")
+	if state[NavbarMenuApps] {
+		t.Fatalf("apps navbar item should stay hidden by default")
+	}
+	if !state[NavbarMenuVirtual] || !state[NavbarMenuSosmed] {
+		t.Fatalf("nomor virtual and sosmed defaults should stay visible")
 	}
 
 	publicItems, err := svc.PublicList()
@@ -57,12 +65,12 @@ func TestNavbarMenuSettingServiceListPublicAndUpdate(t *testing.T) {
 		t.Fatalf("public list navbar menu settings: %v", err)
 	}
 	for _, item := range publicItems {
-		if item.Key == NavbarMenuConvert {
-			t.Fatalf("public list should not include hidden navbar item")
+		if item.Key == NavbarMenuApps {
+			t.Fatalf("public list should not include hidden apps navbar item")
 		}
 	}
 	if len(publicItems) != 3 {
-		t.Fatalf("expected 3 public items after hiding one, got %d", len(publicItems))
+		t.Fatalf("expected 3 public items after enabling convert, got %d", len(publicItems))
 	}
 }
 

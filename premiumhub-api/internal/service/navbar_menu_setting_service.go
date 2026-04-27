@@ -40,7 +40,7 @@ func DefaultNavbarMenuSettings() []model.NavbarMenuSetting {
 			Label:     "Apps",
 			Href:      "/product/prem-apps",
 			SortOrder: 10,
-			IsVisible: true,
+			IsVisible: false,
 			IsSystem:  true,
 		},
 		{
@@ -48,7 +48,7 @@ func DefaultNavbarMenuSettings() []model.NavbarMenuSetting {
 			Label:     "Convert Aset",
 			Href:      "/product/convert",
 			SortOrder: 20,
-			IsVisible: true,
+			IsVisible: false,
 			IsSystem:  true,
 		},
 		{
