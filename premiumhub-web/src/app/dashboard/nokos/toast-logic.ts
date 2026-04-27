@@ -6,6 +6,8 @@ export interface ToastState {
   message: string
 }
 
+export const TOAST_STACK_LIMIT = 3
+
 export function createToastState(
   tone: ToastTone,
   message: string,
@@ -21,15 +23,18 @@ export function createToastState(
   }
 }
 
-export function dismissToastByID(current: ToastState | null, toastID: number): ToastState | null {
-  if (!current) return null
-  if (current.id === toastID) return null
-  return current
+export function enqueueToast(current: ToastState[], next: ToastState, limit: number = TOAST_STACK_LIMIT): ToastState[] {
+  if (limit <= 0) return []
+  return [next, ...current].slice(0, limit)
+}
+
+export function dismissToastByID(current: ToastState[], toastID: number): ToastState[] {
+  return current.filter((item) => item.id !== toastID)
 }
 
 export function startToastAutoDismiss(
   toastID: number,
-  setToast: (updater: (current: ToastState | null) => ToastState | null) => void,
+  setToast: (updater: (current: ToastState[]) => ToastState[]) => void,
   timeoutMs: number = 3200
 ): () => void {
   const timer = globalThis.setTimeout(() => {

@@ -19,7 +19,15 @@ import {
 import { fiveSimService } from '@/services/fiveSimService'
 import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
-import { createToastState, startToastAutoDismiss, type ToastState, type ToastTone } from './toast-logic'
+import {
+  createToastState,
+  dismissToastByID,
+  enqueueToast,
+  startToastAutoDismiss,
+  TOAST_STACK_LIMIT,
+  type ToastState,
+  type ToastTone,
+} from './toast-logic'
 import type {
   FiveSimCountriesPayload,
   FiveSimMutateResponse,
@@ -563,7 +571,7 @@ export default function NomorVirtualPage() {
   const [selectedPrice, setSelectedPrice] = useState<PriceOption | null>(null)
 
   const [buying, setBuying] = useState(false)
-  const [toast, setToast] = useState<ToastState | null>(null)
+  const [toasts, setToasts] = useState<ToastState[]>([])
   const [insufficientByServer, setInsufficientByServer] = useState(false)
 
   const [orders, setOrders] = useState<FiveSimOrder[]>([])
@@ -581,6 +589,7 @@ export default function NomorVirtualPage() {
 
   const activationIdempotencyKeyRef = useRef('')
   const activationIdempotencyScopeRef = useRef('')
+  const toastCleanupRef = useRef<Record<number, () => void>>({})
 
   const selectedCountryKey = selectedCountry?.key || ''
   const selectedProductKey = selectedProduct?.key || ''
@@ -720,17 +729,40 @@ export default function NomorVirtualPage() {
     const sanitized = sanitizeNokosUserMessage(message)
     const nextToast = createToastState(tone, sanitized)
     if (!nextToast) return
-    setToast(nextToast)
+    setToasts((current) => enqueueToast(current, nextToast, TOAST_STACK_LIMIT))
   }, [])
 
   const clearToast = useCallback(() => {
-    setToast(null)
+    setToasts([])
   }, [])
 
   useEffect(() => {
-    if (!toast) return
-    return startToastAutoDismiss(toast.id, setToast, 3200)
-  }, [toast])
+    const activeIDs = new Set<number>()
+
+    toasts.forEach((toast) => {
+      activeIDs.add(toast.id)
+      if (toastCleanupRef.current[toast.id]) return
+      toastCleanupRef.current[toast.id] = startToastAutoDismiss(toast.id, setToasts, 3200)
+    })
+
+    Object.entries(toastCleanupRef.current).forEach(([id, cleanup]) => {
+      const toastID = Number(id)
+      if (activeIDs.has(toastID)) return
+      cleanup()
+      delete toastCleanupRef.current[toastID]
+    })
+  }, [toasts])
+
+  useEffect(() => {
+    return () => {
+      Object.values(toastCleanupRef.current).forEach((cleanup) => cleanup())
+      toastCleanupRef.current = {}
+    }
+  }, [])
+
+  const closeToast = useCallback((toastID: number) => {
+    setToasts((current) => dismissToastByID(current, toastID))
+  }, [])
 
   const refreshWalletBalance = useCallback(async () => {
     setWalletLoading(true)
@@ -914,7 +946,6 @@ export default function NomorVirtualPage() {
 
   const applyMutateSuccess = useCallback(
     async (payload: FiveSimMutateResponse, infoMessage: string) => {
-      clearToast()
       pushToast('success', infoMessage)
       setInsufficientByServer(false)
 
@@ -943,13 +974,12 @@ export default function NomorVirtualPage() {
       setOrdersPage(1)
       await Promise.all([loadOrders(1), refreshWalletBalance()])
     },
-    [clearToast, loadOrders, pushToast, refreshWalletBalance]
+    [loadOrders, pushToast, refreshWalletBalance]
   )
 
   const handleActivationBuy = async () => {
     if (!selectedCountry || !selectedProduct || !selectedPrice) return
 
-    clearToast()
     setBuying(true)
 
     try {
@@ -988,9 +1018,6 @@ export default function NomorVirtualPage() {
   ): Promise<boolean> => {
     const actionKey = `${action}:${order.provider_order_id}`
     setActionLoading((prev) => ({ ...prev, [actionKey]: true }))
-    if (!options?.silentSuccess) {
-      clearToast()
-    }
 
     try {
       const response =
@@ -1039,7 +1066,7 @@ export default function NomorVirtualPage() {
     } finally {
       setActionLoading((prev) => ({ ...prev, [actionKey]: false }))
     }
-  }, [clearToast, pushToast, refreshWalletBalance])
+  }, [pushToast, refreshWalletBalance])
 
   const toggleSMSInbox = async (order: FiveSimOrder) => {
     const current = smsStateByOrder[order.provider_order_id]
@@ -1919,30 +1946,33 @@ export default function NomorVirtualPage() {
       )}
 
       <div
-        className={`fixed bottom-4 right-4 z-[90] w-[min(92vw,360px)] transition-all duration-200 ${
-          toast ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0 pointer-events-none'
+        className={`fixed bottom-4 right-4 z-[90] w-[min(92vw,360px)] space-y-2 transition-all duration-200 ${
+          toasts.length > 0 ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0 pointer-events-none'
         }`}
       >
-        <div
-          className={`rounded-xl border px-4 py-3 shadow-lg ${
-            toast?.tone === 'error'
-              ? 'border-red-200 bg-red-50 text-red-700'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-          }`}
-        >
-          <div className="flex items-start gap-2">
-            {toast?.tone === 'error' ? <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
-            <p className="flex-1 text-sm leading-relaxed">{toast?.message || ''}</p>
-            <button
-              type="button"
-              className={toast?.tone === 'error' ? 'text-red-400 hover:text-red-600' : 'text-emerald-400 hover:text-emerald-600'}
-              onClick={clearToast}
-              aria-label="Tutup notifikasi"
-            >
-              ×
-            </button>
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`rounded-xl border px-4 py-3 shadow-lg ${
+              toast.tone === 'error'
+                ? 'border-red-200 bg-red-50 text-red-700'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              {toast.tone === 'error' ? <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
+              <p className="flex-1 text-sm leading-relaxed">{toast.message}</p>
+              <button
+                type="button"
+                className={toast.tone === 'error' ? 'text-red-400 hover:text-red-600' : 'text-emerald-400 hover:text-emerald-600'}
+                onClick={() => closeToast(toast.id)}
+                aria-label="Tutup notifikasi"
+              >
+                ×
+              </button>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   )
