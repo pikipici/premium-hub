@@ -20,7 +20,8 @@ import type { NokosLandingSummary } from '@/types/nokos'
 
 type OtpCard = {
   app: string
-  iconSrc: string
+  iconSrc?: string
+  iconText?: string
   iconClassName: string
   before: string
   code: string
@@ -67,6 +68,102 @@ const otpCards: OtpCard[] = [
     code: '481726',
     after: 'It expires in 10 minutes.',
   },
+  {
+    app: 'Facebook',
+    iconSrc: '/icons/apps/facebook.svg',
+    iconClassName: 'bg-[#1877F2] text-white',
+    before: 'Use',
+    code: '96243264',
+    after: 'as your Facebook verification code.',
+  },
+  {
+    app: 'Google / YouTube / Gmail',
+    iconSrc: '/icons/apps/google.svg',
+    iconClassName: 'bg-[#4285F4] text-white',
+    before: 'Verification code:',
+    code: '560 214',
+    after: 'Enter it to continue sign-in.',
+  },
+  {
+    app: 'Viber',
+    iconSrc: '/icons/apps/viber.svg',
+    iconClassName: 'bg-[#7360F2] text-white',
+    before: 'Your Viber code is',
+    code: '108 593',
+    after: 'Expires in 5 minutes.',
+  },
+  {
+    app: 'Discord',
+    iconSrc: '/icons/apps/discord.svg',
+    iconClassName: 'bg-[#5865F2] text-white',
+    before: 'Discord authentication code:',
+    code: '774922',
+    after: 'Never share this code.',
+  },
+  {
+    app: 'TikTok / Douyin',
+    iconSrc: '/icons/apps/tiktok.svg',
+    iconClassName: 'bg-[#111111] text-white',
+    before: 'Your TikTok code is',
+    code: '339 551',
+    after: 'valid for 10 minutes.',
+  },
+  {
+    app: 'Steam',
+    iconSrc: '/icons/apps/steam.svg',
+    iconClassName: 'bg-[#0B1C2C] text-white',
+    before: 'Steam Guard code:',
+    code: '91456',
+    after: 'enter this in the Steam app.',
+  },
+  {
+    app: 'Alipay / Alibaba / 1688',
+    iconSrc: '/icons/apps/alipay.svg',
+    iconClassName: 'bg-[#1677FF] text-white',
+    before: 'Verification code:',
+    code: '861203',
+    after: 'Do not disclose this code.',
+  },
+  {
+    app: 'OpenAI',
+    iconSrc: '/icons/apps/openai.svg',
+    iconClassName: 'bg-[#111827] text-white',
+    before: 'OpenAI confirmation code:',
+    code: '447 908',
+    after: 'Complete sign-in to continue.',
+  },
+  {
+    app: 'Whoosh',
+    iconSrc: '/icons/apps/whoosh.svg',
+    iconClassName: 'bg-[#16A34A] text-white',
+    before: 'Whoosh verification code:',
+    code: '730 824',
+    after: 'Valid for one-time use.',
+  },
+  {
+    app: 'Yandex / Uber',
+    iconSrc: '/icons/apps/yandex.svg',
+    iconClassName: 'bg-[#111827] text-white',
+    before: 'Use',
+    code: '640219',
+    after: 'to verify your account.',
+  },
+  {
+    app: 'FunPay',
+    iconSrc: '/icons/apps/funpay.png',
+    iconClassName: 'bg-[#2563EB] text-white',
+    before: 'Security code:',
+    code: '227 440',
+    after: 'confirm your marketplace login.',
+  },
+  {
+    app: 'White Calling',
+    iconSrc: '/icons/apps/white-calling.png',
+    iconClassName: 'bg-[#334155] text-white',
+    before: 'Your call verification code is',
+    code: '905113',
+    after: 'Use it within 3 minutes.',
+  },
 ]
 
 function OtpPreviewCard({ card }: { card: OtpCard }) {
@@ -74,13 +171,17 @@ function OtpPreviewCard({ card }: { card: OtpCard }) {
     <article className="rounded-2xl border border-[#f5f5f5] bg-white p-4 shadow-[0_8px_32px_rgba(20,20,20,0.10)] transition hover:-translate-y-0.5">
       <div className="flex items-start gap-3">
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${card.iconClassName}`}>
-          <Image
-            src={card.iconSrc}
-            alt={`${card.app} logo`}
-            width={18}
-            height={18}
-            className="h-[18px] w-[18px] brightness-0 invert"
-          />
+          {card.iconSrc ? (
+            <Image
+              src={card.iconSrc}
+              alt={`${card.app} logo`}
+              width={18}
+              height={18}
+              className="h-[18px] w-[18px] brightness-0 invert"
+            />
+          ) : (
+            <span className="text-[11px] font-extrabold uppercase tracking-wide">{card.iconText ?? card.app.slice(0, 2)}</span>
+          )}
         </div>
         <div>
           <h3 className="mb-1 text-sm font-extrabold text-[#141414]">{card.app}</h3>
