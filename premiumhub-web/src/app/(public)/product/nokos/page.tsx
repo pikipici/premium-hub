@@ -519,7 +519,7 @@ export default function LandingPage() {
 
         .otp-escalator-track {
           will-change: transform;
-          animation: otp-escalator 32s linear infinite;
+          animation: otp-escalator 48s linear infinite;
         }
 
         .otp-escalator-mask:hover .otp-escalator-track {
