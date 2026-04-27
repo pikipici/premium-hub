@@ -195,7 +195,7 @@ const otpCards: OtpCard[] = [
   },
   {
     app: 'Whoosh',
-    iconSrc: '/icons/apps/whoosh.svg',
+    iconSrc: '/icons/apps/whoosh.png',
     iconClassName: 'bg-[#16A34A] text-white',
     before: 'Whoosh verification code:',
     code: '730 824',
@@ -518,7 +518,7 @@ export default function LandingPage() {
 
         .otp-escalator-track {
           will-change: transform;
-          animation: otp-escalator 18s linear infinite;
+          animation: otp-escalator 24s linear infinite;
         }
 
         .otp-escalator-mask:hover .otp-escalator-track {
