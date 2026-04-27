@@ -125,7 +125,7 @@ export default function HomePage() {
               <ul className="mt-5 space-y-2.5 text-sm text-[#2E2E2E]">
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#2853A6]" />
-                  Layanan lengkap per platform
+                  Layanan platform lengkap, Instagram, TikTok, YouTube, Facebook, Telegram, Twitter/X, Website Traffic, dan masih banyak lagi
                 </li>
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#2853A6]" />
