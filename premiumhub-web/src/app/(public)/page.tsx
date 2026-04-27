@@ -119,7 +119,7 @@ export default function HomePage() {
                 Naikin Follower, Viewer, dan Engagement
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-[#6B7280] md:text-[15px]">
-                Order SMM praktis dengan progres yang bisa dipantau.
+                Order praktis dengan progres instant.
               </p>
 
               <ul className="mt-5 space-y-2.5 text-sm text-[#2E2E2E]">
@@ -149,7 +149,7 @@ export default function HomePage() {
                 href="/product/sosmed"
                 className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#2853A6] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#204486]"
               >
-                Lihat Layanan SMM
+                Beli Engager
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </article>
