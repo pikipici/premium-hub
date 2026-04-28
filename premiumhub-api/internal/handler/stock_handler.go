@@ -2,7 +2,6 @@ package handler
 
 import (
 	"math"
-	"strconv"
 
 	"premiumhub-api/internal/service"
 	"premiumhub-api/pkg/response"
@@ -20,8 +19,7 @@ func NewStockHandler(stockSvc *service.StockService) *StockHandler {
 }
 
 func (h *StockHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	page, limit := parsePageLimit(c, 20, 100)
 	status := c.Query("status")
 
 	var productID *uuid.UUID

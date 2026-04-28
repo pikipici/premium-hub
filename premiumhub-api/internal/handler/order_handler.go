@@ -2,7 +2,6 @@ package handler
 
 import (
 	"math"
-	"strconv"
 
 	"premiumhub-api/internal/service"
 	"premiumhub-api/pkg/response"
@@ -36,8 +35,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 
 func (h *OrderHandler) List(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	page, limit := parsePageLimit(c, 10, 100)
 
 	orders, total, err := h.orderSvc.ListByUser(userID, page, limit)
 	if err != nil {
@@ -81,8 +79,7 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 
 func (h *OrderHandler) AdminList(c *gin.Context) {
 	status := c.Query("status")
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	page, limit := parsePageLimit(c, 20, 100)
 	orders, total, err := h.orderSvc.AdminList(status, page, limit)
 	if err != nil {
 		response.InternalError(c)

@@ -33,6 +33,43 @@ func (c *Config) Validate() error {
 		problems = append(problems, "COOKIE_SECURE wajib true kalau COOKIE_SAMESITE=none")
 	}
 
+	validateDuration := func(raw, field string, max time.Duration) {
+		if v := strings.TrimSpace(raw); v != "" {
+			d, err := time.ParseDuration(v)
+			if err != nil || d <= 0 || d > max {
+				problems = append(problems, field+" harus format duration valid > 0 dan <= "+max.String())
+			}
+		}
+	}
+	validatePositiveInt := func(raw, field string, max int64) {
+		if v := strings.TrimSpace(raw); v != "" {
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil || n <= 0 || n > max {
+				problems = append(problems, field+" harus angka 1-"+strconv.FormatInt(max, 10))
+			}
+		}
+	}
+	validateRate := func(maxRaw, winRaw, maxField, winField string) {
+		if v := strings.TrimSpace(maxRaw); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n <= 0 {
+				problems = append(problems, maxField+" harus angka > 0")
+			}
+		}
+		if v := strings.TrimSpace(winRaw); v != "" {
+			if _, err := time.ParseDuration(v); err != nil {
+				problems = append(problems, winField+" harus format duration valid (contoh: 1m, 30s)")
+			}
+		}
+	}
+
+	validateDuration(c.HTTPReadHeaderTimeout, "HTTP_READ_HEADER_TIMEOUT", 30*time.Second)
+	validateDuration(c.HTTPReadTimeout, "HTTP_READ_TIMEOUT", 5*time.Minute)
+	validateDuration(c.HTTPWriteTimeout, "HTTP_WRITE_TIMEOUT", 5*time.Minute)
+	validateDuration(c.HTTPIdleTimeout, "HTTP_IDLE_TIMEOUT", 30*time.Minute)
+	validatePositiveInt(c.HTTPMaxHeaderBytes, "HTTP_MAX_HEADER_BYTES", 8*1024*1024)
+	validatePositiveInt(c.MaxRequestBodyBytes, "MAX_REQUEST_BODY_BYTES", 100*1024*1024)
+
 	if v := strings.TrimSpace(c.AuthRateLimitMax); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 {
@@ -44,6 +81,10 @@ func (c *Config) Validate() error {
 			problems = append(problems, "AUTH_RATE_LIMIT_WINDOW harus format duration valid (contoh: 1m, 30s)")
 		}
 	}
+	validateRate(c.GlobalRateLimitMax, c.GlobalRateLimitWindow, "GLOBAL_RATE_LIMIT_MAX", "GLOBAL_RATE_LIMIT_WINDOW")
+	validateRate(c.ProviderRateLimitMax, c.ProviderRateLimitWindow, "PROVIDER_RATE_LIMIT_MAX", "PROVIDER_RATE_LIMIT_WINDOW")
+	validateRate(c.PaymentRateLimitMax, c.PaymentRateLimitWindow, "PAYMENT_RATE_LIMIT_MAX", "PAYMENT_RATE_LIMIT_WINDOW")
+	validateRate(c.WebhookRateLimitMax, c.WebhookRateLimitWindow, "WEBHOOK_RATE_LIMIT_MAX", "WEBHOOK_RATE_LIMIT_WINDOW")
 
 	if v := strings.TrimSpace(c.DuitkuHTTPTimeoutSec); v != "" {
 		n, err := strconv.Atoi(v)
@@ -111,20 +152,6 @@ func (c *Config) Validate() error {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 || n > 1_000_000_000 {
 			problems = append(problems, "NOKOS_LANDING_METHOD_PROBE_AMOUNT harus angka > 0 dan <= 1000000000")
-		}
-	}
-
-	validateRate := func(maxRaw, winRaw, maxField, winField string) {
-		if v := strings.TrimSpace(maxRaw); v != "" {
-			n, err := strconv.Atoi(v)
-			if err != nil || n <= 0 {
-				problems = append(problems, maxField+" harus angka > 0")
-			}
-		}
-		if v := strings.TrimSpace(winRaw); v != "" {
-			if _, err := time.ParseDuration(v); err != nil {
-				problems = append(problems, winField+" harus format duration valid (contoh: 1m, 30s)")
-			}
 		}
 	}
 

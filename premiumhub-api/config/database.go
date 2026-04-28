@@ -16,7 +16,11 @@ import (
 func InitDB(cfg *Config) *gorm.DB {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Jakarta",
 		cfg.DBHost, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBPort)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Info)})
+	dbLogger := logger.Default.LogMode(logger.Info)
+	if strings.EqualFold(strings.TrimSpace(cfg.AppEnv), "production") {
+		dbLogger = logger.Default.LogMode(logger.Warn)
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: dbLogger})
 	if err != nil {
 		log.Fatal("DB connect:", err)
 	}

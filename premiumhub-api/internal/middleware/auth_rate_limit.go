@@ -13,17 +13,20 @@ import (
 )
 
 type authRateLimiter struct {
-	mu     sync.Mutex
-	max    int
-	window time.Duration
-	hits   map[string][]time.Time
+	mu        sync.Mutex
+	max       int
+	window    time.Duration
+	hits      map[string][]time.Time
+	maxKeys   int
+	lastSweep time.Time
 }
 
 func NewAuthRateLimiter(maxRaw, windowRaw string) gin.HandlerFunc {
 	limiter := &authRateLimiter{
-		max:    parsePositiveInt(maxRaw, 20),
-		window: parseDuration(windowRaw, time.Minute),
-		hits:   map[string][]time.Time{},
+		max:     parsePositiveInt(maxRaw, 20),
+		window:  parseDuration(windowRaw, time.Minute),
+		hits:    map[string][]time.Time{},
+		maxKeys: defaultRateLimiterMaxKeys,
 	}
 
 	return func(c *gin.Context) {
@@ -47,6 +50,10 @@ func (l *authRateLimiter) allow(ip string) bool {
 	if strings.TrimSpace(ip) == "" {
 		ip = "unknown"
 	}
+	l.sweepLocked(now)
+	if _, ok := l.hits[ip]; !ok && l.maxKeys > 0 && len(l.hits) >= l.maxKeys {
+		return false
+	}
 
 	prev := l.hits[ip]
 	filtered := prev[:0]
@@ -64,6 +71,31 @@ func (l *authRateLimiter) allow(ip string) bool {
 	filtered = append(filtered, now)
 	l.hits[ip] = filtered
 	return true
+}
+
+func (l *authRateLimiter) sweepLocked(now time.Time) {
+	if l == nil || len(l.hits) == 0 {
+		return
+	}
+	if !l.lastSweep.IsZero() && now.Sub(l.lastSweep) < l.window {
+		return
+	}
+
+	cutoff := now.Add(-l.window)
+	for key, hits := range l.hits {
+		filtered := hits[:0]
+		for _, ts := range hits {
+			if ts.After(cutoff) {
+				filtered = append(filtered, ts)
+			}
+		}
+		if len(filtered) == 0 {
+			delete(l.hits, key)
+			continue
+		}
+		l.hits[key] = filtered
+	}
+	l.lastSweep = now
 }
 
 func parsePositiveInt(raw string, fallback int) int {

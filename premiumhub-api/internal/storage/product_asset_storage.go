@@ -48,6 +48,9 @@ func (s *ProductAssetStorage) Store(ctx context.Context, productID, kind string,
 	if file == nil {
 		return "", fmt.Errorf("file asset tidak ditemukan")
 	}
+	if file.Size <= 0 || file.Size > s.proofStorage.MaxFileSize() {
+		return "", fmt.Errorf("ukuran file asset tidak valid (maks 5MB)")
+	}
 
 	kind = strings.ToLower(strings.TrimSpace(kind))
 	if kind != productAssetKindIcon && kind != productAssetKindHero {

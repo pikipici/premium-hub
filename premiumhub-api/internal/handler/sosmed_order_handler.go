@@ -40,17 +40,12 @@ func (h *SosmedOrderHandler) Create(c *gin.Context) {
 
 func (h *SosmedOrderHandler) List(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	page, limit := parsePageLimit(c, 10, 100)
 
 	orders, total, err := h.svc.ListByUser(userID, page, limit)
 	if err != nil {
 		response.InternalError(c)
 		return
-	}
-
-	if limit < 1 {
-		limit = 10
 	}
 
 	response.SuccessWithMeta(c, "OK", orders, response.Meta{
@@ -96,17 +91,12 @@ func (h *SosmedOrderHandler) Cancel(c *gin.Context) {
 
 func (h *SosmedOrderHandler) AdminList(c *gin.Context) {
 	status := strings.TrimSpace(c.Query("status"))
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	page, limit := parsePageLimit(c, 20, 100)
 
 	orders, total, err := h.svc.AdminList(status, page, limit)
 	if err != nil {
 		response.InternalError(c)
 		return
-	}
-
-	if limit < 1 {
-		limit = 20
 	}
 
 	response.SuccessWithMeta(c, "OK", orders, response.Meta{

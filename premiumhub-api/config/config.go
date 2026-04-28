@@ -31,7 +31,13 @@ type Config struct {
 	CookieDomain, CookieSameSite                                                string
 	CookieSecure                                                                bool
 	GoogleClientID                                                              string
+	HTTPReadHeaderTimeout, HTTPReadTimeout, HTTPWriteTimeout, HTTPIdleTimeout   string
+	HTTPMaxHeaderBytes, MaxRequestBodyBytes                                     string
 	AuthRateLimitMax, AuthRateLimitWindow                                       string
+	GlobalRateLimitMax, GlobalRateLimitWindow                                   string
+	ProviderRateLimitMax, ProviderRateLimitWindow                               string
+	PaymentRateLimitMax, PaymentRateLimitWindow                                 string
+	WebhookRateLimitMax, WebhookRateLimitWindow                                 string
 	ConvertTrackRateLimitMax, ConvertTrackRateLimitWindow                       string
 	ConvertCreateRateLimitMax, ConvertCreateRateLimitWindow                     string
 	ConvertProofRateLimitMax, ConvertProofRateLimitWindow                       string
@@ -110,8 +116,22 @@ func Load() *Config {
 		CookieSameSite:                       e("COOKIE_SAMESITE", "lax"),
 		CookieSecure:                         eb("COOKIE_SECURE", isProd),
 		GoogleClientID:                       e("GOOGLE_CLIENT_ID", ""),
+		HTTPReadHeaderTimeout:                e("HTTP_READ_HEADER_TIMEOUT", "5s"),
+		HTTPReadTimeout:                      e("HTTP_READ_TIMEOUT", "15s"),
+		HTTPWriteTimeout:                     e("HTTP_WRITE_TIMEOUT", "30s"),
+		HTTPIdleTimeout:                      e("HTTP_IDLE_TIMEOUT", "60s"),
+		HTTPMaxHeaderBytes:                   e("HTTP_MAX_HEADER_BYTES", "1048576"),
+		MaxRequestBodyBytes:                  e("MAX_REQUEST_BODY_BYTES", "12582912"),
 		AuthRateLimitMax:                     e("AUTH_RATE_LIMIT_MAX", "20"),
 		AuthRateLimitWindow:                  e("AUTH_RATE_LIMIT_WINDOW", "1m"),
+		GlobalRateLimitMax:                   e("GLOBAL_RATE_LIMIT_MAX", "600"),
+		GlobalRateLimitWindow:                e("GLOBAL_RATE_LIMIT_WINDOW", "1m"),
+		ProviderRateLimitMax:                 e("PROVIDER_RATE_LIMIT_MAX", "60"),
+		ProviderRateLimitWindow:              e("PROVIDER_RATE_LIMIT_WINDOW", "1m"),
+		PaymentRateLimitMax:                  e("PAYMENT_RATE_LIMIT_MAX", "20"),
+		PaymentRateLimitWindow:               e("PAYMENT_RATE_LIMIT_WINDOW", "1m"),
+		WebhookRateLimitMax:                  e("WEBHOOK_RATE_LIMIT_MAX", "120"),
+		WebhookRateLimitWindow:               e("WEBHOOK_RATE_LIMIT_WINDOW", "1m"),
 		ConvertTrackRateLimitMax:             e("CONVERT_TRACK_RATE_LIMIT_MAX", "120"),
 		ConvertTrackRateLimitWindow:          e("CONVERT_TRACK_RATE_LIMIT_WINDOW", "1m"),
 		ConvertCreateRateLimitMax:            e("CONVERT_CREATE_RATE_LIMIT_MAX", "12"),

@@ -18,7 +18,11 @@ import (
 )
 
 func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	if cfg == nil || !strings.EqualFold(strings.TrimSpace(cfg.AppEnv), "production") {
+		r.Use(gin.Logger())
+	}
+	r.Use(gin.Recovery())
 	r.Use(middleware.CORS(cfg.FrontendURL))
 
 	r.GET("/healthz", func(c *gin.Context) {
@@ -137,6 +141,10 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
 
 	api := r.Group("/api/v1")
+	api.Use(
+		middleware.MaxRequestBodyBytes(cfg.MaxRequestBodyBytes),
+		middleware.NewIPRateLimiter(cfg.GlobalRateLimitMax, cfg.GlobalRateLimitWindow, "Terlalu banyak request API. Coba lagi sebentar."),
+	)
 
 	// Public routes
 	auth := api.Group("/auth")
@@ -156,7 +164,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.GET("/product-categories", productCategoryHandler.List)
 	api.GET("/maintenance/evaluate", maintenanceHandler.Evaluate)
 
-	api.POST("/payment/webhook", paymentHandler.Webhook)
+	api.POST(
+		"/payment/webhook",
+		middleware.NewIPRateLimiter(cfg.WebhookRateLimitMax, cfg.WebhookRateLimitWindow, "Terlalu banyak request webhook. Coba lagi sebentar."),
+		paymentHandler.Webhook,
+	)
 	api.GET("/public/nokos/landing-summary", nokosPublicHandler.GetLandingSummary)
 	api.GET("/public/nokos/countries", nokosPublicHandler.GetCountries)
 	api.GET("/public/navbar-menu", navbarMenuSettingHandler.PublicList)
@@ -206,18 +218,46 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/activities/history", activityHandler.List)
 	protected.GET("/me/sidebar-menu", userSidebarMenuSettingHandler.List)
 
-	protected.GET("/payment/methods", paymentHandler.ListMethods)
-	protected.POST("/payment/create", paymentHandler.Create)
-	protected.GET("/payment/status/:orderId", paymentHandler.GetStatus)
-	protected.POST("/sosmed/payments", sosmedPaymentHandler.Create)
-	protected.GET("/sosmed/payments/status/:orderId", sosmedPaymentHandler.GetStatus)
+	protected.GET(
+		"/payment/methods",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request metode pembayaran. Coba lagi sebentar."),
+		paymentHandler.ListMethods,
+	)
+	protected.POST(
+		"/payment/create",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request pembayaran. Coba lagi sebentar."),
+		paymentHandler.Create,
+	)
+	protected.GET(
+		"/payment/status/:orderId",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak cek status pembayaran. Coba lagi sebentar."),
+		paymentHandler.GetStatus,
+	)
+	protected.POST(
+		"/sosmed/payments",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request pembayaran. Coba lagi sebentar."),
+		sosmedPaymentHandler.Create,
+	)
+	protected.GET(
+		"/sosmed/payments/status/:orderId",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak cek status pembayaran. Coba lagi sebentar."),
+		sosmedPaymentHandler.GetStatus,
+	)
 
 	protected.GET("/wallet/balance", walletHandler.Balance)
 	protected.GET("/wallet/ledger", walletHandler.ListLedger)
-	protected.POST("/wallet/topups", walletHandler.CreateTopup)
+	protected.POST(
+		"/wallet/topups",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request topup. Coba lagi sebentar."),
+		walletHandler.CreateTopup,
+	)
 	protected.GET("/wallet/topups", walletHandler.ListTopups)
 	protected.GET("/wallet/topups/:id", walletHandler.GetTopup)
-	protected.POST("/wallet/topups/:id/check", walletHandler.CheckTopup)
+	protected.POST(
+		"/wallet/topups/:id/check",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak cek topup. Coba lagi sebentar."),
+		walletHandler.CheckTopup,
+	)
 
 	protected.POST(
 		"/convert/orders",
@@ -232,9 +272,21 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		convertHandler.UploadProof,
 	)
 
-	protected.GET("/5sim/catalog/countries", fiveSimHandler.GetCountries)
-	protected.GET("/5sim/catalog/products", fiveSimHandler.GetProducts)
-	protected.GET("/5sim/catalog/prices", fiveSimHandler.GetPrices)
+	protected.GET(
+		"/5sim/catalog/countries",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak request katalog provider. Coba lagi sebentar."),
+		fiveSimHandler.GetCountries,
+	)
+	protected.GET(
+		"/5sim/catalog/products",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak request katalog provider. Coba lagi sebentar."),
+		fiveSimHandler.GetProducts,
+	)
+	protected.GET(
+		"/5sim/catalog/prices",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak request katalog provider. Coba lagi sebentar."),
+		fiveSimHandler.GetPrices,
+	)
 
 	protected.GET("/5sim/orders", fiveSimHandler.ListOrders)
 	protected.POST(
@@ -252,11 +304,31 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		middleware.NewUserRateLimiter(cfg.FiveSimBuyRateLimitMax, cfg.FiveSimBuyRateLimitWindow, "Terlalu banyak request pembelian 5sim. Coba lagi sebentar."),
 		fiveSimHandler.ReuseNumber,
 	)
-	protected.GET("/5sim/orders/:id", fiveSimHandler.CheckOrder)
-	protected.POST("/5sim/orders/:id/finish", fiveSimHandler.FinishOrder)
-	protected.POST("/5sim/orders/:id/cancel", fiveSimHandler.CancelOrder)
-	protected.POST("/5sim/orders/:id/ban", fiveSimHandler.BanOrder)
-	protected.GET("/5sim/orders/:id/sms-inbox", fiveSimHandler.GetSMSInbox)
+	protected.GET(
+		"/5sim/orders/:id",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak sinkron order provider. Coba lagi sebentar."),
+		fiveSimHandler.CheckOrder,
+	)
+	protected.POST(
+		"/5sim/orders/:id/finish",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak aksi order provider. Coba lagi sebentar."),
+		fiveSimHandler.FinishOrder,
+	)
+	protected.POST(
+		"/5sim/orders/:id/cancel",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak aksi order provider. Coba lagi sebentar."),
+		fiveSimHandler.CancelOrder,
+	)
+	protected.POST(
+		"/5sim/orders/:id/ban",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak aksi order provider. Coba lagi sebentar."),
+		fiveSimHandler.BanOrder,
+	)
+	protected.GET(
+		"/5sim/orders/:id/sms-inbox",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak cek inbox provider. Coba lagi sebentar."),
+		fiveSimHandler.GetSMSInbox,
+	)
 
 	protected.POST("/claims", claimHandler.Create)
 	protected.GET("/claims", claimHandler.List)
@@ -267,8 +339,16 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.Use(middleware.Auth(cfg.JWTSecret), middleware.AdminOnly())
 
 	admin.GET("/dashboard", adminHandler.Dashboard)
-	admin.GET("/5sim/profile", fiveSimHandler.GetProviderProfile)
-	admin.GET("/5sim/orders", fiveSimHandler.GetProviderOrderHistory)
+	admin.GET(
+		"/5sim/profile",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak request provider. Coba lagi sebentar."),
+		fiveSimHandler.GetProviderProfile,
+	)
+	admin.GET(
+		"/5sim/orders",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak request provider. Coba lagi sebentar."),
+		fiveSimHandler.GetProviderOrderHistory,
+	)
 
 	admin.GET("/products", productHandler.AdminList)
 	admin.POST("/products", productHandler.Create)
@@ -291,8 +371,16 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.DELETE("/product-categories/:id", productCategoryHandler.Delete)
 
 	admin.GET("/sosmed/services", sosmedServiceHandler.AdminList)
-	admin.GET("/sosmed/provider/jap/balance", japHandler.GetBalance)
-	admin.GET("/sosmed/provider/jap/services", japHandler.GetServices)
+	admin.GET(
+		"/sosmed/provider/jap/balance",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak request provider. Coba lagi sebentar."),
+		japHandler.GetBalance,
+	)
+	admin.GET(
+		"/sosmed/provider/jap/services",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak request provider. Coba lagi sebentar."),
+		japHandler.GetServices,
+	)
 	admin.POST("/sosmed/services", sosmedServiceHandler.Create)
 	admin.POST("/sosmed/services/preview-jap-selected", sosmedServiceHandler.PreviewSelectedFromJAP)
 	admin.POST("/sosmed/services/import-jap-selected", sosmedServiceHandler.ImportSelectedFromJAP)
@@ -321,12 +409,28 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	admin.GET("/sosmed/orders", sosmedOrderHandler.AdminList)
 	admin.GET("/sosmed/orders/ops-summary", sosmedOrderHandler.AdminOpsSummary)
-	admin.POST("/sosmed/orders/sync-provider", sosmedOrderHandler.AdminSyncProcessingProviders)
+	admin.POST(
+		"/sosmed/orders/sync-provider",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak sinkron provider. Coba lagi sebentar."),
+		sosmedOrderHandler.AdminSyncProcessingProviders,
+	)
 	admin.GET("/sosmed/orders/:id", sosmedOrderHandler.AdminGetByID)
 	admin.PATCH("/sosmed/orders/:id/status", sosmedOrderHandler.AdminUpdateStatus)
-	admin.POST("/sosmed/orders/:id/sync-provider", sosmedOrderHandler.AdminSyncProvider)
-	admin.POST("/sosmed/orders/:id/retry-provider", sosmedOrderHandler.AdminRetryProvider)
-	admin.POST("/sosmed/orders/:id/refill", sosmedOrderHandler.AdminTriggerRefill)
+	admin.POST(
+		"/sosmed/orders/:id/sync-provider",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak sinkron provider. Coba lagi sebentar."),
+		sosmedOrderHandler.AdminSyncProvider,
+	)
+	admin.POST(
+		"/sosmed/orders/:id/retry-provider",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak retry provider. Coba lagi sebentar."),
+		sosmedOrderHandler.AdminRetryProvider,
+	)
+	admin.POST(
+		"/sosmed/orders/:id/refill",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak refill provider. Coba lagi sebentar."),
+		sosmedOrderHandler.AdminTriggerRefill,
+	)
 	admin.POST("/sosmed/orders/:id/backfill-refill", sosmedOrderHandler.AdminBackfillRefill)
 	admin.POST("/sosmed/orders/backfill-refill", sosmedOrderHandler.AdminBackfillAllRefill)
 
@@ -336,8 +440,16 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	admin.GET("/users", adminHandler.ListUsers)
 	admin.PUT("/users/:id/block", adminHandler.BlockUser)
-	admin.POST("/wallet/topups/:id/recheck", walletHandler.AdminRecheckTopup)
-	admin.POST("/wallet/topups/reconcile", walletHandler.ReconcilePending)
+	admin.POST(
+		"/wallet/topups/:id/recheck",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak recheck topup. Coba lagi sebentar."),
+		walletHandler.AdminRecheckTopup,
+	)
+	admin.POST(
+		"/wallet/topups/reconcile",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak reconcile topup. Coba lagi sebentar."),
+		walletHandler.ReconcilePending,
+	)
 
 	admin.GET("/convert/orders", convertHandler.AdminListOrders)
 	admin.GET("/convert/orders/:id", convertHandler.AdminGetOrder)

@@ -39,7 +39,7 @@ func (h *PaymentHandler) ListMethods(c *gin.Context) {
 	amount := int64(10000)
 	if raw := strings.TrimSpace(c.Query("amount")); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || parsed <= 0 {
+		if err != nil || parsed <= 0 || parsed > 1_000_000_000 {
 			response.BadRequest(c, "amount tidak valid")
 			return
 		}

@@ -59,17 +59,9 @@ func (h *AdminHandler) Dashboard(c *gin.Context) {
 }
 
 func (h *AdminHandler) ListUsers(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	page, limit := parsePageLimit(c, 20, 100)
 	search := strings.TrimSpace(c.Query("search"))
 	status := strings.TrimSpace(c.Query("status"))
-
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 20
-	}
 
 	users, total, err := h.userRepo.List(page, limit, search, status)
 	if err != nil {

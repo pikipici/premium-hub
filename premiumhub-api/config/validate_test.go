@@ -71,6 +71,50 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject malformed http safety config", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                  "development",
+			JWTSecret:               "super-secure-secret-value-32chars++",
+			CookieSameSite:          "lax",
+			HTTPReadHeaderTimeout:   "0",
+			HTTPReadTimeout:         "bad",
+			HTTPWriteTimeout:        "6m",
+			HTTPIdleTimeout:         "31m",
+			HTTPMaxHeaderBytes:      "0",
+			MaxRequestBodyBytes:     "999999999",
+			GlobalRateLimitMax:      "0",
+			GlobalRateLimitWindow:   "wrong",
+			ProviderRateLimitMax:    "-1",
+			ProviderRateLimitWindow: "1m",
+			PaymentRateLimitMax:     "abc",
+			PaymentRateLimitWindow:  "1m",
+			WebhookRateLimitMax:     "120",
+			WebhookRateLimitWindow:  "bad",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected http safety validation error")
+		}
+		msg := err.Error()
+		for _, expected := range []string{
+			"HTTP_READ_HEADER_TIMEOUT",
+			"HTTP_READ_TIMEOUT",
+			"HTTP_WRITE_TIMEOUT",
+			"HTTP_IDLE_TIMEOUT",
+			"HTTP_MAX_HEADER_BYTES",
+			"MAX_REQUEST_BODY_BYTES",
+			"GLOBAL_RATE_LIMIT_MAX",
+			"GLOBAL_RATE_LIMIT_WINDOW",
+			"PROVIDER_RATE_LIMIT_MAX",
+			"PAYMENT_RATE_LIMIT_MAX",
+			"WEBHOOK_RATE_LIMIT_WINDOW",
+		} {
+			if !strings.Contains(msg, expected) {
+				t.Fatalf("expected error to contain %q, got: %s", expected, msg)
+			}
+		}
+	})
+
 	t.Run("reject invalid fivesim timeout", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:                "development",

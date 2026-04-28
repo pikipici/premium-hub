@@ -2,7 +2,6 @@ package handler
 
 import (
 	"math"
-	"strconv"
 	"strings"
 
 	"premiumhub-api/internal/service"
@@ -22,8 +21,7 @@ func NewProductHandler(productSvc *service.ProductService) *ProductHandler {
 
 func (h *ProductHandler) List(c *gin.Context) {
 	category := c.Query("category")
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "12"))
+	page, limit := parsePageLimit(c, 12, 100)
 
 	products, total, err := h.productSvc.List(category, page, limit)
 	if err != nil {
@@ -60,8 +58,7 @@ func (h *ProductHandler) GetPrices(c *gin.Context) {
 }
 
 func (h *ProductHandler) AdminList(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	page, limit := parsePageLimit(c, 20, 100)
 	products, total, err := h.productSvc.AdminList(page, limit)
 	if err != nil {
 		response.InternalError(c)
