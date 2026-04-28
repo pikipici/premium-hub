@@ -463,14 +463,22 @@ export default function WalletPage() {
             <div className="text-3xl">⚡</div>
             <div className="flex-1">
               <h3 className="text-sm font-bold mb-1">Saldo Wallet Siap Dipakai</h3>
-              <p className="text-xs text-white/60">Saldo wallet kamu bisa dipakai untuk beli nomor OTP di Dashboard Nokos.</p>
+              <p className="text-xs text-white/60">Pakai saldo wallet untuk checkout Nokos dan layanan SMM dalam satu akun.</p>
             </div>
-            <Link
-              href="/dashboard/nokos"
-              className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#141414] hover:opacity-90"
-            >
-              Buka Nokos
-            </Link>
+            <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+              <Link
+                href="/dashboard/nokos"
+                className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#141414] hover:opacity-90"
+              >
+                Buka Nokos
+              </Link>
+              <Link
+                href="/product/sosmed"
+                className="inline-flex items-center justify-center rounded-lg border border-white/35 bg-white/10 px-3 py-2 text-xs font-bold text-white hover:bg-white/20"
+              >
+                Buka SMM
+              </Link>
+            </div>
           </section>
 
           <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
