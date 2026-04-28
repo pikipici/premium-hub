@@ -142,6 +142,10 @@ LAST_SUCCESS_COMMIT_FILE="${LAST_SUCCESS_COMMIT_FILE:-${DEPLOY_STATE_DIR}/main-l
 # Health check targets
 FE_HEALTH_URL="${FE_HEALTH_URL:-http://127.0.0.1:3002/}"
 BE_HEALTH_URL="${BE_HEALTH_URL:-http://127.0.0.1:8081/healthz}"
+FE_HEALTH_ATTEMPTS="${FE_HEALTH_ATTEMPTS:-20}"
+FE_HEALTH_SLEEP_SEC="${FE_HEALTH_SLEEP_SEC:-1}"
+BE_HEALTH_ATTEMPTS="${BE_HEALTH_ATTEMPTS:-30}"
+BE_HEALTH_SLEEP_SEC="${BE_HEALTH_SLEEP_SEC:-1}"
 
 # Service names (user-level systemd)
 SERVICES=(
@@ -631,10 +635,10 @@ step_done "RESTART SERVICES"
 step_start "POST-RESTART HEALTHCHECK"
 
 log_info "Checking frontend endpoint: ${FE_HEALTH_URL}"
-wait_for_http "${FE_HEALTH_URL}" "Frontend" 20 1
+wait_for_http "${FE_HEALTH_URL}" "Frontend" "${FE_HEALTH_ATTEMPTS}" "${FE_HEALTH_SLEEP_SEC}"
 
 log_info "Checking backend health endpoint: ${BE_HEALTH_URL}"
-wait_for_http "${BE_HEALTH_URL}" "Backend(healthz)" 10 1
+wait_for_http "${BE_HEALTH_URL}" "Backend(healthz)" "${BE_HEALTH_ATTEMPTS}" "${BE_HEALTH_SLEEP_SEC}"
 
 step_done "POST-RESTART HEALTHCHECK"
 
