@@ -202,12 +202,51 @@ func TestConfigValidate(t *testing.T) {
 			"DUITKU_MERCHANT_CODE",
 			"DUITKU_API_KEY",
 			"DUITKU_BASE_URL",
-			"DUITKU_CALLBACK_URL atau FRONTEND_URL",
+			"PAYMENT_GATEWAY_CALLBACK_URL atau DUITKU_CALLBACK_URL atau FRONTEND_URL",
 			"FIVESIM_API_KEY",
 		} {
 			if !strings.Contains(msg, expected) {
 				t.Fatalf("expected error to contain %q, got: %s", expected, msg)
 			}
+		}
+	})
+
+	t.Run("production requires pakasir fields when selected", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                 "production",
+			JWTSecret:              "super-secure-secret-value-32chars++",
+			PaymentGatewayProvider: "pakasir",
+			FiveSimAPIKey:          "FS_xxx",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected validation error")
+		}
+
+		msg := err.Error()
+		for _, expected := range []string{
+			"PAKASIR_PROJECT",
+			"PAKASIR_API_KEY",
+			"PAKASIR_BASE_URL",
+		} {
+			if !strings.Contains(msg, expected) {
+				t.Fatalf("expected error to contain %q, got: %s", expected, msg)
+			}
+		}
+		if strings.Contains(msg, "DUITKU_MERCHANT_CODE") {
+			t.Fatalf("pakasir mode should not require duitku creds, got: %s", msg)
+		}
+	})
+
+	t.Run("reject invalid payment provider", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                 "development",
+			JWTSecret:              "super-secure-secret-value-32chars++",
+			PaymentGatewayProvider: "unknown",
+		}
+		err := cfg.Validate()
+		if err == nil || !strings.Contains(err.Error(), "PAYMENT_GATEWAY_PROVIDER") {
+			t.Fatalf("expected payment provider error, got: %v", err)
 		}
 	})
 
@@ -358,6 +397,37 @@ func TestConfigValidate(t *testing.T) {
 		}
 		if err := cfg.Validate(); err != nil {
 			t.Fatalf("expected valid production config, got: %v", err)
+		}
+	})
+
+	t.Run("production passes with pakasir", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                            "Production",
+			JWTSecret:                         "super-secure-secret-value-32chars++",
+			PaymentGatewayProvider:            "pakasir",
+			PakasirProject:                    "digimarket",
+			PakasirAPIKey:                     "PK_xxx",
+			PakasirBaseURL:                    "https://app.pakasir.com",
+			PakasirHTTPTimeoutSec:             "12",
+			FiveSimAPIKey:                     "FS_xxx",
+			FiveSimHTTPTimeoutSec:             "15",
+			CookieSameSite:                    "strict",
+			CookieSecure:                      true,
+			AuthRateLimitMax:                  "25",
+			AuthRateLimitWindow:               "2m",
+			ConvertTrackRateLimitMax:          "120",
+			ConvertTrackRateLimitWindow:       "1m",
+			ConvertCreateRateLimitMax:         "12",
+			ConvertCreateRateLimitWindow:      "1m",
+			ConvertProofRateLimitMax:          "20",
+			ConvertProofRateLimitWindow:       "5m",
+			ConvertAdminStatusRateLimitMax:    "120",
+			ConvertAdminStatusRateLimitWindow: "1m",
+			ConvertExpiryWorkerInterval:       "1m",
+			ConvertExpiryWorkerBatchLimit:     "200",
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("expected valid pakasir production config, got: %v", err)
 		}
 	})
 }

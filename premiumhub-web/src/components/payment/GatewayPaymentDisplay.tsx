@@ -18,8 +18,31 @@ type QRState = {
   error: string
 }
 
-const qrisMethods = new Set(['SP', 'NQ', 'GQ', 'SQ'])
-const vaMethods = new Set(['BC', 'M2', 'VA', 'I1', 'B1', 'BT', 'A1', 'AG', 'NC', 'BR', 'S1', 'DM', 'BV'])
+const qrisMethods = new Set(['SP', 'QRIS', 'NQ', 'GQ', 'SQ'])
+const vaMethods = new Set([
+  'BC',
+  'M2',
+  'VA',
+  'I1',
+  'B1',
+  'BT',
+  'A1',
+  'AG',
+  'NC',
+  'BR',
+  'S1',
+  'DM',
+  'BV',
+  'BRI_VA',
+  'BNI_VA',
+  'PERMATA_VA',
+  'MAYBANK_VA',
+  'CIMB_NIAGA_VA',
+  'BNC_VA',
+  'SAMPOERNA_VA',
+  'ATM_BERSAMA_VA',
+  'ARTHA_GRAHA_VA',
+])
 
 const methodAliases: Record<string, string> = {
   QRIS: 'SP',
@@ -33,6 +56,10 @@ const methodAliases: Record<string, string> = {
   CIMB_NIAGA_VA: 'B1',
   BNC_VA: 'NC',
   BSI_VA: 'BV',
+  MAYBANK_VA: 'VA',
+  SAMPOERNA_VA: 'S1',
+  ATM_BERSAMA_VA: 'A1',
+  ARTHA_GRAHA_VA: 'AG',
 }
 
 const methodLabels: Record<string, string> = {

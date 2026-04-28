@@ -107,8 +107,9 @@ func (s *PaymentService) ListPaymentMethods(ctx context.Context, amount int64) (
 
 	seen := make(map[string]struct{}, len(methods))
 	out := make([]PaymentMethodResponse, 0, len(methods))
+	provider := PaymentGatewayProvider(s.cfg)
 	for _, method := range methods {
-		code := NormalizePaymentGatewayMethod(method.Method)
+		code := NormalizePaymentGatewayMethodForProvider(provider, method.Method)
 		if code == "" {
 			continue
 		}
@@ -183,9 +184,10 @@ func (s *PaymentService) CreateTransaction(userID uuid.UUID, input CreatePayment
 		return nil, fmt.Errorf("gateway payment belum dikonfigurasi")
 	}
 
-	method := NormalizePaymentGatewayMethod(input.PaymentMethod)
+	provider := gatewayProviderLabel(s.cfg)
+	method := NormalizePaymentGatewayMethodForProvider(provider, input.PaymentMethod)
 	if method == "" {
-		method = defaultDuitkuPaymentMethod
+		method = DefaultPaymentGatewayMethod(s.cfg)
 	}
 
 	providerOrderID := buildGatewayOrderReference("ORD", order.ID.String())
@@ -205,7 +207,7 @@ func (s *PaymentService) CreateTransaction(userID uuid.UUID, input CreatePayment
 		ExpiryPeriodMinutes: 15,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("gagal membuat invoice duitku: %w", err)
+		return nil, fmt.Errorf("gagal membuat invoice payment gateway: %w", err)
 	}
 
 	order.GatewayOrderID = created.OrderID
@@ -221,7 +223,7 @@ func (s *PaymentService) CreateTransaction(userID uuid.UUID, input CreatePayment
 	expiresAt := created.ExpiredAt
 	return &PaymentResponse{
 		OrderID:          order.ID.String(),
-		Provider:         "duitku",
+		Provider:         provider,
 		PaymentMethod:    order.PaymentMethod,
 		PaymentNumber:    created.PaymentNumber,
 		PaymentURL:       created.PaymentURL,
@@ -258,15 +260,24 @@ func (s *PaymentService) handleGatewayWebhook(input WebhookInput) error {
 		return fmt.Errorf("order_id wajib diisi")
 	}
 
-	if configuredMerchant := strings.TrimSpace(s.cfg.DuitkuMerchantCode); configuredMerchant != "" {
-		if incomingMerchant := strings.TrimSpace(input.Project); incomingMerchant != "" && !strings.EqualFold(incomingMerchant, configuredMerchant) {
-			log.Printf("[payment-webhook][order] ignored merchant_mismatch order_id=%s incoming=%s expected=%s", orderID, incomingMerchant, configuredMerchant)
+	provider := PaymentGatewayProvider(s.cfg)
+	expectedProject := configuredGatewayProject(s.cfg)
+	incomingProject := strings.TrimSpace(input.Project)
+	if provider == paymentGatewayProviderPakasir {
+		if expectedProject == "" || incomingProject == "" || !strings.EqualFold(incomingProject, expectedProject) {
+			log.Printf("[payment-webhook][order] ignored project_mismatch order_id=%s incoming=%s expected=%s", orderID, incomingProject, expectedProject)
 			return nil
 		}
-	}
-
-	if !ValidateDuitkuCallbackSignature(s.cfg.DuitkuMerchantCode, input.Amount, orderID, s.cfg.DuitkuAPIKey, input.Signature) {
-		return fmt.Errorf("signature callback tidak valid")
+	} else {
+		if expectedProject != "" {
+			if incomingProject != "" && !strings.EqualFold(incomingProject, expectedProject) {
+				log.Printf("[payment-webhook][order] ignored merchant_mismatch order_id=%s incoming=%s expected=%s", orderID, incomingProject, expectedProject)
+				return nil
+			}
+		}
+		if !ValidateDuitkuCallbackSignature(s.cfg.DuitkuMerchantCode, input.Amount, orderID, s.cfg.DuitkuAPIKey, input.Signature) {
+			return fmt.Errorf("signature callback tidak valid")
+		}
 	}
 
 	status := NormalizePaymentGatewayStatus(strings.TrimSpace(input.Status))
@@ -284,7 +295,7 @@ func (s *PaymentService) handleGatewayWebhook(input WebhookInput) error {
 	defer cancel()
 	verified, _, err := s.gateway.TransactionDetail(ctx, orderID, order.TotalPrice)
 	if err != nil {
-		return fmt.Errorf("gagal verifikasi pembayaran duitku: %w", err)
+		return fmt.Errorf("gagal verifikasi pembayaran gateway: %w", err)
 	}
 	if !IsPaymentGatewayPaidStatus(verified.Status) {
 		return nil
@@ -296,10 +307,10 @@ func (s *PaymentService) handleGatewayWebhook(input WebhookInput) error {
 
 	method := verified.PaymentMethod
 	if method == "" {
-		method = NormalizePaymentGatewayMethod(input.PaymentMethod)
+		method = NormalizePaymentGatewayMethodForProvider(provider, input.PaymentMethod)
 	}
 	if method == "" {
-		method = defaultDuitkuPaymentMethod
+		method = DefaultPaymentGatewayMethod(s.cfg)
 	}
 
 	order.PaymentMethod = method

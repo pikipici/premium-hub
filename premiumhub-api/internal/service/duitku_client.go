@@ -173,7 +173,7 @@ func (c *duitkuHTTPClient) CreateTransaction(ctx context.Context, input GatewayC
 		return nil, nil, err
 	}
 
-	method := NormalizePaymentGatewayMethod(input.PaymentMethod)
+	method := NormalizePaymentGatewayMethodForProvider(paymentGatewayProviderDuitku, input.PaymentMethod)
 	if method == "" {
 		method = defaultDuitkuPaymentMethod
 	}
@@ -402,7 +402,7 @@ func (c *duitkuHTTPClient) ListPaymentMethods(ctx context.Context, amount int64)
 
 	methods := make([]GatewayPaymentMethod, 0, len(parsed.PaymentFee))
 	for _, row := range parsed.PaymentFee {
-		method := NormalizePaymentGatewayMethod(row.PaymentMethod)
+		method := NormalizePaymentGatewayMethodForProvider(paymentGatewayProviderDuitku, row.PaymentMethod)
 		if method == "" {
 			continue
 		}

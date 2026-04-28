@@ -7,8 +7,31 @@ export const FALLBACK_PAYMENT_METHODS: PaymentMethodOption[] = [
   { method: 'BT', name: 'Permata VA', fee: 'Sesuai channel' },
 ]
 
-const QR_METHODS = new Set(['SP', 'NQ', 'GQ', 'SQ', 'BQ', 'IQ', 'DQ', 'QD', 'LQ'])
-const VA_METHODS = new Set(['BC', 'M2', 'VA', 'I1', 'B1', 'BT', 'A1', 'AG', 'NC', 'BR', 'S1', 'DM', 'BV'])
+const QR_METHODS = new Set(['SP', 'QRIS', 'NQ', 'GQ', 'SQ', 'BQ', 'IQ', 'DQ', 'QD', 'LQ'])
+const VA_METHODS = new Set([
+  'BC',
+  'M2',
+  'VA',
+  'I1',
+  'B1',
+  'BT',
+  'A1',
+  'AG',
+  'NC',
+  'BR',
+  'S1',
+  'DM',
+  'BV',
+  'BRI_VA',
+  'BNI_VA',
+  'PERMATA_VA',
+  'MAYBANK_VA',
+  'CIMB_NIAGA_VA',
+  'BNC_VA',
+  'SAMPOERNA_VA',
+  'ATM_BERSAMA_VA',
+  'ARTHA_GRAHA_VA',
+])
 const RETAIL_METHODS = new Set(['FT', 'IR', 'A2'])
 const EWALLET_METHODS = new Set(['OV', 'SA', 'LF', 'LA', 'DA', 'SL', 'OL'])
 

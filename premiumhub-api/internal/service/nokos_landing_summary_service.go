@@ -284,7 +284,7 @@ func (s *NokosLandingSummaryService) fetchSentTotalByCategory(ctx context.Contex
 }
 
 func (s *NokosLandingSummaryService) fetchActivePaymentMethods(ctx context.Context) ([]string, error) {
-	if strings.TrimSpace(s.cfg.DuitkuMerchantCode) == "" || strings.TrimSpace(s.cfg.DuitkuAPIKey) == "" {
+	if !gatewayCredentialsConfigured(s.cfg) {
 		return []string{}, nil
 	}
 
@@ -295,15 +295,16 @@ func (s *NokosLandingSummaryService) fetchActivePaymentMethods(ctx context.Conte
 	}
 
 	activeSet := make(map[string]struct{}, len(methods))
+	provider := PaymentGatewayProvider(s.cfg)
 	for _, method := range methods {
-		code := NormalizePaymentGatewayMethod(method.Method)
+		code := NormalizePaymentGatewayMethodForProvider(provider, method.Method)
 		if code == "" {
 			continue
 		}
 		activeSet[code] = struct{}{}
 	}
 
-	candidates := parseMethodCandidates(s.cfg.NokosLandingMethodCandidates)
+	candidates := parseMethodCandidatesForProvider(provider, s.cfg.NokosLandingMethodCandidates)
 	if len(candidates) == 0 {
 		active := make([]string, 0, len(activeSet))
 		for method := range activeSet {
@@ -323,6 +324,10 @@ func (s *NokosLandingSummaryService) fetchActivePaymentMethods(ctx context.Conte
 }
 
 func parseMethodCandidates(raw string) []string {
+	return parseMethodCandidatesForProvider(paymentGatewayProviderDuitku, raw)
+}
+
+func parseMethodCandidatesForProvider(provider, raw string) []string {
 	if strings.TrimSpace(raw) == "" {
 		raw = "SP,BR,I1,BT"
 	}
@@ -330,7 +335,7 @@ func parseMethodCandidates(raw string) []string {
 	seen := map[string]struct{}{}
 	out := make([]string, 0, 8)
 	for _, part := range strings.Split(raw, ",") {
-		method := NormalizePaymentGatewayMethod(part)
+		method := NormalizePaymentGatewayMethodForProvider(provider, part)
 		if method == "" {
 			continue
 		}

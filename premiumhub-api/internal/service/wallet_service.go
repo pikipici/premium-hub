@@ -342,15 +342,16 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 		return nil, errors.New("gagal cek idempotency")
 	}
 
-	paymentMethod := NormalizePaymentGatewayMethod(input.PaymentMethod)
+	provider := gatewayProviderLabel(s.cfg)
+	paymentMethod := NormalizePaymentGatewayMethodForProvider(provider, input.PaymentMethod)
 	if paymentMethod == "" {
-		paymentMethod = defaultDuitkuPaymentMethod
+		paymentMethod = DefaultPaymentGatewayMethod(s.cfg)
 	}
 	providerOrderID := buildGatewayTopupReference(userID, idempotencyKey)
 
 	rawReq, _ := json.Marshal(map[string]any{
 		"action":         "transactioncreate",
-		"provider":       "duitku",
+		"provider":       provider,
 		"order_id":       providerOrderID,
 		"amount":         amount,
 		"payment_method": paymentMethod,
@@ -385,7 +386,7 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 	topup := &model.WalletTopup{
 		ID:              uuid.New(),
 		UserID:          userID,
-		Provider:        "duitku",
+		Provider:        provider,
 		GatewayRef:      created.OrderID,
 		PaymentMethod:   created.PaymentMethod,
 		PaymentNumber:   created.PaymentNumber,
@@ -707,15 +708,24 @@ func (s *WalletService) HandleGatewayWebhook(ctx context.Context, input WalletGa
 		return errors.New("order_id wajib diisi")
 	}
 
-	if cfgMerchant := strings.TrimSpace(s.cfg.DuitkuMerchantCode); cfgMerchant != "" {
-		if merchant := strings.TrimSpace(input.Project); merchant != "" && !strings.EqualFold(merchant, cfgMerchant) {
-			log.Printf("[payment-webhook][wallet] ignored merchant_mismatch order_id=%s incoming=%s expected=%s", orderID, merchant, cfgMerchant)
+	provider := PaymentGatewayProvider(s.cfg)
+	expectedProject := configuredGatewayProject(s.cfg)
+	incomingProject := strings.TrimSpace(input.Project)
+	if provider == paymentGatewayProviderPakasir {
+		if expectedProject == "" || incomingProject == "" || !strings.EqualFold(incomingProject, expectedProject) {
+			log.Printf("[payment-webhook][wallet] ignored project_mismatch order_id=%s incoming=%s expected=%s", orderID, incomingProject, expectedProject)
 			return nil
 		}
-	}
-
-	if !ValidateDuitkuCallbackSignature(s.cfg.DuitkuMerchantCode, input.Amount, orderID, s.cfg.DuitkuAPIKey, input.Signature) {
-		return fmt.Errorf("signature callback tidak valid")
+	} else {
+		if expectedProject != "" {
+			if incomingProject != "" && !strings.EqualFold(incomingProject, expectedProject) {
+				log.Printf("[payment-webhook][wallet] ignored merchant_mismatch order_id=%s incoming=%s expected=%s", orderID, incomingProject, expectedProject)
+				return nil
+			}
+		}
+		if !ValidateDuitkuCallbackSignature(s.cfg.DuitkuMerchantCode, input.Amount, orderID, s.cfg.DuitkuAPIKey, input.Signature) {
+			return fmt.Errorf("signature callback tidak valid")
+		}
 	}
 
 	if !IsPaymentGatewayPaidStatus(input.Status) {
@@ -723,7 +733,7 @@ func (s *WalletService) HandleGatewayWebhook(ctx context.Context, input WalletGa
 		return nil
 	}
 
-	topup, err := s.walletRepo.FindTopupByGatewayRef("duitku", orderID)
+	topup, err := s.walletRepo.FindTopupByGatewayRef(provider, orderID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Printf("[payment-webhook][wallet] ignored unknown_topup order_id=%s", orderID)
@@ -840,7 +850,7 @@ func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, 
 			BalanceBefore: before,
 			BalanceAfter:  after,
 			Reference:     reference,
-			Description:   fmt.Sprintf("Topup wallet via Duitku (%s)", topup.GatewayRef),
+			Description:   fmt.Sprintf("Top up saldo via %s (%s)", topup.Provider, topup.GatewayRef),
 		}
 		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
 			return errors.New("gagal menulis ledger wallet")

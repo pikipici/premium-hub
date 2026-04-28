@@ -124,15 +124,17 @@ func (s *PaymentWebhookService) Handle(ctx context.Context, input WebhookInput) 
 	}
 
 	if s.walletLookup != nil {
-		if _, err := s.walletLookup.FindTopupByGatewayRef("duitku", orderID); err == nil {
-			if s.walletHandler == nil {
-				return errors.New("wallet webhook handler belum diinisialisasi")
+		for _, provider := range []string{paymentGatewayProviderPakasir, paymentGatewayProviderDuitku} {
+			if _, err := s.walletLookup.FindTopupByGatewayRef(provider, orderID); err == nil {
+				if s.walletHandler == nil {
+					return errors.New("wallet webhook handler belum diinisialisasi")
+				}
+				log.Printf("[payment-webhook] route=wallet by_lookup provider=%s order_id=%s", provider, orderID)
+				return s.walletHandler.HandleGatewayWebhook(ctx, toWalletWebhookInput(input))
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				log.Printf("[payment-webhook] lookup_error target=wallet provider=%s order_id=%s err=%v", provider, orderID, err)
+				return err
 			}
-			log.Printf("[payment-webhook] route=wallet by_lookup order_id=%s", orderID)
-			return s.walletHandler.HandleGatewayWebhook(ctx, toWalletWebhookInput(input))
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("[payment-webhook] lookup_error target=wallet order_id=%s err=%v", orderID, err)
-			return err
 		}
 	}
 

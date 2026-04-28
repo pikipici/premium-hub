@@ -28,7 +28,10 @@ describe('payment method helpers', () => {
 
   it('maps method icons by channel family', () => {
     expect(paymentMethodIcon('SP')).toBe('QR')
+    expect(paymentMethodIcon('qris')).toBe('QR')
     expect(paymentMethodIcon('BR')).toBe('VA')
+    expect(paymentMethodIcon('bri_va')).toBe('VA')
+    expect(paymentMethodIcon('atm_bersama_va')).toBe('VA')
     expect(paymentMethodIcon('IR')).toBe('RT')
     expect(paymentMethodIcon('DA')).toBe('EW')
     expect(paymentMethodIcon('VC')).toBe('CC')

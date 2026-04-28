@@ -43,6 +43,22 @@ func TestDuitkuSignatureHelpersAndNormalization(t *testing.T) {
 			t.Fatalf("NormalizePaymentGatewayMethod(%q) = %q, want %q", raw, got, want)
 		}
 	}
+
+	pakasirCases := map[string]string{
+		"qris":           "qris",
+		"SP":             "qris",
+		"BR":             "bri_va",
+		"bri-va":         "bri_va",
+		"BNI VA":         "bni_va",
+		"cimb_niaga_va":  "cimb_niaga_va",
+		"ATM_BERSAMA_VA": "atm_bersama_va",
+		"paypal":         "paypal",
+	}
+	for raw, want := range pakasirCases {
+		if got := NormalizePaymentGatewayMethodForProvider(paymentGatewayProviderPakasir, raw); got != want {
+			t.Fatalf("NormalizePaymentGatewayMethodForProvider(pakasir, %q) = %q, want %q", raw, got, want)
+		}
+	}
 }
 
 func TestDuitkuClientCreateTransaction(t *testing.T) {

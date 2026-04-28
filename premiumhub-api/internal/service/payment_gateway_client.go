@@ -14,7 +14,12 @@ import (
 	"premiumhub-api/config"
 )
 
-const defaultDuitkuPaymentMethod = "SP"
+const (
+	paymentGatewayProviderDuitku  = "duitku"
+	paymentGatewayProviderPakasir = "pakasir"
+	defaultDuitkuPaymentMethod    = "SP"
+	defaultPakasirPaymentMethod   = "qris"
+)
 
 type PaymentGatewayClient interface {
 	CreateTransaction(ctx context.Context, input GatewayCreateTransactionInput) (*GatewayCreateResult, []byte, error)
@@ -72,7 +77,7 @@ var duitkuPaymentMethodSet = map[string]struct{}{
 	"T3": {}, "BQ": {}, "IQ": {}, "DQ": {}, "QD": {}, "LQ": {}, "A2": {},
 }
 
-var paymentMethodAliases = map[string]string{
+var duitkuPaymentMethodAliases = map[string]string{
 	"QRIS":           "SP",
 	"QR":             "SP",
 	"SHOPEEPAY_QRIS": "SP",
@@ -102,24 +107,125 @@ var paymentMethodAliases = map[string]string{
 	"POS_INDONESIA":  "A2",
 }
 
+var pakasirPaymentMethodSet = map[string]struct{}{
+	"cimb_niaga_va":  {},
+	"bni_va":         {},
+	"qris":           {},
+	"sampoerna_va":   {},
+	"bnc_va":         {},
+	"maybank_va":     {},
+	"permata_va":     {},
+	"atm_bersama_va": {},
+	"artha_graha_va": {},
+	"bri_va":         {},
+	"paypal":         {},
+}
+
+var pakasirPaymentMethodAliases = map[string]string{
+	"QRIS":           "qris",
+	"QR":             "qris",
+	"SP":             "qris",
+	"CIMB_NIAGA_VA":  "cimb_niaga_va",
+	"B1":             "cimb_niaga_va",
+	"BNI_VA":         "bni_va",
+	"I1":             "bni_va",
+	"SAMPOERNA_VA":   "sampoerna_va",
+	"S1":             "sampoerna_va",
+	"BNC_VA":         "bnc_va",
+	"NC":             "bnc_va",
+	"MAYBANK_VA":     "maybank_va",
+	"VA":             "maybank_va",
+	"PERMATA_VA":     "permata_va",
+	"BT":             "permata_va",
+	"ATM_BERSAMA_VA": "atm_bersama_va",
+	"A1":             "atm_bersama_va",
+	"ARTHA_GRAHA_VA": "artha_graha_va",
+	"AG":             "artha_graha_va",
+	"BRI_VA":         "bri_va",
+	"BRIVA":          "bri_va",
+	"BR":             "bri_va",
+	"PAYPAL":         "paypal",
+}
+
 func NewPaymentGatewayClient(cfg *config.Config) PaymentGatewayClient {
+	if PaymentGatewayProvider(cfg) == paymentGatewayProviderPakasir {
+		return NewPakasirClient(cfg)
+	}
 	return NewDuitkuClient(cfg)
 }
 
+func PaymentGatewayProvider(cfg *config.Config) string {
+	if cfg == nil {
+		return paymentGatewayProviderDuitku
+	}
+	return normalizePaymentGatewayProvider(cfg.PaymentGatewayProvider)
+}
+
+func normalizePaymentGatewayProvider(raw string) string {
+	provider := strings.ToLower(strings.TrimSpace(raw))
+	switch provider {
+	case "", paymentGatewayProviderDuitku:
+		return paymentGatewayProviderDuitku
+	case paymentGatewayProviderPakasir:
+		return paymentGatewayProviderPakasir
+	default:
+		return provider
+	}
+}
+
+func DefaultPaymentGatewayMethod(cfg *config.Config) string {
+	if PaymentGatewayProvider(cfg) == paymentGatewayProviderPakasir {
+		return defaultPakasirPaymentMethod
+	}
+	return defaultDuitkuPaymentMethod
+}
+
 func NormalizePaymentGatewayMethod(raw string) string {
+	return NormalizePaymentGatewayMethodForProvider(paymentGatewayProviderDuitku, raw)
+}
+
+func NormalizePaymentGatewayMethodForProvider(provider, raw string) string {
+	if normalizePaymentGatewayProvider(provider) == paymentGatewayProviderPakasir {
+		return normalizePakasirPaymentMethod(raw)
+	}
+	return normalizeDuitkuPaymentMethod(raw)
+}
+
+func normalizeDuitkuPaymentMethod(raw string) string {
 	method := strings.ToUpper(strings.TrimSpace(raw))
 	if method == "" {
 		return ""
 	}
 	method = strings.ReplaceAll(method, "-", "_")
 	method = strings.ReplaceAll(method, " ", "_")
-	if alias, ok := paymentMethodAliases[method]; ok {
+	if alias, ok := duitkuPaymentMethodAliases[method]; ok {
 		method = alias
 	}
 	if _, ok := duitkuPaymentMethodSet[method]; ok {
 		return method
 	}
 	if isLikelyDuitkuPaymentMethod(method) {
+		return method
+	}
+	return ""
+}
+
+func normalizePakasirPaymentMethod(raw string) string {
+	method := strings.TrimSpace(raw)
+	if method == "" {
+		return ""
+	}
+	aliasKey := strings.ToUpper(method)
+	aliasKey = strings.ReplaceAll(aliasKey, "-", "_")
+	aliasKey = strings.ReplaceAll(aliasKey, " ", "_")
+	if alias, ok := pakasirPaymentMethodAliases[aliasKey]; ok {
+		return alias
+	}
+
+	method = strings.ToLower(method)
+	method = strings.ReplaceAll(method, "-", "_")
+	method = strings.ReplaceAll(method, " ", "_")
+	if _, ok := pakasirPaymentMethodSet[method]; ok {
 		return method
 	}
 	return ""
@@ -192,12 +298,41 @@ func gatewayConfigured(cfg *config.Config, client PaymentGatewayClient) bool {
 	if cfg == nil || client == nil {
 		return false
 	}
-	return strings.TrimSpace(cfg.DuitkuMerchantCode) != "" && strings.TrimSpace(cfg.DuitkuAPIKey) != ""
+	return gatewayCredentialsConfigured(cfg)
+}
+
+func gatewayCredentialsConfigured(cfg *config.Config) bool {
+	if cfg == nil {
+		return false
+	}
+	switch PaymentGatewayProvider(cfg) {
+	case paymentGatewayProviderPakasir:
+		return strings.TrimSpace(cfg.PakasirProject) != "" && strings.TrimSpace(cfg.PakasirAPIKey) != ""
+	default:
+		return strings.TrimSpace(cfg.DuitkuMerchantCode) != "" && strings.TrimSpace(cfg.DuitkuAPIKey) != ""
+	}
+}
+
+func configuredGatewayProject(cfg *config.Config) string {
+	if cfg == nil {
+		return ""
+	}
+	if PaymentGatewayProvider(cfg) == paymentGatewayProviderPakasir {
+		return strings.TrimSpace(cfg.PakasirProject)
+	}
+	return strings.TrimSpace(cfg.DuitkuMerchantCode)
+}
+
+func gatewayProviderLabel(cfg *config.Config) string {
+	return PaymentGatewayProvider(cfg)
 }
 
 func defaultGatewayCallbackURL(cfg *config.Config) string {
 	if cfg == nil {
 		return ""
+	}
+	if raw := strings.TrimSpace(cfg.PaymentGatewayCallbackURL); raw != "" {
+		return raw
 	}
 	if raw := strings.TrimSpace(cfg.DuitkuCallbackURL); raw != "" {
 		return raw
@@ -208,6 +343,9 @@ func defaultGatewayCallbackURL(cfg *config.Config) string {
 func defaultGatewayReturnURL(cfg *config.Config, fallbackPath string) string {
 	if cfg == nil {
 		return ""
+	}
+	if raw := strings.TrimSpace(cfg.PaymentGatewayReturnURL); raw != "" {
+		return raw
 	}
 	if raw := strings.TrimSpace(cfg.DuitkuReturnURL); raw != "" {
 		return raw

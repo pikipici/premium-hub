@@ -12,8 +12,10 @@ type Config struct {
 	AppPort, AppEnv                                                             string
 	DBHost, DBPort, DBUser, DBPassword, DBName                                  string
 	JWTSecret, JWTExpiry, RefreshTokenExpiry, StockCredentialKey                string
+	PaymentGatewayProvider, PaymentGatewayCallbackURL, PaymentGatewayReturnURL  string
 	DuitkuBaseURL, DuitkuMerchantCode, DuitkuAPIKey, DuitkuHTTPTimeoutSec       string
 	DuitkuCallbackURL, DuitkuReturnURL                                          string
+	PakasirBaseURL, PakasirProject, PakasirAPIKey, PakasirHTTPTimeoutSec        string
 	JAPAPIURL, JAPAPIKey, JAPHTTPTimeoutSec                                     string
 	FiveSimBaseURL, FiveSimAPIKey, FiveSimHTTPTimeoutSec                        string
 	FiveSimWalletPriceMultiplier, FiveSimWalletMinDebit                         string
@@ -76,12 +78,19 @@ func Load() *Config {
 		JWTExpiry:                            e("JWT_EXPIRY", "24h"),
 		RefreshTokenExpiry:                   e("REFRESH_TOKEN_EXPIRY", "720h"),
 		StockCredentialKey:                   stockCredentialKey,
+		PaymentGatewayProvider:               e("PAYMENT_GATEWAY_PROVIDER", "duitku"),
+		PaymentGatewayCallbackURL:            e("PAYMENT_GATEWAY_CALLBACK_URL", ""),
+		PaymentGatewayReturnURL:              e("PAYMENT_GATEWAY_RETURN_URL", ""),
 		DuitkuBaseURL:                        e("DUITKU_BASE_URL", "https://passport.duitku.com"),
 		DuitkuMerchantCode:                   e("DUITKU_MERCHANT_CODE", ""),
 		DuitkuAPIKey:                         e("DUITKU_API_KEY", ""),
 		DuitkuHTTPTimeoutSec:                 e("DUITKU_HTTP_TIMEOUT_SEC", "12"),
 		DuitkuCallbackURL:                    e("DUITKU_CALLBACK_URL", ""),
 		DuitkuReturnURL:                      e("DUITKU_RETURN_URL", ""),
+		PakasirBaseURL:                       e("PAKASIR_BASE_URL", "https://app.pakasir.com"),
+		PakasirProject:                       e("PAKASIR_PROJECT", ""),
+		PakasirAPIKey:                        e("PAKASIR_API_KEY", ""),
+		PakasirHTTPTimeoutSec:                e("PAKASIR_HTTP_TIMEOUT_SEC", "12"),
 		JAPAPIURL:                            e("JAP_API_URL", "https://justanotherpanel.com/api/v2"),
 		JAPAPIKey:                            e("JAP_API_KEY", ""),
 		JAPHTTPTimeoutSec:                    e("JAP_HTTP_TIMEOUT_SEC", "15"),

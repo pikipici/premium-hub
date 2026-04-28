@@ -381,6 +381,47 @@ func TestWalletHandleWebhook(t *testing.T) {
 	}
 }
 
+func TestWalletPakasirWebhookDoesNotRequireDuitkuSignature(t *testing.T) {
+	svc, db, fake, user := setupWalletService(t)
+	svc.cfg.PaymentGatewayProvider = "pakasir"
+	svc.cfg.PakasirProject = "digimarket"
+	svc.cfg.PakasirAPIKey = "PK_test"
+	svc.cfg.DuitkuMerchantCode = ""
+	svc.cfg.DuitkuAPIKey = ""
+
+	topup, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{Amount: 15000, PaymentMethod: "qris"})
+	if err != nil {
+		t.Fatalf("create pakasir topup: %v", err)
+	}
+	if topup.Provider != "pakasir" {
+		t.Fatalf("expected provider pakasir, got %s", topup.Provider)
+	}
+
+	fake.statusMap[topup.GatewayRef] = "completed"
+	if err := svc.HandleGatewayWebhook(context.Background(), WalletGatewayWebhookInput{
+		Amount:        15000,
+		OrderID:       topup.GatewayRef,
+		Project:       "digimarket",
+		Status:        "completed",
+		PaymentMethod: "qris",
+	}); err != nil {
+		t.Fatalf("handle pakasir webhook: %v", err)
+	}
+
+	var stored model.WalletTopup
+	if err := db.First(&stored, "id = ?", mustParseUUID(t, topup.ID)).Error; err != nil {
+		t.Fatalf("load topup: %v", err)
+	}
+	if stored.Status != "success" {
+		t.Fatalf("expected success, got %s", stored.Status)
+	}
+
+	userAfter := mustLoadUser(t, db, user.ID)
+	if userAfter.WalletBalance != 15000 {
+		t.Fatalf("wallet balance = %d, want 15000", userAfter.WalletBalance)
+	}
+}
+
 func TestWalletHandleWebhookAcceptsPayableAmount(t *testing.T) {
 	svc, db, fake, user := setupWalletService(t)
 

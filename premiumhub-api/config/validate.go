@@ -86,6 +86,25 @@ func (c *Config) Validate() error {
 	validateRate(c.PaymentRateLimitMax, c.PaymentRateLimitWindow, "PAYMENT_RATE_LIMIT_MAX", "PAYMENT_RATE_LIMIT_WINDOW")
 	validateRate(c.WebhookRateLimitMax, c.WebhookRateLimitWindow, "WEBHOOK_RATE_LIMIT_MAX", "WEBHOOK_RATE_LIMIT_WINDOW")
 
+	paymentProvider := strings.ToLower(strings.TrimSpace(c.PaymentGatewayProvider))
+	if paymentProvider == "" {
+		paymentProvider = "duitku"
+	}
+	switch paymentProvider {
+	case "duitku", "pakasir":
+	default:
+		problems = append(problems, "PAYMENT_GATEWAY_PROVIDER harus salah satu: duitku|pakasir")
+	}
+	if v := strings.TrimSpace(c.PaymentGatewayCallbackURL); v != "" {
+		if err := validateHTTPURL(v); err != nil {
+			problems = append(problems, "PAYMENT_GATEWAY_CALLBACK_URL tidak valid: "+err.Error())
+		}
+	}
+	if v := strings.TrimSpace(c.PaymentGatewayReturnURL); v != "" {
+		if err := validateHTTPURL(v); err != nil {
+			problems = append(problems, "PAYMENT_GATEWAY_RETURN_URL tidak valid: "+err.Error())
+		}
+	}
 	if v := strings.TrimSpace(c.DuitkuHTTPTimeoutSec); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n <= 0 || n > 120 {
@@ -105,6 +124,17 @@ func (c *Config) Validate() error {
 	if v := strings.TrimSpace(c.DuitkuReturnURL); v != "" {
 		if err := validateHTTPURL(v); err != nil {
 			problems = append(problems, "DUITKU_RETURN_URL tidak valid: "+err.Error())
+		}
+	}
+	if v := strings.TrimSpace(c.PakasirHTTPTimeoutSec); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 120 {
+			problems = append(problems, "PAKASIR_HTTP_TIMEOUT_SEC harus angka 1-120")
+		}
+	}
+	if v := strings.TrimSpace(c.PakasirBaseURL); v != "" {
+		if err := validateHTTPURL(v); err != nil {
+			problems = append(problems, "PAKASIR_BASE_URL tidak valid: "+err.Error())
 		}
 	}
 	if v := strings.TrimSpace(c.JAPHTTPTimeoutSec); v != "" {
@@ -273,17 +303,32 @@ func (c *Config) Validate() error {
 	}
 
 	if appEnv == "production" {
-		if strings.TrimSpace(c.DuitkuMerchantCode) == "" {
-			problems = append(problems, "DUITKU_MERCHANT_CODE wajib diisi di production")
-		}
-		if strings.TrimSpace(c.DuitkuAPIKey) == "" {
-			problems = append(problems, "DUITKU_API_KEY wajib diisi di production")
-		}
-		if strings.TrimSpace(c.DuitkuBaseURL) == "" {
-			problems = append(problems, "DUITKU_BASE_URL wajib diisi di production")
-		}
-		if strings.TrimSpace(c.DuitkuCallbackURL) == "" && strings.TrimSpace(c.FrontendURL) == "" {
-			problems = append(problems, "DUITKU_CALLBACK_URL atau FRONTEND_URL wajib diisi di production")
+		switch paymentProvider {
+		case "pakasir":
+			if strings.TrimSpace(c.PakasirProject) == "" {
+				problems = append(problems, "PAKASIR_PROJECT wajib diisi di production")
+			}
+			if strings.TrimSpace(c.PakasirAPIKey) == "" {
+				problems = append(problems, "PAKASIR_API_KEY wajib diisi di production")
+			}
+			if strings.TrimSpace(c.PakasirBaseURL) == "" {
+				problems = append(problems, "PAKASIR_BASE_URL wajib diisi di production")
+			}
+		default:
+			if strings.TrimSpace(c.DuitkuMerchantCode) == "" {
+				problems = append(problems, "DUITKU_MERCHANT_CODE wajib diisi di production")
+			}
+			if strings.TrimSpace(c.DuitkuAPIKey) == "" {
+				problems = append(problems, "DUITKU_API_KEY wajib diisi di production")
+			}
+			if strings.TrimSpace(c.DuitkuBaseURL) == "" {
+				problems = append(problems, "DUITKU_BASE_URL wajib diisi di production")
+			}
+			if strings.TrimSpace(c.PaymentGatewayCallbackURL) == "" &&
+				strings.TrimSpace(c.DuitkuCallbackURL) == "" &&
+				strings.TrimSpace(c.FrontendURL) == "" {
+				problems = append(problems, "PAYMENT_GATEWAY_CALLBACK_URL atau DUITKU_CALLBACK_URL atau FRONTEND_URL wajib diisi di production")
+			}
 		}
 		if strings.TrimSpace(c.FiveSimAPIKey) == "" {
 			problems = append(problems, "FIVESIM_API_KEY wajib diisi di production")
