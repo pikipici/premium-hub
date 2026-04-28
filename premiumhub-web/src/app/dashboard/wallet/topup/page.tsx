@@ -30,13 +30,46 @@ function statusLabel(status: WalletTopup['status']) {
   switch (status) {
     case 'success':
     case 'paid':
-      return 'success'
+      return 'berhasil'
     case 'failed':
-      return 'failed'
+      return 'gagal'
     case 'expired':
-      return 'expired'
+      return 'kedaluwarsa'
     default:
-      return 'pending'
+      return 'menunggu pembayaran'
+  }
+}
+
+function isPayableTopup(topup: WalletTopup) {
+  return topup.status === 'pending'
+}
+
+function finalTopupCopy(topup: WalletTopup) {
+  switch (topup.status) {
+    case 'success':
+    case 'paid':
+      return {
+        tone: 'border-green-100 bg-green-50 text-green-700',
+        title: 'Top up berhasil.',
+        description: 'Saldo wallet sudah masuk otomatis dan siap dipakai.',
+        cta: 'Kembali ke Wallet',
+      }
+    case 'failed':
+      return {
+        tone: 'border-red-100 bg-red-50 text-red-700',
+        title: 'Top up gagal diproses.',
+        description: 'Jangan lakukan pembayaran ke invoice ini. Silakan buat top up ulang dengan metode pembayaran baru.',
+        cta: 'Top Up Ulang',
+      }
+    case 'expired':
+      return {
+        tone: 'border-gray-200 bg-gray-50 text-gray-700',
+        title: 'Invoice top up sudah kedaluwarsa.',
+        description: 'Jangan lakukan pembayaran ke invoice ini. Buat invoice baru untuk top up ulang.',
+        cta: 'Buat Invoice Baru',
+      }
+    default:
+      return null
   }
 }
 
@@ -49,6 +82,25 @@ function sanitizeWalletTopupText(value: string | undefined): string {
     .replace(/\bprovider\b/gi, 'sistem pembayaran')
     .replace(/provider[_\s-]*order[_\s-]*id/gi, 'ID order')
     .replace(/\b5sim\b/gi, 'nomor OTP')
+}
+
+function TopupFinalNotice({ topup }: { topup: WalletTopup }) {
+  const copy = finalTopupCopy(topup)
+
+  if (!copy) return null
+
+  return (
+    <div className={`rounded-xl border px-4 py-3 text-sm ${copy.tone}`}>
+      <div className="font-bold">{copy.title}</div>
+      <p className="mt-1 text-xs leading-relaxed opacity-85">{copy.description}</p>
+      <Link
+        href="/dashboard/wallet"
+        className="mt-3 inline-flex rounded-lg bg-[#141414] px-3 py-2 text-xs font-bold text-white hover:opacity-90"
+      >
+        {copy.cta}
+      </Link>
+    </div>
+  )
 }
 
 function WalletTopupStatusContent() {
@@ -66,6 +118,10 @@ function WalletTopupStatusContent() {
   const finalStatus = useMemo(() => {
     if (!topup) return false
     return ['success', 'paid', 'failed', 'expired'].includes(topup.status)
+  }, [topup])
+
+  const payableStatus = useMemo(() => {
+    return topup ? isPayableTopup(topup) : false
   }, [topup])
 
   const refreshBalance = useCallback(async () => {
@@ -203,7 +259,13 @@ function WalletTopupStatusContent() {
             </div>
 
             <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold capitalize ${statusTone(topup.status)}`}>
-              {topup.status === 'pending' ? <Clock3 className="w-3.5 h-3.5" /> : <CircleCheckBig className="w-3.5 h-3.5" />}
+              {topup.status === 'pending' ? (
+                <Clock3 className="w-3.5 h-3.5" />
+              ) : topup.status === 'success' || topup.status === 'paid' ? (
+                <CircleCheckBig className="w-3.5 h-3.5" />
+              ) : (
+                <CircleAlert className="w-3.5 h-3.5" />
+              )}
               {statusLabel(topup.status)}
             </span>
           </div>
@@ -238,10 +300,14 @@ function WalletTopupStatusContent() {
               <div className="text-xs text-[#888] mb-1">Status Pembayaran</div>
               <div className="font-bold capitalize">{topup.provider_status || topup.status}</div>
             </div>
-            <GatewayPaymentDisplay paymentMethod={topup.payment_method} paymentNumber={topup.payment_number} />
+            {payableStatus ? (
+              <GatewayPaymentDisplay paymentMethod={topup.payment_method} paymentNumber={topup.payment_number} />
+            ) : (
+              <TopupFinalNotice topup={topup} />
+            )}
           </div>
 
-          {topup.status === 'pending' ? (
+          {payableStatus ? (
             <div className="mt-4 rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] px-4 py-3 text-xs text-[#666] leading-relaxed">
               Polling adaptif jalan otomatis (3-10 detik). Kalau udah transfer tapi status belum gerak, klik <strong>Cek Status Sekarang</strong>.
             </div>
@@ -276,11 +342,6 @@ function WalletTopupStatusContent() {
         </button>
       </div>
 
-      {finalStatus && (topup?.status === 'success' || topup?.status === 'paid') ? (
-        <p className="rounded-xl bg-green-50 border border-green-100 px-4 py-3 text-sm text-green-700">
-          Topup sukses. Saldo wallet otomatis ke-update.
-        </p>
-      ) : null}
     </div>
   )
 }
