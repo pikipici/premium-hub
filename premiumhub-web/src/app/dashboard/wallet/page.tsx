@@ -14,6 +14,7 @@ import type { PaymentMethodOption, WalletLedger, WalletTopup } from '@/types/wal
 
 const MIN_TOPUP = 10000
 const QUICK_AMOUNTS = [25000, 50000, 100000, 200000]
+const MUTATION_PAGE_SIZE = 8
 
 type TxFilter = 'all' | 'topup' | 'purchase' | 'refund'
 type LedgerGroup = 'topup' | 'purchase' | 'refund' | 'other'
@@ -107,6 +108,7 @@ export default function WalletPage() {
   const [amount, setAmount] = useState<number>(QUICK_AMOUNTS[1])
   const [paymentMethod, setPaymentMethod] = useState(FALLBACK_PAYMENT_METHODS[0].method)
   const [txFilter, setTxFilter] = useState<TxFilter>('all')
+  const [txPage, setTxPage] = useState(1)
   const [error, setError] = useState('')
 
   const selectedAmount = useMemo(() => {
@@ -192,6 +194,15 @@ export default function WalletPage() {
     return mutationRows
   }, [mutationRows, txFilter])
 
+  const mutationTotalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredMutationRows.length / MUTATION_PAGE_SIZE))
+  }, [filteredMutationRows.length])
+
+  const paginatedMutationRows = useMemo(() => {
+    const start = (txPage - 1) * MUTATION_PAGE_SIZE
+    return filteredMutationRows.slice(start, start + MUTATION_PAGE_SIZE)
+  }, [filteredMutationRows, txPage])
+
   const fetchAll = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     if (silent) setRefreshing(true)
@@ -236,6 +247,14 @@ export default function WalletPage() {
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
+
+  useEffect(() => {
+    setTxPage(1)
+  }, [txFilter])
+
+  useEffect(() => {
+    setTxPage((current) => Math.min(current, mutationTotalPages))
+  }, [mutationTotalPages])
 
   const createIdempotencyKey = () => {
     const suffix = Math.random().toString(36).slice(2, 8)
@@ -484,9 +503,7 @@ export default function WalletPage() {
           <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
             <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
               <h2 className="text-sm font-bold">Riwayat Mutasi</h2>
-              <button type="button" onClick={() => router.push('/dashboard/riwayat-order')} className="text-xs text-[#888] hover:text-[#141414]">
-                Lihat semua →
-              </button>
+              <div className="text-xs text-[#888]">Halaman {txPage}/{mutationTotalPages}</div>
             </header>
 
             <div className="px-4 py-3 border-b border-[#EBEBEB] flex gap-2 overflow-x-auto">
@@ -510,7 +527,7 @@ export default function WalletPage() {
               {filteredMutationRows.length === 0 ? (
                 <div className="p-5 text-sm text-[#888]">Belum ada mutasi untuk filter ini.</div>
               ) : (
-                filteredMutationRows.slice(0, 8).map((row) => {
+                paginatedMutationRows.map((row) => {
                   const visual = txVisual(row.group)
 
                   return (
@@ -533,6 +550,28 @@ export default function WalletPage() {
                 })
               )}
             </div>
+
+            {filteredMutationRows.length > MUTATION_PAGE_SIZE ? (
+              <div className="flex items-center justify-between border-t border-[#EBEBEB] px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => setTxPage((current) => Math.max(1, current - 1))}
+                  disabled={txPage <= 1}
+                  className="rounded-lg border border-[#EBEBEB] px-3 py-1.5 text-xs font-semibold text-[#141414] disabled:opacity-40"
+                >
+                  Sebelumnya
+                </button>
+                <div className="text-xs text-[#888]">{filteredMutationRows.length} transaksi</div>
+                <button
+                  type="button"
+                  onClick={() => setTxPage((current) => Math.min(mutationTotalPages, current + 1))}
+                  disabled={txPage >= mutationTotalPages}
+                  className="rounded-lg border border-[#EBEBEB] px-3 py-1.5 text-xs font-semibold text-[#141414] disabled:opacity-40"
+                >
+                  Berikutnya
+                </button>
+              </div>
+            ) : null}
           </section>
         </div>
       </div>
