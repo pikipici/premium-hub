@@ -81,6 +81,16 @@ function txVisual(group: LedgerGroup) {
   }
 }
 
+function isUnfinishedTopup(topup: WalletTopup) {
+  const status = (topup.status || '').toLowerCase()
+  const providerStatus = (topup.provider_status || '').toLowerCase()
+
+  if (status === 'pending' || status === 'failed' || status === 'expired') return true
+  if (providerStatus.includes('unpaid') || providerStatus.includes('pending') || providerStatus.includes('waiting')) return true
+
+  return false
+}
+
 function sanitizeWalletText(value: string | undefined): string {
   const trimmed = (value || '').trim()
   if (!trimmed) return ''
@@ -193,6 +203,10 @@ export default function WalletPage() {
     if (txFilter === 'refund') return mutationRows.filter((row) => row.group === 'refund')
     return mutationRows
   }, [mutationRows, txFilter])
+
+  const unfinishedTopups = useMemo(() => {
+    return topups.filter((topup) => isUnfinishedTopup(topup))
+  }, [topups])
 
   const mutationTotalPages = useMemo(() => {
     return Math.max(1, Math.ceil(filteredMutationRows.length / MUTATION_PAGE_SIZE))
@@ -502,7 +516,7 @@ export default function WalletPage() {
 
           <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
             <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
-              <h2 className="text-sm font-bold">Riwayat Mutasi</h2>
+              <h2 className="text-sm font-bold">Riwayat Saldo</h2>
               <div className="text-xs text-[#888]">Halaman {txPage}/{mutationTotalPages}</div>
             </header>
 
@@ -518,7 +532,7 @@ export default function WalletPage() {
                       : 'bg-white border-[#EBEBEB] text-[#888] hover:border-[#141414] hover:text-[#141414]'
                   }`}
                 >
-                  {filter === 'all' ? 'Semua' : filter === 'topup' ? 'Top Up' : filter === 'purchase' ? 'Pembelian' : 'Refund'}
+                  {filter === 'all' ? 'Semua' : filter === 'topup' ? 'Isi Saldo' : filter === 'purchase' ? 'Pembelian' : 'Refund'}
                 </button>
               ))}
             </div>
@@ -578,7 +592,10 @@ export default function WalletPage() {
 
       <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
         <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
-          <h2 className="text-sm font-bold">Invoice Topup Terakhir</h2>
+          <div>
+            <h2 className="text-sm font-bold">Top Up Belum Selesai</h2>
+            <p className="mt-1 text-xs text-[#888]">Selesaikan pembayaran agar saldo masuk otomatis.</p>
+          </div>
           <button type="button" onClick={() => fetchAll(true)} className="text-xs text-[#888] hover:text-[#141414] inline-flex items-center gap-1">
             <RefreshCcw className="w-3.5 h-3.5" />
             Muat ulang
@@ -586,10 +603,10 @@ export default function WalletPage() {
         </header>
 
         <div className="divide-y divide-[#EBEBEB]">
-          {topups.length === 0 ? (
-            <div className="p-5 text-sm text-[#888]">Belum ada invoice topup.</div>
+          {unfinishedTopups.length === 0 ? (
+            <div className="p-5 text-sm text-[#888]">Belum ada invoice top up yang perlu diselesaikan.</div>
           ) : (
-            topups.slice(0, 8).map((topup) => (
+            unfinishedTopups.slice(0, 8).map((topup) => (
               <button
                 key={topup.id}
                 type="button"
