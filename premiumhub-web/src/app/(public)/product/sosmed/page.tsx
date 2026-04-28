@@ -1,7 +1,8 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { animate, createScope, stagger } from 'animejs'
 import {
   ArrowRight,
   CheckCircle2,
@@ -35,6 +36,7 @@ function iconForCategory(categoryCode: string) {
 }
 
 export default function ProductSosmedLandingPage() {
+  const animationRootRef = useRef<HTMLElement | null>(null)
   const [services, setServices] = useState<SosmedService[]>([])
 
   useEffect(() => {
@@ -57,13 +59,45 @@ export default function ProductSosmedLandingPage() {
 
   const cards = useMemo(() => buildSosmedServiceCards(services), [services])
 
+  useEffect(() => {
+    if (!animationRootRef.current) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const scope = { current: createScope({ root: animationRootRef }).add(() => {
+      animate('[data-anime="sosmed-hero"]', {
+        opacity: [0, 1],
+        translateY: [18, 0],
+        duration: 650,
+        ease: 'out(3)',
+      })
+
+      animate('[data-anime="sosmed-trust-badge"]', {
+        opacity: [0, 1],
+        translateY: [10, 0],
+        delay: stagger(70),
+        duration: 500,
+        ease: 'out(3)',
+      })
+
+      animate('[data-anime="sosmed-card"]', {
+        opacity: [0, 1],
+        translateY: [24, 0],
+        delay: stagger(85, { start: 120 }),
+        duration: 700,
+        ease: 'out(3)',
+      })
+    }) }
+
+    return () => scope.current.revert()
+  }, [cards.length])
+
   return (
     <>
       <Navbar />
 
-      <main className="bg-[#F7F7F5]">
+      <main ref={animationRootRef} className="bg-[#F7F7F5]">
         <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <header className="mx-auto mb-6 max-w-3xl text-center">
+          <header data-anime="sosmed-hero" className="mx-auto mb-6 max-w-3xl text-center">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FF5733]">Sosmed</p>
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#141414] md:text-4xl">
               Pilih product sosmed yang tersedia
@@ -74,13 +108,13 @@ export default function ProductSosmedLandingPage() {
           </header>
 
           <div className="mb-6 grid gap-2 rounded-2xl border border-[#FFE2CF] bg-white p-3 text-xs shadow-sm sm:grid-cols-3">
-            <span className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F2FCEB] px-3 py-2 font-semibold text-[#2F6B1A]">
+            <span data-anime="sosmed-trust-badge" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F2FCEB] px-3 py-2 font-semibold text-[#2F6B1A]">
               <ShieldCheck className="h-4 w-4" /> Tanpa perlu password
             </span>
-            <span className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#EDF4FF] px-3 py-2 font-semibold text-[#1E4F9B]">
+            <span data-anime="sosmed-trust-badge" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#EDF4FF] px-3 py-2 font-semibold text-[#1E4F9B]">
               <Clock3 className="h-4 w-4" /> Mulai diproses cepat
             </span>
-            <span className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFF3EA] px-3 py-2 font-semibold text-[#9A4B16]">
+            <span data-anime="sosmed-trust-badge" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFF3EA] px-3 py-2 font-semibold text-[#9A4B16]">
               <Sparkles className="h-4 w-4" /> Garansi jelas kalau tersedia
             </span>
           </div>
@@ -93,6 +127,7 @@ export default function ProductSosmedLandingPage() {
               return (
                 <article
                   key={service.key}
+                  data-anime="sosmed-card"
                   className={`group relative flex h-full flex-col rounded-3xl border bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-xl ${
                     service.isRecommended ? 'border-[#FF9B80] ring-2 ring-[#FFE2D8]' : 'border-[#EBEBEB]'
                   }`}

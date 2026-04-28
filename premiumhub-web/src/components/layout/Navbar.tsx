@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import { animate, createScope, stagger } from 'animejs'
 import {
   ChevronDown,
   LayoutDashboard,
@@ -64,6 +65,7 @@ export default function Navbar() {
   const [navItems, setNavItems] = useState<PublicNavItem[]>(() => getNavbarMenuMemoryCache() || [])
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null)
 
   const authReady = hasHydrated && isBootstrapped
   const showAuthenticated = authReady && isAuthenticated
@@ -209,6 +211,47 @@ export default function Navbar() {
     }
   }, [accountMenuOpen])
 
+  useEffect(() => {
+    if (!open || !mobileMenuRef.current) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const scope = { current: createScope({ root: mobileMenuRef }).add(() => {
+      animate('[data-anime="mobile-menu-panel"]', {
+        opacity: [0, 1],
+        translateX: [28, 0],
+        duration: 280,
+        ease: 'out(3)',
+      })
+
+      animate('[data-anime="mobile-menu-item"]', {
+        opacity: [0, 1],
+        translateY: [8, 0],
+        delay: stagger(35, { start: 90 }),
+        duration: 260,
+        ease: 'out(3)',
+      })
+    }) }
+
+    return () => scope.current.revert()
+  }, [open, mobileSectionsOpen.nav, mobileSectionsOpen.account, mobileSectionsOpen.admin])
+
+  useEffect(() => {
+    if (!accountMenuOpen || !accountMenuRef.current) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const scope = { current: createScope({ root: accountMenuRef }).add(() => {
+      animate('[data-anime="account-menu"]', {
+        opacity: [0, 1],
+        translateY: [8, 0],
+        scale: [0.98, 1],
+        duration: 220,
+        ease: 'out(3)',
+      })
+    }) }
+
+    return () => scope.current.revert()
+  }, [accountMenuOpen])
+
   const handleLogout = async () => {
     if (logouting) return
 
@@ -295,7 +338,7 @@ export default function Navbar() {
                       </button>
 
                       {accountMenuOpen ? (
-                        <div className="absolute right-0 top-[42px] z-[70] w-56 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_14px_30px_rgba(20,20,20,.12)]">
+                        <div data-anime="account-menu" className="absolute right-0 top-[42px] z-[70] w-56 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_14px_30px_rgba(20,20,20,.12)]">
                           <div className="border-b border-[#F1F1EE] px-3 py-2.5">
                             <p className="truncate text-sm font-semibold text-[#141414]">{user?.name || 'User'}</p>
                             <p className="truncate text-xs text-[#888]">{user?.email || '-'}</p>
@@ -364,7 +407,7 @@ export default function Navbar() {
       </nav>
 
       {open ? (
-        <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Menu navigasi">
+        <div ref={mobileMenuRef} className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label="Menu navigasi">
           <button
             type="button"
             aria-label="Tutup menu"
@@ -372,7 +415,7 @@ export default function Navbar() {
             className="absolute inset-0 bg-black/35"
           />
 
-          <div className="relative ml-auto flex h-full w-full min-h-0 flex-col overflow-hidden bg-white">
+          <div data-anime="mobile-menu-panel" className="relative ml-auto flex h-full w-full min-h-0 flex-col overflow-hidden bg-white">
             <div className="flex items-center justify-between border-b border-[#EBEBEB] px-4 py-3">
               <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FF5733]">

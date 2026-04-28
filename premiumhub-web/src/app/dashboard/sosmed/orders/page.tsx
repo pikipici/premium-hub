@@ -1,7 +1,8 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { animate, createScope, stagger } from 'animejs'
 import { CheckCircle2, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw, X } from 'lucide-react'
 
 import { formatRupiah } from '@/lib/utils'
@@ -162,6 +163,7 @@ function refillDescription(order: SosmedOrder) {
 }
 
 export default function DashboardSosmedOrdersPage() {
+  const animationRootRef = useRef<HTMLDivElement | null>(null)
   const [orders, setOrders] = useState<SosmedOrder[]>([])
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -210,6 +212,48 @@ export default function DashboardSosmedOrdersPage() {
     return () => {
       document.body.style.overflow = previousOverflow
     }
+  }, [refillTarget])
+
+  useEffect(() => {
+    if (!animationRootRef.current || loading || orders.length === 0) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const scope = { current: createScope({ root: animationRootRef }).add(() => {
+      animate('[data-anime="sosmed-order-card"]', {
+        opacity: [0, 1],
+        translateY: [18, 0],
+        delay: stagger(70),
+        duration: 520,
+        ease: 'out(3)',
+      })
+
+      animate('[data-anime="refill-panel"]', {
+        opacity: [0, 1],
+        translateX: [-10, 0],
+        delay: stagger(80, { start: 140 }),
+        duration: 520,
+        ease: 'out(3)',
+      })
+    }) }
+
+    return () => scope.current.revert()
+  }, [loading, orders.length])
+
+  useEffect(() => {
+    if (!refillTarget || !animationRootRef.current) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const scope = { current: createScope({ root: animationRootRef }).add(() => {
+      animate('[data-anime="refill-modal"]', {
+        opacity: [0, 1],
+        scale: [0.96, 1],
+        translateY: [14, 0],
+        duration: 320,
+        ease: 'out(3)',
+      })
+    }) }
+
+    return () => scope.current.revert()
   }, [refillTarget])
 
   const handleCancel = async (order: SosmedOrder) => {
@@ -270,7 +314,7 @@ export default function DashboardSosmedOrdersPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={animationRootRef} className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Order Sosmed</h1>
@@ -323,6 +367,7 @@ export default function DashboardSosmedOrdersPage() {
             return (
               <article
                 key={order.id}
+                data-anime="sosmed-order-card"
                 className="overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white shadow-[0_10px_35px_rgba(20,20,20,0.03)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(20,20,20,0.06)]"
               >
                 <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -412,6 +457,7 @@ export default function DashboardSosmedOrdersPage() {
 
                     {refill ? (
                       <div
+                        data-anime="refill-panel"
                         className={`rounded-2xl border px-3.5 py-3 ${
                           refill.canClaim
                             ? 'border-violet-200 bg-violet-50'
@@ -516,7 +562,7 @@ export default function DashboardSosmedOrdersPage() {
 
       {refillTarget ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-sm">
-          <section className="w-full max-w-lg overflow-hidden rounded-3xl border border-[#E7DCF8] bg-white shadow-[0_24px_80px_rgba(28,18,44,0.25)]">
+          <section data-anime="refill-modal" className="w-full max-w-lg overflow-hidden rounded-3xl border border-[#E7DCF8] bg-white shadow-[0_24px_80px_rgba(28,18,44,0.25)]">
             <div className="flex items-start justify-between gap-3 border-b border-[#F0EAF8] bg-gradient-to-br from-violet-50 via-white to-orange-50 px-5 py-4">
               <div>
                 <div className="inline-flex rounded-full border border-violet-200 bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-violet-700">

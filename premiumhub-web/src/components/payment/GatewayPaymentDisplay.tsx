@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { animate, createScope } from 'animejs'
 import { Building2, Copy, Download, ExternalLink, QrCode } from 'lucide-react'
 import QRCode from 'qrcode'
 
@@ -93,6 +94,7 @@ const methodLabel = (value?: string) => {
 const isHttpURL = (value: string) => /^https?:\/\//i.test(value.trim())
 
 export default function GatewayPaymentDisplay({ paymentMethod, paymentNumber, paymentUrl, appUrl, className }: GatewayPaymentDisplayProps) {
+  const paymentRootRef = useRef<HTMLDivElement | null>(null)
   const [copied, setCopied] = useState(false)
   const [qrState, setQrState] = useState<QRState>({ source: '', dataUrl: '', error: '' })
 
@@ -135,6 +137,23 @@ export default function GatewayPaymentDisplay({ paymentMethod, paymentNumber, pa
   const qrDataUrl = isQris && qrState.source === value ? qrState.dataUrl : ''
   const qrError = isQris && qrState.source === value ? qrState.error : ''
 
+  useEffect(() => {
+    if (!paymentRootRef.current) return
+    if (!value && !actionUrl) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const scope = { current: createScope({ root: paymentRootRef }).add(() => {
+      animate('[data-anime="payment-panel"]', {
+        opacity: [0, 1],
+        translateY: [10, 0],
+        duration: 320,
+        ease: 'out(3)',
+      })
+    }) }
+
+    return () => scope.current.revert()
+  }, [actionUrl, qrDataUrl, value])
+
   const handleCopy = async () => {
     if (!value || isHttpURL(value)) return
     await navigator.clipboard.writeText(value)
@@ -143,7 +162,7 @@ export default function GatewayPaymentDisplay({ paymentMethod, paymentNumber, pa
   }
 
   return (
-    <div className={`rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3 ${className || ''}`}>
+    <div ref={paymentRootRef} data-anime="payment-panel" className={`rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3 ${className || ''}`}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="text-xs text-[#777] font-semibold">{methodLabel(normalizedMethod)}</div>
         {value && !isQris && !isHttpURL(value) ? (
