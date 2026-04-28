@@ -623,13 +623,16 @@ export default function WalletPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold capitalize ${topupStatusClass(topup.status)}`}>
-                      {topup.status}
-                    </span>
-                    {topup.is_overdue ? (
-                      <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-gray-200 text-gray-700">overdue</span>
-                    ) : null}
+                  <div className="flex items-center justify-between gap-3 md:min-w-[200px] md:justify-end">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold capitalize ${topupStatusClass(topup.status)}`}>
+                        {topup.status}
+                      </span>
+                      {topup.is_overdue ? (
+                        <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-gray-200 text-gray-700">overdue</span>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-xs font-semibold text-[#141414]">Lanjut bayar</span>
                   </div>
                 </div>
               </button>
