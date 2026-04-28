@@ -29,14 +29,19 @@ func TestNavbarMenuSettingServiceListPublicAndUpdate(t *testing.T) {
 		t.Fatalf("expected 4 defaults, got %d", len(items))
 	}
 	defaultState := map[string]bool{}
+	defaultLabels := map[string]string{}
 	for _, item := range items {
 		defaultState[item.Key] = item.IsVisible
+		defaultLabels[item.Key] = item.Label
 	}
 	if defaultState[NavbarMenuApps] || defaultState[NavbarMenuConvert] {
 		t.Fatalf("apps and convert navbar defaults should be hidden")
 	}
 	if !defaultState[NavbarMenuVirtual] || !defaultState[NavbarMenuSosmed] {
 		t.Fatalf("nomor virtual and sosmed navbar defaults should be visible")
+	}
+	if defaultLabels[NavbarMenuSosmed] != "Paket Sosmed" {
+		t.Fatalf("sosmed navbar label = %q, want Paket Sosmed", defaultLabels[NavbarMenuSosmed])
 	}
 
 	visible := true

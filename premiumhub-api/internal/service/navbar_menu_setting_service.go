@@ -61,7 +61,7 @@ func DefaultNavbarMenuSettings() []model.NavbarMenuSetting {
 		},
 		{
 			Key:       NavbarMenuSosmed,
-			Label:     "Sosmed",
+			Label:     "Paket Sosmed",
 			Href:      "/product/sosmed",
 			SortOrder: 40,
 			IsVisible: true,

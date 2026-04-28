@@ -66,7 +66,7 @@ export default function ProductSosmedLandingPage() {
           <header className="mx-auto mb-6 max-w-3xl text-center">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FF5733]">Sosmed</p>
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#141414] md:text-4xl">
-              Pilih paket yang paling gampang dipahami
+              Pilih product sosmed yang tersedia
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-[#666] md:text-base">
               Semua harga ditulis per paket ±1.000. Pilih jumlah paket di checkout, pastikan akun/link public, lalu sistem mulai proses tanpa minta password.

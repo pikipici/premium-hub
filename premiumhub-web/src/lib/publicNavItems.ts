@@ -5,5 +5,5 @@ export type PublicNavItem = {
 
 export const DEFAULT_PUBLIC_NAV_ITEMS: PublicNavItem[] = [
   { href: '/product/nokos', label: 'Nomor Virtual' },
-  { href: '/product/sosmed', label: 'Sosmed' },
+  { href: '/product/sosmed', label: 'Paket Sosmed' },
 ]

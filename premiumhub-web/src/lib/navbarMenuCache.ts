@@ -15,6 +15,11 @@ export const NAVBAR_MENU_CACHE_EVENT = 'digimarket:public-navbar-menu-updated'
 
 let memoryCache: CachedNavbarMenuItem[] | null = null
 
+function normalizeNavbarMenuLabel(href: string, label: string) {
+  if (href === '/product/sosmed' && label === 'Sosmed') return 'Paket Sosmed'
+  return label
+}
+
 export function normalizeNavbarMenuItems(
   items: NavbarMenuSourceItem[],
   options: { visibleOnly?: boolean } = {}
@@ -26,7 +31,7 @@ export function normalizeNavbarMenuItems(
     const label = String(item.label || '').trim()
     if (!href || !label) return acc
 
-    acc.push({ href, label })
+    acc.push({ href, label: normalizeNavbarMenuLabel(href, label) })
     return acc
   }, [])
 }
