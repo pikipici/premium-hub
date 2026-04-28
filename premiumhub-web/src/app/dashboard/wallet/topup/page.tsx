@@ -8,9 +8,11 @@ import { ArrowLeft, CircleAlert, CircleCheckBig, Clock3, Loader2, RefreshCcw } f
 
 import { walletService } from '@/services/walletService'
 import type { WalletTopup } from '@/types/wallet'
-import { formatDate, formatRupiah } from '@/lib/utils'
+import { formatRupiah } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import GatewayPaymentDisplay from '@/components/payment/GatewayPaymentDisplay'
+
+const FINAL_TOPUP_STATUSES: WalletTopup['status'][] = ['success', 'paid', 'failed', 'expired']
 
 function statusTone(status: WalletTopup['status']) {
   switch (status) {
@@ -44,8 +46,8 @@ function isPayableTopup(topup: WalletTopup) {
   return topup.status === 'pending'
 }
 
-function finalTopupCopy(topup: WalletTopup) {
-  switch (topup.status) {
+function finalTopupCopy(status: WalletTopup['status']) {
+  switch (status) {
     case 'success':
     case 'paid':
       return {
@@ -73,6 +75,31 @@ function finalTopupCopy(topup: WalletTopup) {
   }
 }
 
+function parseDateMs(value?: string | Date | null) {
+  if (!value) return 0
+
+  const time = new Date(value).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+function formatDateTime(value: string | Date) {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
 function sanitizeWalletTopupText(value: string | undefined): string {
   const trimmed = (value || '').trim()
   if (!trimmed) return ''
@@ -84,8 +111,8 @@ function sanitizeWalletTopupText(value: string | undefined): string {
     .replace(/\b5sim\b/gi, 'nomor OTP')
 }
 
-function TopupFinalNotice({ topup }: { topup: WalletTopup }) {
-  const copy = finalTopupCopy(topup)
+function TopupFinalNotice({ status }: { status: WalletTopup['status'] }) {
+  const copy = finalTopupCopy(status)
 
   if (!copy) return null
 
@@ -114,15 +141,35 @@ function WalletTopupStatusContent() {
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState('')
   const [pollAttempt, setPollAttempt] = useState(0)
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
   const finalStatus = useMemo(() => {
     if (!topup) return false
-    return ['success', 'paid', 'failed', 'expired'].includes(topup.status)
+    return FINAL_TOPUP_STATUSES.includes(topup.status)
   }, [topup])
 
+  const expiresAt = topup?.expires_at ?? topup?.expired_at
+  const expiresAtMs = useMemo(() => parseDateMs(expiresAt), [expiresAt])
+
+  const clientExpired = useMemo(() => {
+    if (!topup || topup.status !== 'pending') return false
+    if (topup.is_overdue) return true
+    return expiresAtMs > 0 && nowMs >= expiresAtMs
+  }, [expiresAtMs, nowMs, topup])
+
+  const effectiveStatus = useMemo<WalletTopup['status']>(() => {
+    if (topup?.status === 'pending' && clientExpired) return 'expired'
+    return topup?.status ?? 'pending'
+  }, [clientExpired, topup?.status])
+
   const payableStatus = useMemo(() => {
-    return topup ? isPayableTopup(topup) : false
-  }, [topup])
+    return topup ? isPayableTopup(topup) && !clientExpired : false
+  }, [clientExpired, topup])
+
+  const countdownMs = useMemo(() => {
+    if (!payableStatus || expiresAtMs <= 0) return 0
+    return Math.max(0, expiresAtMs - nowMs)
+  }, [expiresAtMs, nowMs, payableStatus])
 
   const refreshBalance = useCallback(async () => {
     try {
@@ -211,6 +258,16 @@ function WalletTopupStatusContent() {
     return () => clearTimeout(timer)
   }, [finalStatus, loadTopup, pollAttempt, topupId])
 
+  useEffect(() => {
+    if (!topup || finalStatus) return
+
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [finalStatus, topup])
+
   if (!topupId) {
     return (
       <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6">
@@ -224,7 +281,6 @@ function WalletTopupStatusContent() {
   }
 
   const transferAmount = topup?.payable_amount ?? topup?.total_credit ?? topup?.amount ?? topup?.requested_amount ?? 0
-  const expiresAt = topup?.expires_at ?? topup?.expired_at
 
   return (
     <div className="space-y-4">
@@ -258,15 +314,15 @@ function WalletTopupStatusContent() {
               <div className="text-3xl font-extrabold tracking-tight mt-1">{formatRupiah(transferAmount)}</div>
             </div>
 
-            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold capitalize ${statusTone(topup.status)}`}>
-              {topup.status === 'pending' ? (
+            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold capitalize ${statusTone(effectiveStatus)}`}>
+              {effectiveStatus === 'pending' ? (
                 <Clock3 className="w-3.5 h-3.5" />
-              ) : topup.status === 'success' || topup.status === 'paid' ? (
+              ) : effectiveStatus === 'success' || effectiveStatus === 'paid' ? (
                 <CircleCheckBig className="w-3.5 h-3.5" />
               ) : (
                 <CircleAlert className="w-3.5 h-3.5" />
               )}
-              {statusLabel(topup.status)}
+              {statusLabel(effectiveStatus)}
             </span>
           </div>
         ) : (
@@ -287,23 +343,32 @@ function WalletTopupStatusContent() {
             </div>
             <div className="rounded-xl bg-[#F7F7F5] p-3">
               <div className="text-xs text-[#888] mb-1">Dibuat</div>
-              <div className="font-bold">{formatDate(topup.created_at)}</div>
+              <div className="font-bold">{formatDateTime(topup.created_at)}</div>
             </div>
             <div className="rounded-xl bg-[#F7F7F5] p-3">
-              <div className="text-xs text-[#888] mb-1">Expired</div>
-              <div className="font-bold">{expiresAt ? formatDate(expiresAt) : '-'}</div>
+              <div className="text-xs text-[#888] mb-1">Batas Pembayaran</div>
+              <div className="font-bold">{expiresAt ? formatDateTime(expiresAt) : '-'}</div>
             </div>
           </div>
+
+          {payableStatus && expiresAt ? (
+            <div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <span className="font-semibold">Bayar sebelum {formatDateTime(expiresAt)}</span>
+                <span className="font-extrabold">Sisa {formatCountdown(countdownMs)}</span>
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm">
             <div className="rounded-xl bg-[#F7F7F5] p-3">
               <div className="text-xs text-[#888] mb-1">Status Pembayaran</div>
-              <div className="font-bold capitalize">{topup.provider_status || topup.status}</div>
+              <div className="font-bold capitalize">{clientExpired ? statusLabel(effectiveStatus) : topup.provider_status || statusLabel(topup.status)}</div>
             </div>
             {payableStatus ? (
               <GatewayPaymentDisplay paymentMethod={topup.payment_method} paymentNumber={topup.payment_number} />
             ) : (
-              <TopupFinalNotice topup={topup} />
+              <TopupFinalNotice status={effectiveStatus} />
             )}
           </div>
 
