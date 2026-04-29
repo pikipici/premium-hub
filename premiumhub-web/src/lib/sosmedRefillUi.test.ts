@@ -124,6 +124,31 @@ describe('sosmed refill UI helpers', () => {
     )
   })
 
+  it('shows submitted JAP refill availability from the provider order start-time window when available', () => {
+    const order = {
+      ...baseOrder,
+      created_at: '2026-04-26T10:55:00Z',
+      refill_status: 'requested',
+      refill_provider_status: 'submitted',
+      refill_provider_order_id: '98706469',
+      refill_requested_at: '2026-04-29T05:22:00Z',
+      refill_period_days: 30,
+      service: {
+        id: 'service-1',
+        category_code: 'instagram',
+        code: 'instagram-followers',
+        title: 'Instagram Followers Refill 30 Hari',
+        start_time: '2 Hours',
+        provider_title: 'Instagram Followers [Refill: 30D] [Max: 50K] [Start Time: 2 Hours] [Speed: 30K/Day]',
+        is_active: true,
+      },
+    }
+
+    expect(getUserRefillDescription(order, new Date('2026-04-29T07:24:00Z'))).toBe(
+      'Refill lagi diproses sistem. Next refill bisa diklaim lagi sekitar 5 jam 31 menit. Tombol klaim tetap dikunci dulu biar nggak dobel request.'
+    )
+  })
+
   it('does not show a fake sebentar lagi countdown after the submitted refill availability window has passed', () => {
     const order = {
       ...baseOrder,
@@ -133,10 +158,19 @@ describe('sosmed refill UI helpers', () => {
       refill_provider_order_id: '98706469',
       refill_requested_at: '2026-04-29T05:22:00Z',
       refill_period_days: 30,
+      service: {
+        id: 'service-1',
+        category_code: 'instagram',
+        code: 'instagram-followers',
+        title: 'Instagram Followers Refill 30 Hari',
+        start_time: '2 Hours',
+        provider_title: 'Instagram Followers [Refill: 30D] [Max: 50K] [Start Time: 2 Hours] [Speed: 30K/Day]',
+        is_active: true,
+      },
     }
 
     expect(getUserRefillDescription(order, new Date('2026-04-29T13:00:00Z'))).toBe(
-      'Refill lagi diproses sistem. Jadwal refill sudah masuk, tinggal nunggu proses sistem selesai. Tombol klaim tetap dikunci dulu biar nggak dobel request.'
+      'Refill lagi diproses sistem. Next refill lagi dicek jadwalnya sama sistem. Tombol klaim tetap dikunci dulu biar nggak dobel request.'
     )
   })
 
