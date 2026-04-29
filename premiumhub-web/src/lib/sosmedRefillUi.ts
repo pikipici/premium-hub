@@ -135,6 +135,11 @@ export function canAdminTriggerRefill(order: SosmedOrder) {
   return true
 }
 
+function isSubmittedJAPRefill(order: Pick<SosmedOrder, 'provider_code' | 'refill_provider_status' | 'refill_provider_order_id'>) {
+  const providerStatus = normalize(order.refill_provider_status)
+  return normalize(order.provider_code) === 'jap' && providerStatus === 'submitted' && normalize(order.refill_provider_order_id) !== ''
+}
+
 export function getUserRefillMeta(order: SosmedOrder): UserRefillMeta | null {
   if (!order.refill_eligible) return null
 
@@ -144,6 +149,9 @@ export function getUserRefillMeta(order: SosmedOrder): UserRefillMeta | null {
 
   if (isJAPRefillCooldown(order)) {
     return { label: 'Refill Menunggu Antrian', className: 'bg-amber-50 text-amber-700 border-amber-200', canClaim: false }
+  }
+  if (isSubmittedJAPRefill(order)) {
+    return { label: 'Refill Terkirim ke Supplier', className: 'bg-indigo-50 text-indigo-700 border-indigo-200', canClaim: false }
   }
   if (status === 'requested' || status === 'processing') {
     return { label: 'Refill Diproses', className: 'bg-sky-50 text-sky-600 border-sky-200', canClaim: false }
@@ -175,6 +183,7 @@ export function getUserRefillMeta(order: SosmedOrder): UserRefillMeta | null {
 export function getUserRefillTitle(order: SosmedOrder) {
   const status = normalize(order.refill_status) || 'none'
   if (isJAPRefillCooldown(order)) return 'Refill Sedang Diproses'
+  if (isSubmittedJAPRefill(order)) return 'Refill Terkirim ke Supplier'
   if (status === 'requested' || status === 'processing') return 'Refill Sedang Diproses'
   if (status === 'completed') return 'Refill Sudah Selesai'
   if (status === 'failed') return 'Refill Belum Berhasil'
@@ -202,6 +211,9 @@ export function getUserRefillDescription(order: SosmedOrder, now: Date = new Dat
       return `Refill lu sedang nunggu cooldown JAP. Estimasi bisa diproses lagi sekitar ${remaining}. Tombol klaim tetap dikunci biar nggak dobel request.`
     }
     return 'Refill lu sudah masuk antrian sistem. Kalau sistem lagi nunggu giliran refill, tombol klaim tetap dikunci biar nggak dobel request.'
+  }
+  if (isSubmittedJAPRefill(order)) {
+    return `Permintaan refill sudah terkirim ke JAP dan lagi nunggu update dari supplier. Status supplier terakhir: ${formatProviderStatus(order.refill_provider_status)}.`
   }
   if (status === 'requested' || status === 'processing') {
     return 'Permintaan refill udah masuk ke sistem. Tinggal tunggu prosesnya jalan.'

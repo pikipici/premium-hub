@@ -94,4 +94,22 @@ describe('sosmed refill UI helpers', () => {
 
     expect(getJAPRefillCooldownRemainingText(order, new Date('2026-04-29T10:30:00Z'))).toBe('6 jam 33 menit')
   })
+
+  it('shows a visible supplier-submitted refill state instead of the generic processing copy', () => {
+    const order = {
+      ...baseOrder,
+      refill_status: 'requested',
+      refill_provider_status: 'submitted',
+      refill_provider_order_id: '98706469',
+    }
+
+    expect(getUserRefillMeta(order)).toMatchObject({
+      label: 'Refill Terkirim ke Supplier',
+      canClaim: false,
+    })
+    expect(getUserRefillTitle(order)).toBe('Refill Terkirim ke Supplier')
+    expect(getUserRefillDescription(order)).toBe(
+      'Permintaan refill sudah terkirim ke JAP dan lagi nunggu update dari supplier. Status supplier terakhir: Submitted.'
+    )
+  })
 })
