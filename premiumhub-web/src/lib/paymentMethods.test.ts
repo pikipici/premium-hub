@@ -21,12 +21,18 @@ describe('payment method helpers', () => {
       normalizePaymentMethodOptions([
         { method: ' sp ', name: ' ShopeePay QRIS ', image: ' https://example.test/sp.png ', fee: '0' },
         { method: 'SP', name: 'Duplicate QRIS' },
+        { method: ' qris ', name: ' QRIS ' },
         { method: 'br', name: '' },
+        { method: ' bni_va ', name: ' BNI VA ' },
+        { method: ' cimb_niaga_va ', name: ' CIMB Niaga VA ' },
         { method: ' paypal ', name: ' PayPal ' },
       ])
     ).toEqual([
       { method: 'SP', name: 'ShopeePay QRIS', image: 'https://example.test/sp.png', fee: '0' },
+      { method: 'QRIS', name: 'QRIS', image: '/icons/payments/qris.png', fee: undefined },
       { method: 'BR', name: 'BR', image: undefined, fee: undefined },
+      { method: 'BNI_VA', name: 'BNI VA', image: '/icons/payments/bni.png', fee: undefined },
+      { method: 'CIMB_NIAGA_VA', name: 'CIMB Niaga VA', image: '/icons/payments/cimb.png', fee: undefined },
       { method: 'PAYPAL', name: 'PayPal', image: '/icons/apps/paypal.svg', fee: undefined },
     ])
   })

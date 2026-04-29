@@ -11,6 +11,17 @@ export const FALLBACK_PAYMENT_METHODS: PaymentMethodOption[] = [
 ]
 
 const PAYMENT_METHOD_IMAGE_BY_CODE: Record<string, string> = {
+  QRIS: '/icons/payments/qris.png',
+  MAYBANK_VA: '/icons/payments/maybank.png',
+  BNI_VA: '/icons/payments/bni.png',
+  PERMATA_VA: '/icons/payments/permata.png',
+  CIMB_NIAGA_VA: '/icons/payments/cimb.png',
+  ATM_BERSAMA_VA: '/icons/payments/atmbersama.png',
+  ARTHA_GRAHA_VA: '/icons/payments/arthagraha.png',
+  BRI_VA: '/icons/payments/bri.png',
+  BNC_VA: '/icons/payments/bnc.png',
+  SAMPOERNA_VA: '/icons/payments/sampoerna.png',
+  BCA_VA: '/icons/payments/bca.png',
   PAYPAL: '/icons/apps/paypal.svg',
 }
 
