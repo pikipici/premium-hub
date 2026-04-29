@@ -476,7 +476,7 @@ export default function LandingPage() {
               Cuma empat langkah, dari daftar sampai OTP masuk.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[#888]">
-              Tidak perlu langkah ribet. Mulai dalam hitungan menit.
+              Gak usah ribet. Order dalam hitungan menit.
             </p>
           </div>
 
@@ -484,7 +484,7 @@ export default function LandingPage() {
             {[
               {
                 title: 'Daftar & Isi Saldo',
-                desc: 'Buat akun gratis dan isi saldo wallet via transfer bank, e-wallet, atau QRIS.',
+                desc: 'Buat akun dan isi saldo wallet via transfer bank atau QRIS.',
               },
               {
                 title: 'Pilih Layanan di Dashboard',
@@ -492,7 +492,7 @@ export default function LandingPage() {
               },
               {
                 title: 'Nomor Aktif Otomatis',
-                desc: 'Setelah pembelian sukses, nomor langsung aktif dan status order bisa kamu pantau dari dashboard.',
+                desc: 'Setelah pembelian sukses, nomor langsung dikirim otomatis dan OTP bisa kamu ambil.',
               },
               {
                 title: 'Terima OTP Instan',
