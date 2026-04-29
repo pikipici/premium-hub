@@ -1,5 +1,8 @@
 import type { PaymentMethodOption } from '../types/wallet'
 
+export const MIN_TOPUP_DEFAULT = 10000
+export const MIN_TOPUP_QRIS = 5000
+
 export const FALLBACK_PAYMENT_METHODS: PaymentMethodOption[] = [
   { method: 'SP', name: 'QRIS', fee: 'Sesuai channel' },
   { method: 'BR', name: 'BRI VA', fee: 'Sesuai channel' },
@@ -79,4 +82,10 @@ export function paymentMethodFeeLabel(fee: string | undefined): string {
   if (normalized === '0') return 'Admin Rp0'
   if (/^\d+$/.test(normalized)) return `Admin Rp${Number(normalized).toLocaleString('id-ID')}`
   return normalized
+}
+
+export function minimumTopupAmountByMethod(method: string): number {
+  const code = method.trim().toUpperCase()
+  if (QR_METHODS.has(code)) return MIN_TOPUP_QRIS
+  return MIN_TOPUP_DEFAULT
 }

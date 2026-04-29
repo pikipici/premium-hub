@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   FALLBACK_PAYMENT_METHODS,
+  MIN_TOPUP_DEFAULT,
+  MIN_TOPUP_QRIS,
+  minimumTopupAmountByMethod,
   normalizePaymentMethodOptions,
   paymentMethodFeeLabel,
   paymentMethodIcon,
@@ -43,5 +46,13 @@ describe('payment method helpers', () => {
     expect(paymentMethodFeeLabel('0')).toBe('Admin Rp0')
     expect(paymentMethodFeeLabel('3000.00')).toBe('Admin Rp3.000')
     expect(paymentMethodFeeLabel('Sesuai channel')).toBe('Sesuai channel')
+  })
+
+  it('resolves minimum topup by payment method', () => {
+    expect(minimumTopupAmountByMethod('qris')).toBe(MIN_TOPUP_QRIS)
+    expect(minimumTopupAmountByMethod('SP')).toBe(MIN_TOPUP_QRIS)
+    expect(minimumTopupAmountByMethod('DQ')).toBe(MIN_TOPUP_QRIS)
+    expect(minimumTopupAmountByMethod('bni_va')).toBe(MIN_TOPUP_DEFAULT)
+    expect(minimumTopupAmountByMethod('')).toBe(MIN_TOPUP_DEFAULT)
   })
 })
