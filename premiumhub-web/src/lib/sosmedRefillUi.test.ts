@@ -124,6 +124,22 @@ describe('sosmed refill UI helpers', () => {
     )
   })
 
+  it('does not show a fake sebentar lagi countdown after the submitted refill availability window has passed', () => {
+    const order = {
+      ...baseOrder,
+      created_at: '2026-04-26T10:55:00Z',
+      refill_status: 'requested',
+      refill_provider_status: 'submitted',
+      refill_provider_order_id: '98706469',
+      refill_requested_at: '2026-04-29T05:22:00Z',
+      refill_period_days: 30,
+    }
+
+    expect(getUserRefillDescription(order, new Date('2026-04-29T13:00:00Z'))).toBe(
+      'Refill lagi diproses sistem. Jadwal refill sudah masuk, tinggal nunggu proses sistem selesai. Tombol klaim tetap dikunci dulu biar nggak dobel request.'
+    )
+  })
+
   it('shows an enabled claim button style when refill is available', () => {
     const order = {
       ...baseOrder,

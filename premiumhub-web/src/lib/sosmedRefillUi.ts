@@ -90,6 +90,16 @@ function getRemainingTextFromStartAndDuration(startValue: string | undefined, du
   return formatRemainingDuration(remainingMs)
 }
 
+function getPositiveRemainingTextFromStartAndDuration(startValue: string | undefined, durationMs: number, now: Date) {
+  const startedAt = startValue ? new Date(startValue) : null
+  if (!startedAt || Number.isNaN(startedAt.getTime())) return formatRemainingDuration(durationMs)
+
+  const availableAt = startedAt.getTime() + durationMs
+  const remainingMs = availableAt - now.getTime()
+  if (remainingMs <= 0) return null
+  return formatRemainingDuration(remainingMs)
+}
+
 export function getJAPRefillCooldownRemainingText(
   order: Pick<SosmedOrder, 'refill_provider_status' | 'refill_provider_error' | 'refill_requested_at'>,
   now: Date = new Date()
@@ -108,10 +118,10 @@ function getSubmittedJAPRefillAvailabilityRemainingText(
 ) {
   const providerDurationMs = parseCooldownDurationMs(order.refill_provider_error)
   if (providerDurationMs) {
-    return getRemainingTextFromStartAndDuration(order.refill_requested_at, providerDurationMs, now)
+    return getPositiveRemainingTextFromStartAndDuration(order.refill_requested_at, providerDurationMs, now)
   }
 
-  return getRemainingTextFromStartAndDuration(order.created_at, JAP_REFILL_INITIAL_AVAILABILITY_MS, now)
+  return getPositiveRemainingTextFromStartAndDuration(order.created_at, JAP_REFILL_INITIAL_AVAILABILITY_MS, now)
 }
 
 export function isJAPRefillCooldown(order: Pick<SosmedOrder, 'refill_provider_status'>) {
@@ -255,7 +265,7 @@ export function getUserRefillDescription(order: SosmedOrder, now: Date = new Dat
     if (nextRefillRemaining) {
       return `Refill lagi diproses sistem. Next refill bisa diklaim lagi sekitar ${nextRefillRemaining}. Tombol klaim tetap dikunci dulu biar nggak dobel request.`
     }
-    return 'Refill lagi diproses sistem. Tombol klaim tetap dikunci dulu biar nggak dobel request. Cek berkala buat next refill berikutnya.'
+    return 'Refill lagi diproses sistem. Jadwal refill sudah masuk, tinggal nunggu proses sistem selesai. Tombol klaim tetap dikunci dulu biar nggak dobel request.'
   }
   if (status === 'requested' || status === 'processing') {
     return 'Permintaan refill udah masuk ke sistem. Tinggal tunggu prosesnya jalan.'
