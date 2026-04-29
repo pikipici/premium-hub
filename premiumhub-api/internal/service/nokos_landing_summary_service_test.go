@@ -13,6 +13,7 @@ import (
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
 
+	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -79,7 +80,7 @@ func setupNokosLandingService(t *testing.T) (*NokosLandingSummaryService, *repos
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.NokosLandingSummary{}); err != nil {
+	if err := db.AutoMigrate(&model.NokosLandingSummary{}, &model.FiveSimOrder{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -99,34 +100,33 @@ func setupNokosLandingService(t *testing.T) (*NokosLandingSummaryService, *repos
 	return svc, repo, db, fiveSim, gateway
 }
 
-func TestNokosLandingSummarySync_UsesProviderDataAndFiltersStatuses(t *testing.T) {
-	svc, repo, _, fiveSim, gateway := setupNokosLandingService(t)
+func seedFiveSimOrders(t *testing.T, db *gorm.DB, rows []model.FiveSimOrder) {
+	t.Helper()
+	if len(rows) == 0 {
+		return
+	}
+	if err := db.Create(&rows).Error; err != nil {
+		t.Fatalf("seed five_sim_orders: %v", err)
+	}
+}
+
+func TestNokosLandingSummarySync_UsesLocalDataAndFiltersStatuses(t *testing.T) {
+	svc, repo, db, fiveSim, gateway := setupNokosLandingService(t)
 
 	fiveSim.countries = map[string]any{
 		"indonesia":    map[string]any{"iso": "ID"},
 		"unitedstates": map[string]any{"iso": "US"},
 		"singapore":    map[string]any{"iso": "SG"},
 	}
-	fiveSim.history = map[string]map[int]map[string]any{
-		"activation": {
-			0: {
-				"Statuses": map[string]any{
-					"PENDING":  10,
-					"FINISHED": 20,
-					"CANCELED": 3,
-					"BANNED":   2,
-				},
-			},
-		},
-		"hosting": {
-			0: {
-				"Statuses": map[string]any{
-					"RECEIVED": 5,
-					"BANNED":   1,
-				},
-			},
-		},
-	}
+	userID := uuid.New()
+	seedFiveSimOrders(t, db, []model.FiveSimOrder{
+		{UserID: userID, ProviderOrderID: 1001, OrderType: "activation", ProviderStatus: "FINISHED"},
+		{UserID: userID, ProviderOrderID: 1002, OrderType: "activation", ProviderStatus: "TIMEOUT"},
+		{UserID: userID, ProviderOrderID: 1003, OrderType: "activation", ProviderStatus: "PENDING"},
+		{UserID: userID, ProviderOrderID: 1004, OrderType: "activation", ProviderStatus: "CANCELED"},
+		{UserID: userID, ProviderOrderID: 1005, OrderType: "hosting", ProviderStatus: "FINISHED"},
+		{UserID: userID, ProviderOrderID: 1006, OrderType: "hosting", ProviderStatus: "BANNED"},
+	})
 	gateway.activeMethods = map[string]bool{
 		"SP": true,
 		"I1": true,
@@ -147,14 +147,14 @@ func TestNokosLandingSummarySync_UsesProviderDataAndFiltersStatuses(t *testing.T
 	if len(row.Countries) != 3 {
 		t.Fatalf("countries snapshot mismatch: got %d want 3", len(row.Countries))
 	}
-	if row.ActivationSentTotal != 30 {
-		t.Fatalf("activation_sent_total mismatch: got %d want 30", row.ActivationSentTotal)
+	if row.ActivationSentTotal != 3 {
+		t.Fatalf("activation_sent_total mismatch: got %d want 3", row.ActivationSentTotal)
 	}
-	if row.HostingSentTotal != 5 {
-		t.Fatalf("hosting_sent_total mismatch: got %d want 5", row.HostingSentTotal)
+	if row.HostingSentTotal != 1 {
+		t.Fatalf("hosting_sent_total mismatch: got %d want 1", row.HostingSentTotal)
 	}
-	if row.SentTotalAllTime != 35 {
-		t.Fatalf("sent_total_all_time mismatch: got %d want 35", row.SentTotalAllTime)
+	if row.SentTotalAllTime != 4 {
+		t.Fatalf("sent_total_all_time mismatch: got %d want 4", row.SentTotalAllTime)
 	}
 
 	expectedMethods := []string{"SP", "I1"}
@@ -167,14 +167,16 @@ func TestNokosLandingSummarySync_UsesProviderDataAndFiltersStatuses(t *testing.T
 }
 
 func TestNokosLandingSummaryGetPublicSummary_OnDemandSyncWhenMissing(t *testing.T) {
-	svc, _, _, fiveSim, gateway := setupNokosLandingService(t)
+	svc, _, db, fiveSim, gateway := setupNokosLandingService(t)
 	fiveSim.countries = map[string]any{
 		"indonesia": map[string]any{"iso": "ID"},
 	}
-	fiveSim.history = map[string]map[int]map[string]any{
-		"activation": {0: {"Statuses": map[string]any{"FINISHED": 12}}},
-		"hosting":    {0: {"Statuses": map[string]any{"RECEIVED": 8}}},
-	}
+	userID := uuid.New()
+	seedFiveSimOrders(t, db, []model.FiveSimOrder{
+		{UserID: userID, ProviderOrderID: 2001, OrderType: "activation", ProviderStatus: "FINISHED"},
+		{UserID: userID, ProviderOrderID: 2002, OrderType: "hosting", ProviderStatus: "RECEIVED"},
+		{UserID: userID, ProviderOrderID: 2003, OrderType: "activation", ProviderStatus: "CANCELED"},
+	})
 	gateway.activeMethods = map[string]bool{"SP": true}
 
 	res, err := svc.GetPublicSummary(context.Background())
@@ -185,8 +187,8 @@ func TestNokosLandingSummaryGetPublicSummary_OnDemandSyncWhenMissing(t *testing.
 	if res.CountriesCount != 1 {
 		t.Fatalf("countries_count mismatch: got %d want 1", res.CountriesCount)
 	}
-	if res.SentTotalAllTime != 20 {
-		t.Fatalf("sent_total_all_time mismatch: got %d want 20", res.SentTotalAllTime)
+	if res.SentTotalAllTime != 2 {
+		t.Fatalf("sent_total_all_time mismatch: got %d want 2", res.SentTotalAllTime)
 	}
 	if res.IsStale {
 		t.Fatalf("expected fresh summary")
@@ -194,15 +196,15 @@ func TestNokosLandingSummaryGetPublicSummary_OnDemandSyncWhenMissing(t *testing.
 }
 
 func TestNokosLandingSummaryGetPublicCountries(t *testing.T) {
-	svc, _, _, fiveSim, gateway := setupNokosLandingService(t)
+	svc, _, db, fiveSim, gateway := setupNokosLandingService(t)
 	fiveSim.countries = map[string]any{
 		"indonesia": map[string]any{"iso": map[string]any{"id": 1}, "prefix": map[string]any{"+62": 1}, "text_en": "Indonesia"},
 		"japan":     map[string]any{"iso": map[string]any{"jp": 1}, "prefix": map[string]any{"+81": 1}, "text_en": "Japan"},
 	}
-	fiveSim.history = map[string]map[int]map[string]any{
-		"activation": {0: {"Statuses": map[string]any{"FINISHED": 2}}},
-		"hosting":    {0: {"Statuses": map[string]any{"FINISHED": 1}}},
-	}
+	userID := uuid.New()
+	seedFiveSimOrders(t, db, []model.FiveSimOrder{
+		{UserID: userID, ProviderOrderID: 3001, OrderType: "activation", ProviderStatus: "FINISHED"},
+	})
 	gateway.activeMethods = map[string]bool{"SP": true}
 
 	res, err := svc.GetPublicCountries(context.Background())
@@ -222,12 +224,14 @@ func TestNokosLandingSummaryGetPublicCountries(t *testing.T) {
 }
 
 func TestNokosLandingSummarySync_DegradedWhenPartialFailure(t *testing.T) {
-	svc, repo, _, fiveSim, gateway := setupNokosLandingService(t)
+	svc, repo, db, fiveSim, gateway := setupNokosLandingService(t)
 	fiveSim.countriesErr = errors.New("provider down")
-	fiveSim.history = map[string]map[int]map[string]any{
-		"activation": {0: {"Statuses": map[string]any{"FINISHED": 1}}},
-		"hosting":    {0: {"Statuses": map[string]any{"FINISHED": 2}}},
-	}
+	userID := uuid.New()
+	seedFiveSimOrders(t, db, []model.FiveSimOrder{
+		{UserID: userID, ProviderOrderID: 4001, OrderType: "activation", ProviderStatus: "FINISHED"},
+		{UserID: userID, ProviderOrderID: 4002, OrderType: "hosting", ProviderStatus: "FINISHED"},
+		{UserID: userID, ProviderOrderID: 4003, OrderType: "hosting", ProviderStatus: "CANCELED"},
+	})
 	gateway.activeMethods = map[string]bool{"SP": true}
 
 	if err := svc.Sync(context.Background()); err != nil {
@@ -244,33 +248,20 @@ func TestNokosLandingSummarySync_DegradedWhenPartialFailure(t *testing.T) {
 	if !strings.Contains(row.LastSyncError, "countries") {
 		t.Fatalf("expected countries error in last_sync_error, got %s", row.LastSyncError)
 	}
-	if row.SentTotalAllTime != 3 {
-		t.Fatalf("sent_total_all_time mismatch: got %d want 3", row.SentTotalAllTime)
+	if row.SentTotalAllTime != 2 {
+		t.Fatalf("sent_total_all_time mismatch: got %d want 2", row.SentTotalAllTime)
 	}
 }
 
-func TestNokosLandingSummarySync_FallbackToPageScanWhenStatusesMissing(t *testing.T) {
-	svc, repo, _, fiveSim, gateway := setupNokosLandingService(t)
+func TestNokosLandingSummarySync_UsesLocalOrdersForSentTotals(t *testing.T) {
+	svc, repo, db, fiveSim, gateway := setupNokosLandingService(t)
 	fiveSim.countries = map[string]any{"indonesia": map[string]any{"iso": "ID"}}
-	fiveSim.history = map[string]map[int]map[string]any{
-		"activation": {
-			0: {
-				"Data": []any{
-					map[string]any{"status": "finished"},
-					map[string]any{"status": "canceled"},
-				},
-			},
-			2: {"Data": []any{}},
-		},
-		"hosting": {
-			0: {
-				"Data": []any{
-					map[string]any{"status": "received"},
-				},
-			},
-			1: {"Data": []any{}},
-		},
-	}
+	userID := uuid.New()
+	seedFiveSimOrders(t, db, []model.FiveSimOrder{
+		{UserID: userID, ProviderOrderID: 5001, OrderType: "activation", ProviderStatus: "RECEIVED"},
+		{UserID: userID, ProviderOrderID: 5002, OrderType: "activation", ProviderStatus: "TIMEOUT"},
+		{UserID: userID, ProviderOrderID: 5003, OrderType: "activation", ProviderStatus: "CANCELED"},
+	})
 	gateway.activeMethods = map[string]bool{"SP": true}
 
 	if err := svc.Sync(context.Background()); err != nil {
