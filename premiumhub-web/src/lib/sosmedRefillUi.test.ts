@@ -96,18 +96,20 @@ describe('sosmed refill UI helpers', () => {
     expect(getJAPRefillCooldownRemainingText(order, new Date('2026-04-29T10:30:00Z'))).toBe('6 jam 33 menit')
   })
 
-  it('shows a visible disabled grey claim button while refill is not claimable yet', () => {
+  it('shows next refill countdown copy for submitted JAP refill instead of provider technical text', () => {
     const order = {
       ...baseOrder,
       refill_status: 'requested',
       refill_provider_status: 'submitted',
       refill_provider_order_id: '98706469',
+      refill_requested_at: '2026-04-29T08:00:00Z',
+      refill_period_days: 30,
     }
 
     const refill = getUserRefillMeta(order)
 
     expect(refill).toMatchObject({
-      label: 'Refill Terkirim ke Supplier',
+      label: 'Refill Sedang Diproses',
       canClaim: false,
     })
     expect(getUserRefillButtonState(refill, false)).toMatchObject({
@@ -115,9 +117,9 @@ describe('sosmed refill UI helpers', () => {
       disabled: true,
       className: expect.stringContaining('bg-gray-200'),
     })
-    expect(getUserRefillTitle(order)).toBe('Refill Terkirim ke Supplier')
-    expect(getUserRefillDescription(order)).toBe(
-      'Permintaan refill sudah terkirim ke JAP dan lagi nunggu update dari supplier. Status supplier terakhir: Submitted.'
+    expect(getUserRefillTitle(order)).toBe('Refill Sedang Diproses')
+    expect(getUserRefillDescription(order, new Date('2026-04-29T08:30:00Z'))).toBe(
+      'Refill lagi diproses sistem. Next refill bisa diklaim lagi sekitar 29 hari 23 jam 30 menit. Tombol klaim tetap dikunci dulu biar nggak dobel request.'
     )
   })
 
