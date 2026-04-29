@@ -470,7 +470,7 @@ export default function LandingPage() {
         <section id="how" className="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 md:px-8 lg:px-10 lg:py-20">
           <div className="mb-10 text-center">
             <div className="mb-3 inline-flex rounded-full border border-[#FF573326] bg-[#FFF0ED] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5733]">
-              ⚡ Cara Kerja
+              ⚡ Cara Beli
             </div>
             <h2 className="text-[1.72rem] font-extrabold leading-tight tracking-tight text-[#141414] sm:text-4xl">
               Empat langkah mudah — dari daftar sampai OTP masuk ke dashboard kamu.
