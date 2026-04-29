@@ -329,6 +329,8 @@ export default function LandingPage() {
   const countriesCount = landingSummary?.countries_count ?? 0
   const sentTotalAllTime = landingSummary?.sent_total_all_time ?? 0
   const activePaymentMethods = (landingSummary?.payment_methods || []).map(paymentMethodLabel)
+  const compactPaymentMethodsLabel = activePaymentMethods.slice(0, 4).join(' / ')
+  const paymentMethodsTrustLabel = activePaymentMethods.length > 4 ? `${compactPaymentMethodsLabel} / ...` : compactPaymentMethodsLabel
 
   const heroBadgeLabel = hasLiveSummary ? `${formatNumber(sentTotalAllTime)} nomor terkirim` : 'Memuat data penjualan...'
   const statItems = [
@@ -347,7 +349,7 @@ export default function LandingPage() {
     {
       key: 'payments',
       icon: <CreditCard className="h-4 w-4" />,
-      label: activePaymentMethods.join(' / '),
+      label: paymentMethodsTrustLabel,
       hidden: activePaymentMethods.length === 0,
     },
     { key: 'support', icon: <Headphones className="h-4 w-4" />, label: 'Support 24/7' },
