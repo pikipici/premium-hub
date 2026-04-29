@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { animate, createScope, stagger } from 'animejs'
 import { CheckCircle2, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw, X } from 'lucide-react'
 
+import { getUserRefillDescription, getUserRefillMeta, getUserRefillTitle } from '@/lib/sosmedRefillUi'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
 import type { SosmedOrder } from '@/types/sosmedOrder'
@@ -28,37 +29,6 @@ function statusMeta(order: SosmedOrder) {
     return { label: 'Expired', className: 'bg-gray-100 text-gray-700 border-gray-200' }
   }
   return { label: 'Menunggu Bayar', className: 'bg-amber-100 text-amber-700 border-amber-200' }
-}
-
-function refillMeta(order: SosmedOrder) {
-  if (!order.refill_eligible) return null
-
-  const status = (order.refill_status || 'none').toLowerCase()
-  const deadlineStr = order.refill_deadline
-  const isExpired = deadlineStr ? new Date(deadlineStr) < new Date() : false
-
-  if (status === 'requested' || status === 'processing') {
-    return { label: 'Refill Diproses', className: 'bg-sky-50 text-sky-600 border-sky-200', canClaim: false }
-  }
-  if (status === 'completed') {
-    return { label: 'Refill Selesai', className: 'bg-emerald-50 text-emerald-600 border-emerald-200', canClaim: false }
-  }
-  if (status === 'rejected') {
-    return { label: 'Refill Ditolak', className: 'bg-red-50 text-red-600 border-red-200', canClaim: false }
-  }
-  if (isExpired) {
-    return { label: 'Refill Expired', className: 'bg-gray-50 text-gray-500 border-gray-200', canClaim: false }
-  }
-  if (!deadlineStr) {
-    return { label: 'Refill Perlu Dicek Admin', className: 'bg-amber-50 text-amber-600 border-amber-200', canClaim: false }
-  }
-
-  // Eligible & can claim (status is none or failed)
-  const canClaim = order.order_status === 'success' && !isExpired
-  if (status === 'failed') {
-    return { label: 'Refill Gagal', className: 'bg-red-50 text-red-600 border-red-200', canClaim }
-  }
-  return { label: `Refill ${order.refill_period_days || ''}${order.refill_period_days ? ' Hari' : ''}`, className: 'bg-violet-50 text-violet-600 border-violet-200', canClaim }
 }
 
 function formatDate(value: string) {
@@ -129,37 +99,6 @@ function progressSteps(order: SosmedOrder) {
       danger: failed,
     },
   ]
-}
-
-function refillTitle(status?: string) {
-  const value = (status || 'none').toLowerCase()
-  if (value === 'requested' || value === 'processing') return 'Refill Sedang Diproses'
-  if (value === 'completed') return 'Refill Sudah Selesai'
-  if (value === 'failed') return 'Refill Belum Berhasil'
-  if (value === 'rejected') return 'Refill Ditolak Sistem'
-  return 'Garansi Refill Aktif'
-}
-
-function refillDescription(order: SosmedOrder) {
-  const status = (order.refill_status || 'none').toLowerCase()
-  if (status === 'requested' || status === 'processing') {
-    return 'Permintaan refill udah masuk ke sistem. Tinggal tunggu prosesnya jalan.'
-  }
-  if (status === 'completed') {
-    return order.refill_completed_at
-      ? `Selesai diproses pada ${formatDate(order.refill_completed_at)}.`
-      : 'Refill udah selesai diproses.'
-  }
-  if (status === 'failed') {
-    return 'Refill belum berhasil dikirim. Lu bisa coba klaim ulang kalau tombolnya masih aktif.'
-  }
-  if (status === 'rejected') {
-    return 'Sistem menolak refill ini. Kalau perlu, hubungi admin buat dicek manual.'
-  }
-  if (!order.refill_deadline) {
-    return 'Garansi refill perlu dicek admin dulu sebelum bisa diklaim.'
-  }
-  return `Bisa klaim sampai ${formatDeadline(order.refill_deadline)}.`
 }
 
 export default function DashboardSosmedOrdersPage() {
@@ -360,7 +299,7 @@ export default function DashboardSosmedOrdersPage() {
         <section className="space-y-2">
           {orders.map((order) => {
             const status = statusMeta(order)
-            const refill = refillMeta(order)
+            const refill = getUserRefillMeta(order)
             const steps = progressSteps(order)
             const target = compactTarget(order.target_link)
 
@@ -470,8 +409,8 @@ export default function DashboardSosmedOrdersPage() {
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
-                            <div className="text-xs font-black text-[#141414]">{refillTitle(order.refill_status)}</div>
-                            <p className="mt-1 text-[11px] leading-relaxed text-[#666]">{refillDescription(order)}</p>
+                            <div className="text-xs font-black text-[#141414]">{getUserRefillTitle(order)}</div>
+                            <p className="mt-1 text-[11px] leading-relaxed text-[#666]">{getUserRefillDescription(order)}</p>
                           </div>
 
                           {refill.canClaim ? (

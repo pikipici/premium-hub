@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { canAdminTriggerRefill, formatProviderStatus, getAdminRefillStatusLabel, isJAPRefillCooldown } from '@/lib/sosmedRefillUi'
 import { sosmedOrderService, type AdminSosmedOpsSummary } from '@/services/sosmedOrderService'
 import type { SosmedOrder, SosmedOrderDetail } from '@/types/sosmedOrder'
 
@@ -48,15 +49,6 @@ function statusLabel(value: string) {
   }
 }
 
-function formatProviderStatus(value?: string) {
-  const normalized = value?.trim()
-  if (!normalized) return '-'
-  return normalized
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
-}
-
 function nextStatusActions(order: SosmedOrder) {
   if (order.order_status === 'pending_payment') {
     return [
@@ -85,25 +77,7 @@ function canRetryProvider(order: SosmedOrder) {
 }
 
 function canTriggerRefill(order: SosmedOrder) {
-  if (!order.refill_eligible) return false
-  if (order.order_status !== 'success') return false
-  if (!order.provider_order_id || order.provider_code !== 'jap') return false
-  const status = (order.refill_status || 'none').toLowerCase()
-  if (status === 'requested' || status === 'processing') return false
-  return true
-}
-
-function refillStatusLabel(status?: string) {
-  const s = (status || 'none').toLowerCase()
-  switch (s) {
-    case 'none': return { text: 'Belum Diklaim', color: 'var(--muted)' }
-    case 'requested': return { text: 'Requested', color: '#2563eb' }
-    case 'processing': return { text: 'Processing', color: '#2563eb' }
-    case 'completed': return { text: 'Selesai', color: '#16a34a' }
-    case 'failed': return { text: 'Gagal', color: 'var(--red)' }
-    case 'rejected': return { text: 'Ditolak', color: 'var(--red)' }
-    default: return { text: s, color: 'var(--muted)' }
-  }
+  return canAdminTriggerRefill(order)
 }
 
 export default function SosmedOrderPage() {
@@ -459,8 +433,8 @@ export default function SosmedOrderPage() {
                             Sync: {order.provider_synced_at ? formatDate(order.provider_synced_at) : '-'}
                           </div>
                           {order.refill_eligible ? (
-                            <div style={{ marginTop: 4, fontSize: 11, color: refillStatusLabel(order.refill_status).color, fontWeight: 600 }}>
-                              Refill: {refillStatusLabel(order.refill_status).text}
+                            <div style={{ marginTop: 4, fontSize: 11, color: getAdminRefillStatusLabel(order).color, fontWeight: 600 }}>
+                              Refill: {getAdminRefillStatusLabel(order).text}
                             </div>
                           ) : null}
                           {order.provider_error ? (
@@ -497,7 +471,7 @@ export default function SosmedOrderPage() {
                                 disabled={saving}
                                 onClick={() => void triggerRefill(order)}
                               >
-                                Trigger Refill
+                                {isJAPRefillCooldown(order) ? 'Retry Refill Cooldown' : 'Trigger Refill'}
                               </button>
                             ) : null}
                             {canRetryProvider(order) ? (
@@ -633,8 +607,8 @@ export default function SosmedOrderPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status</div>
-                      <div style={{ fontWeight: 700, color: refillStatusLabel(detail.order.refill_status).color }}>
-                        {refillStatusLabel(detail.order.refill_status).text}
+                      <div style={{ fontWeight: 700, color: getAdminRefillStatusLabel(detail.order).color }}>
+                        {getAdminRefillStatusLabel(detail.order).text}
                       </div>
                     </div>
                     <div>
@@ -662,6 +636,11 @@ export default function SosmedOrderPage() {
                       <div style={{ fontWeight: 600 }}>{detail.order.refill_completed_at ? formatDate(detail.order.refill_completed_at) : '-'}</div>
                     </div>
                   </div>
+                  {isJAPRefillCooldown(detail.order) ? (
+                    <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600 }}>
+                      JAP lagi minta jeda/cooldown. Tombol retry admin tersedia karena belum ada Refill ID JAP; jalankan ulang setelah waktu tunggu supplier lewat.
+                    </div>
+                  ) : null}
                   {detail.order.refill_provider_error ? (
                     <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: '#FFF1F2', color: 'var(--red)', fontSize: 12 }}>
                       {detail.order.refill_provider_error}
@@ -670,7 +649,7 @@ export default function SosmedOrderPage() {
                   {canTriggerRefill(detail.order) ? (
                     <div style={{ marginTop: 10 }}>
                       <button className="action-btn" type="button" disabled={saving} onClick={() => void triggerRefill(detail.order)}>
-                        Trigger Refill
+                        {isJAPRefillCooldown(detail.order) ? 'Retry Refill Cooldown' : 'Trigger Refill'}
                       </button>
                     </div>
                   ) : null}
