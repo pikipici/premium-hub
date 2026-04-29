@@ -22,10 +22,12 @@ describe('payment method helpers', () => {
         { method: ' sp ', name: ' ShopeePay QRIS ', image: ' https://example.test/sp.png ', fee: '0' },
         { method: 'SP', name: 'Duplicate QRIS' },
         { method: 'br', name: '' },
+        { method: ' paypal ', name: ' PayPal ' },
       ])
     ).toEqual([
       { method: 'SP', name: 'ShopeePay QRIS', image: 'https://example.test/sp.png', fee: '0' },
       { method: 'BR', name: 'BR', image: undefined, fee: undefined },
+      { method: 'PAYPAL', name: 'PayPal', image: '/icons/apps/paypal.svg', fee: undefined },
     ])
   })
 

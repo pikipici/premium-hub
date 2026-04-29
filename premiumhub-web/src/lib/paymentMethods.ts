@@ -10,6 +10,10 @@ export const FALLBACK_PAYMENT_METHODS: PaymentMethodOption[] = [
   { method: 'BT', name: 'Permata VA', fee: 'Sesuai channel' },
 ]
 
+const PAYMENT_METHOD_IMAGE_BY_CODE: Record<string, string> = {
+  PAYPAL: '/icons/apps/paypal.svg',
+}
+
 const QR_METHODS = new Set(['SP', 'QRIS', 'NQ', 'GQ', 'SQ', 'BQ', 'IQ', 'DQ', 'QD', 'LQ'])
 const VA_METHODS = new Set([
   'BC',
@@ -47,10 +51,11 @@ export function normalizePaymentMethodOptions(methods: PaymentMethodOption[] | u
   const normalized = methods
     .map((method) => {
       const code = method.method.trim().toUpperCase()
+      const normalizedImage = method.image?.trim()
       return {
         method: code,
         name: method.name.trim() || code,
-        image: method.image?.trim(),
+        image: normalizedImage || PAYMENT_METHOD_IMAGE_BY_CODE[code],
         fee: method.fee?.trim(),
       }
     })
