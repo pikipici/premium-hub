@@ -16,6 +16,32 @@ import (
 
 // --- Pure logic tests (no DB, runs everywhere) ---
 
+func TestIsSosmedJAPRefillCooldownError(t *testing.T) {
+	cooldownMessages := []error{
+		errors.New("Please wait 24 hours before requesting refill again"),
+		errors.New("refill not available yet"),
+		errors.New("Order refill already in progress"),
+		errors.New("too soon, try again later"),
+	}
+	for _, err := range cooldownMessages {
+		if !isSosmedJAPRefillCooldownError(err) {
+			t.Fatalf("expected cooldown error for %q", err.Error())
+		}
+	}
+
+	regularMessages := []error{
+		nil,
+		errors.New("Incorrect order ID"),
+		errors.New("JAP timeout"),
+		errors.New("insufficient balance"),
+	}
+	for _, err := range regularMessages {
+		if isSosmedJAPRefillCooldownError(err) {
+			t.Fatalf("did not expect cooldown error for %v", err)
+		}
+	}
+}
+
 func TestParseSosmedRefillPeriodDays(t *testing.T) {
 	cases := []struct {
 		input    string
@@ -433,6 +459,99 @@ func TestSosmedOrderService_UserRequestRefillFailure(t *testing.T) {
 	}
 	if orderAfter.RefillRequestedAt == nil {
 		t.Fatal("expected refill_requested_at to be set even on failure")
+	}
+}
+
+func TestSosmedOrderService_UserRequestRefillCooldownKeepsRefillActive(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+	); err != nil {
+		t.Fatalf("migrate refill cooldown models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID: uuid.New(), Name: "Refill Cooldown Buyer", Email: "refill-cooldown@example.com",
+		Password: "hashed", Role: "user", IsActive: true,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := seedSosmedRefillService(t, db, uuid.New())
+	deadline := time.Now().Add(30 * 24 * time.Hour)
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            buyer.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://instagram.com/example",
+		Quantity:          1,
+		UnitPrice:         19000,
+		TotalPrice:        19000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusSuccess,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderOrderID:   "JAP-REFILL-COOLDOWN-001",
+		ProviderStatus:    "Completed",
+		RefillEligible:    true,
+		RefillPeriodDays:  30,
+		RefillDeadline:    &deadline,
+		RefillStatus:      "none",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{refillErr: errors.New("Please wait 24 hours before requesting refill again")}
+	orderSvc := NewSosmedOrderService(
+		repository.NewSosmedOrderRepo(db),
+		repository.NewSosmedServiceRepo(db),
+		nil,
+	).SetJAPOrderProvider(fakeJAP)
+
+	detail, err := orderSvc.UserRequestRefill(context.Background(), order.ID, buyer.ID)
+	if err != nil {
+		t.Fatalf("expected cooldown refill to stay active without user-facing failure, got: %v", err)
+	}
+	if detail.Order.RefillStatus != sosmedRefillStatusProcessing {
+		t.Fatalf("expected refill_status=processing, got %s", detail.Order.RefillStatus)
+	}
+	if detail.Order.RefillProviderStatus != "cooldown" {
+		t.Fatalf("expected provider status cooldown, got %q", detail.Order.RefillProviderStatus)
+	}
+	if !strings.Contains(detail.Order.RefillProviderError, "Please wait 24 hours") {
+		t.Fatalf("expected cooldown provider error stored, got %q", detail.Order.RefillProviderError)
+	}
+	if detail.Order.RefillProviderOrderID != "" {
+		t.Fatalf("expected no refill provider id while waiting cooldown, got %q", detail.Order.RefillProviderOrderID)
+	}
+
+	_, err = orderSvc.UserRequestRefill(context.Background(), order.ID, buyer.ID)
+	if err == nil || !strings.Contains(err.Error(), "sedang diproses") {
+		t.Fatalf("expected second claim blocked while cooldown is active, got: %v", err)
+	}
+
+	fakeJAP.mu.Lock()
+	fakeJAP.refillErr = nil
+	fakeJAP.refillRes = &JAPRefillResponse{Refill: "REFILL-AFTER-COOLDOWN"}
+	fakeJAP.mu.Unlock()
+
+	detail, err = orderSvc.AdminTriggerRefill(context.Background(), order.ID, uuid.New())
+	if err != nil {
+		t.Fatalf("expected admin to retry cooldown refill, got: %v", err)
+	}
+	if detail.Order.RefillStatus != sosmedRefillStatusRequested {
+		t.Fatalf("expected refill_status=requested after admin retry, got %s", detail.Order.RefillStatus)
+	}
+	if detail.Order.RefillProviderOrderID != "REFILL-AFTER-COOLDOWN" {
+		t.Fatalf("expected refill provider id after admin retry, got %q", detail.Order.RefillProviderOrderID)
 	}
 }
 

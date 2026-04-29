@@ -143,6 +143,46 @@ func isActiveSosmedRefillStatus(value string) bool {
 	}
 }
 
+func isSosmedJAPRefillCooldownError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	if message == "" {
+		return false
+	}
+	cooldownSignals := []string{
+		"cooldown",
+		"cool down",
+		"please wait",
+		"try again",
+		"request again",
+		"before requesting refill again",
+		"refill again",
+		"already requested",
+		"already in progress",
+		"refill already",
+		"refill is already",
+		"refill not available yet",
+		"not available yet",
+		"too soon",
+		"after 24",
+		"after 12",
+		"after 6",
+		"after 1 day",
+		"24 hours",
+		"24 hour",
+		"12 hours",
+		"6 hours",
+	}
+	for _, signal := range cooldownSignals {
+		if strings.Contains(message, signal) {
+			return true
+		}
+	}
+	return false
+}
+
 func mapSosmedJAPRefillStatus(value string) string {
 	switch normalizeSosmedProviderStatus(value) {
 	case "completed", "complete", "success", "delivered", "done":
@@ -931,7 +971,12 @@ func (s *SosmedOrderService) reserveSosmedRefillRequest(ctx context.Context, opt
 			}
 		}
 		if isActiveSosmedRefillStatus(order.RefillStatus) {
-			return errors.New("refill sedang diproses, tunggu sampai selesai")
+			isAdminCooldownRetry := opts.actorType == "admin" &&
+				strings.EqualFold(strings.TrimSpace(order.RefillProviderStatus), "cooldown") &&
+				strings.TrimSpace(order.RefillProviderOrderID) == ""
+			if !isAdminCooldownRetry {
+				return errors.New("refill sedang diproses, tunggu sampai selesai")
+			}
 		}
 
 		providerOrderID := strings.TrimSpace(order.ProviderOrderID)
@@ -1054,6 +1099,22 @@ func (s *SosmedOrderService) requestSosmedRefill(ctx context.Context, opts sosme
 	providerOrderID := strings.TrimSpace(order.ProviderOrderID)
 	refillRes, err := s.japOrderProvider.RequestRefill(ctx, providerOrderID)
 	if err != nil {
+		if isSosmedJAPRefillCooldownError(err) {
+			reason := fmt.Sprintf("refill menunggu cooldown JAP: %v", err)
+			if opts.actorType == "admin" {
+				reason = fmt.Sprintf("admin refill menunggu cooldown JAP: %v", err)
+			}
+			stored, finalizeErr := s.finalizeSosmedRefillRequest(ctx, order.ID, opts.actorID, opts.actorType, sosmedRefillStatusProcessing, "", "cooldown", err.Error(), reason)
+			if finalizeErr != nil {
+				return nil, finalizeErr
+			}
+			fresh, findErr := s.repo.FindByID(stored.ID)
+			if findErr != nil {
+				return nil, errors.New("gagal memuat order sosmed")
+			}
+			return s.buildDetail(fresh)
+		}
+
 		reason := fmt.Sprintf("refill gagal dikirim ke JAP: %v", err)
 		if opts.actorType == "admin" {
 			reason = fmt.Sprintf("admin refill gagal dikirim ke JAP: %v", err)
