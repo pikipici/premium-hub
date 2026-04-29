@@ -329,6 +329,8 @@ export default function LandingPage() {
   const countriesCount = landingSummary?.countries_count ?? 0
   const sentTotalAllTime = landingSummary?.sent_total_all_time ?? 0
   const activePaymentMethods = (landingSummary?.payment_methods || []).map(paymentMethodLabel)
+  const compactPaymentMethodsLabel = activePaymentMethods.slice(0, 4).join(' / ')
+  const paymentMethodsTrustLabel = activePaymentMethods.length > 4 ? `${compactPaymentMethodsLabel} / ...` : compactPaymentMethodsLabel
 
   const heroBadgeLabel = hasLiveSummary ? `${formatNumber(sentTotalAllTime)} nomor terkirim` : 'Memuat data penjualan...'
   const statItems = [
@@ -347,7 +349,7 @@ export default function LandingPage() {
     {
       key: 'payments',
       icon: <CreditCard className="h-4 w-4" />,
-      label: activePaymentMethods.join(' / '),
+      label: paymentMethodsTrustLabel,
       hidden: activePaymentMethods.length === 0,
     },
     { key: 'support', icon: <Headphones className="h-4 w-4" />, label: 'Support 24/7' },
@@ -468,13 +470,13 @@ export default function LandingPage() {
         <section id="how" className="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 md:px-8 lg:px-10 lg:py-20">
           <div className="mb-10 text-center">
             <div className="mb-3 inline-flex rounded-full border border-[#FF573326] bg-[#FFF0ED] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5733]">
-              ⚡ Cara Kerja
+              ⚡ Cara Beli
             </div>
             <h2 className="text-[1.72rem] font-extrabold leading-tight tracking-tight text-[#141414] sm:text-4xl">
-              Empat langkah mudah — dari daftar sampai OTP masuk ke dashboard kamu.
+              Cuma empat langkah, dari daftar sampai OTP masuk.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[#888]">
-              Tidak perlu langkah ribet. Mulai dalam hitungan menit.
+              Gak usah ribet. Order dalam hitungan menit.
             </p>
           </div>
 
@@ -482,7 +484,7 @@ export default function LandingPage() {
             {[
               {
                 title: 'Daftar & Isi Saldo',
-                desc: 'Buat akun gratis dan isi saldo wallet via transfer bank, e-wallet, atau QRIS.',
+                desc: 'Buat akun dan isi saldo wallet via transfer bank atau QRIS.',
               },
               {
                 title: 'Pilih Layanan di Dashboard',
@@ -490,7 +492,7 @@ export default function LandingPage() {
               },
               {
                 title: 'Nomor Aktif Otomatis',
-                desc: 'Setelah pembelian sukses, nomor langsung aktif dan status order bisa kamu pantau dari dashboard.',
+                desc: 'Setelah pembelian sukses, nomor langsung dikirim otomatis dan OTP bisa kamu ambil.',
               },
               {
                 title: 'Terima OTP Instan',
