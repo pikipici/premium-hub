@@ -883,7 +883,80 @@ func (s *SosmedOrderService) GetByID(id, userID uuid.UUID) (*SosmedOrderDetail, 
 }
 
 func (s *SosmedOrderService) ListByUser(userID uuid.UUID, page, limit int) ([]model.SosmedOrder, int64, error) {
-	return s.repo.FindByUserID(userID, page, limit)
+	orders, total, err := s.repo.FindByUserID(userID, page, limit)
+	if err != nil {
+		return orders, total, err
+	}
+
+	for idx := range orders {
+		if synced := s.syncActiveJAPRefillStatusForUserList(&orders[idx]); synced != nil {
+			orders[idx] = *synced
+		}
+	}
+
+	return orders, total, nil
+}
+
+func (s *SosmedOrderService) syncActiveJAPRefillStatusForUserList(order *model.SosmedOrder) *model.SosmedOrder {
+	if s == nil || s.japOrderProvider == nil || order == nil {
+		return nil
+	}
+	if !isJAPSosmedOrder(order) || !isActiveSosmedRefillStatus(order.RefillStatus) {
+		return nil
+	}
+	if strings.TrimSpace(order.RefillProviderOrderID) == "" {
+		return nil
+	}
+
+	previousRefillStatus := normalizeSosmedRefillStatus(order.RefillStatus)
+	previousRefillProviderStatus := strings.TrimSpace(order.RefillProviderStatus)
+	now := time.Now()
+	refillRes, err := s.japOrderProvider.GetRefillStatus(context.Background(), order.RefillProviderOrderID)
+	if err != nil {
+		order.RefillProviderError = truncateSosmedProviderText(err.Error(), 2000)
+		if saveErr := s.repo.Update(order); saveErr != nil {
+			return nil
+		}
+		stored, loadErr := s.repo.FindByID(order.ID)
+		if loadErr != nil {
+			return order
+		}
+		return stored
+	}
+
+	nextRefillProviderStatus := strings.TrimSpace(refillRes.Status)
+	if nextRefillProviderStatus == "" {
+		return nil
+	}
+	nextRefillStatus := mapSosmedJAPRefillStatus(nextRefillProviderStatus)
+	order.RefillProviderStatus = nextRefillProviderStatus
+	order.RefillProviderError = ""
+	order.RefillStatus = nextRefillStatus
+	if nextRefillStatus == sosmedRefillStatusCompleted && order.RefillCompletedAt == nil {
+		order.RefillCompletedAt = &now
+	}
+
+	refillChanged := previousRefillStatus != nextRefillStatus || previousRefillProviderStatus != nextRefillProviderStatus
+	if err := s.repo.Update(order); err != nil {
+		return nil
+	}
+	if refillChanged {
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: previousRefillStatus,
+			ToStatus:   order.RefillStatus,
+			Reason:     fmt.Sprintf("sync refill JAP saat user buka order: provider status %s, refill jadi %s", humanizeSosmedProviderStatus(order.RefillProviderStatus), order.RefillStatus),
+			ActorType:  "system",
+			CreatedAt:  now,
+		}
+		_ = s.repo.CreateEvent(event)
+	}
+
+	stored, loadErr := s.repo.FindByID(order.ID)
+	if loadErr != nil {
+		return order
+	}
+	return stored
 }
 
 func (s *SosmedOrderService) Cancel(id, userID uuid.UUID) error {

@@ -739,6 +739,88 @@ func TestSosmedOrderService_AdminTriggerRefill(t *testing.T) {
 	}
 }
 
+func TestSosmedOrderService_ListByUserSyncsActiveJAPRefillStatus(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+	); err != nil {
+		t.Fatalf("migrate user list refill sync models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID: uuid.New(), Name: "Refill List Buyer", Email: "refill-list@example.com",
+		Password: "hashed", Role: "user", IsActive: true,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := seedSosmedRefillService(t, db, uuid.New())
+	deadline := time.Now().Add(30 * 24 * time.Hour)
+	requestedAt := time.Now().Add(-23 * time.Hour)
+	order := &model.SosmedOrder{
+		ID:                    uuid.New(),
+		UserID:                buyer.ID,
+		ServiceID:             serviceItem.ID,
+		ServiceCode:           serviceItem.Code,
+		ServiceTitle:          serviceItem.Title,
+		TargetLink:            "https://instagram.com/example",
+		Quantity:              1,
+		UnitPrice:             19000,
+		TotalPrice:            19000,
+		PaymentMethod:         "wallet",
+		PaymentStatus:         "paid",
+		OrderStatus:           sosmedOrderStatusSuccess,
+		ProviderCode:          "jap",
+		ProviderServiceID:     "6331",
+		ProviderOrderID:       "JAP-REFILL-LIST-001",
+		ProviderStatus:        "Completed",
+		RefillEligible:        true,
+		RefillPeriodDays:      30,
+		RefillDeadline:        &deadline,
+		RefillStatus:          sosmedRefillStatusRequested,
+		RefillProviderOrderID: "REFILL-LIST-001",
+		RefillProviderStatus:  "submitted",
+		RefillRequestedAt:     &requestedAt,
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{
+		refillStatusRes: &JAPRefillStatusResponse{Status: "Rejected"},
+	}
+	orderSvc := NewSosmedOrderService(
+		repository.NewSosmedOrderRepo(db),
+		repository.NewSosmedServiceRepo(db),
+		nil,
+	).SetJAPOrderProvider(fakeJAP)
+
+	orders, total, err := orderSvc.ListByUser(buyer.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("list by user: %v", err)
+	}
+	if total != 1 || len(orders) != 1 {
+		t.Fatalf("expected one order, got total=%d len=%d", total, len(orders))
+	}
+	if orders[0].RefillProviderStatus != "Rejected" {
+		t.Fatalf("expected fresh provider refill status Rejected, got %q", orders[0].RefillProviderStatus)
+	}
+	if orders[0].RefillStatus != sosmedRefillStatusRejected {
+		t.Fatalf("expected refill status rejected, got %q", orders[0].RefillStatus)
+	}
+
+	fakeJAP.mu.Lock()
+	refillStatusInputs := append([]string(nil), fakeJAP.refillStatusInputs...)
+	fakeJAP.mu.Unlock()
+	if len(refillStatusInputs) != 1 || refillStatusInputs[0] != "REFILL-LIST-001" {
+		t.Fatalf("unexpected refill status inputs: %+v", refillStatusInputs)
+	}
+}
+
 func TestSosmedOrderService_AdminSyncProviderStatusSyncsRefill(t *testing.T) {
 	db := setupCoreDB(t)
 	if err := db.AutoMigrate(
