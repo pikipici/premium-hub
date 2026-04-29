@@ -473,7 +473,7 @@ export default function LandingPage() {
               ⚡ Cara Beli
             </div>
             <h2 className="text-[1.72rem] font-extrabold leading-tight tracking-tight text-[#141414] sm:text-4xl">
-              Empat langkah mudah — dari daftar sampai OTP masuk ke dashboard kamu.
+              Cuma empat langkah, dari daftar sampai OTP masuk.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[#888]">
               Tidak perlu langkah ribet. Mulai dalam hitungan menit.
