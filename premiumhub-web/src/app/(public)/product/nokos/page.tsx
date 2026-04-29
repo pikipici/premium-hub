@@ -432,10 +432,16 @@ export default function LandingPage() {
           <div className="relative">
             <div className="absolute -right-16 inset-y-0 hidden rounded-l-[40px] bg-gradient-to-br from-[#FFE8E0] via-[#FFCDB8] to-[#FFE5D5] md:block" />
             <div className="relative z-10">
-              <div className="grid gap-3 sm:grid-cols-2 md:hidden">
-                {otpCards.map((card) => (
-                  <OtpPreviewCard key={`mobile-${card.app}`} card={card} />
-                ))}
+              <div className="otp-escalator-mask-mobile md:hidden">
+                <div className="otp-escalator-track-mobile">
+                  {[0, 1].map((loop) => (
+                    <div key={`mobile-loop-${loop}`} className="grid gap-3 pb-3">
+                      {otpCards.map((card) => (
+                        <OtpPreviewCard key={`mobile-${loop}-${card.app}`} card={card} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="otp-escalator-mask hidden md:block">
@@ -532,12 +538,28 @@ export default function LandingPage() {
           mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
         }
 
+        .otp-escalator-mask-mobile {
+          max-height: 360px;
+          overflow: hidden;
+          -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 8%, #000 92%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, #000 8%, #000 92%, transparent 100%);
+        }
+
         .otp-escalator-track {
           will-change: transform;
           animation: otp-escalator 96s linear infinite;
         }
 
+        .otp-escalator-track-mobile {
+          will-change: transform;
+          animation: otp-escalator-mobile 120s linear infinite;
+        }
+
         .otp-escalator-mask:hover .otp-escalator-track {
+          animation-play-state: paused;
+        }
+
+        .otp-escalator-mask-mobile:active .otp-escalator-track-mobile {
           animation-play-state: paused;
         }
 
@@ -551,8 +573,19 @@ export default function LandingPage() {
           }
         }
 
+        @keyframes otp-escalator-mobile {
+          from {
+            transform: translateY(0);
+          }
+
+          to {
+            transform: translateY(-50%);
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .otp-escalator-track {
+          .otp-escalator-track,
+          .otp-escalator-track-mobile {
             animation: none;
           }
         }
