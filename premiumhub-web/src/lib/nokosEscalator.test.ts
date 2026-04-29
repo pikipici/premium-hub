@@ -10,7 +10,8 @@ describe('nokos otp escalator layout', () => {
     expect(source).toContain('otp-escalator-mask-mobile md:hidden')
     expect(source).toContain('otp-escalator-track-mobile')
     expect(source).toContain('key={`mobile-loop-${loop}`}')
-    expect(source).toContain('animation: otp-escalator-mobile 120s linear infinite')
+    expect(source).toContain('const MOBILE_ESCALATOR_CYCLE_SEC = 120')
+    expect(source).toContain('animation: otp-escalator-mobile ${MOBILE_ESCALATOR_CYCLE_SEC}s linear infinite')
     expect(source).toContain('@keyframes otp-escalator-mobile')
   })
 
@@ -19,6 +20,8 @@ describe('nokos otp escalator layout', () => {
 
     expect(source).toContain('otp-escalator-mask hidden md:block')
     expect(source).toContain('otp-escalator-track')
+    expect(source).toContain('buildOtpCardsForCycle(otpCards, desktopCycleSeed)')
+    expect(source).toContain('buildOtpCardsForCycle(otpCards, mobileCycleSeed)')
     expect(source).toContain('prefers-reduced-motion: reduce')
     expect(source).toContain('.otp-escalator-track-mobile')
     expect(source).toContain('animation: none')
