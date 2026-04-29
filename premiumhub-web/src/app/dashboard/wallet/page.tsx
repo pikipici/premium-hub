@@ -6,13 +6,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, CircleAlert, Loader2, RefreshCcw, Sparkles } from 'lucide-react'
 
-import { FALLBACK_PAYMENT_METHODS, normalizePaymentMethodOptions, paymentMethodFeeLabel, paymentMethodIcon } from '@/lib/paymentMethods'
+import {
+  FALLBACK_PAYMENT_METHODS,
+  MIN_TOPUP_DEFAULT,
+  MIN_TOPUP_QRIS,
+  minimumTopupAmountByMethod,
+  normalizePaymentMethodOptions,
+  paymentMethodFeeLabel,
+  paymentMethodIcon,
+} from '@/lib/paymentMethods'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
 import type { PaymentMethodOption, WalletLedger, WalletTopup } from '@/types/wallet'
 
-const MIN_TOPUP = 10000
 const QUICK_AMOUNTS = [25000, 50000, 100000, 200000]
 const MUTATION_PAGE_SIZE = 8
 
@@ -140,6 +147,8 @@ export default function WalletPage() {
     return Math.floor(amount)
   }, [amount])
 
+  const selectedMinTopup = useMemo(() => minimumTopupAmountByMethod(paymentMethod), [paymentMethod])
+
   const estimatedBalance = useMemo(() => balance + selectedAmount, [balance, selectedAmount])
 
   const selectedPaymentMethodLabel = useMemo(
@@ -254,7 +263,7 @@ export default function WalletPage() {
       }
 
       try {
-        const methodRes = await walletService.listPaymentMethods(MIN_TOPUP)
+        const methodRes = await walletService.listPaymentMethods(MIN_TOPUP_DEFAULT)
         if (methodRes.success) {
           const methods = normalizePaymentMethodOptions(methodRes.data)
           setPaymentMethods(methods)
@@ -290,8 +299,8 @@ export default function WalletPage() {
   }
 
   const handleCreateTopup = async () => {
-    if (selectedAmount < MIN_TOPUP) {
-      setError(`Nominal minimal ${formatRupiah(MIN_TOPUP)}`)
+    if (selectedAmount < selectedMinTopup) {
+      setError(`Nominal minimal ${formatRupiah(selectedMinTopup)}`)
       return
     }
 
@@ -384,7 +393,10 @@ export default function WalletPage() {
         <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
           <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
             <h2 className="text-sm font-bold">Top Up Saldo</h2>
-            <span className="text-xs text-[#888]">Min. {formatRupiah(MIN_TOPUP)}</span>
+            <span className="text-xs text-[#888]">
+              Min. {formatRupiah(selectedMinTopup)}{' '}
+              <span className="hidden sm:inline">(QRIS {formatRupiah(MIN_TOPUP_QRIS)} • Lainnya {formatRupiah(MIN_TOPUP_DEFAULT)})</span>
+            </span>
           </header>
 
           <div className="p-5 space-y-4">
@@ -422,7 +434,7 @@ export default function WalletPage() {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#888]">Rp</span>
                 <input
                   type="number"
-                  min={MIN_TOPUP}
+                  min={selectedMinTopup}
                   step={1000}
                   value={amount || ''}
                   onChange={(e) => setAmount(Number(e.target.value))}
@@ -472,7 +484,7 @@ export default function WalletPage() {
             <div className="rounded-xl border border-[#EBEBEB] bg-[#F7F7F5] px-4 py-3 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[#888]">Nominal top up</span>
-                <span className="font-semibold">{selectedAmount >= MIN_TOPUP ? formatRupiah(selectedAmount) : 'Belum dipilih'}</span>
+                <span className="font-semibold">{selectedAmount >= selectedMinTopup ? formatRupiah(selectedAmount) : 'Belum dipilih'}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[#888]">Metode bayar</span>
@@ -495,7 +507,7 @@ export default function WalletPage() {
             <button
               type="button"
               onClick={handleCreateTopup}
-              disabled={submitting || selectedAmount < MIN_TOPUP}
+              disabled={submitting || selectedAmount < selectedMinTopup}
               className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF5733] px-4 py-3 text-sm font-bold text-white hover:bg-[#e64d2e] disabled:opacity-50"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

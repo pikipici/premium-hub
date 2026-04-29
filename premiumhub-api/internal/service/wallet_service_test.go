@@ -292,6 +292,34 @@ func TestWalletCreateTopupValidationAndBlockedUser(t *testing.T) {
 	}
 }
 
+func TestWalletCreateTopupMinAmountPakasirByMethod(t *testing.T) {
+	svc, _, _, user := setupWalletService(t)
+	svc.cfg.PaymentGatewayProvider = "pakasir"
+	svc.cfg.PakasirProject = "digimarket"
+	svc.cfg.PakasirAPIKey = "PK_test"
+
+	if _, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{
+		Amount:        5000,
+		PaymentMethod: "qris",
+	}); err != nil {
+		t.Fatalf("qris min 5000 should pass, got: %v", err)
+	}
+
+	if _, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{
+		Amount:        5000,
+		PaymentMethod: "bni_va",
+	}); err == nil || !strings.Contains(err.Error(), "minimal topup Rp 10.000") {
+		t.Fatalf("non-qris 5000 should fail with min 10k, got: %v", err)
+	}
+
+	if _, err := svc.CreateTopup(context.Background(), user.ID, CreateTopupInput{
+		Amount:        10000,
+		PaymentMethod: "bni_va",
+	}); err != nil {
+		t.Fatalf("non-qris min 10000 should pass, got: %v", err)
+	}
+}
+
 func TestWalletCheckTopupSuccessCreditsOnce(t *testing.T) {
 	svc, db, fake, user := setupWalletService(t)
 

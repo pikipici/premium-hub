@@ -128,6 +128,24 @@ type WalletGatewayWebhookInput struct {
 	Signature     string `json:"signature"`
 }
 
+const (
+	minWalletTopupDefault int64 = 10_000
+	minWalletTopupQRIS    int64 = 5_000
+	maxWalletTopupAmount  int64 = 1_000_000_000
+)
+
+var duitkuQrisPaymentMethodSet = map[string]struct{}{
+	"SP": {},
+	"NQ": {},
+	"GQ": {},
+	"SQ": {},
+	"BQ": {},
+	"IQ": {},
+	"DQ": {},
+	"QD": {},
+	"LQ": {},
+}
+
 func (s *WalletService) GetBalance(userID uuid.UUID) (*WalletBalanceResponse, error) {
 	user, err := s.ensureActiveUser(userID)
 	if err != nil {
@@ -324,10 +342,16 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 	}
 
 	amount := input.Amount
-	if amount < 10000 {
-		return nil, errors.New("minimal topup Rp 10.000")
+	provider := gatewayProviderLabel(s.cfg)
+	paymentMethod := NormalizePaymentGatewayMethodForProvider(provider, input.PaymentMethod)
+	if paymentMethod == "" {
+		paymentMethod = DefaultPaymentGatewayMethod(s.cfg)
 	}
-	if amount > 1_000_000_000 {
+	minAmount := minimumWalletTopupAmount(provider, paymentMethod)
+	if amount < minAmount {
+		return nil, fmt.Errorf("minimal topup %s", formatWalletTopupAmount(minAmount))
+	}
+	if amount > maxWalletTopupAmount {
 		return nil, errors.New("nominal topup terlalu besar")
 	}
 
@@ -342,11 +366,6 @@ func (s *WalletService) CreateTopup(ctx context.Context, userID uuid.UUID, input
 		return nil, errors.New("gagal cek idempotency")
 	}
 
-	provider := gatewayProviderLabel(s.cfg)
-	paymentMethod := NormalizePaymentGatewayMethodForProvider(provider, input.PaymentMethod)
-	if paymentMethod == "" {
-		paymentMethod = DefaultPaymentGatewayMethod(s.cfg)
-	}
 	providerOrderID := buildGatewayTopupReference(userID, idempotencyKey)
 
 	rawReq, _ := json.Marshal(map[string]any{
@@ -1007,4 +1026,47 @@ func buildGatewayTopupReference(userID uuid.UUID, idempotencyKey string) string 
 		token = token[:24]
 	}
 	return "WLT-" + token
+}
+
+func minimumWalletTopupAmount(provider, paymentMethod string) int64 {
+	if isQrisPaymentMethod(provider, paymentMethod) {
+		return minWalletTopupQRIS
+	}
+	return minWalletTopupDefault
+}
+
+func isQrisPaymentMethod(provider, paymentMethod string) bool {
+	switch normalizePaymentGatewayProvider(provider) {
+	case paymentGatewayProviderPakasir:
+		return NormalizePaymentGatewayMethodForProvider(provider, paymentMethod) == defaultPakasirPaymentMethod
+	default:
+		method := NormalizePaymentGatewayMethodForProvider(provider, paymentMethod)
+		_, ok := duitkuQrisPaymentMethodSet[method]
+		return ok
+	}
+}
+
+func formatWalletTopupAmount(amount int64) string {
+	if amount < 0 {
+		amount = -amount
+	}
+	raw := strconv.FormatInt(amount, 10)
+	if len(raw) <= 3 {
+		return "Rp " + raw
+	}
+
+	head := len(raw) % 3
+	if head == 0 {
+		head = 3
+	}
+
+	var b strings.Builder
+	b.Grow(len(raw) + len(raw)/3 + 3)
+	b.WriteString("Rp ")
+	b.WriteString(raw[:head])
+	for i := head; i < len(raw); i += 3 {
+		b.WriteByte('.')
+		b.WriteString(raw[i : i+3])
+	}
+	return b.String()
 }
