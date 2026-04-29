@@ -81,7 +81,7 @@ describe('sosmed refill UI helpers', () => {
     })
     expect(getUserRefillTitle(order)).toBe('Refill Sedang Diproses')
     expect(getUserRefillDescription(order, new Date('2026-04-29T08:00:00Z'))).toBe(
-      'Refill lu sedang nunggu cooldown JAP. Estimasi bisa diproses lagi sekitar 9 jam 3 menit. Tombol klaim tetap dikunci biar nggak dobel request.'
+      'Refill lu sedang nunggu jadwal sistem. Estimasi bisa diproses lagi sekitar 9 jam 3 menit. Tombol klaim tetap dikunci biar nggak dobel request.'
     )
   })
 
@@ -96,13 +96,14 @@ describe('sosmed refill UI helpers', () => {
     expect(getJAPRefillCooldownRemainingText(order, new Date('2026-04-29T10:30:00Z'))).toBe('6 jam 33 menit')
   })
 
-  it('shows next refill countdown copy for submitted JAP refill instead of provider technical text', () => {
+  it('shows submitted JAP refill availability from the original order window instead of the 30 day warranty period', () => {
     const order = {
       ...baseOrder,
+      created_at: '2026-04-26T10:55:00Z',
       refill_status: 'requested',
       refill_provider_status: 'submitted',
       refill_provider_order_id: '98706469',
-      refill_requested_at: '2026-04-29T08:00:00Z',
+      refill_requested_at: '2026-04-29T05:22:00Z',
       refill_period_days: 30,
     }
 
@@ -118,8 +119,8 @@ describe('sosmed refill UI helpers', () => {
       className: expect.stringContaining('bg-gray-200'),
     })
     expect(getUserRefillTitle(order)).toBe('Refill Sedang Diproses')
-    expect(getUserRefillDescription(order, new Date('2026-04-29T08:30:00Z'))).toBe(
-      'Refill lagi diproses sistem. Next refill bisa diklaim lagi sekitar 29 hari 23 jam 30 menit. Tombol klaim tetap dikunci dulu biar nggak dobel request.'
+    expect(getUserRefillDescription(order, new Date('2026-04-29T05:22:00Z'))).toBe(
+      'Refill lagi diproses sistem. Next refill bisa diklaim lagi sekitar 5 jam 33 menit. Tombol klaim tetap dikunci dulu biar nggak dobel request.'
     )
   })
 

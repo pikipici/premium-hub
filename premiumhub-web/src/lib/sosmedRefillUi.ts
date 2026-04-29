@@ -41,6 +41,7 @@ const SECOND_MS = 1000
 const MINUTE_MS = 60 * SECOND_MS
 const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
+const JAP_REFILL_INITIAL_AVAILABILITY_MS = 72 * HOUR_MS
 
 function parseCooldownDurationMs(message?: string) {
   const text = normalize(message)
@@ -101,14 +102,16 @@ export function getJAPRefillCooldownRemainingText(
   return getRemainingTextFromStartAndDuration(order.refill_requested_at, durationMs, now)
 }
 
-function getNextRefillRemainingText(
-  order: Pick<SosmedOrder, 'refill_period_days' | 'refill_requested_at'>,
+function getSubmittedJAPRefillAvailabilityRemainingText(
+  order: Pick<SosmedOrder, 'created_at' | 'refill_provider_error' | 'refill_requested_at'>,
   now: Date = new Date()
 ) {
-  const periodDays = Number(order.refill_period_days)
-  if (!Number.isFinite(periodDays) || periodDays <= 0) return null
+  const providerDurationMs = parseCooldownDurationMs(order.refill_provider_error)
+  if (providerDurationMs) {
+    return getRemainingTextFromStartAndDuration(order.refill_requested_at, providerDurationMs, now)
+  }
 
-  return getRemainingTextFromStartAndDuration(order.refill_requested_at, periodDays * DAY_MS, now)
+  return getRemainingTextFromStartAndDuration(order.created_at, JAP_REFILL_INITIAL_AVAILABILITY_MS, now)
 }
 
 export function isJAPRefillCooldown(order: Pick<SosmedOrder, 'refill_provider_status'>) {
@@ -243,12 +246,12 @@ export function getUserRefillDescription(order: SosmedOrder, now: Date = new Dat
   if (isJAPRefillCooldown(order)) {
     const remaining = getJAPRefillCooldownRemainingText(order, now)
     if (remaining) {
-      return `Refill lu sedang nunggu cooldown JAP. Estimasi bisa diproses lagi sekitar ${remaining}. Tombol klaim tetap dikunci biar nggak dobel request.`
+      return `Refill lu sedang nunggu jadwal sistem. Estimasi bisa diproses lagi sekitar ${remaining}. Tombol klaim tetap dikunci biar nggak dobel request.`
     }
     return 'Refill lu sudah masuk antrian sistem. Kalau sistem lagi nunggu giliran refill, tombol klaim tetap dikunci biar nggak dobel request.'
   }
   if (isSubmittedJAPRefill(order)) {
-    const nextRefillRemaining = getNextRefillRemainingText(order, now)
+    const nextRefillRemaining = getSubmittedJAPRefillAvailabilityRemainingText(order, now)
     if (nextRefillRemaining) {
       return `Refill lagi diproses sistem. Next refill bisa diklaim lagi sekitar ${nextRefillRemaining}. Tombol klaim tetap dikunci dulu biar nggak dobel request.`
     }
