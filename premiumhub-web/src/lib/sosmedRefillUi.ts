@@ -22,6 +22,17 @@ export interface UserRefillMeta {
   canClaim: boolean
 }
 
+export interface UserRefillButtonState {
+  label: string
+  disabled: boolean
+  className: string
+}
+
+const USER_REFILL_BUTTON_BASE_CLASS =
+  'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-black shadow-sm transition disabled:cursor-not-allowed'
+const USER_REFILL_BUTTON_ENABLED_CLASS = `${USER_REFILL_BUTTON_BASE_CLASS} bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60`
+const USER_REFILL_BUTTON_DISABLED_CLASS = `${USER_REFILL_BUTTON_BASE_CLASS} border border-gray-200 bg-gray-200 text-gray-500 shadow-none`
+
 function normalize(value?: string) {
   return (value || '').trim().toLowerCase()
 }
@@ -177,6 +188,16 @@ export function getUserRefillMeta(order: SosmedOrder): UserRefillMeta | null {
     label: `Refill ${order.refill_period_days || ''}${order.refill_period_days ? ' Hari' : ''}`,
     className: 'bg-violet-50 text-violet-600 border-violet-200',
     canClaim,
+  }
+}
+
+export function getUserRefillButtonState(refill: UserRefillMeta | null, loading = false): UserRefillButtonState | null {
+  if (!refill) return null
+  const disabled = loading || !refill.canClaim
+  return {
+    label: 'Klaim Refill',
+    disabled,
+    className: refill.canClaim ? USER_REFILL_BUTTON_ENABLED_CLASS : USER_REFILL_BUTTON_DISABLED_CLASS,
   }
 }
 

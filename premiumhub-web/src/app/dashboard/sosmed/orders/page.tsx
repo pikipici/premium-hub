@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { animate, createScope, stagger } from 'animejs'
 import { CheckCircle2, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw, X } from 'lucide-react'
 
-import { getUserRefillDescription, getUserRefillMeta, getUserRefillTitle } from '@/lib/sosmedRefillUi'
+import { getUserRefillButtonState, getUserRefillDescription, getUserRefillMeta, getUserRefillTitle } from '@/lib/sosmedRefillUi'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
 import type { SosmedOrder } from '@/types/sosmedOrder'
@@ -300,6 +300,7 @@ export default function DashboardSosmedOrdersPage() {
           {orders.map((order) => {
             const status = statusMeta(order)
             const refill = getUserRefillMeta(order)
+            const refillButton = getUserRefillButtonState(refill, refillLoading === order.id)
             const steps = progressSteps(order)
             const target = compactTarget(order.target_link)
 
@@ -413,19 +414,21 @@ export default function DashboardSosmedOrdersPage() {
                             <p className="mt-1 text-[11px] leading-relaxed text-[#666]">{getUserRefillDescription(order)}</p>
                           </div>
 
-                          {refill.canClaim ? (
+                          {refillButton ? (
                             <button
                               type="button"
                               onClick={() => openRefillModal(order)}
-                              disabled={refillLoading === order.id}
-                              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-[11px] font-black text-white shadow-sm hover:bg-violet-700 disabled:opacity-60"
+                              disabled={refillButton.disabled}
+                              className={refillButton.className}
+                              aria-disabled={refillButton.disabled}
+                              title={refill.canClaim ? undefined : 'Refill belum tersedia buat diklaim'}
                             >
                               {refillLoading === order.id ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
                               ) : (
                                 <RotateCcw className="h-3 w-3" />
                               )}
-                              Klaim Refill
+                              {refillButton.label}
                             </button>
                           ) : null}
                         </div>
