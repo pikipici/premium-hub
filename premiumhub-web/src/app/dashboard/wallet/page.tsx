@@ -12,7 +12,6 @@ import {
   MIN_TOPUP_QRIS,
   minimumTopupAmountByMethod,
   normalizePaymentMethodOptions,
-  paymentMethodFeeLabel,
   paymentMethodIcon,
 } from '@/lib/paymentMethods'
 import { formatDate, formatRupiah } from '@/lib/utils'
@@ -474,7 +473,6 @@ export default function WalletPage() {
                         )}
                       </div>
                       <div className="truncate text-[11px] font-semibold leading-tight text-[#141414]">{method.name}</div>
-                      <div className="truncate text-[10px] font-semibold text-green-700">{paymentMethodFeeLabel(method.fee)}</div>
                     </button>
                   )
                 })}
