@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   canAdminTriggerRefill,
   getAdminRefillStatusLabel,
+  getJAPRefillCooldownRemainingText,
   getUserRefillDescription,
   getUserRefillMeta,
   getUserRefillTitle,
@@ -64,20 +65,33 @@ describe('sosmed refill UI helpers', () => {
     expect(canAdminTriggerRefill(cooldownWithRefillID)).toBe(false)
   })
 
-  it('keeps user cooldown copy friendly and keeps claim disabled', () => {
+  it('shows the remaining JAP cooldown time to users when the provider message contains a duration', () => {
     const order = {
       ...baseOrder,
       refill_provider_status: 'cooldown',
-      refill_provider_error: 'Please wait 24 hours before requesting refill again',
+      refill_provider_error: 'Refill will be available in 9 hours 3 minutes',
+      refill_requested_at: '2026-04-29T08:00:00Z',
     }
 
+    expect(getJAPRefillCooldownRemainingText(order, new Date('2026-04-29T08:00:00Z'))).toBe('9 jam 3 menit')
     expect(getUserRefillMeta(order)).toMatchObject({
       label: 'Refill Menunggu Antrian',
       canClaim: false,
     })
     expect(getUserRefillTitle(order)).toBe('Refill Sedang Diproses')
-    expect(getUserRefillDescription(order)).toBe(
-      'Refill lu sudah masuk antrian sistem. Kalau sistem lagi nunggu giliran refill, tombol klaim tetap dikunci biar nggak dobel request.'
+    expect(getUserRefillDescription(order, new Date('2026-04-29T08:00:00Z'))).toBe(
+      'Refill lu sedang nunggu cooldown JAP. Estimasi bisa diproses lagi sekitar 9 jam 3 menit. Tombol klaim tetap dikunci biar nggak dobel request.'
     )
+  })
+
+  it('counts down JAP cooldown time from when the refill request was saved', () => {
+    const order = {
+      ...baseOrder,
+      refill_provider_status: 'cooldown',
+      refill_provider_error: 'Refill will be available in 9 hours 3 minutes',
+      refill_requested_at: '2026-04-29T08:00:00Z',
+    }
+
+    expect(getJAPRefillCooldownRemainingText(order, new Date('2026-04-29T10:30:00Z'))).toBe('6 jam 33 menit')
   })
 })

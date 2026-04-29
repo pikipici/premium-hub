@@ -26,6 +26,66 @@ function normalize(value?: string) {
   return (value || '').trim().toLowerCase()
 }
 
+const SECOND_MS = 1000
+const MINUTE_MS = 60 * SECOND_MS
+const HOUR_MS = 60 * MINUTE_MS
+const DAY_MS = 24 * HOUR_MS
+
+function parseCooldownDurationMs(message?: string) {
+  const text = normalize(message)
+  if (!text) return null
+
+  let total = 0
+  const durationPattern = /(\d+)\s*(days?|hari|d|hours?|hrs?|jam|h|minutes?|mins?|menit|m)\b/g
+  let match: RegExpExecArray | null
+  while ((match = durationPattern.exec(text)) !== null) {
+    const value = Number.parseInt(match[1], 10)
+    if (!Number.isFinite(value) || value <= 0) continue
+    const unit = match[2]
+    if (unit === 'day' || unit === 'days' || unit === 'hari' || unit === 'd') total += value * DAY_MS
+    if (unit === 'hour' || unit === 'hours' || unit === 'hr' || unit === 'hrs' || unit === 'jam' || unit === 'h') {
+      total += value * HOUR_MS
+    }
+    if (unit === 'minute' || unit === 'minutes' || unit === 'min' || unit === 'mins' || unit === 'menit' || unit === 'm') {
+      total += value * MINUTE_MS
+    }
+  }
+
+  return total > 0 ? total : null
+}
+
+function formatRemainingDuration(ms: number) {
+  const roundedMinutes = Math.max(1, Math.ceil(ms / MINUTE_MS))
+  const days = Math.floor(roundedMinutes / (24 * 60))
+  const hours = Math.floor((roundedMinutes % (24 * 60)) / 60)
+  const minutes = roundedMinutes % 60
+  const parts: string[] = []
+
+  if (days > 0) parts.push(`${days} hari`)
+  if (hours > 0) parts.push(`${hours} jam`)
+  if (minutes > 0) parts.push(`${minutes} menit`)
+
+  return parts.length > 0 ? parts.join(' ') : 'sebentar lagi'
+}
+
+export function getJAPRefillCooldownRemainingText(
+  order: Pick<SosmedOrder, 'refill_provider_status' | 'refill_provider_error' | 'refill_requested_at'>,
+  now: Date = new Date()
+) {
+  if (!isJAPRefillCooldown(order)) return null
+
+  const durationMs = parseCooldownDurationMs(order.refill_provider_error)
+  if (!durationMs) return null
+
+  const requestedAt = order.refill_requested_at ? new Date(order.refill_requested_at) : null
+  if (!requestedAt || Number.isNaN(requestedAt.getTime())) return formatRemainingDuration(durationMs)
+
+  const availableAt = requestedAt.getTime() + durationMs
+  const remainingMs = availableAt - now.getTime()
+  if (remainingMs <= 0) return 'sebentar lagi'
+  return formatRemainingDuration(remainingMs)
+}
+
 export function isJAPRefillCooldown(order: Pick<SosmedOrder, 'refill_provider_status'>) {
   return normalize(order.refill_provider_status) === 'cooldown'
 }
@@ -134,9 +194,13 @@ export function formatRefillDeadline(value: string) {
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(date)
 }
 
-export function getUserRefillDescription(order: SosmedOrder) {
+export function getUserRefillDescription(order: SosmedOrder, now: Date = new Date()) {
   const status = normalize(order.refill_status) || 'none'
   if (isJAPRefillCooldown(order)) {
+    const remaining = getJAPRefillCooldownRemainingText(order, now)
+    if (remaining) {
+      return `Refill lu sedang nunggu cooldown JAP. Estimasi bisa diproses lagi sekitar ${remaining}. Tombol klaim tetap dikunci biar nggak dobel request.`
+    }
     return 'Refill lu sudah masuk antrian sistem. Kalau sistem lagi nunggu giliran refill, tombol klaim tetap dikunci biar nggak dobel request.'
   }
   if (status === 'requested' || status === 'processing') {
