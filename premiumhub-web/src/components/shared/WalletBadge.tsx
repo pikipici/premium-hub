@@ -31,7 +31,9 @@ export default function WalletBadge() {
     }
   }, [data, setWalletBalance])
 
-  const balance = typeof data === 'number' ? data : walletBalance
+  // Store is source of truth so balance updates from any page (topup/order/etc.)
+  // are reflected immediately without waiting for query refetch.
+  const balance = walletBalance
 
   useEffect(() => {
     if (!walletBadgeRef.current) return
