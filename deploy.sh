@@ -93,9 +93,28 @@ trap 'on_error "$LINENO" "$BASH_COMMAND" "$?"' ERR
 # ---------- Config ----------
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_RUNTIME_ROOT="/home/ubuntu/premium-hub"
+DEFAULT_REMOTE_HOST="sandbox-ubuntu"
+DEFAULT_REMOTE_ROOT="/home/ubuntu/premium-hub"
 # Backward compatibility: DEPLOY_TARGET_ROOT tetap didukung, tapi runtime root jadi sumber kebenaran.
 RUNTIME_ROOT="${RUNTIME_ROOT:-${DEPLOY_TARGET_ROOT:-${DEFAULT_RUNTIME_ROOT}}}"
 BRANCH="${BRANCH:-main}"
+DEPLOY_REMOTE_HOST="${DEPLOY_REMOTE_HOST:-${DEFAULT_REMOTE_HOST}}"
+DEPLOY_REMOTE_ROOT="${DEPLOY_REMOTE_ROOT:-${DEFAULT_REMOTE_ROOT}}"
+FORCE_REMOTE_DEPLOY="${FORCE_REMOTE_DEPLOY:-1}"
+
+# Default behavior: script lokal otomatis jadi remote launcher ke sandbox-ubuntu,
+# supaya bisa dipanggil dari mesin mana pun tanpa harus cd/ssh manual dulu.
+if [[ "${DEPLOY_REMOTE_EXEC:-0}" != "1" && "${FORCE_REMOTE_DEPLOY}" == "1" ]]; then
+  REMOTE_ROOT_REAL=""
+  if [[ -d "${DEPLOY_REMOTE_ROOT}" ]]; then
+    REMOTE_ROOT_REAL="$(cd "${DEPLOY_REMOTE_ROOT}" && pwd)"
+  fi
+
+  if [[ -z "${REMOTE_ROOT_REAL}" || "${SCRIPT_ROOT}" != "${REMOTE_ROOT_REAL}" ]]; then
+    log_info "Remote deploy mode aktif -> ${DEPLOY_REMOTE_HOST}:${DEPLOY_REMOTE_ROOT}"
+    exec ssh "${DEPLOY_REMOTE_HOST}" "cd ${DEPLOY_REMOTE_ROOT@Q} && DEPLOY_REMOTE_EXEC=1 RUNTIME_ROOT=${DEPLOY_REMOTE_ROOT@Q} BRANCH=${BRANCH@Q} ./deploy.sh"
+  fi
+fi
 
 if [[ ! -d "${RUNTIME_ROOT}" ]]; then
   log_err "Runtime project root tidak ditemukan: ${RUNTIME_ROOT}"
