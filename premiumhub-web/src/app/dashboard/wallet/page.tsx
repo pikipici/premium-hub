@@ -446,7 +446,7 @@ export default function WalletPage() {
 
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wide text-[#888] mb-2">Metode Pembayaran</div>
-              <div className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid max-h-[312px] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
                 {paymentMethods.map((method) => {
                   const selected = paymentMethod === method.method
                   const icon = paymentMethodIcon(method.method)
@@ -456,7 +456,7 @@ export default function WalletPage() {
                       type="button"
                       onClick={() => setPaymentMethod(method.method)}
                       title={method.name}
-                      className={`relative min-h-[82px] rounded-xl border px-1.5 py-2.5 text-center transition-colors ${
+                      className={`relative min-h-[96px] rounded-xl border px-2 py-3 text-center transition-colors ${
                         selected
                           ? 'border-[#141414] bg-[#FAFAF8]'
                           : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D5]'
@@ -465,16 +465,16 @@ export default function WalletPage() {
                       {selected ? (
                         <span className="absolute right-1 top-1 h-3.5 w-3.5 rounded-full bg-[#141414] text-white text-[8px] leading-[14px] font-black">✓</span>
                       ) : null}
-                      <div className="mb-1 flex h-6 items-center justify-center">
+                      <div className="mb-1.5 flex h-7 items-center justify-center">
                         {method.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={method.image} alt={method.name} className="max-h-6 max-w-12 object-contain" />
+                          <img src={method.image} alt={method.name} className="max-h-7 max-w-14 object-contain" />
                         ) : (
-                          <span className="text-[10px] leading-none font-black tracking-wide">{icon}</span>
+                          <span className="text-[11px] leading-none font-black tracking-wide">{icon}</span>
                         )}
                       </div>
-                      <div className="truncate text-[10px] font-semibold leading-tight text-[#141414]">{method.name}</div>
-                      <div className="truncate text-[9px] font-semibold text-green-700">{paymentMethodFeeLabel(method.fee)}</div>
+                      <div className="truncate text-[11px] font-semibold leading-tight text-[#141414]">{method.name}</div>
+                      <div className="truncate text-[10px] font-semibold text-green-700">{paymentMethodFeeLabel(method.fee)}</div>
                     </button>
                   )
                 })}
