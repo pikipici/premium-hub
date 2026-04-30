@@ -115,6 +115,7 @@ func TestSosmedOrderService_CreateAndConfirm(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.Notification{},
 	); err != nil {
 		t.Fatalf("migrate sosmed order models: %v", err)
@@ -241,6 +242,7 @@ func TestSosmedOrderService_CancelValidation(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 	); err != nil {
 		t.Fatalf("migrate sosmed order models: %v", err)
 	}
@@ -301,6 +303,7 @@ func TestSosmedOrderService_CreateWalletPaidJAPOrder(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.WalletLedger{},
 		&model.Notification{},
 	); err != nil {
@@ -392,6 +395,7 @@ func TestSosmedOrderService_CreateWalletPaidJAPFailureRefunds(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.WalletLedger{},
 	); err != nil {
 		t.Fatalf("migrate wallet sosmed models: %v", err)
@@ -473,6 +477,7 @@ func TestSosmedOrderService_CreateWalletPaidInsufficientBalance(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.WalletLedger{},
 	); err != nil {
 		t.Fatalf("migrate wallet sosmed models: %v", err)
@@ -537,6 +542,7 @@ func TestSosmedOrderService_AdminSyncProviderStatus(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 	); err != nil {
 		t.Fatalf("migrate sync models: %v", err)
 	}
@@ -637,6 +643,7 @@ func TestSosmedOrderService_AdminSyncProcessingProviderOrders(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 	); err != nil {
 		t.Fatalf("migrate bulk sync models: %v", err)
 	}
@@ -881,6 +888,7 @@ func TestSosmedOrderService_AdminRetryProviderOrderDebitsWalletAndSubmits(t *tes
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.WalletLedger{},
 	); err != nil {
 		t.Fatalf("migrate retry models: %v", err)
@@ -979,6 +987,7 @@ func TestSosmedOrderService_AdminRetryProviderOrderRefundsOnFailure(t *testing.T
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.WalletLedger{},
 	); err != nil {
 		t.Fatalf("migrate retry failure models: %v", err)

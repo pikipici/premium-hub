@@ -77,6 +77,7 @@ func setupSosmedOrderHandlerDB(t *testing.T) *gorm.DB {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.WalletLedger{},
 		&model.Notification{},
 	); err != nil {

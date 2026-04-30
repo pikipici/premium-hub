@@ -57,6 +57,23 @@ function compactTarget(value?: string) {
     .replace(/\/$/, '')
 }
 
+function refillHistoryStatusLabel(value?: string) {
+  switch ((value || '').toLowerCase()) {
+    case 'requested':
+      return { label: 'Dikirim', className: 'bg-violet-100 text-violet-700 border-violet-200' }
+    case 'processing':
+      return { label: 'Diproses', className: 'bg-sky-100 text-sky-700 border-sky-200' }
+    case 'completed':
+      return { label: 'Sukses', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
+    case 'failed':
+      return { label: 'Gagal', className: 'bg-red-100 text-red-700 border-red-200' }
+    case 'rejected':
+      return { label: 'Ditolak', className: 'bg-amber-100 text-amber-700 border-amber-200' }
+    default:
+      return { label: value || '-', className: 'bg-gray-100 text-gray-700 border-gray-200' }
+  }
+}
+
 function paymentLabel(value: SosmedOrder['payment_status']) {
   switch (value) {
     case 'paid':
@@ -431,6 +448,51 @@ export default function DashboardSosmedOrdersPage() {
                               {refillButton.label}
                             </button>
                           ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {order.refill_history && order.refill_history.length > 0 ? (
+                      <div className="rounded-2xl border border-[#EFEFEA] bg-white px-3.5 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <div className="text-xs font-black text-[#141414]">Riwayat Refill</div>
+                            <p className="mt-0.5 text-[11px] text-[#777]">Semua klaim refill buat order ini dicatat di sini.</p>
+                          </div>
+                          <span className="rounded-full bg-[#FAFAF8] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#777]">
+                            {order.refill_history.length}x klaim
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid gap-2">
+                          {order.refill_history.map((attempt) => {
+                            const historyStatus = refillHistoryStatusLabel(attempt.status)
+                            return (
+                              <div key={attempt.id} className="rounded-2xl border border-[#F0F0EC] bg-[#FCFCFA] px-3 py-2.5">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="text-xs font-black text-[#141414]">Refill #{attempt.attempt_number}</div>
+                                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${historyStatus.className}`}>
+                                    {historyStatus.label}
+                                  </span>
+                                </div>
+                                <div className="mt-1.5 grid gap-1 text-[11px] text-[#666] sm:grid-cols-2">
+                                  <div>Diklaim: <span className="font-semibold text-[#333]">{formatDate(attempt.requested_at)}</span></div>
+                                  <div>Selesai: <span className="font-semibold text-[#333]">{attempt.completed_at ? formatDate(attempt.completed_at) : '-'}</span></div>
+                                  {attempt.provider_refill_id ? (
+                                    <div>ID Refill: <span className="font-semibold text-[#333]">{attempt.provider_refill_id}</span></div>
+                                  ) : null}
+                                  {attempt.provider_status ? (
+                                    <div>Status Supplier: <span className="font-semibold text-[#333]">{attempt.provider_status}</span></div>
+                                  ) : null}
+                                </div>
+                                {attempt.provider_error ? (
+                                  <p className="mt-2 rounded-xl border border-red-100 bg-red-50 px-2.5 py-2 text-[11px] leading-relaxed text-red-700">
+                                    {attempt.provider_error}
+                                  </p>
+                                ) : null}
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     ) : null}

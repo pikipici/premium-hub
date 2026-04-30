@@ -3,6 +3,23 @@ import type { SosmedService } from '@/types/sosmedService'
 export type SosmedOrderPaymentStatus = 'pending' | 'paid' | 'failed' | 'expired'
 export type SosmedOrderStatus = 'pending_payment' | 'processing' | 'success' | 'failed' | 'canceled' | 'expired'
 
+export interface SosmedRefillAttempt {
+  id: string
+  order_id: string
+  attempt_number: number
+  status: string
+  provider_refill_id?: string
+  provider_status?: string
+  provider_error?: string
+  reason?: string
+  actor_type: 'user' | 'admin' | 'system' | string
+  actor_id?: string
+  requested_at: string
+  completed_at?: string
+  created_at: string
+  updated_at?: string
+}
+
 export interface SosmedOrder {
   id: string
   user_id: string
@@ -34,6 +51,7 @@ export interface SosmedOrder {
   refill_provider_error?: string
   refill_requested_at?: string
   refill_completed_at?: string
+  refill_history?: SosmedRefillAttempt[]
   notes?: string
   paid_at?: string
   expires_at?: string

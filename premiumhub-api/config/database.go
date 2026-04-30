@@ -36,6 +36,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.ProductPrice{},
 		&model.Stock{},
 		&model.Order{},

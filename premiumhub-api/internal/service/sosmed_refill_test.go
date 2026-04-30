@@ -186,6 +186,7 @@ func TestSosmedOrderService_UserRequestRefill(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.Notification{},
 	); err != nil {
 		t.Fatalf("migrate refill test models: %v", err)
@@ -265,6 +266,19 @@ func TestSosmedOrderService_UserRequestRefill(t *testing.T) {
 	if detail.Order.RefillRequestedAt == nil {
 		t.Fatal("expected refill_requested_at to be set")
 	}
+	if len(detail.Order.RefillHistory) != 1 {
+		t.Fatalf("expected one refill history item after first claim, got %d", len(detail.Order.RefillHistory))
+	}
+	firstHistory := detail.Order.RefillHistory[0]
+	if firstHistory.AttemptNumber != 1 || firstHistory.Status != sosmedRefillStatusRequested {
+		t.Fatalf("unexpected refill history after first claim: attempt=%d status=%q", firstHistory.AttemptNumber, firstHistory.Status)
+	}
+	if firstHistory.ProviderRefillID != "REFILL-1001" || firstHistory.ProviderStatus != "submitted" {
+		t.Fatalf("expected provider refill history to keep id/status, got id=%q status=%q", firstHistory.ProviderRefillID, firstHistory.ProviderStatus)
+	}
+	if firstHistory.RequestedAt.IsZero() {
+		t.Fatal("expected refill history requested_at to be set")
+	}
 	if len(fakeJAP.refillInputs) != 1 || fakeJAP.refillInputs[0] != "JAP-REFILL-001" {
 		t.Fatalf("unexpected refill inputs: %+v", fakeJAP.refillInputs)
 	}
@@ -273,6 +287,41 @@ func TestSosmedOrderService_UserRequestRefill(t *testing.T) {
 	_, err = orderSvc.UserRequestRefill(context.Background(), order.ID, buyer.ID)
 	if err == nil || !strings.Contains(err.Error(), "sedang diproses") {
 		t.Fatalf("expected active refill block, got: %v", err)
+	}
+
+	// Test 3b: Rejected refill can be claimed again and keeps previous history.
+	if err := db.Model(&model.SosmedOrder{}).
+		Where("id = ?", order.ID).
+		Updates(map[string]any{
+			"refill_status":            sosmedRefillStatusRejected,
+			"refill_provider_status":   "Rejected",
+			"refill_provider_error":    "provider rejected previous attempt",
+			"refill_provider_order_id": "REFILL-1001",
+		}).Error; err != nil {
+		t.Fatalf("mark first refill rejected: %v", err)
+	}
+	rejectedOrder, err := orderSvc.repo.FindByID(order.ID)
+	if err != nil {
+		t.Fatalf("load rejected order: %v", err)
+	}
+	if err := orderSvc.updateLatestSosmedRefillHistory(rejectedOrder, time.Now(), "test rejected refill"); err != nil {
+		t.Fatalf("update first refill history as rejected: %v", err)
+	}
+	fakeJAP.refillRes = &JAPRefillResponse{Refill: "REFILL-1002"}
+	secondDetail, err := orderSvc.UserRequestRefill(context.Background(), order.ID, buyer.ID)
+	if err != nil {
+		t.Fatalf("user request second refill after rejected attempt: %v", err)
+	}
+	if len(secondDetail.Order.RefillHistory) != 2 {
+		t.Fatalf("expected two refill history items after retry, got %d", len(secondDetail.Order.RefillHistory))
+	}
+	firstAttempt := secondDetail.Order.RefillHistory[0]
+	secondAttempt := secondDetail.Order.RefillHistory[1]
+	if firstAttempt.AttemptNumber != 1 || firstAttempt.ProviderRefillID != "REFILL-1001" || firstAttempt.Status != sosmedRefillStatusRejected {
+		t.Fatalf("expected first refill history to stay intact as rejected, got attempt=%d status=%q id=%q", firstAttempt.AttemptNumber, firstAttempt.Status, firstAttempt.ProviderRefillID)
+	}
+	if secondAttempt.AttemptNumber != 2 || secondAttempt.ProviderRefillID != "REFILL-1002" || secondAttempt.Status != sosmedRefillStatusRequested {
+		t.Fatalf("expected second refill history attempt requested with REFILL-1002, got attempt=%d status=%q id=%q", secondAttempt.AttemptNumber, secondAttempt.Status, secondAttempt.ProviderRefillID)
 	}
 
 	// Test 4: Check event was created.
@@ -305,6 +354,7 @@ func TestSosmedOrderService_UserRequestRefillLocksBeforeProviderCall(t *testing.
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 	); err != nil {
 		t.Fatalf("migrate refill lock models: %v", err)
 	}
@@ -394,6 +444,7 @@ func TestSosmedOrderService_UserRequestRefillFailure(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 	); err != nil {
 		t.Fatalf("migrate refill failure models: %v", err)
 	}
@@ -469,6 +520,7 @@ func TestSosmedOrderService_UserRequestRefillCooldownKeepsRefillActive(t *testin
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 	); err != nil {
 		t.Fatalf("migrate refill cooldown models: %v", err)
 	}
@@ -562,6 +614,7 @@ func TestSosmedOrderService_UserRequestRefillValidation(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 	); err != nil {
 		t.Fatalf("migrate refill validation models: %v", err)
 	}
@@ -643,6 +696,7 @@ func TestSosmedOrderService_AdminTriggerRefill(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 		&model.Notification{},
 	); err != nil {
 		t.Fatalf("migrate admin refill models: %v", err)
@@ -746,6 +800,7 @@ func TestSosmedOrderService_ListByUserSyncsActiveJAPRefillStatus(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 	); err != nil {
 		t.Fatalf("migrate user list refill sync models: %v", err)
 	}
@@ -828,6 +883,7 @@ func TestSosmedOrderService_AdminSyncProviderStatusSyncsRefill(t *testing.T) {
 		&model.SosmedService{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
 	); err != nil {
 		t.Fatalf("migrate refill sync models: %v", err)
 	}

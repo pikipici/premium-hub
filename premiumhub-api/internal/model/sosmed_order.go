@@ -39,15 +39,16 @@ type SosmedOrder struct {
 	ProviderSyncedAt  *time.Time `json:"provider_synced_at"`
 
 	// Refill tracking — populated at checkout from SosmedService metadata.
-	RefillEligible       bool       `gorm:"default:false" json:"refill_eligible"`
-	RefillPeriodDays     int        `gorm:"default:0" json:"refill_period_days"`
-	RefillDeadline       *time.Time `json:"refill_deadline"`
-	RefillStatus         string     `gorm:"size:30;default:none;index" json:"refill_status"`
-	RefillProviderOrderID string    `gorm:"size:80" json:"refill_provider_order_id,omitempty"`
-	RefillProviderStatus  string    `gorm:"size:40" json:"refill_provider_status,omitempty"`
-	RefillProviderError   string    `gorm:"type:text" json:"refill_provider_error,omitempty"`
-	RefillRequestedAt    *time.Time `json:"refill_requested_at"`
-	RefillCompletedAt    *time.Time `json:"refill_completed_at"`
+	RefillEligible        bool                       `gorm:"default:false" json:"refill_eligible"`
+	RefillPeriodDays      int                        `gorm:"default:0" json:"refill_period_days"`
+	RefillDeadline        *time.Time                 `json:"refill_deadline"`
+	RefillStatus          string                     `gorm:"size:30;default:none;index" json:"refill_status"`
+	RefillProviderOrderID string                     `gorm:"size:80" json:"refill_provider_order_id,omitempty"`
+	RefillProviderStatus  string                     `gorm:"size:40" json:"refill_provider_status,omitempty"`
+	RefillProviderError   string                     `gorm:"type:text" json:"refill_provider_error,omitempty"`
+	RefillRequestedAt     *time.Time                 `json:"refill_requested_at"`
+	RefillCompletedAt     *time.Time                 `json:"refill_completed_at"`
+	RefillHistory         []SosmedOrderRefillAttempt `gorm:"foreignKey:OrderID" json:"refill_history,omitempty"`
 
 	Notes string `gorm:"type:text" json:"notes"`
 

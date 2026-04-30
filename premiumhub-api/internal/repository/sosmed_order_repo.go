@@ -46,7 +46,9 @@ func (r *SosmedOrderRepo) Update(order *model.SosmedOrder) error {
 
 func (r *SosmedOrderRepo) FindByID(id uuid.UUID) (*model.SosmedOrder, error) {
 	var order model.SosmedOrder
-	err := r.db.Preload("User").Preload("Service").First(&order, "id = ?", id).Error
+	err := r.db.Preload("User").Preload("Service").Preload("RefillHistory", func(db *gorm.DB) *gorm.DB {
+		return db.Order("attempt_number ASC")
+	}).First(&order, "id = ?", id).Error
 	return &order, err
 }
 
@@ -69,7 +71,9 @@ func (r *SosmedOrderRepo) FindByUserID(userID uuid.UUID, page, limit int) ([]mod
 		limit = 10
 	}
 
-	err := q.Preload("Service").
+	err := q.Preload("Service").Preload("RefillHistory", func(db *gorm.DB) *gorm.DB {
+		return db.Order("attempt_number ASC")
+	}).
 		Offset((page - 1) * limit).
 		Limit(limit).
 		Order("created_at DESC").
@@ -93,7 +97,9 @@ func (r *SosmedOrderRepo) AdminList(status string, page, limit int) ([]model.Sos
 		limit = 20
 	}
 
-	err := q.Preload("User").Preload("Service").
+	err := q.Preload("User").Preload("Service").Preload("RefillHistory", func(db *gorm.DB) *gorm.DB {
+		return db.Order("attempt_number ASC")
+	}).
 		Offset((page - 1) * limit).
 		Limit(limit).
 		Order("created_at DESC").
@@ -200,4 +206,21 @@ func (r *SosmedOrderRepo) ListEventsByOrder(orderID uuid.UUID) ([]model.SosmedOr
 		Order("created_at ASC").
 		Find(&events).Error
 	return events, err
+}
+
+func (r *SosmedOrderRepo) NextRefillAttemptNumberTx(tx *gorm.DB, orderID uuid.UUID) (int, error) {
+	var maxAttempt int
+	err := tx.Model(&model.SosmedOrderRefillAttempt{}).
+		Where("order_id = ?", orderID).
+		Select("COALESCE(MAX(attempt_number), 0)").
+		Scan(&maxAttempt).Error
+	return maxAttempt + 1, err
+}
+
+func (r *SosmedOrderRepo) FindLatestRefillAttemptTx(tx *gorm.DB, orderID uuid.UUID) (*model.SosmedOrderRefillAttempt, error) {
+	var attempt model.SosmedOrderRefillAttempt
+	err := tx.Where("order_id = ?", orderID).
+		Order("attempt_number DESC").
+		First(&attempt).Error
+	return &attempt, err
 }
