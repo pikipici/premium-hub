@@ -455,7 +455,7 @@ export default function DashboardSosmedOrdersPage() {
                               disabled={refillButton.disabled}
                               className={refillButton.className}
                               aria-disabled={refillButton.disabled}
-                              title={refill.canClaim ? undefined : 'Refill belum tersedia buat diklaim'}
+                              title={refill.canClaim ? undefined : refillButton.label}
                             >
                               {refillLoading === order.id ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />

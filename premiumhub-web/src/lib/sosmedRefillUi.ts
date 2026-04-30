@@ -18,6 +18,7 @@ export interface AdminRefillStatusLabel {
 
 export interface UserRefillMeta {
   label: string
+  buttonLabel?: string
   className: string
   canClaim: boolean
 }
@@ -150,6 +151,14 @@ function getSubmittedJAPRefillAvailabilityRemainingText(
   )
 }
 
+function getSupplierRejectedJAPAvailabilityButtonLabel(
+  order: Pick<SosmedOrder, 'created_at' | 'refill_provider_error' | 'refill_requested_at' | 'service'>,
+  now: Date = new Date()
+) {
+  const remaining = getSubmittedJAPRefillAvailabilityRemainingText(order, now)
+  return remaining ? `Bisa klaim ${remaining} lagi` : 'Menunggu Update Sistem'
+}
+
 export function isJAPRefillCooldown(order: Pick<SosmedOrder, 'refill_provider_status'>) {
   return normalize(order.refill_provider_status) === 'cooldown'
 }
@@ -215,7 +224,7 @@ function isSubmittedJAPRefill(order: Pick<SosmedOrder, 'provider_code' | 'refill
   return normalize(order.provider_code) === 'jap' && providerStatus === 'submitted' && normalize(order.refill_provider_order_id) !== ''
 }
 
-export function getUserRefillMeta(order: SosmedOrder): UserRefillMeta | null {
+export function getUserRefillMeta(order: SosmedOrder, now: Date = new Date()): UserRefillMeta | null {
   if (!order.refill_eligible) return null
 
   const status = normalize(order.refill_status) || 'none'
@@ -223,13 +232,30 @@ export function getUserRefillMeta(order: SosmedOrder): UserRefillMeta | null {
   const isExpired = deadlineStr ? new Date(deadlineStr) < new Date() : false
 
   if (isJAPRefillCooldown(order)) {
-    return { label: 'Refill Menunggu Antrian', className: 'bg-amber-50 text-amber-700 border-amber-200', canClaim: false }
+    const remaining = getJAPRefillCooldownRemainingText(order, now)
+    return {
+      label: 'Refill Menunggu Antrian',
+      buttonLabel: remaining ? `Bisa klaim ${remaining} lagi` : 'Menunggu Antrian Sistem',
+      className: 'bg-amber-50 text-amber-700 border-amber-200',
+      canClaim: false,
+    }
   }
   if (isSupplierRejectedJAPRefillUnavailable(order)) {
-    return { label: 'Refill Belum Tersedia', className: 'bg-gray-50 text-gray-500 border-gray-200', canClaim: false }
+    return {
+      label: 'Refill Belum Tersedia',
+      buttonLabel: getSupplierRejectedJAPAvailabilityButtonLabel(order, now),
+      className: 'bg-gray-50 text-gray-500 border-gray-200',
+      canClaim: false,
+    }
   }
   if (isSubmittedJAPRefill(order)) {
-    return { label: 'Refill Sedang Diproses', className: 'bg-indigo-50 text-indigo-700 border-indigo-200', canClaim: false }
+    const remaining = getSubmittedJAPRefillAvailabilityRemainingText(order, now)
+    return {
+      label: 'Refill Sedang Diproses',
+      buttonLabel: remaining ? `Bisa klaim ${remaining} lagi` : 'Menunggu Update Sistem',
+      className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      canClaim: false,
+    }
   }
   if (status === 'requested' || status === 'processing') {
     return { label: 'Refill Diproses', className: 'bg-sky-50 text-sky-600 border-sky-200', canClaim: false }
@@ -262,7 +288,7 @@ export function getUserRefillButtonState(refill: UserRefillMeta | null, loading 
   if (!refill) return null
   const disabled = loading || !refill.canClaim
   return {
-    label: 'Klaim Refill',
+    label: loading ? 'Memproses...' : refill.canClaim ? 'Klaim Refill' : refill.buttonLabel || refill.label,
     disabled,
     className: refill.canClaim ? USER_REFILL_BUTTON_ENABLED_CLASS : USER_REFILL_BUTTON_DISABLED_CLASS,
   }

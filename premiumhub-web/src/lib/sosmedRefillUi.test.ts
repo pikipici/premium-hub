@@ -108,14 +108,15 @@ describe('sosmed refill UI helpers', () => {
       refill_period_days: 30,
     }
 
-    const refill = getUserRefillMeta(order)
+    const refill = getUserRefillMeta(order, new Date('2026-04-29T05:22:00Z'))
 
     expect(refill).toMatchObject({
       label: 'Refill Sedang Diproses',
+      buttonLabel: 'Bisa klaim 5 jam 33 menit lagi',
       canClaim: false,
     })
     expect(getUserRefillButtonState(refill, false)).toMatchObject({
-      label: 'Klaim Refill',
+      label: 'Bisa klaim 5 jam 33 menit lagi',
       disabled: true,
       className: expect.stringContaining('bg-gray-200'),
     })
@@ -192,19 +193,30 @@ describe('sosmed refill UI helpers', () => {
     })
   })
 
-  it('locks the user claim button when the previous JAP refill was rejected by the supplier', () => {
+  it('shows a clear disabled button countdown when the previous JAP refill was rejected before provider availability', () => {
     const order = {
       ...baseOrder,
+      created_at: '2026-04-26T10:55:00Z',
       refill_status: 'rejected',
       refill_provider_status: 'Rejected',
       refill_provider_order_id: '98706469',
       refill_deadline: '2099-01-01T00:00:00Z',
+      service: {
+        id: 'service-1',
+        category_code: 'instagram',
+        code: 'instagram-followers',
+        title: 'Instagram Followers Refill 30 Hari',
+        start_time: '2 Hours',
+        provider_title: 'Instagram Followers [Refill: 30D] [Max: 50K] [Start Time: 2 Hours] [Speed: 30K/Day]',
+        is_active: true,
+      },
     }
 
-    const refill = getUserRefillMeta(order)
+    const refill = getUserRefillMeta(order, new Date('2026-04-29T07:24:00Z'))
 
     expect(refill).toMatchObject({
       label: 'Refill Belum Tersedia',
+      buttonLabel: 'Bisa klaim 5 jam 31 menit lagi',
       canClaim: false,
     })
     expect(getUserRefillTitle(order)).toBe('')
@@ -215,7 +227,40 @@ describe('sosmed refill UI helpers', () => {
       contentClassName: expect.stringContaining('justify-end'),
     })
     expect(getUserRefillButtonState(refill, false)).toMatchObject({
-      label: 'Klaim Refill',
+      label: 'Bisa klaim 5 jam 31 menit lagi',
+      disabled: true,
+      className: expect.stringContaining('bg-gray-200'),
+    })
+  })
+
+  it('shows a clear disabled button statement when JAP refill availability is already due but still locked', () => {
+    const order = {
+      ...baseOrder,
+      created_at: '2026-04-26T10:55:00Z',
+      refill_status: 'rejected',
+      refill_provider_status: 'Rejected',
+      refill_provider_order_id: '98706469',
+      refill_deadline: '2099-01-01T00:00:00Z',
+      service: {
+        id: 'service-1',
+        category_code: 'instagram',
+        code: 'instagram-followers',
+        title: 'Instagram Followers Refill 30 Hari',
+        start_time: '2 Hours',
+        provider_title: 'Instagram Followers [Refill: 30D] [Max: 50K] [Start Time: 2 Hours] [Speed: 30K/Day]',
+        is_active: true,
+      },
+    }
+
+    const refill = getUserRefillMeta(order, new Date('2026-04-29T13:00:00Z'))
+
+    expect(refill).toMatchObject({
+      label: 'Refill Belum Tersedia',
+      buttonLabel: 'Menunggu Update Sistem',
+      canClaim: false,
+    })
+    expect(getUserRefillButtonState(refill, false)).toMatchObject({
+      label: 'Menunggu Update Sistem',
       disabled: true,
       className: expect.stringContaining('bg-gray-200'),
     })
