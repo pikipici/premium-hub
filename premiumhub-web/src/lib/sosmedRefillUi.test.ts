@@ -206,10 +206,8 @@ describe('sosmed refill UI helpers', () => {
       label: 'Refill Siap Diklaim Lagi',
       canClaim: true,
     })
-    expect(getUserRefillTitle(order)).toBe('Garansi Refill Aktif')
-    expect(getUserRefillDescription(order)).toBe(
-      'Refill sebelumnya ditolak sistem, tapi garansi masih aktif. Lu bisa klaim ulang kalau syarat refill masih aman.'
-    )
+    expect(getUserRefillTitle(order)).toBe('')
+    expect(getUserRefillDescription(order)).toBe('')
     expect(getUserRefillButtonState(refill, false)).toMatchObject({
       label: 'Klaim Refill',
       disabled: false,

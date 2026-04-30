@@ -255,7 +255,7 @@ export function getUserRefillTitle(order: SosmedOrder) {
   if (status === 'requested' || status === 'processing') return 'Refill Sedang Diproses'
   if (status === 'completed') return 'Refill Sudah Selesai'
   if (status === 'failed') return 'Refill Belum Berhasil'
-  if (status === 'rejected') return 'Garansi Refill Aktif'
+  if (status === 'rejected') return ''
   return 'Garansi Refill Aktif'
 }
 
@@ -299,7 +299,7 @@ export function getUserRefillDescription(order: SosmedOrder, now: Date = new Dat
     return 'Refill belum berhasil dikirim. Lu bisa coba klaim ulang kalau tombolnya masih aktif.'
   }
   if (status === 'rejected') {
-    return 'Refill sebelumnya ditolak sistem, tapi garansi masih aktif. Lu bisa klaim ulang kalau syarat refill masih aman.'
+    return ''
   }
   if (!order.refill_deadline) {
     return 'Garansi refill perlu dicek admin dulu sebelum bisa diklaim.'

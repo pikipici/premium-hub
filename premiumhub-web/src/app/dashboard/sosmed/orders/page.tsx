@@ -320,6 +320,8 @@ export default function DashboardSosmedOrdersPage() {
             const status = statusMeta(order)
             const refill = getUserRefillMeta(order)
             const refillButton = getUserRefillButtonState(refill, refillLoading === order.id)
+            const refillTitle = getUserRefillTitle(order)
+            const refillDescription = getUserRefillDescription(order)
             const steps = progressSteps(order)
             const target = compactTarget(order.target_link)
             const refillHistory = order.refill_history || []
@@ -430,10 +432,14 @@ export default function DashboardSosmedOrdersPage() {
                         }`}
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <div className="text-xs font-black text-[#141414]">{getUserRefillTitle(order)}</div>
-                            <p className="mt-1 text-[11px] leading-relaxed text-[#666]">{getUserRefillDescription(order)}</p>
-                          </div>
+                          {refillTitle || refillDescription ? (
+                            <div>
+                              {refillTitle ? <div className="text-xs font-black text-[#141414]">{refillTitle}</div> : null}
+                              {refillDescription ? (
+                                <p className="mt-1 text-[11px] leading-relaxed text-[#666]">{refillDescription}</p>
+                              ) : null}
+                            </div>
+                          ) : null}
 
                           {refillButton ? (
                             <button
