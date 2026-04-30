@@ -192,7 +192,7 @@ describe('sosmed refill UI helpers', () => {
     })
   })
 
-  it('lets users claim again when the previous JAP refill was rejected but the warranty is still active', () => {
+  it('locks the user claim button when the previous JAP refill was rejected by the supplier', () => {
     const order = {
       ...baseOrder,
       refill_status: 'rejected',
@@ -204,8 +204,8 @@ describe('sosmed refill UI helpers', () => {
     const refill = getUserRefillMeta(order)
 
     expect(refill).toMatchObject({
-      label: 'Refill Siap Diklaim Lagi',
-      canClaim: true,
+      label: 'Refill Belum Tersedia',
+      canClaim: false,
     })
     expect(getUserRefillTitle(order)).toBe('')
     expect(getUserRefillDescription(order)).toBe('')
@@ -216,8 +216,8 @@ describe('sosmed refill UI helpers', () => {
     })
     expect(getUserRefillButtonState(refill, false)).toMatchObject({
       label: 'Klaim Refill',
-      disabled: false,
-      className: expect.stringContaining('bg-violet-600'),
+      disabled: true,
+      className: expect.stringContaining('bg-gray-200'),
     })
   })
 })

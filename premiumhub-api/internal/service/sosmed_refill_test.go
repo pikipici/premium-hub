@@ -156,6 +156,33 @@ func TestPopulateSosmedOrderRefill(t *testing.T) {
 	})
 }
 
+func TestCanUserRequestSosmedRefill(t *testing.T) {
+	deadline := time.Now().Add(30 * 24 * time.Hour)
+	base := &model.SosmedOrder{
+		OrderStatus:       sosmedOrderStatusSuccess,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderOrderID:   "JAP-REFILL-001",
+		RefillEligible:    true,
+		RefillPeriodDays:  30,
+		RefillDeadline:    &deadline,
+		RefillStatus:      sosmedRefillStatusNone,
+	}
+
+	if err := canUserRequestSosmedRefill(base, time.Now()); err != nil {
+		t.Fatalf("expected base order to be claimable, got %v", err)
+	}
+
+	supplierRejected := *base
+	supplierRejected.RefillStatus = sosmedRefillStatusRejected
+	supplierRejected.RefillProviderStatus = "Rejected"
+	supplierRejected.RefillProviderOrderID = "98982771"
+
+	if err := canUserRequestSosmedRefill(&supplierRejected, time.Now()); err == nil || !strings.Contains(err.Error(), "belum tersedia") {
+		t.Fatalf("expected supplier-rejected refill to be locked, got %v", err)
+	}
+}
+
 // --- DB-backed service tests (require CGO/sqlite, run on rdpkhorur) ---
 
 func seedSosmedRefillService(t *testing.T, db *gorm.DB, id uuid.UUID) *model.SosmedService {

@@ -154,6 +154,17 @@ export function isJAPRefillCooldown(order: Pick<SosmedOrder, 'refill_provider_st
   return normalize(order.refill_provider_status) === 'cooldown'
 }
 
+function isSupplierRejectedJAPRefillUnavailable(
+  order: Pick<SosmedOrder, 'provider_code' | 'refill_status' | 'refill_provider_status' | 'refill_provider_order_id'>
+) {
+  return (
+    normalize(order.provider_code) === 'jap' &&
+    normalize(order.refill_status) === 'rejected' &&
+    normalize(order.refill_provider_status) === 'rejected' &&
+    normalize(order.refill_provider_order_id) !== ''
+  )
+}
+
 export function formatProviderStatus(value?: string) {
   const normalized = value?.trim()
   if (!normalized) return '-'
@@ -213,6 +224,9 @@ export function getUserRefillMeta(order: SosmedOrder): UserRefillMeta | null {
 
   if (isJAPRefillCooldown(order)) {
     return { label: 'Refill Menunggu Antrian', className: 'bg-amber-50 text-amber-700 border-amber-200', canClaim: false }
+  }
+  if (isSupplierRejectedJAPRefillUnavailable(order)) {
+    return { label: 'Refill Belum Tersedia', className: 'bg-gray-50 text-gray-500 border-gray-200', canClaim: false }
   }
   if (isSubmittedJAPRefill(order)) {
     return { label: 'Refill Sedang Diproses', className: 'bg-indigo-50 text-indigo-700 border-indigo-200', canClaim: false }

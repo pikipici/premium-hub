@@ -1048,6 +1048,47 @@ func (s *SosmedOrderService) Cancel(id, userID uuid.UUID) error {
 	return nil
 }
 
+func isSosmedSupplierRejectedRefillUnavailable(order *model.SosmedOrder) bool {
+	if order == nil {
+		return false
+	}
+	return isJAPSosmedOrder(order) &&
+		normalizeSosmedRefillStatus(order.RefillStatus) == sosmedRefillStatusRejected &&
+		strings.EqualFold(strings.TrimSpace(order.RefillProviderStatus), "rejected") &&
+		strings.TrimSpace(order.RefillProviderOrderID) != ""
+}
+
+func canUserRequestSosmedRefill(order *model.SosmedOrder, now time.Time) error {
+	if order == nil {
+		return errors.New("order sosmed tidak ditemukan")
+	}
+	if !order.RefillEligible {
+		return errors.New("order ini tidak memiliki garansi refill")
+	}
+	if order.OrderStatus != sosmedOrderStatusSuccess {
+		return errors.New("refill hanya bisa diklaim untuk order yang sudah sukses")
+	}
+	if order.RefillDeadline == nil || order.RefillPeriodDays <= 0 {
+		return errors.New("periode garansi refill belum dikonfigurasi, hubungi admin")
+	}
+	if now.After(*order.RefillDeadline) {
+		return errors.New("periode garansi refill sudah habis")
+	}
+	if isSosmedSupplierRejectedRefillUnavailable(order) {
+		return errors.New("refill dari supplier belum tersedia, tunggu update sistem atau hubungi admin")
+	}
+	if isActiveSosmedRefillStatus(order.RefillStatus) {
+		return errors.New("refill sedang diproses, tunggu sampai selesai")
+	}
+	if strings.TrimSpace(order.ProviderOrderID) == "" {
+		return errors.New("order belum memiliki provider order ID untuk refill")
+	}
+	if !isJAPSosmedOrder(order) {
+		return errors.New("refill hanya tersedia untuk order supplier JAP")
+	}
+	return nil
+}
+
 type sosmedRefillRequestOptions struct {
 	orderID         uuid.UUID
 	actorID         uuid.UUID
@@ -1081,6 +1122,11 @@ func (s *SosmedOrderService) reserveSosmedRefillRequest(ctx context.Context, opt
 
 		if opts.ownerID != nil && order.UserID != *opts.ownerID {
 			return errors.New("akses ditolak")
+		}
+		if opts.actorType == "user" {
+			if err := canUserRequestSosmedRefill(&order, now); err != nil {
+				return err
+			}
 		}
 		if !order.RefillEligible {
 			return errors.New("order ini tidak memiliki garansi refill")
