@@ -217,9 +217,6 @@ export function getUserRefillMeta(order: SosmedOrder): UserRefillMeta | null {
   if (status === 'completed') {
     return { label: 'Refill Selesai', className: 'bg-emerald-50 text-emerald-600 border-emerald-200', canClaim: false }
   }
-  if (status === 'rejected') {
-    return { label: 'Refill Ditolak', className: 'bg-red-50 text-red-600 border-red-200', canClaim: false }
-  }
   if (isExpired) {
     return { label: 'Refill Expired', className: 'bg-gray-50 text-gray-500 border-gray-200', canClaim: false }
   }
@@ -228,6 +225,9 @@ export function getUserRefillMeta(order: SosmedOrder): UserRefillMeta | null {
   }
 
   const canClaim = order.order_status === 'success' && !isExpired
+  if (status === 'rejected') {
+    return { label: 'Refill Siap Diklaim Lagi', className: 'bg-violet-50 text-violet-600 border-violet-200', canClaim }
+  }
   if (status === 'failed') {
     return { label: 'Refill Gagal', className: 'bg-red-50 text-red-600 border-red-200', canClaim }
   }
@@ -255,7 +255,7 @@ export function getUserRefillTitle(order: SosmedOrder) {
   if (status === 'requested' || status === 'processing') return 'Refill Sedang Diproses'
   if (status === 'completed') return 'Refill Sudah Selesai'
   if (status === 'failed') return 'Refill Belum Berhasil'
-  if (status === 'rejected') return 'Refill Ditolak Sistem'
+  if (status === 'rejected') return 'Garansi Refill Aktif'
   return 'Garansi Refill Aktif'
 }
 
@@ -299,7 +299,7 @@ export function getUserRefillDescription(order: SosmedOrder, now: Date = new Dat
     return 'Refill belum berhasil dikirim. Lu bisa coba klaim ulang kalau tombolnya masih aktif.'
   }
   if (status === 'rejected') {
-    return 'Sistem menolak refill ini. Kalau perlu, hubungi admin buat dicek manual.'
+    return 'Refill sebelumnya ditolak sistem, tapi garansi masih aktif. Lu bisa klaim ulang kalau syarat refill masih aman.'
   }
   if (!order.refill_deadline) {
     return 'Garansi refill perlu dicek admin dulu sebelum bisa diklaim.'
