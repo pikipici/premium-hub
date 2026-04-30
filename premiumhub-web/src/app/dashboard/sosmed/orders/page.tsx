@@ -5,7 +5,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { animate, createScope, stagger } from 'animejs'
 import { CheckCircle2, ChevronDown, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw, X } from 'lucide-react'
 
-import { getUserRefillButtonState, getUserRefillDescription, getUserRefillMeta, getUserRefillTitle } from '@/lib/sosmedRefillUi'
+import {
+  getUserRefillButtonState,
+  getUserRefillDescription,
+  getUserRefillMeta,
+  getUserRefillPanelLayout,
+  getUserRefillTitle,
+} from '@/lib/sosmedRefillUi'
 import { getRefillHistoryToggleLabel, isRefillHistoryExpanded } from '@/lib/sosmedRefillHistoryUi'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
@@ -322,6 +328,7 @@ export default function DashboardSosmedOrdersPage() {
             const refillButton = getUserRefillButtonState(refill, refillLoading === order.id)
             const refillTitle = getUserRefillTitle(order)
             const refillDescription = getUserRefillDescription(order)
+            const refillPanelLayout = getUserRefillPanelLayout(refillTitle, refillDescription)
             const steps = progressSteps(order)
             const target = compactTarget(order.target_link)
             const refillHistory = order.refill_history || []
@@ -421,7 +428,7 @@ export default function DashboardSosmedOrdersPage() {
                     {refill ? (
                       <div
                         data-anime="refill-panel"
-                        className={`rounded-2xl border px-3.5 py-3 ${
+                        className={`rounded-2xl border ${refillPanelLayout.panelClassName} ${
                           refill.canClaim
                             ? 'border-violet-200 bg-violet-50'
                             : order.refill_status === 'completed'
@@ -431,8 +438,8 @@ export default function DashboardSosmedOrdersPage() {
                                 : 'border-sky-200 bg-sky-50'
                         }`}
                       >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          {refillTitle || refillDescription ? (
+                        <div className={refillPanelLayout.contentClassName}>
+                          {refillPanelLayout.hasCopy ? (
                             <div>
                               {refillTitle ? <div className="text-xs font-black text-[#141414]">{refillTitle}</div> : null}
                               {refillDescription ? (

@@ -7,6 +7,7 @@ import {
   getUserRefillButtonState,
   getUserRefillDescription,
   getUserRefillMeta,
+  getUserRefillPanelLayout,
   getUserRefillTitle,
 } from './sosmedRefillUi'
 import type { SosmedOrder } from '@/types/sosmedOrder'
@@ -208,6 +209,11 @@ describe('sosmed refill UI helpers', () => {
     })
     expect(getUserRefillTitle(order)).toBe('')
     expect(getUserRefillDescription(order)).toBe('')
+    expect(getUserRefillPanelLayout(getUserRefillTitle(order), getUserRefillDescription(order))).toMatchObject({
+      hasCopy: false,
+      panelClassName: expect.stringContaining('py-2'),
+      contentClassName: expect.stringContaining('justify-end'),
+    })
     expect(getUserRefillButtonState(refill, false)).toMatchObject({
       label: 'Klaim Refill',
       disabled: false,

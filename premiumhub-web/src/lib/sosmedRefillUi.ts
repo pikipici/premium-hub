@@ -28,6 +28,12 @@ export interface UserRefillButtonState {
   className: string
 }
 
+export interface UserRefillPanelLayout {
+  hasCopy: boolean
+  panelClassName: string
+  contentClassName: string
+}
+
 const USER_REFILL_BUTTON_BASE_CLASS =
   'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-black shadow-sm transition disabled:cursor-not-allowed'
 const USER_REFILL_BUTTON_ENABLED_CLASS = `${USER_REFILL_BUTTON_BASE_CLASS} bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60`
@@ -245,6 +251,17 @@ export function getUserRefillButtonState(refill: UserRefillMeta | null, loading 
     label: 'Klaim Refill',
     disabled,
     className: refill.canClaim ? USER_REFILL_BUTTON_ENABLED_CLASS : USER_REFILL_BUTTON_DISABLED_CLASS,
+  }
+}
+
+export function getUserRefillPanelLayout(title?: string, description?: string): UserRefillPanelLayout {
+  const hasCopy = Boolean(title?.trim() || description?.trim())
+  return {
+    hasCopy,
+    panelClassName: hasCopy ? 'px-3.5 py-3' : 'px-3.5 py-2',
+    contentClassName: hasCopy
+      ? 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+      : 'flex items-center justify-end',
   }
 }
 
