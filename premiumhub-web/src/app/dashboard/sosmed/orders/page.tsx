@@ -3,9 +3,10 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { animate, createScope, stagger } from 'animejs'
-import { CheckCircle2, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw, X } from 'lucide-react'
 
 import { getUserRefillButtonState, getUserRefillDescription, getUserRefillMeta, getUserRefillTitle } from '@/lib/sosmedRefillUi'
+import { getRefillHistoryToggleLabel, isRefillHistoryExpanded } from '@/lib/sosmedRefillHistoryUi'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
 import type { SosmedOrder } from '@/types/sosmedOrder'
@@ -129,6 +130,7 @@ export default function DashboardSosmedOrdersPage() {
   const [refillLoading, setRefillLoading] = useState<string | null>(null)
   const [refillTarget, setRefillTarget] = useState<SosmedOrder | null>(null)
   const [refillAgreement, setRefillAgreement] = useState(false)
+  const [openRefillHistoryOrderID, setOpenRefillHistoryOrderID] = useState<string | null>(null)
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
 
@@ -320,6 +322,8 @@ export default function DashboardSosmedOrdersPage() {
             const refillButton = getUserRefillButtonState(refill, refillLoading === order.id)
             const steps = progressSteps(order)
             const target = compactTarget(order.target_link)
+            const refillHistory = order.refill_history || []
+            const historyExpanded = isRefillHistoryExpanded(openRefillHistoryOrderID, order.id)
 
             return (
               <article
@@ -452,20 +456,27 @@ export default function DashboardSosmedOrdersPage() {
                       </div>
                     ) : null}
 
-                    {order.refill_history && order.refill_history.length > 0 ? (
+                    {refillHistory.length > 0 ? (
                       <div className="rounded-2xl border border-[#EFEFEA] bg-white px-3.5 py-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
                             <div className="text-xs font-black text-[#141414]">Riwayat Refill</div>
-                            <p className="mt-0.5 text-[11px] text-[#777]">Semua klaim refill buat order ini dicatat di sini.</p>
+                            <p className="mt-0.5 text-[11px] text-[#777]">Detail klaim refill disimpan rapi dan bisa lu buka kalau perlu.</p>
                           </div>
-                          <span className="rounded-full bg-[#FAFAF8] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#777]">
-                            {order.refill_history.length}x klaim
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setOpenRefillHistoryOrderID((current) => (current === order.id ? null : order.id))}
+                            aria-expanded={historyExpanded}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-[#E7E7E1] bg-[#FAFAF8] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#555] transition hover:border-[#FFB29F] hover:bg-[#FFF3EF] hover:text-[#FF5733]"
+                          >
+                            {getRefillHistoryToggleLabel(refillHistory.length, historyExpanded)}
+                            <ChevronDown className={`h-3.5 w-3.5 transition ${historyExpanded ? 'rotate-180' : ''}`} />
+                          </button>
                         </div>
 
-                        <div className="mt-3 grid gap-2">
-                          {order.refill_history.map((attempt) => {
+                        {historyExpanded ? (
+                          <div className="mt-3 grid gap-2">
+                          {refillHistory.map((attempt) => {
                             const historyStatus = refillHistoryStatusLabel(attempt.status)
                             return (
                               <div key={attempt.id} className="rounded-2xl border border-[#F0F0EC] bg-[#FCFCFA] px-3 py-2.5">
@@ -493,7 +504,8 @@ export default function DashboardSosmedOrdersPage() {
                               </div>
                             )
                           })}
-                        </div>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
