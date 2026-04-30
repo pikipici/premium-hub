@@ -49,6 +49,7 @@ const MINUTE_MS = 60 * SECOND_MS
 const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
 const JAP_REFILL_INITIAL_AVAILABILITY_MS = 72 * HOUR_MS
+const JAP_REJECTED_REFILL_RETRY_MS = 24 * HOUR_MS
 
 function parseCooldownDurationMs(message?: string) {
   const text = normalize(message)
@@ -155,7 +156,18 @@ function getSupplierRejectedJAPAvailabilityButtonLabel(
   order: Pick<SosmedOrder, 'created_at' | 'refill_provider_error' | 'refill_requested_at' | 'service'>,
   now: Date = new Date()
 ) {
-  const remaining = getSubmittedJAPRefillAvailabilityRemainingText(order, now)
+  const providerDurationMs = parseCooldownDurationMs(order.refill_provider_error)
+  if (providerDurationMs) {
+    const remaining = getPositiveRemainingTextFromStartAndDuration(order.refill_requested_at, providerDurationMs, now)
+    return remaining ? `Bisa klaim ${remaining} lagi` : 'Menunggu Update Sistem'
+  }
+
+  const requestedAt = order.refill_requested_at ? new Date(order.refill_requested_at) : null
+  const hasRequestedAt = Boolean(requestedAt && !Number.isNaN(requestedAt.getTime()))
+  const remaining = hasRequestedAt
+    ? getPositiveRemainingTextFromStartAndDuration(order.refill_requested_at, JAP_REJECTED_REFILL_RETRY_MS, now)
+    : getSubmittedJAPRefillAvailabilityRemainingText(order, now)
+
   return remaining ? `Bisa klaim ${remaining} lagi` : 'Menunggu Update Sistem'
 }
 

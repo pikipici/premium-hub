@@ -233,13 +233,15 @@ describe('sosmed refill UI helpers', () => {
     })
   })
 
-  it('shows a clear disabled button statement when JAP refill availability is already due but still locked', () => {
+  it('shows the next JAP retry countdown from the rejected refill request time when provider error is empty', () => {
     const order = {
       ...baseOrder,
       created_at: '2026-04-26T10:55:00Z',
       refill_status: 'rejected',
       refill_provider_status: 'Rejected',
-      refill_provider_order_id: '98706469',
+      refill_provider_order_id: '98982771',
+      refill_provider_error: '',
+      refill_requested_at: '2026-04-30T10:30:08Z',
       refill_deadline: '2099-01-01T00:00:00Z',
       service: {
         id: 'service-1',
@@ -252,15 +254,15 @@ describe('sosmed refill UI helpers', () => {
       },
     }
 
-    const refill = getUserRefillMeta(order, new Date('2026-04-29T13:00:00Z'))
+    const refill = getUserRefillMeta(order, new Date('2026-04-30T15:11:08Z'))
 
     expect(refill).toMatchObject({
       label: 'Refill Belum Tersedia',
-      buttonLabel: 'Menunggu Update Sistem',
+      buttonLabel: 'Bisa klaim 19 jam 19 menit lagi',
       canClaim: false,
     })
     expect(getUserRefillButtonState(refill, false)).toMatchObject({
-      label: 'Menunggu Update Sistem',
+      label: 'Bisa klaim 19 jam 19 menit lagi',
       disabled: true,
       className: expect.stringContaining('bg-gray-200'),
     })
