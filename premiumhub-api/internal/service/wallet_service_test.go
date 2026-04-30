@@ -732,3 +732,33 @@ func TestWalletListLedgerSanitizesInternalCopy(t *testing.T) {
 		}
 	}
 }
+
+func TestToTopupResponsePakasirPendingPastExpiryIsNotOverdue(t *testing.T) {
+	past := time.Now().Add(-5 * time.Minute)
+	topup := &model.WalletTopup{
+		ID:        uuid.New(),
+		Provider:  "pakasir",
+		Status:    "pending",
+		ExpiresAt: past,
+	}
+
+	res := toTopupResponse(topup)
+	if res.IsOverdue {
+		t.Fatalf("pakasir pending topup should not be marked overdue by local clock")
+	}
+}
+
+func TestToTopupResponseNonPakasirPendingPastExpiryIsOverdue(t *testing.T) {
+	past := time.Now().Add(-5 * time.Minute)
+	topup := &model.WalletTopup{
+		ID:        uuid.New(),
+		Provider:  "duitku",
+		Status:    "pending",
+		ExpiresAt: past,
+	}
+
+	res := toTopupResponse(topup)
+	if !res.IsOverdue {
+		t.Fatalf("non-pakasir pending topup should still be marked overdue when past expiry")
+	}
+}

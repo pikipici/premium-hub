@@ -980,8 +980,11 @@ func mapProviderStatus(status string) string {
 }
 
 func toTopupResponse(topup *model.WalletTopup) *WalletTopupResponse {
-	now := time.Now()
-	isOverdue := topup.Status == "pending" && now.After(topup.ExpiresAt)
+	isOverdue := false
+	if normalizePaymentGatewayProvider(topup.Provider) != paymentGatewayProviderPakasir {
+		now := time.Now()
+		isOverdue = topup.Status == "pending" && now.After(topup.ExpiresAt)
+	}
 
 	return &WalletTopupResponse{
 		ID:              topup.ID.String(),

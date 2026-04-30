@@ -155,11 +155,7 @@ func (c *pakasirHTTPClient) CreateTransaction(ctx context.Context, input Gateway
 
 	expiredAt := parsePakasirTime(payment.ExpiredAt)
 	if expiredAt.IsZero() {
-		expiryMinutes := input.ExpiryPeriodMinutes
-		if expiryMinutes <= 0 {
-			expiryMinutes = 15
-		}
-		expiredAt = time.Now().UTC().Add(time.Duration(expiryMinutes) * time.Minute)
+		return nil, respBody, fmt.Errorf("response pakasir transactioncreate tidak valid: payment.expired_at kosong/invalid")
 	}
 
 	paymentMethod := NormalizePaymentGatewayMethodForProvider(paymentGatewayProviderPakasir, payment.PaymentMethod)

@@ -151,20 +151,13 @@ function WalletTopupStatusContent() {
   const expiresAt = topup?.expires_at ?? topup?.expired_at
   const expiresAtMs = useMemo(() => parseDateMs(expiresAt), [expiresAt])
 
-  const clientExpired = useMemo(() => {
-    if (!topup || topup.status !== 'pending') return false
-    if (topup.is_overdue) return true
-    return expiresAtMs > 0 && nowMs >= expiresAtMs
-  }, [expiresAtMs, nowMs, topup])
-
   const effectiveStatus = useMemo<WalletTopup['status']>(() => {
-    if (topup?.status === 'pending' && clientExpired) return 'expired'
     return topup?.status ?? 'pending'
-  }, [clientExpired, topup?.status])
+  }, [topup?.status])
 
   const payableStatus = useMemo(() => {
-    return topup ? isPayableTopup(topup) && !clientExpired : false
-  }, [clientExpired, topup])
+    return topup ? isPayableTopup(topup) : false
+  }, [topup])
 
   const countdownMs = useMemo(() => {
     if (!payableStatus || expiresAtMs <= 0) return 0
@@ -363,7 +356,7 @@ function WalletTopupStatusContent() {
           <div className="mt-3 grid grid-cols-1 gap-3 text-sm">
             <div className="rounded-xl bg-[#F7F7F5] p-3">
               <div className="text-xs text-[#888] mb-1">Status Pembayaran</div>
-              <div className="font-bold capitalize">{clientExpired ? statusLabel(effectiveStatus) : topup.provider_status || statusLabel(topup.status)}</div>
+              <div className="font-bold capitalize">{topup.provider_status || statusLabel(effectiveStatus)}</div>
             </div>
             {payableStatus ? (
               <GatewayPaymentDisplay paymentMethod={topup.payment_method} paymentNumber={topup.payment_number} />

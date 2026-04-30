@@ -128,3 +128,38 @@ func TestPakasirClientListPaymentMethods(t *testing.T) {
 		t.Fatalf("unexpected method order: %+v", methods[:2])
 	}
 }
+
+func TestPakasirClientCreateTransactionRequiresProviderExpiredAt(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"payment": {
+				"project": "digimarket",
+				"order_id": "WLT-1",
+				"amount": 50000,
+				"fee": 1000,
+				"total_payment": 51000,
+				"payment_method": "qris",
+				"payment_number": "000201010212",
+				"expired_at": ""
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewPakasirClient(&config.Config{
+		PakasirBaseURL:        server.URL,
+		PakasirProject:        "digimarket",
+		PakasirAPIKey:         "secret",
+		PakasirHTTPTimeoutSec: "5",
+	})
+
+	_, _, err := client.CreateTransaction(context.Background(), GatewayCreateTransactionInput{
+		PaymentMethod: "qris",
+		OrderID:       "WLT-1",
+		Amount:        50000,
+	})
+	if err == nil {
+		t.Fatalf("expected error when pakasir expired_at is missing")
+	}
+}
