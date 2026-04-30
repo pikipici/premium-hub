@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   BadgeCheck,
   CreditCard,
@@ -14,6 +14,7 @@ import {
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
+import { buildOtpCardsForCycle } from '@/lib/nokosOtpCycle'
 import { nokosPublicService } from '@/services/nokosPublicService'
 import { useAuthStore } from '@/store/authStore'
 import type { NokosLandingSummary } from '@/types/nokos'
@@ -219,6 +220,9 @@ const monoBadgeInvertIconSrcs = new Set<string>([
   '/icons/apps/openai.svg',
 ])
 
+const DESKTOP_ESCALATOR_CYCLE_SEC = 96
+const MOBILE_ESCALATOR_CYCLE_SEC = 120
+
 function OtpPreviewCard({ card }: { card: OtpCard }) {
   const useMonoBadge = card.iconSrc ? monoBadgeIconSrcs.has(card.iconSrc) : false
   const useMonoBadgeInvert = card.iconSrc ? monoBadgeInvertIconSrcs.has(card.iconSrc) : false
@@ -303,6 +307,8 @@ const paymentMethodLabel = (method: string) => {
 
 export default function LandingPage() {
   const [landingSummary, setLandingSummary] = useState<NokosLandingSummary | null>(null)
+  const [desktopCycleSeed, setDesktopCycleSeed] = useState(0)
+  const [mobileCycleSeed, setMobileCycleSeed] = useState(0)
   const { isAuthenticated, hasHydrated, isBootstrapped } = useAuthStore()
 
   useEffect(() => {
@@ -324,6 +330,37 @@ export default function LandingPage() {
       canceled = true
     }
   }, [])
+
+  useEffect(() => {
+    const scheduleSeedUpdate = (durationMs: number, setter: (seed: number) => void) => {
+      let timer: ReturnType<typeof setTimeout> | null = null
+
+      const sync = () => {
+        const now = Date.now()
+        setter(Math.floor(now / durationMs))
+
+        const delayToNextCycle = durationMs - (now % durationMs) + 32
+        timer = setTimeout(sync, delayToNextCycle)
+      }
+
+      sync()
+
+      return () => {
+        if (timer) clearTimeout(timer)
+      }
+    }
+
+    const stopDesktop = scheduleSeedUpdate(DESKTOP_ESCALATOR_CYCLE_SEC * 1000, setDesktopCycleSeed)
+    const stopMobile = scheduleSeedUpdate(MOBILE_ESCALATOR_CYCLE_SEC * 1000, setMobileCycleSeed)
+
+    return () => {
+      stopDesktop()
+      stopMobile()
+    }
+  }, [])
+
+  const desktopOtpCards = useMemo(() => buildOtpCardsForCycle(otpCards, desktopCycleSeed), [desktopCycleSeed])
+  const mobileOtpCards = useMemo(() => buildOtpCardsForCycle(otpCards, mobileCycleSeed), [mobileCycleSeed])
 
   const hasLiveSummary = Boolean(landingSummary)
   const countriesCount = landingSummary?.countries_count ?? 0
@@ -432,17 +469,23 @@ export default function LandingPage() {
           <div className="relative">
             <div className="absolute -right-16 inset-y-0 hidden rounded-l-[40px] bg-gradient-to-br from-[#FFE8E0] via-[#FFCDB8] to-[#FFE5D5] md:block" />
             <div className="relative z-10">
-              <div className="grid gap-3 sm:grid-cols-2 md:hidden">
-                {otpCards.map((card) => (
-                  <OtpPreviewCard key={`mobile-${card.app}`} card={card} />
-                ))}
+              <div className="otp-escalator-mask-mobile md:hidden">
+                <div className="otp-escalator-track-mobile">
+                  {[0, 1].map((loop) => (
+                    <div key={`mobile-loop-${loop}`} className="grid gap-3 pb-3">
+                      {mobileOtpCards.map((card) => (
+                        <OtpPreviewCard key={`mobile-${loop}-${card.app}`} card={card} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="otp-escalator-mask hidden md:block">
                 <div className="otp-escalator-track">
                   {[0, 1].map((loop) => (
                     <div key={`loop-${loop}`} className="grid gap-3 pb-3">
-                      {otpCards.map((card) => (
+                      {desktopOtpCards.map((card) => (
                         <OtpPreviewCard key={`desktop-${loop}-${card.app}`} card={card} />
                       ))}
                     </div>
@@ -532,12 +575,28 @@ export default function LandingPage() {
           mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 90%, transparent 100%);
         }
 
+        .otp-escalator-mask-mobile {
+          max-height: 360px;
+          overflow: hidden;
+          -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 8%, #000 92%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, #000 8%, #000 92%, transparent 100%);
+        }
+
         .otp-escalator-track {
           will-change: transform;
-          animation: otp-escalator 96s linear infinite;
+          animation: otp-escalator ${DESKTOP_ESCALATOR_CYCLE_SEC}s linear infinite;
+        }
+
+        .otp-escalator-track-mobile {
+          will-change: transform;
+          animation: otp-escalator-mobile ${MOBILE_ESCALATOR_CYCLE_SEC}s linear infinite;
         }
 
         .otp-escalator-mask:hover .otp-escalator-track {
+          animation-play-state: paused;
+        }
+
+        .otp-escalator-mask-mobile:active .otp-escalator-track-mobile {
           animation-play-state: paused;
         }
 
@@ -551,8 +610,19 @@ export default function LandingPage() {
           }
         }
 
+        @keyframes otp-escalator-mobile {
+          from {
+            transform: translateY(0);
+          }
+
+          to {
+            transform: translateY(-50%);
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .otp-escalator-track {
+          .otp-escalator-track,
+          .otp-escalator-track-mobile {
             animation: none;
           }
         }

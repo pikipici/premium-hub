@@ -83,6 +83,11 @@ func (s *NokosLandingSummaryService) GetPublicSummary(ctx context.Context) (*Nok
 	if err != nil {
 		return nil, err
 	}
+	if sentTotals, e := s.repo.CountSentTotals(); e == nil {
+		row.ActivationSentTotal = sentTotals.Activation
+		row.HostingSentTotal = sentTotals.Hosting
+		row.SentTotalAllTime = sentTotals.Total
+	}
 	return s.toResponse(row), nil
 }
 
@@ -146,16 +151,11 @@ func (s *NokosLandingSummaryService) Sync(ctx context.Context) error {
 		countriesCount = int64(len(fetchedCountries))
 	}
 
-	if count, e := s.fetchSentTotalByCategory(ctx, "activation"); e != nil {
-		errorsList = append(errorsList, "activation_sales:"+e.Error())
+	if sentTotals, e := s.repo.CountSentTotals(); e != nil {
+		errorsList = append(errorsList, "local_orders:"+e.Error())
 	} else {
-		activationTotal = count
-	}
-
-	if count, e := s.fetchSentTotalByCategory(ctx, "hosting"); e != nil {
-		errorsList = append(errorsList, "hosting_sales:"+e.Error())
-	} else {
-		hostingTotal = count
+		activationTotal = sentTotals.Activation
+		hostingTotal = sentTotals.Hosting
 	}
 
 	if methods, e := s.fetchActivePaymentMethods(ctx); e != nil {
