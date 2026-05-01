@@ -71,6 +71,34 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("reject malformed turnstile config", func(t *testing.T) {
+		cfg := &Config{
+			AppEnv:                  "development",
+			JWTSecret:               "super-secure-secret-value-32chars++",
+			CookieSameSite:          "lax",
+			AuthRateLimitMax:        "20",
+			AuthRateLimitWindow:     "1m",
+			AuthTurnstileEnabled:    true,
+			TurnstileSecretKey:      "",
+			TurnstileVerifyURL:      "ftp://invalid-turnstile",
+			TurnstileHTTPTimeoutSec: "0",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatalf("expected turnstile validation error")
+		}
+		msg := err.Error()
+		for _, expected := range []string{
+			"TURNSTILE_SECRET_KEY",
+			"TURNSTILE_VERIFY_URL",
+			"TURNSTILE_HTTP_TIMEOUT_SEC",
+		} {
+			if !strings.Contains(msg, expected) {
+				t.Fatalf("expected error to contain %q, got: %s", expected, msg)
+			}
+		}
+	})
+
 	t.Run("reject malformed http safety config", func(t *testing.T) {
 		cfg := &Config{
 			AppEnv:                  "development",

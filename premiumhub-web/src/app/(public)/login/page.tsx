@@ -3,11 +3,13 @@
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
+import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { resolvePostAuthPath } from '@/lib/auth'
+import { canSubmitAuth, isTurnstileEnabled, turnstileSiteKey } from '@/lib/turnstile'
 import { useAuthStore } from '@/store/authStore'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
@@ -29,16 +31,26 @@ function LoginPageContent() {
     return `/register?next=${encodeURIComponent(nextAuthPath)}`
   }, [nextAuthPath])
   const [form, setForm] = useState({ email: '', password: '' })
+  const [turnstileToken, setTurnstileToken] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const turnstileEnabled = useMemo(() => isTurnstileEnabled(turnstileSiteKey()), [])
+  const canSubmit = canSubmitAuth(loading, turnstileEnabled, turnstileToken)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (turnstileEnabled && !turnstileToken.trim()) {
+      setError('Selesaikan verifikasi human dulu')
+      return
+    }
     setLoading(true)
     try {
-      const res = await authService.login(form)
+      const res = await authService.login({
+        ...form,
+        turnstile_token: turnstileEnabled ? turnstileToken : undefined,
+      })
       if (res.success) {
         setUser(res.data.user)
         router.push(resolvePostAuthPath(nextAuthPath, res.data.user.role))
@@ -121,9 +133,19 @@ function LoginPageContent() {
                 </Link>
               </div>
 
+              <TurnstileWidget
+                action="login"
+                disabled={loading}
+                onTokenChange={setTurnstileToken}
+                onError={setError}
+              />
+              {turnstileEnabled && !turnstileToken && (
+                <p className="text-xs text-[#888]">Selesaikan verifikasi human untuk lanjut login.</p>
+              )}
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={!canSubmit}
                 className="w-full py-3.5 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
               >
                 {loading ? 'Memproses...' : <><LogIn className="w-4 h-4" /> Masuk</>}

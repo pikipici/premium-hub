@@ -16,8 +16,9 @@ import (
 )
 
 type AuthHandler struct {
-	authSvc *service.AuthService
-	cfg     *config.Config
+	authSvc           *service.AuthService
+	cfg               *config.Config
+	turnstileVerifier service.TurnstileVerifier
 }
 
 const (
@@ -30,13 +31,25 @@ type authSessionPayload struct {
 }
 
 func NewAuthHandler(authSvc *service.AuthService, cfg *config.Config) *AuthHandler {
-	return &AuthHandler{authSvc: authSvc, cfg: cfg}
+	return &AuthHandler{
+		authSvc:           authSvc,
+		cfg:               cfg,
+		turnstileVerifier: service.NewTurnstileVerifier(cfg),
+	}
+}
+
+func (h *AuthHandler) SetTurnstileVerifier(verifier service.TurnstileVerifier) *AuthHandler {
+	h.turnstileVerifier = verifier
+	return h
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
 	var input service.RegisterInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		response.BadRequest(c, err.Error())
+		return
+	}
+	if !h.verifyTurnstile(c, input.TurnstileToken) {
 		return
 	}
 
@@ -58,6 +71,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var input service.LoginInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		response.BadRequest(c, err.Error())
+		return
+	}
+	if !h.verifyTurnstile(c, input.TurnstileToken) {
 		return
 	}
 
@@ -252,4 +268,30 @@ func statusFromGoogleLoginError(msg string) int {
 	default:
 		return http.StatusBadRequest
 	}
+}
+
+func (h *AuthHandler) verifyTurnstile(c *gin.Context, token string) bool {
+	if h == nil || h.cfg == nil || !h.cfg.AuthTurnstileEnabled {
+		return true
+	}
+
+	if strings.TrimSpace(token) == "" {
+		response.Error(c, http.StatusBadRequest, "Verifikasi human wajib diselesaikan")
+		return false
+	}
+	if h.turnstileVerifier == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Verifikasi human belum dikonfigurasi")
+		return false
+	}
+
+	ok, err := h.turnstileVerifier.Verify(c.Request.Context(), token, c.ClientIP())
+	if err != nil {
+		response.Error(c, http.StatusServiceUnavailable, "Verifikasi human sedang bermasalah, coba lagi")
+		return false
+	}
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Verifikasi human gagal")
+		return false
+	}
+	return true
 }

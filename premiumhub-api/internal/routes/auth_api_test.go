@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -261,5 +262,113 @@ func TestAuthLogoutRevokesRefreshSession(t *testing.T) {
 	code, env, _ = doAuthJSONRequest(t, r, http.MethodGet, "/api/v1/auth/session", nil, accessCookie, refreshCookie)
 	if code != http.StatusUnauthorized || env.Success {
 		t.Fatalf("revoked refresh token should not restore session: code=%d msg=%s", code, env.Message)
+	}
+}
+
+func TestAuthLoginRequiresTurnstileWhenEnabled(t *testing.T) {
+	db := openAuthAPITestDB(t)
+	seedAuthAPIUser(t, db, "turnstile-login@example.com", "secret123")
+
+	cfg := &config.Config{
+		FrontendURL:          "http://localhost:3000",
+		JWTSecret:            "super-secure-secret-value-32chars++",
+		JWTExpiry:            "1h",
+		RefreshTokenExpiry:   "24h",
+		AuthRateLimitMax:     "100",
+		AuthRateLimitWindow:  "1m",
+		AuthTurnstileEnabled: true,
+		TurnstileSecretKey:   "turnstile-secret",
+	}
+
+	r := Setup(db, cfg)
+	code, env, _ := doAuthJSONRequest(t, r, http.MethodPost, "/api/v1/auth/login", map[string]any{
+		"email":    "turnstile-login@example.com",
+		"password": "secret123",
+	})
+
+	if code != http.StatusBadRequest || env.Success {
+		t.Fatalf("expected 400 when token missing, got code=%d msg=%s", code, env.Message)
+	}
+	if !strings.Contains(strings.ToLower(env.Message), "verifikasi human") {
+		t.Fatalf("expected turnstile message, got: %s", env.Message)
+	}
+}
+
+func TestAuthLoginTurnstileTokenValidatedByProvider(t *testing.T) {
+	db := openAuthAPITestDB(t)
+	seedAuthAPIUser(t, db, "turnstile-provider@example.com", "secret123")
+
+	turnstileServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST, got %s", r.Method)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		ok := r.Form.Get("response") == "ok-token"
+		_, _ = w.Write([]byte(fmt.Sprintf(`{"success":%t}`, ok)))
+	}))
+	defer turnstileServer.Close()
+
+	cfg := &config.Config{
+		FrontendURL:             "http://localhost:3000",
+		JWTSecret:               "super-secure-secret-value-32chars++",
+		JWTExpiry:               "1h",
+		RefreshTokenExpiry:      "24h",
+		AuthRateLimitMax:        "100",
+		AuthRateLimitWindow:     "1m",
+		AuthTurnstileEnabled:    true,
+		TurnstileSecretKey:      "turnstile-secret",
+		TurnstileVerifyURL:      turnstileServer.URL,
+		TurnstileHTTPTimeoutSec: "3",
+	}
+
+	r := Setup(db, cfg)
+
+	code, env, _ := doAuthJSONRequest(t, r, http.MethodPost, "/api/v1/auth/login", map[string]any{
+		"email":           "turnstile-provider@example.com",
+		"password":        "secret123",
+		"turnstile_token": "bad-token",
+	})
+	if code != http.StatusUnauthorized || env.Success {
+		t.Fatalf("expected 401 when turnstile rejects token, got code=%d msg=%s", code, env.Message)
+	}
+
+	code, env, _ = doAuthJSONRequest(t, r, http.MethodPost, "/api/v1/auth/login", map[string]any{
+		"email":           "turnstile-provider@example.com",
+		"password":        "secret123",
+		"turnstile_token": "ok-token",
+	})
+	if code != http.StatusOK || !env.Success {
+		t.Fatalf("expected login success with valid turnstile token, got code=%d msg=%s", code, env.Message)
+	}
+}
+
+func TestAuthRegisterRequiresTurnstileWhenEnabled(t *testing.T) {
+	db := openAuthAPITestDB(t)
+
+	cfg := &config.Config{
+		FrontendURL:          "http://localhost:3000",
+		JWTSecret:            "super-secure-secret-value-32chars++",
+		JWTExpiry:            "1h",
+		RefreshTokenExpiry:   "24h",
+		AuthRateLimitMax:     "100",
+		AuthRateLimitWindow:  "1m",
+		AuthTurnstileEnabled: true,
+		TurnstileSecretKey:   "turnstile-secret",
+	}
+
+	r := Setup(db, cfg)
+	code, env, _ := doAuthJSONRequest(t, r, http.MethodPost, "/api/v1/auth/register", map[string]any{
+		"name":     "User Turnstile",
+		"email":    "turnstile-register@example.com",
+		"password": "secret123",
+	})
+
+	if code != http.StatusBadRequest || env.Success {
+		t.Fatalf("expected 400 when register token missing, got code=%d msg=%s", code, env.Message)
+	}
+	if !strings.Contains(strings.ToLower(env.Message), "verifikasi human") {
+		t.Fatalf("expected turnstile message, got: %s", env.Message)
 	}
 }

@@ -45,15 +45,17 @@ func (s *AuthService) SetSessionRepo(sessionRepo *repository.AuthSessionRepo) *A
 }
 
 type RegisterInput struct {
-	Name     string `json:"name" binding:"required,min=2"`
-	Email    string `json:"email" binding:"required,email"`
-	Phone    string `json:"phone"`
-	Password string `json:"password" binding:"required,min=6"`
+	Name           string `json:"name" binding:"required,min=2"`
+	Email          string `json:"email" binding:"required,email"`
+	Phone          string `json:"phone"`
+	Password       string `json:"password" binding:"required,min=6"`
+	TurnstileToken string `json:"turnstile_token"`
 }
 
 type LoginInput struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Email          string `json:"email" binding:"required,email"`
+	Password       string `json:"password" binding:"required"`
+	TurnstileToken string `json:"turnstile_token"`
 }
 
 type GoogleLoginInput struct {

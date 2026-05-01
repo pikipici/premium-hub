@@ -3,11 +3,13 @@
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
+import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { resolvePostAuthPath } from '@/lib/auth'
+import { canSubmitAuth, isTurnstileEnabled, turnstileSiteKey } from '@/lib/turnstile'
 import { useAuthStore } from '@/store/authStore'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { Eye, EyeOff, UserPlus } from 'lucide-react'
@@ -29,9 +31,12 @@ function RegisterPageContent() {
     return `/login?next=${encodeURIComponent(nextAuthPath)}`
   }, [nextAuthPath])
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirm: '' })
+  const [turnstileToken, setTurnstileToken] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const turnstileEnabled = useMemo(() => isTurnstileEnabled(turnstileSiteKey()), [])
+  const canSubmit = canSubmitAuth(loading, turnstileEnabled, turnstileToken)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,10 +49,20 @@ function RegisterPageContent() {
       setError('Password minimal 6 karakter')
       return
     }
+    if (turnstileEnabled && !turnstileToken.trim()) {
+      setError('Selesaikan verifikasi human dulu')
+      return
+    }
 
     setLoading(true)
     try {
-      const res = await authService.register({ name: form.name, email: form.email, phone: form.phone, password: form.password })
+      const res = await authService.register({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+        turnstile_token: turnstileEnabled ? turnstileToken : undefined,
+      })
       if (res.success) {
         setUser(res.data.user)
         router.push(resolvePostAuthPath(nextAuthPath, res.data.user.role))
@@ -129,7 +144,17 @@ function RegisterPageContent() {
                   placeholder="Ulangi password" required />
               </div>
 
-              <button type="submit" disabled={loading}
+              <TurnstileWidget
+                action="register"
+                disabled={loading}
+                onTokenChange={setTurnstileToken}
+                onError={setError}
+              />
+              {turnstileEnabled && !turnstileToken && (
+                <p className="text-xs text-[#888]">Selesaikan verifikasi human untuk lanjut daftar.</p>
+              )}
+
+              <button type="submit" disabled={!canSubmit}
                 className="w-full py-3.5 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2">
                 {loading ? 'Memproses...' : <><UserPlus className="w-4 h-4" /> Daftar</>}
               </button>

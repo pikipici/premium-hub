@@ -9,12 +9,12 @@ interface AuthResponse {
 }
 
 export const authService = {
-  register: async (data: { name: string; email: string; phone?: string; password: string }) => {
+  register: async (data: { name: string; email: string; phone?: string; password: string; turnstile_token?: string }) => {
     const res = await api.post<ApiResponse<AuthResponse>>('/auth/register', data)
     return res.data
   },
 
-  login: async (data: { email: string; password: string }) => {
+  login: async (data: { email: string; password: string; turnstile_token?: string }) => {
     const res = await api.post<ApiResponse<AuthResponse>>('/auth/login', data)
     return res.data
   },

@@ -33,6 +33,8 @@ type Config struct {
 	CookieDomain, CookieSameSite                                                string
 	CookieSecure                                                                bool
 	GoogleClientID                                                              string
+	AuthTurnstileEnabled                                                        bool
+	TurnstileSecretKey, TurnstileVerifyURL, TurnstileHTTPTimeoutSec             string
 	HTTPReadHeaderTimeout, HTTPReadTimeout, HTTPWriteTimeout, HTTPIdleTimeout   string
 	HTTPMaxHeaderBytes, MaxRequestBodyBytes                                     string
 	AuthRateLimitMax, AuthRateLimitWindow                                       string
@@ -125,6 +127,10 @@ func Load() *Config {
 		CookieSameSite:                       e("COOKIE_SAMESITE", "lax"),
 		CookieSecure:                         eb("COOKIE_SECURE", isProd),
 		GoogleClientID:                       e("GOOGLE_CLIENT_ID", ""),
+		AuthTurnstileEnabled:                 eb("AUTH_TURNSTILE_ENABLED", false),
+		TurnstileSecretKey:                   e("TURNSTILE_SECRET_KEY", ""),
+		TurnstileVerifyURL:                   e("TURNSTILE_VERIFY_URL", "https://challenges.cloudflare.com/turnstile/v0/siteverify"),
+		TurnstileHTTPTimeoutSec:              e("TURNSTILE_HTTP_TIMEOUT_SEC", "8"),
 		HTTPReadHeaderTimeout:                e("HTTP_READ_HEADER_TIMEOUT", "5s"),
 		HTTPReadTimeout:                      e("HTTP_READ_TIMEOUT", "15s"),
 		HTTPWriteTimeout:                     e("HTTP_WRITE_TIMEOUT", "30s"),

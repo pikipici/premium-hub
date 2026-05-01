@@ -81,6 +81,20 @@ func (c *Config) Validate() error {
 			problems = append(problems, "AUTH_RATE_LIMIT_WINDOW harus format duration valid (contoh: 1m, 30s)")
 		}
 	}
+	if c.AuthTurnstileEnabled && strings.TrimSpace(c.TurnstileSecretKey) == "" {
+		problems = append(problems, "TURNSTILE_SECRET_KEY wajib diisi saat AUTH_TURNSTILE_ENABLED=true")
+	}
+	if v := strings.TrimSpace(c.TurnstileVerifyURL); v != "" {
+		if err := validateHTTPURL(v); err != nil {
+			problems = append(problems, "TURNSTILE_VERIFY_URL tidak valid: "+err.Error())
+		}
+	}
+	if v := strings.TrimSpace(c.TurnstileHTTPTimeoutSec); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 || n > 120 {
+			problems = append(problems, "TURNSTILE_HTTP_TIMEOUT_SEC harus angka 1-120")
+		}
+	}
 	validateRate(c.GlobalRateLimitMax, c.GlobalRateLimitWindow, "GLOBAL_RATE_LIMIT_MAX", "GLOBAL_RATE_LIMIT_WINDOW")
 	validateRate(c.ProviderRateLimitMax, c.ProviderRateLimitWindow, "PROVIDER_RATE_LIMIT_MAX", "PROVIDER_RATE_LIMIT_WINDOW")
 	validateRate(c.PaymentRateLimitMax, c.PaymentRateLimitWindow, "PAYMENT_RATE_LIMIT_MAX", "PAYMENT_RATE_LIMIT_WINDOW")
