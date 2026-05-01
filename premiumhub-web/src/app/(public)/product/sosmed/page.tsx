@@ -346,7 +346,7 @@ export default function ProductSosmedLandingPage() {
                   </div>
                 </article>
               )
-            })}}
+            })}
           </div>
           )}
 
