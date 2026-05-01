@@ -11,7 +11,10 @@ describe('nokos otp escalator layout', () => {
     expect(source).toContain('otp-escalator-track-mobile')
     expect(source).toContain('key={`mobile-loop-${loop}`}')
     expect(source).toContain('const MOBILE_ESCALATOR_CYCLE_SEC = 120')
-    expect(source).toContain('animation: otp-escalator-mobile ${MOBILE_ESCALATOR_CYCLE_SEC}s linear infinite')
+    expect(source).toContain('animation-name: otp-escalator-mobile')
+    expect(source).toContain('animation-duration: ${MOBILE_ESCALATOR_CYCLE_SEC}s')
+    expect(source).toContain('animation-timing-function: linear')
+    expect(source).toContain('animation-iteration-count: infinite')
     expect(source).toContain('@keyframes otp-escalator-mobile')
   })
 

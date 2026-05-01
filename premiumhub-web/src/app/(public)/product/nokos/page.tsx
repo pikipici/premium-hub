@@ -584,12 +584,18 @@ export default function LandingPage() {
 
         .otp-escalator-track {
           will-change: transform;
-          animation: otp-escalator ${DESKTOP_ESCALATOR_CYCLE_SEC}s linear infinite;
+          animation-name: otp-escalator;
+          animation-duration: ${DESKTOP_ESCALATOR_CYCLE_SEC}s;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
         }
 
         .otp-escalator-track-mobile {
           will-change: transform;
-          animation: otp-escalator-mobile ${MOBILE_ESCALATOR_CYCLE_SEC}s linear infinite;
+          animation-name: otp-escalator-mobile;
+          animation-duration: ${MOBILE_ESCALATOR_CYCLE_SEC}s;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
         }
 
         @keyframes otp-escalator {
