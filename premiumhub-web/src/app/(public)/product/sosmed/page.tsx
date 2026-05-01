@@ -167,6 +167,9 @@ export default function ProductSosmedLandingPage() {
   const animationRootRef = useRef<HTMLElement | null>(null)
   const [services, setServices] = useState<SosmedService[]>([])
   const [activeTab, setActiveTab] = useState<'satuan' | 'bundling'>('satuan')
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const CARDS_PER_PAGE = 6
 
   useEffect(() => {
     let alive = true
@@ -187,6 +190,8 @@ export default function ProductSosmedLandingPage() {
   }, [])
 
   const cards = useMemo(() => buildSosmedServiceCards(services), [services])
+  const totalPages = Math.ceil(cards.length / CARDS_PER_PAGE)
+  const paginatedCards = cards.slice((currentPage - 1) * CARDS_PER_PAGE, currentPage * CARDS_PER_PAGE)
 
   useEffect(() => {
     if (!animationRootRef.current) return
@@ -218,7 +223,7 @@ export default function ProductSosmedLandingPage() {
     }) }
 
     return () => scope.current.revert()
-  }, [cards.length])
+  }, [paginatedCards.length, currentPage, activeTab])
 
   return (
     <>
@@ -251,7 +256,10 @@ export default function ProductSosmedLandingPage() {
           <div className="mb-8 flex justify-center">
             <div className="inline-flex rounded-full bg-white p-1.5 shadow-sm ring-1 ring-inset ring-gray-200">
               <button
-                onClick={() => setActiveTab('satuan')}
+                onClick={() => {
+                  setActiveTab('satuan')
+                  setCurrentPage(1)
+                }}
                 className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
                   activeTab === 'satuan'
                     ? 'bg-[#FF5733] text-white shadow-md'
@@ -262,7 +270,10 @@ export default function ProductSosmedLandingPage() {
                 Layanan Satuan
               </button>
               <button
-                onClick={() => setActiveTab('bundling')}
+                onClick={() => {
+                  setActiveTab('bundling')
+                  setCurrentPage(1)
+                }}
                 className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
                   activeTab === 'bundling'
                     ? 'bg-[#FF5733] text-white shadow-md'
@@ -276,8 +287,9 @@ export default function ProductSosmedLandingPage() {
           </div>
 
           {activeTab === 'satuan' && (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {cards.map((service) => {
+            <div className="space-y-8">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {paginatedCards.map((service) => {
               const checkoutHref = `/product/sosmed/checkout?service=${encodeURIComponent(service.code)}`
               const ServiceIcon = iconForCategory(service.categoryCode)
               const isRecommended = service.isRecommended
@@ -372,10 +384,45 @@ export default function ProductSosmedLandingPage() {
                       Pilih Layanan <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                   </div>
-                </article>
+                                </article>
               )
             })}
-          </div>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-[#FF5733] text-white shadow-md'
+                            : 'text-gray-500 hover:bg-gray-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === 'bundling' && (
