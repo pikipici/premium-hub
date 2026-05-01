@@ -342,7 +342,7 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
     return (left.code || '').localeCompare(right.code || '')
   })
 
-  return sorted.map((item, index) => {
+  const dbCards = sorted.map((item, index) => {
     const fallback = FALLBACK_SERVICES[index % FALLBACK_SERVICES.length]
     const platform = normalizePlatform(cleanValue(item.platform_label, fallback.platform))
     const unit = unitFromService(item)
@@ -378,4 +378,13 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
       isRecommended: badge.toLowerCase().includes('rekomendasi'),
     }
   })
+
+  // Append any fallback services that are not already present in the database (based on code)
+  const dbCodes = new Set(sorted.map((i) => i.code))
+  const missingFallbacks = FALLBACK_SERVICES.filter((f) => !dbCodes.has(f.code)).map((service, index) => ({
+    key: `fallback-${service.code}-${index}`,
+    ...service,
+  }))
+
+  return [...dbCards, ...missingFallbacks]
 }
