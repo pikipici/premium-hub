@@ -7,6 +7,8 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock3,
+  ChevronLeft,
+  ChevronRight,
   Heart,
   MessageCircle,
   PlayCircle,
