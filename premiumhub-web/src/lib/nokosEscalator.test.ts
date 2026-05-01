@@ -24,6 +24,7 @@ describe('nokos otp escalator layout', () => {
     expect(source).toContain('buildOtpCardsForCycle(otpCards, mobileCycleSeed)')
     expect(source).toContain('prefers-reduced-motion: reduce')
     expect(source).toContain('.otp-escalator-track-mobile')
-    expect(source).toContain('animation: none')
+    expect(source).toContain('animation-duration: 220s')
+    expect(source).toContain('animation-duration: 260s')
   })
 })

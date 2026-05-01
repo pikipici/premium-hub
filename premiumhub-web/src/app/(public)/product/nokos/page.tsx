@@ -592,14 +592,6 @@ export default function LandingPage() {
           animation: otp-escalator-mobile ${MOBILE_ESCALATOR_CYCLE_SEC}s linear infinite;
         }
 
-        .otp-escalator-mask:hover .otp-escalator-track {
-          animation-play-state: paused;
-        }
-
-        .otp-escalator-mask-mobile:active .otp-escalator-track-mobile {
-          animation-play-state: paused;
-        }
-
         @keyframes otp-escalator {
           from {
             transform: translateY(0);
@@ -621,9 +613,12 @@ export default function LandingPage() {
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .otp-escalator-track,
+          .otp-escalator-track {
+            animation-duration: 220s;
+          }
+
           .otp-escalator-track-mobile {
-            animation: none;
+            animation-duration: 260s;
           }
         }
       `}</style>
