@@ -170,6 +170,7 @@ export default function ProductSosmedLandingPage() {
   const [services, setServices] = useState<SosmedService[]>([])
   const [activeTab, setActiveTab] = useState<'satuan' | 'bundling'>('satuan')
   const [currentPage, setCurrentPage] = useState(1)
+  const [activePlatform, setActivePlatform] = useState('Semua')
 
   const CARDS_PER_PAGE = 6
 
@@ -192,8 +193,18 @@ export default function ProductSosmedLandingPage() {
   }, [])
 
   const cards = useMemo(() => buildSosmedServiceCards(services), [services])
-  const totalPages = Math.ceil(cards.length / CARDS_PER_PAGE)
-  const paginatedCards = cards.slice((currentPage - 1) * CARDS_PER_PAGE, currentPage * CARDS_PER_PAGE)
+  const platforms = useMemo(() => {
+    const unique = Array.from(new Set(cards.map(c => c.platform)))
+    return ['Semua', ...unique.sort()]
+  }, [cards])
+
+  const filteredCards = useMemo(() => {
+    if (activePlatform === 'Semua') return cards
+    return cards.filter(c => c.platform === activePlatform)
+  }, [cards, activePlatform])
+
+  const totalPages = Math.ceil(filteredCards.length / CARDS_PER_PAGE)
+  const paginatedCards = filteredCards.slice((currentPage - 1) * CARDS_PER_PAGE, currentPage * CARDS_PER_PAGE)
 
   useEffect(() => {
     if (!animationRootRef.current) return
@@ -225,7 +236,7 @@ export default function ProductSosmedLandingPage() {
     }) }
 
     return () => scope.current.revert()
-  }, [paginatedCards.length, currentPage, activeTab])
+  }, [paginatedCards.length, currentPage, activeTab, activePlatform])
 
   return (
     <>
@@ -261,6 +272,7 @@ export default function ProductSosmedLandingPage() {
                 onClick={() => {
                   setActiveTab('satuan')
                   setCurrentPage(1)
+                  setActivePlatform('Semua')
                 }}
                 className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
                   activeTab === 'satuan'
@@ -290,6 +302,26 @@ export default function ProductSosmedLandingPage() {
 
           {activeTab === 'satuan' && (
             <div className="space-y-8">
+              <div className="flex w-full overflow-x-auto pb-2 scrollbar-hide">
+                <div className="flex gap-2 mx-auto px-4">
+                  {platforms.map(p => (
+                    <button
+                      key={p}
+                      onClick={() => {
+                        setActivePlatform(p)
+                        setCurrentPage(1)
+                      }}
+                      className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-all ${
+                        activePlatform === p
+                          ? 'bg-[#141414] text-white shadow-md'
+                          : 'bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 ring-1 ring-inset ring-gray-200'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {paginatedCards.map((service) => {
               const checkoutHref = `/product/sosmed/checkout?service=${encodeURIComponent(service.code)}`
