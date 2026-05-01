@@ -122,7 +122,15 @@ export default function HomePage() {
     : 'Data layanan sedang dimuat'
   const showNokosCard = visibleProductCards.includes('/product/nokos')
   const showSosmedCard = visibleProductCards.includes('/product/sosmed')
+  const visibleCardsCount = Number(showNokosCard) + Number(showSosmedCard)
+  const isSingleVisibleCard = visibleCardsCount === 1
   const hasVisibleCards = showNokosCard || showSosmedCard
+  const cardsGridClass = isSingleVisibleCard
+    ? 'grid gap-5 md:grid-cols-1 md:justify-items-center lg:gap-7'
+    : 'grid gap-5 md:grid-cols-2 lg:gap-7'
+  const productCardClass = isSingleVisibleCard
+    ? 'w-full rounded-3xl border border-[#EBEBEB] bg-white p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)] md:max-w-[640px] lg:p-7'
+    : 'rounded-3xl border border-[#EBEBEB] bg-white p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7'
 
   return (
     <>
@@ -138,9 +146,9 @@ export default function HomePage() {
             </p>
           </header>
 
-          <div className="grid gap-5 md:grid-cols-2 lg:gap-7">
+          <div className={cardsGridClass}>
             {showNokosCard ? (
-              <article className="rounded-3xl border border-[#EBEBEB] bg-white p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7">
+              <article className={productCardClass}>
               <p className="inline-flex rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5733]">
                 Nomor Virtual OTP
               </p>
@@ -182,7 +190,7 @@ export default function HomePage() {
             ) : null}
 
             {showSosmedCard ? (
-              <article className="rounded-3xl border border-[#EBEBEB] bg-white p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7">
+              <article className={productCardClass}>
               <p className="inline-flex rounded-full border border-[#DCE9FF] bg-[#EEF4FF] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#2853A6]">
                 Jasa SMM
               </p>
