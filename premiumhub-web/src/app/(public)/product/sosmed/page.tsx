@@ -14,11 +14,13 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
+  PackageCheck,
   type LucideIcon,
 } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
+import { BUNDLING_PACKAGES } from '@/lib/sosmedBundlingCards'
 import { buildSosmedServiceCards } from '@/lib/sosmedProductCards'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
 import type { SosmedService } from '@/types/sosmedService'
@@ -38,6 +40,7 @@ function iconForCategory(categoryCode: string) {
 export default function ProductSosmedLandingPage() {
   const animationRootRef = useRef<HTMLElement | null>(null)
   const [services, setServices] = useState<SosmedService[]>([])
+  const [activeTab, setActiveTab] = useState<'satuan' | 'bundling'>('satuan')
 
   useEffect(() => {
     let alive = true
@@ -119,7 +122,35 @@ export default function ProductSosmedLandingPage() {
             </span>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mb-8 flex justify-center">
+            <div className="inline-flex rounded-full bg-white p-1.5 shadow-sm ring-1 ring-inset ring-gray-200">
+              <button
+                onClick={() => setActiveTab('satuan')}
+                className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
+                  activeTab === 'satuan'
+                    ? 'bg-[#FF5733] text-white shadow-md'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                Layanan Satuan
+              </button>
+              <button
+                onClick={() => setActiveTab('bundling')}
+                className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
+                  activeTab === 'bundling'
+                    ? 'bg-[#FF5733] text-white shadow-md'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                <PackageCheck className="h-4 w-4" />
+                Paket Spesial
+              </button>
+            </div>
+          </div>
+
+          {activeTab === 'satuan' && (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {cards.map((service) => {
               const checkoutHref = `/product/sosmed/checkout?service=${encodeURIComponent(service.code)}`
               const ServiceIcon = iconForCategory(service.categoryCode)
@@ -209,6 +240,76 @@ export default function ProductSosmedLandingPage() {
               )
             })}
           </div>
+          )}
+
+          {activeTab === 'bundling' && (
+            <div className="grid gap-6 md:grid-cols-2">
+              {BUNDLING_PACKAGES.map((bundle) => {
+                const BundleIcon = bundle.targetPlatform.toLowerCase().includes('tiktok') ? PlayCircle : Users
+                return (
+                  <article
+                    key={bundle.key}
+                    data-anime="sosmed-card"
+                    className={`group relative flex h-full flex-col rounded-3xl border border-[#FFE2CF] bg-white p-6 transition hover:-translate-y-0.5 hover:shadow-xl`}
+                  >
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${bundle.tone}`}>
+                        <BundleIcon className="h-6 w-6 text-[#141414]" />
+                      </div>
+                      <span className="rounded-full border border-[#FFD5C8] bg-[#FFF3EF] px-3 py-1 text-[11px] font-bold text-[#FF5733]">
+                        {bundle.badge}
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#777]">{bundle.targetPlatform}</p>
+                      <h2 className="mt-1 text-2xl font-extrabold leading-tight text-[#141414]">{bundle.title}</h2>
+                      <p className="mt-2 text-sm leading-relaxed text-[#555]">{bundle.summary}</p>
+                      <p className="mt-3 rounded-2xl bg-[#FAFAF8] px-4 py-3 text-sm leading-relaxed text-[#444] border border-[#F0F0F0]">
+                        <span className="font-bold text-[#FF5733]">Cocok Untuk:</span> {bundle.targetAudience}
+                      </p>
+                    </div>
+
+                    <div className="mt-5 space-y-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[#8A431D]">Layanan Termasuk:</p>
+                      <ul className="grid grid-cols-1 gap-2 text-sm text-[#343434] sm:grid-cols-2">
+                        {bundle.features.map((feat, i) => (
+                          <li key={i} className="flex gap-2 leading-relaxed">
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#22A447]" />
+                            <span className="font-medium">{feat}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="mt-6 rounded-2xl border border-[#FFD5C8] bg-[#FFF6F2] p-4">
+                      <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[#A2572E]">Pilihan Harga Mulai</p>
+                      <div className="flex flex-col gap-3">
+                        {bundle.packages.map((pkg, i) => (
+                          <div key={i} className="flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm border border-[#FBECE6]">
+                            <div>
+                              <p className="text-xs font-bold text-[#141414]">{pkg.name}</p>
+                              <p className="mt-0.5 text-[10px] text-[#666]">{pkg.items.join(' + ')}</p>
+                            </div>
+                            <p className="text-sm font-black text-[#FF5733]">{pkg.priceLabel}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto pt-6">
+                      <button
+                        onClick={() => alert('Fitur Checkout Bundling Segera Hadir!')}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#141414] px-4 py-3.5 text-sm font-bold text-white transition hover:bg-[#333]"
+                      >
+                        Pesan Paket Ini <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
 
           <section className="mt-8 rounded-2xl border border-[#FFD5C8] bg-[#FFF3EF] p-6 text-center">
             <h2 className="text-xl font-extrabold text-[#141414]">Masih bingung pilih paket?</h2>
