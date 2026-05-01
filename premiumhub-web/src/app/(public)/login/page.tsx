@@ -2,10 +2,9 @@
 
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import TurnstileWidget from '@/components/auth/TurnstileWidget'
 import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { resolvePostAuthPath } from '@/lib/auth'
@@ -61,22 +60,6 @@ function LoginPageContent() {
       setLoading(false)
     }
   }
-
-  const handleGoogleToken = useCallback(async (idToken: string) => {
-    setError('')
-    setLoading(true)
-    try {
-      const res = await authService.googleLogin({ id_token: idToken })
-      if (res.success) {
-        setUser(res.data.user)
-        router.push(resolvePostAuthPath(nextAuthPath, res.data.user.role))
-      }
-    } catch (err: unknown) {
-      setError(getHttpErrorMessage(err, 'Login Google gagal'))
-    } finally {
-      setLoading(false)
-    }
-  }, [nextAuthPath, router, setUser])
 
   if (authReady && isAuthenticated) return null
 
@@ -151,20 +134,6 @@ function LoginPageContent() {
                 {loading ? 'Memproses...' : <><LogIn className="w-4 h-4" /> Masuk</>}
               </button>
             </form>
-
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-[#EBEBEB]" />
-              <span className="text-xs text-[#888] font-medium">atau</span>
-              <div className="h-px flex-1 bg-[#EBEBEB]" />
-            </div>
-
-            <GoogleSignInButton
-              mode="login"
-              disabled={loading}
-              onToken={handleGoogleToken}
-              onError={setError}
-            />
-
             <p className="text-center text-sm text-[#888] mt-6">
               Belum punya akun?{' '}
               <Link href={registerHref} className="text-[#FF5733] font-semibold hover:underline">Daftar</Link>
