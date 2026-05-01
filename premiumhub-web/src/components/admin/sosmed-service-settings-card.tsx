@@ -256,6 +256,9 @@ export default function SosmedServiceSettingsCard() {
   const [importJAPPreview, setImportJAPPreview] = useState<AdminSosmedImportJAPPreviewResult | null>(null)
   const [previewingJAP, setPreviewingJAP] = useState(false)
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activePlatformFilter, setActivePlatformFilter] = useState('All')
+
   const categoryOptions = useMemo(
     () => categories.sort((left, right) => (left.sort_order || 100) - (right.sort_order || 100)),
     [categories]
@@ -273,15 +276,36 @@ export default function SosmedServiceSettingsCard() {
     }, {})
   }, [categoryOptions])
 
+  const platformFilterOptions = useMemo(() => {
+    const platforms = new Set<string>()
+    items.forEach(item => {
+      if (item.platform_label) platforms.add(item.platform_label)
+    })
+    return ['All', ...Array.from(platforms).sort()]
+  }, [items])
+
   const sortedItems = useMemo(
-    () =>
-      [...items].sort((left, right) => {
+    () => {
+      let result = [...items]
+      if (activePlatformFilter !== 'All') {
+        result = result.filter(item => item.platform_label === activePlatformFilter)
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim()
+        result = result.filter(item => 
+          (item.title || '').toLowerCase().includes(q) ||
+          (item.code || '').toLowerCase().includes(q) ||
+          (item.platform_label || '').toLowerCase().includes(q)
+        )
+      }
+      return result.sort((left, right) => {
         const leftSort = left.sort_order ?? 100
         const rightSort = right.sort_order ?? 100
         if (leftSort !== rightSort) return leftSort - rightSort
         return (left.code || '').localeCompare(right.code || '')
-      }),
-    [items]
+      })
+    },
+    [items, activePlatformFilter, searchQuery]
   )
 
   const importJAPServiceIds = useMemo(
@@ -855,10 +879,31 @@ export default function SosmedServiceSettingsCard() {
         )}
 
         <div style={{ padding: '0 18px 18px' }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              className="form-input"
+              style={{ width: 220 }}
+              placeholder="Cari nama/kode..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <select
+              className="form-select"
+              style={{ width: 180 }}
+              value={activePlatformFilter}
+              onChange={(e) => setActivePlatformFilter(e.target.value)}
+            >
+              {platformFilterOptions.map(p => (
+                <option key={p} value={p}>{p === 'All' ? 'Semua Platform' : p}</option>
+              ))}
+            </select>
+          </div>
+
           {loading ? (
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memuat layanan sosmed...</div>
           ) : sortedItems.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada layanan sosmed.</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Tidak ada layanan sosmed yang sesuai pencarian.</div>
           ) : (
             <div className="table-wrap" style={{ overflowX: 'auto' }}>
               <table>
