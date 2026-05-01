@@ -715,6 +715,5 @@ func main() {
 		}
 	}
 
-	fmt.Printf("✓ Berhasil seed %d layanan JAP ke database!
-", count)
+	fmt.Printf("✓ Berhasil seed %d layanan JAP ke database!\\n", count)
 }
