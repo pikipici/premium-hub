@@ -6,6 +6,18 @@ import { ArrowRight, BarChart3, CheckCircle2, Rocket } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
+import {
+  fallbackHomeProductCardsFromDefaultMenu,
+  selectVisibleHomeProductCards,
+  type HomeProductCardHref,
+} from '@/lib/homeProductCards'
+import {
+  NAVBAR_MENU_CACHE_EVENT,
+  normalizeNavbarMenuItems,
+  readNavbarMenuCache,
+  writeNavbarMenuCache,
+} from '@/lib/navbarMenuCache'
+import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
 import { nokosPublicService } from '@/services/nokosPublicService'
 import { sosmedService } from '@/services/sosmedService'
 
@@ -15,6 +27,9 @@ export default function HomePage() {
   const [countriesCount, setCountriesCount] = useState<number | null>(null)
   const [sentTotalAllTime, setSentTotalAllTime] = useState<number | null>(null)
   const [sosmedServicesCount, setSosmedServicesCount] = useState<number | null>(null)
+  const [visibleProductCards, setVisibleProductCards] = useState<HomeProductCardHref[]>(
+    () => fallbackHomeProductCardsFromDefaultMenu()
+  )
 
   useEffect(() => {
     let canceled = false
@@ -45,6 +60,56 @@ export default function HomePage() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+
+    const loadVisibleProductCards = async () => {
+      const cachedItems = readNavbarMenuCache()
+      if (cachedItems !== null) {
+        setVisibleProductCards(selectVisibleHomeProductCards(cachedItems))
+      }
+
+      try {
+        const res = await navbarMenuSettingService.publicList()
+        if (cancelled) return
+        if (!res.success) {
+          if (readNavbarMenuCache() === null) {
+            setVisibleProductCards(fallbackHomeProductCardsFromDefaultMenu())
+          }
+          return
+        }
+
+        const visibleItems = normalizeNavbarMenuItems(res.data || [])
+        writeNavbarMenuCache(visibleItems)
+        setVisibleProductCards(selectVisibleHomeProductCards(visibleItems))
+      } catch {
+        if (!cancelled && readNavbarMenuCache() === null) {
+          setVisibleProductCards(fallbackHomeProductCardsFromDefaultMenu())
+        }
+      }
+    }
+
+    void loadVisibleProductCards()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleNavbarMenuCacheUpdate = () => {
+      const cachedItems = readNavbarMenuCache()
+      if (cachedItems !== null) {
+        setVisibleProductCards(selectVisibleHomeProductCards(cachedItems))
+      }
+    }
+
+    window.addEventListener(NAVBAR_MENU_CACHE_EVENT, handleNavbarMenuCacheUpdate)
+    return () => {
+      window.removeEventListener(NAVBAR_MENU_CACHE_EVENT, handleNavbarMenuCacheUpdate)
+    }
+  }, [])
+
   const nokosCoverageLabel = countriesCount !== null
     ? `Cakupan ${formatNumber(countriesCount)}+ negara`
     : 'Cakupan negara sedang dimuat'
@@ -55,6 +120,9 @@ export default function HomePage() {
   const smmMiniStatLabel = sosmedServicesCount !== null
     ? `${formatNumber(sosmedServicesCount)}+ layanan aktif`
     : 'Data layanan sedang dimuat'
+  const showNokosCard = visibleProductCards.includes('/product/nokos')
+  const showSosmedCard = visibleProductCards.includes('/product/sosmed')
+  const hasVisibleCards = showNokosCard || showSosmedCard
 
   return (
     <>
@@ -71,7 +139,8 @@ export default function HomePage() {
           </header>
 
           <div className="grid gap-5 md:grid-cols-2 lg:gap-7">
-            <article className="rounded-3xl border border-[#EBEBEB] bg-white p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7">
+            {showNokosCard ? (
+              <article className="rounded-3xl border border-[#EBEBEB] bg-white p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7">
               <p className="inline-flex rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#FF5733]">
                 Nomor Virtual OTP
               </p>
@@ -109,9 +178,11 @@ export default function HomePage() {
                 Beli Nomor
                 <ArrowRight className="h-4 w-4" />
               </Link>
-            </article>
+              </article>
+            ) : null}
 
-            <article className="rounded-3xl border border-[#EBEBEB] bg-white p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7">
+            {showSosmedCard ? (
+              <article className="rounded-3xl border border-[#EBEBEB] bg-white p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7">
               <p className="inline-flex rounded-full border border-[#DCE9FF] bg-[#EEF4FF] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#2853A6]">
                 Jasa SMM
               </p>
@@ -152,7 +223,19 @@ export default function HomePage() {
                 Beli Engager
                 <ArrowRight className="h-4 w-4" />
               </Link>
-            </article>
+              </article>
+            ) : null}
+
+            {!hasVisibleCards ? (
+              <article className="rounded-3xl border border-[#EBEBEB] bg-white p-6 text-center shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:col-span-2 lg:p-7">
+                <h2 className="text-xl font-extrabold tracking-tight text-[#141414]">
+                  Produk sementara disembunyikan
+                </h2>
+                <p className="mt-2 text-sm text-[#6B7280]">
+                  Coba lagi sebentar atau hubungi admin untuk info produk yang sedang aktif.
+                </p>
+              </article>
+            ) : null}
           </div>
         </section>
       </main>
