@@ -176,24 +176,16 @@ func (s *SosmedServiceService) RepriceResellerToIDR(ctx context.Context, input R
 
 		usdPer1K, ok := extractSosmedResellerUSDPer1K(item.PricePer1K, item.PriceStart, item.Summary)
 		if !ok || usdPer1K <= 0 {
+			usdPer1K, ok = extractSosmedProviderRateUSD(*item)
+		}
+		if !ok || usdPer1K <= 0 {
 			result.Skipped++
 			continue
 		}
 
 		result.Eligible++
 
-		idrPer1K := int64(math.Round(usdPer1K * rateUsed))
-		if idrPer1K < 0 {
-			idrPer1K = 0
-		}
-		idrText := formatIDRThousands(idrPer1K)
-		usdText := normalizeUSDText(usdPer1K)
-
-		priceStart := fmt.Sprintf("Reseller Rp %s/1K", idrText)
-		pricePer1K := fmt.Sprintf("Reseller Rp %s per 1K • USD %s", idrText, usdText)
-		if suffix := extractSosmedProviderServiceID(*item); suffix != "" {
-			pricePer1K += fmt.Sprintf(" • JAP#%s", suffix)
-		}
+		priceStart, pricePer1K := formatSosmedResellerPriceFields(usdPer1K, rateUsed, extractSosmedProviderServiceID(*item))
 
 		nextTitle := item.Title
 		nextProviderTitle := item.ProviderTitle
@@ -551,6 +543,38 @@ func extractSosmedResellerUSDPer1K(candidates ...string) (float64, bool) {
 		}
 	}
 	return 0, false
+}
+
+func extractSosmedProviderRateUSD(item model.SosmedService) (float64, bool) {
+	currency := strings.TrimSpace(item.ProviderCurrency)
+	if currency != "" && !strings.EqualFold(currency, "USD") {
+		return 0, false
+	}
+	rateText := strings.TrimSpace(item.ProviderRate)
+	if rateText == "" {
+		return 0, false
+	}
+	parsed, err := strconv.ParseFloat(rateText, 64)
+	if err != nil || parsed <= 0 {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func formatSosmedResellerPriceFields(usdPer1K, rateUsed float64, providerID string) (string, string) {
+	idrPer1K := int64(math.Round(usdPer1K * rateUsed))
+	if idrPer1K < 0 {
+		idrPer1K = 0
+	}
+	idrText := formatIDRThousands(idrPer1K)
+	usdText := normalizeUSDText(usdPer1K)
+
+	priceStart := fmt.Sprintf("Reseller Rp %s/1K", idrText)
+	pricePer1K := fmt.Sprintf("Reseller Rp %s per 1K • USD %s", idrText, usdText)
+	if providerID = strings.TrimSpace(providerID); providerID != "" {
+		pricePer1K += fmt.Sprintf(" • JAP#%s", providerID)
+	}
+	return priceStart, pricePer1K
 }
 
 func formatIDRThousands(value int64) string {

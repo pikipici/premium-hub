@@ -554,6 +554,122 @@ func TestSosmedService_PreviewSelectedFromJAP_AuditsOrderRequirements(t *testing
 	}
 }
 
+func TestSosmedService_SyncAllJAPMetadata_BackfillsLegacyPrices(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(&model.ProductCategory{}, &model.SosmedService{}); err != nil {
+		t.Fatalf("migrate sosmed models: %v", err)
+	}
+
+	categoryRepo := repository.NewProductCategoryRepo(db)
+	seedSosmedCategory(t, categoryRepo, "views", "Views", 30)
+
+	repo := repository.NewSosmedServiceRepo(db)
+	svc := NewSosmedServiceService(repo, categoryRepo).
+		SetResellerFXConfig(SosmedResellerFXConfig{Mode: "fixed", FixedRate: 17000}).
+		SetJAPCatalogProvider(staticJAPCatalogProvider{items: []JAPServiceItem{
+			{
+				Service:  "1486",
+				Name:     "TikTok Views [Refill: No] [Max: 1M] [Start Time: 0-1 Hr] [Speed: 100K/Day]",
+				Type:     "Default",
+				Category: "TikTok Views",
+				Rate:     "0.25",
+				Min:      "100",
+				Max:      "1000000",
+			},
+		}})
+
+	item := &model.SosmedService{
+		CategoryCode:      "views",
+		Code:              "jap-tiktok-views-1486",
+		Title:             "TikTok Views Legacy",
+		ProviderCode:      "jap",
+		ProviderServiceID: "1486",
+		CheckoutPrice:     15000,
+		IsActive:          true,
+	}
+	if err := repo.Create(item); err != nil {
+		t.Fatalf("create legacy service: %v", err)
+	}
+
+	updated, err := svc.SyncAllJAPMetadata(context.Background())
+	if err != nil {
+		t.Fatalf("sync JAP metadata: %v", err)
+	}
+	if updated != 1 {
+		t.Fatalf("expected updated=1, got %d", updated)
+	}
+
+	stored, err := repo.FindByID(item.ID)
+	if err != nil {
+		t.Fatalf("find legacy service: %v", err)
+	}
+	if stored.ProviderRate != "0.25" || stored.ProviderCurrency != "USD" {
+		t.Fatalf("expected provider rate/currency backfilled, got %s/%s", stored.ProviderRate, stored.ProviderCurrency)
+	}
+	if stored.PriceStart != "Reseller Rp 4.250/1K" {
+		t.Fatalf("unexpected price_start: %s", stored.PriceStart)
+	}
+	if stored.PricePer1K != "Reseller Rp 4.250 per 1K • USD 0.25 • JAP#1486" {
+		t.Fatalf("unexpected price_per_1k: %s", stored.PricePer1K)
+	}
+	if stored.CheckoutPrice != 15000 {
+		t.Fatalf("checkout price should stay manual, got %d", stored.CheckoutPrice)
+	}
+}
+
+func TestSosmedService_RepriceResellerToIDR_FallsBackToProviderRate(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(&model.ProductCategory{}, &model.SosmedService{}); err != nil {
+		t.Fatalf("migrate sosmed models: %v", err)
+	}
+
+	categoryRepo := repository.NewProductCategoryRepo(db)
+	seedSosmedCategory(t, categoryRepo, "views", "Views", 30)
+
+	repo := repository.NewSosmedServiceRepo(db)
+	svc := NewSosmedServiceService(repo, categoryRepo).SetResellerFXConfig(SosmedResellerFXConfig{
+		Mode:      "fixed",
+		FixedRate: 17000,
+	})
+
+	item := &model.SosmedService{
+		CategoryCode:      "views",
+		Code:              "legacy-tiktok-views-1486",
+		Title:             "Legacy TikTok Views",
+		ProviderCode:      "jap",
+		ProviderServiceID: "1486",
+		ProviderRate:      "0.25",
+		ProviderCurrency:  "USD",
+		IsActive:          true,
+	}
+	if err := repo.Create(item); err != nil {
+		t.Fatalf("create provider-rate fallback service: %v", err)
+	}
+
+	fixedRate := 18000.0
+	res, err := svc.RepriceResellerToIDR(context.Background(), RepriceSosmedResellerInput{
+		FixedRate:       &fixedRate,
+		IncludeInactive: boolPtr(true),
+	})
+	if err != nil {
+		t.Fatalf("reprice provider-rate fallback: %v", err)
+	}
+	if res.Eligible != 1 || res.Updated != 1 {
+		t.Fatalf("expected eligible/update 1, got %+v", res)
+	}
+
+	stored, err := repo.FindByID(item.ID)
+	if err != nil {
+		t.Fatalf("find provider-rate fallback service: %v", err)
+	}
+	if stored.PriceStart != "Reseller Rp 4.500/1K" {
+		t.Fatalf("unexpected fallback price_start: %s", stored.PriceStart)
+	}
+	if stored.PricePer1K != "Reseller Rp 4.500 per 1K • USD 0.25 • JAP#1486" {
+		t.Fatalf("unexpected fallback price_per_1k: %s", stored.PricePer1K)
+	}
+}
+
 func TestSosmedService_RepriceResellerToIDR_MatchesProviderCode(t *testing.T) {
 	db := setupCoreDB(t)
 	if err := db.AutoMigrate(&model.ProductCategory{}, &model.SosmedService{}); err != nil {

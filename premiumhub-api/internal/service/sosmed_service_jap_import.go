@@ -742,15 +742,20 @@ func (s *SosmedServiceService) SyncAllJAPMetadata(ctx context.Context) (int, err
 		return 0, err
 	}
 
+	_, rateUsed, _, _, err := s.resolveResellerFXRate(ctx, "", nil)
+	if err != nil {
+		return 0, err
+	}
+
 	updated := 0
 	for idx := range items {
 		item := &items[idx]
-		
+
 		providerID := extractSosmedProviderServiceID(*item)
 		if providerID == "" {
 			continue
 		}
-		
+
 		providerItem, ok := byID[providerID]
 		if !ok {
 			continue
@@ -791,6 +796,16 @@ func (s *SosmedServiceService) SyncAllJAPMetadata(ctx context.Context) (int, err
 		}
 		if item.ProviderTitle != strings.TrimSpace(providerItem.Name) {
 			item.ProviderTitle = strings.TrimSpace(providerItem.Name)
+			changed = true
+		}
+
+		priceStart, pricePer1K := formatSosmedResellerPriceFields(rateUSD, rateUsed, providerID)
+		if item.PriceStart != priceStart {
+			item.PriceStart = priceStart
+			changed = true
+		}
+		if item.PricePer1K != pricePer1K {
+			item.PricePer1K = pricePer1K
 			changed = true
 		}
 
