@@ -717,3 +717,89 @@ func formatSosmedStartTimeValue(raw string) string {
 	value = strings.Join(strings.Fields(value), " ")
 	return strings.TrimSpace(value)
 }
+
+func (s *SosmedServiceService) SyncAllJAPMetadata(ctx context.Context) (int, error) {
+	if s.japCatalogProvider == nil {
+		return 0, errors.New("provider katalog JAP belum terhubung")
+	}
+
+	providerServices, err := s.japCatalogProvider.GetServices(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	byID := make(map[string]JAPServiceItem, len(providerServices))
+	for _, item := range providerServices {
+		id := strings.TrimSpace(string(item.Service))
+		if id == "" {
+			continue
+		}
+		byID[id] = item
+	}
+
+	items, err := s.repo.List(true)
+	if err != nil {
+		return 0, err
+	}
+
+	updated := 0
+	for idx := range items {
+		item := &items[idx]
+		
+		providerID := extractSosmedProviderServiceID(*item)
+		if providerID == "" {
+			continue
+		}
+		
+		providerItem, ok := byID[providerID]
+		if !ok {
+			continue
+		}
+
+		rateUSD, err := strconv.ParseFloat(strings.TrimSpace(providerItem.Rate), 64)
+		if err != nil || rateUSD <= 0 {
+			continue
+		}
+		usdText := normalizeUSDText(rateUSD)
+
+		changed := false
+
+		if item.ProviderCode == "" {
+			item.ProviderCode = sosmedJAPProviderCode
+			changed = true
+		}
+		if item.ProviderServiceID != providerID {
+			item.ProviderServiceID = providerID
+			changed = true
+		}
+
+		if item.ProviderRate != usdText {
+			item.ProviderRate = usdText
+			changed = true
+		}
+		if item.ProviderCurrency != "USD" {
+			item.ProviderCurrency = "USD"
+			changed = true
+		}
+		if item.ProviderCategory != strings.TrimSpace(providerItem.Category) {
+			item.ProviderCategory = strings.TrimSpace(providerItem.Category)
+			changed = true
+		}
+		if item.ProviderType != strings.TrimSpace(providerItem.Type) {
+			item.ProviderType = strings.TrimSpace(providerItem.Type)
+			changed = true
+		}
+		if item.ProviderTitle != strings.TrimSpace(providerItem.Name) {
+			item.ProviderTitle = strings.TrimSpace(providerItem.Name)
+			changed = true
+		}
+
+		if changed {
+			if err := s.repo.Update(item); err == nil {
+				updated++
+			}
+		}
+	}
+
+	return updated, nil
+}

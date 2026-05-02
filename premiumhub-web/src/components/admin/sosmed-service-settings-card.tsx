@@ -239,6 +239,7 @@ export default function SosmedServiceSettingsCard() {
   const [japBalanceLoading, setJAPBalanceLoading] = useState(false)
   const [japBalanceError, setJAPBalanceError] = useState('')
   const [japBalanceFetchedAt, setJAPBalanceFetchedAt] = useState<Date | null>(null)
+  const [syncingJAPMetadata, setSyncingJAPMetadata] = useState(false)
 
   const [resellerFXMode, setResellerFXMode] = useState<ResellerFXMode>('live')
   const [resellerFXRate, setResellerFXRate] = useState('17000')
@@ -345,6 +346,24 @@ export default function SosmedServiceSettingsCard() {
       setJAPBalanceLoading(false)
     }
   }, [])
+
+  const syncJAPMetadata = async () => {
+    setSyncingJAPMetadata(true)
+    setError('')
+    try {
+      const res = await sosmedService.adminSyncJAPMetadata()
+      if (!res.success) {
+        setError(res.message || 'Gagal sinkronisasi metadata JAP')
+        return
+      }
+      setNotice(`Berhasil menarik ${res.data.updated} metadata JAP terbaru.`)
+      await loadData()
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal sinkronisasi metadata JAP'))
+    } finally {
+      setSyncingJAPMetadata(false)
+    }
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -725,14 +744,25 @@ export default function SosmedServiceSettingsCard() {
             </div>
           </div>
 
-          <button
-            className="action-btn"
-            type="button"
-            disabled={japBalanceLoading}
-            onClick={() => void loadJAPBalance()}
-          >
-            {japBalanceLoading ? 'Memuat...' : 'Refresh Saldo'}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="action-btn"
+              type="button"
+              disabled={syncingJAPMetadata}
+              onClick={() => void syncJAPMetadata()}
+              style={{ background: 'var(--accent)', color: 'white' }}
+            >
+              {syncingJAPMetadata ? 'Menarik...' : 'Tarik Harga JAP'}
+            </button>
+            <button
+              className="action-btn"
+              type="button"
+              disabled={japBalanceLoading}
+              onClick={() => void loadJAPBalance()}
+            >
+              {japBalanceLoading ? 'Memuat...' : 'Refresh Saldo'}
+            </button>
+          </div>
         </div>
 
         <div style={{ padding: '0 18px 18px' }}>

@@ -204,4 +204,11 @@ export const sosmedService = {
     )
     return res.data
   },
+
+  adminSyncJAPMetadata: async () => {
+    const res = await api.post<ApiResponse<{ updated: number }>>(
+      '/admin/sosmed/provider/jap/sync-metadata'
+    )
+    return res.data
+  },
 }

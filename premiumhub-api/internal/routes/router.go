@@ -384,6 +384,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/sosmed/services", sosmedServiceHandler.Create)
 	admin.POST("/sosmed/services/preview-jap-selected", sosmedServiceHandler.PreviewSelectedFromJAP)
 	admin.POST("/sosmed/services/import-jap-selected", sosmedServiceHandler.ImportSelectedFromJAP)
+	admin.POST("/sosmed/provider/jap/sync-metadata", sosmedServiceHandler.SyncJAPMetadata)
 	admin.POST("/sosmed/services/reprice-reseller", sosmedServiceHandler.RepriceReseller)
 	admin.PUT("/sosmed/services/:id", sosmedServiceHandler.Update)
 	admin.DELETE("/sosmed/services/:id", sosmedServiceHandler.Delete)

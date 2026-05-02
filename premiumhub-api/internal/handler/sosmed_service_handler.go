@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"time"
@@ -202,4 +203,13 @@ func (h *SosmedServiceHandler) Delete(c *gin.Context) {
 	}
 
 	response.Success(c, "Layanan sosmed dinonaktifkan", nil)
+}
+
+func (h *SosmedServiceHandler) SyncJAPMetadata(c *gin.Context) {
+	updated, err := h.svc.SyncAllJAPMetadata(c.Request.Context())
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, fmt.Sprintf("Berhasil sinkronisasi %d metadata layanan JAP", updated), gin.H{"updated": updated})
 }
