@@ -935,7 +935,7 @@ export default function SosmedServiceSettingsCard() {
                         </td>
                         <td>{categoryLabelMap[item.category_code] || item.category_code || '-'}</td>
                         <td>
-                          <div style={{ fontWeight: 600 }}>{item.price_start || '-'}</div>
+                          <div style={{ fontWeight: 600 }}>{item.price_start || `Rp ${(item.checkout_price || 0).toLocaleString('id-ID')}/1K`}</div>
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                             Checkout: Rp {(item.checkout_price || 0).toLocaleString('id-ID')}
                           </div>
