@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import { animate, createScope, stagger } from 'animejs'
 import {
   ArrowRight,
@@ -9,34 +9,121 @@ import {
   Clock3,
   ChevronLeft,
   ChevronRight,
-  Heart,
-  MessageCircle,
   PlayCircle,
-  Share2,
   ShieldCheck,
   Sparkles,
   Users,
   PackageCheck,
-  type LucideIcon,
 } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { BUNDLING_PACKAGES, type SosmedBundleCard } from '@/lib/sosmedBundlingCards'
-import { buildSosmedServiceCards } from '@/lib/sosmedProductCards'
+import { buildSosmedServiceCards, type SosmedPlatformIconKey } from '@/lib/sosmedProductCards'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
 import type { SosmedService } from '@/types/sosmedService'
 
-const ICON_BY_CATEGORY_CODE: Record<string, LucideIcon> = {
-  followers: Users,
-  likes: Heart,
-  views: PlayCircle,
-  comments: MessageCircle,
-  shares: Share2,
+type BrandIconProps = SVGProps<SVGSVGElement>
+
+function InstagramBrandIcon(props: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="5" />
+      <circle cx="12" cy="12" r="3.5" />
+      <circle cx="17" cy="7" r="0.8" fill="currentColor" stroke="none" />
+    </svg>
+  )
 }
 
-function iconForCategory(categoryCode: string) {
-  return ICON_BY_CATEGORY_CODE[categoryCode] || Users
+function TikTokBrandIcon(props: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M14 4v10.2a4.2 4.2 0 1 1-3.5-4.1" />
+      <path d="M14 4c1 3.1 2.8 5 6 5.3" />
+    </svg>
+  )
+}
+
+function YouTubeBrandIcon(props: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M21.6 7.2a3 3 0 0 0-2.1-2.1C17.7 4.6 12 4.6 12 4.6s-5.7 0-7.5.5a3 3 0 0 0-2.1 2.1A31 31 0 0 0 2 12a31 31 0 0 0 .4 4.8 3 3 0 0 0 2.1 2.1c1.8.5 7.5.5 7.5.5s5.7 0 7.5-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 22 12a31 31 0 0 0-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
+    </svg>
+  )
+}
+
+function TwitterXBrandIcon(props: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M5 4l14 16" />
+      <path d="M19 4L5 20" />
+    </svg>
+  )
+}
+
+function FacebookBrandIcon(props: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M14 8h2.5V4.3A18 18 0 0 0 13 4c-3.4 0-5.6 2-5.6 5.7V13H4v4.1h3.4V24h4.2v-6.9H15l.6-4.1h-4V10c0-1.2.3-2 2.4-2Z" />
+    </svg>
+  )
+}
+
+function TelegramBrandIcon(props: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M21.8 4.2 18.5 20c-.2 1.1-.9 1.4-1.8.9l-5-3.7-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.1L18 6.5c.4-.4-.1-.6-.6-.3L6 13.4l-4.9-1.5c-1.1-.3-1.1-1.1.2-1.6L20.4 3c.9-.3 1.7.2 1.4 1.2Z" />
+    </svg>
+  )
+}
+
+function SpotifyBrandIcon(props: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M7.5 9.3c3.2-1 6.4-.8 9.2.7" />
+      <path d="M8.4 12.5c2.6-.7 5-.5 7.3.7" />
+      <path d="M9.2 15.5c1.9-.5 3.7-.3 5.4.5" />
+    </svg>
+  )
+}
+
+function ShopeeBrandIcon(props: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M6 8h12l-1 12H7L6 8Z" />
+      <path d="M9 8a3 3 0 0 1 6 0" />
+      <path d="M14.5 11.2c-.6-.5-1.5-.8-2.5-.8-1.4 0-2.5.7-2.5 1.7 0 2.4 5 1.3 5 3.8 0 1.1-1.1 1.9-2.6 1.9-1.1 0-2.1-.3-2.8-.9" />
+    </svg>
+  )
+}
+
+function WebsiteBrandIcon(props: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3c2.2 2.5 3.3 5.5 3.3 9S14.2 18.5 12 21" />
+      <path d="M12 3C9.8 5.5 8.7 8.5 8.7 12S9.8 18.5 12 21" />
+    </svg>
+  )
+}
+
+const PLATFORM_ICON_COMPONENTS: Record<SosmedPlatformIconKey, ComponentType<BrandIconProps>> = {
+  instagram: InstagramBrandIcon,
+  facebook: FacebookBrandIcon,
+  shopee: ShopeeBrandIcon,
+  spotify: SpotifyBrandIcon,
+  telegram: TelegramBrandIcon,
+  tiktok: TikTokBrandIcon,
+  'twitter-x': TwitterXBrandIcon,
+  youtube: YouTubeBrandIcon,
+  website: WebsiteBrandIcon,
+  generic: Users,
+}
+
+function iconForPlatform(platformIcon: SosmedPlatformIconKey) {
+  return PLATFORM_ICON_COMPONENTS[platformIcon] || PLATFORM_ICON_COMPONENTS.generic
 }
 
 
@@ -325,7 +412,7 @@ export default function ProductSosmedLandingPage() {
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {paginatedCards.map((service) => {
               const checkoutHref = `/product/sosmed/checkout?service=${encodeURIComponent(service.code)}`
-              const ServiceIcon = iconForCategory(service.categoryCode)
+              const ServiceIcon = iconForPlatform(service.platformIcon)
               const isRecommended = service.isRecommended
 
               return (

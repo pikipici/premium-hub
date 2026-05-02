@@ -1,10 +1,23 @@
 import type { SosmedService } from '@/types/sosmedService'
 
+export type SosmedPlatformIconKey =
+  | 'instagram'
+  | 'facebook'
+  | 'shopee'
+  | 'spotify'
+  | 'telegram'
+  | 'tiktok'
+  | 'twitter-x'
+  | 'youtube'
+  | 'website'
+  | 'generic'
+
 export type SosmedProductCard = {
   key: string
   code: string
   categoryCode: string
   platform: string
+  platformIcon: SosmedPlatformIconKey
   title: string
   buyerTitle: string
   summary: string
@@ -23,7 +36,7 @@ export type SosmedProductCard = {
   isRecommended: boolean
 }
 
-type SosmedServicePreset = Omit<SosmedProductCard, 'key'>
+type SosmedServicePreset = Omit<SosmedProductCard, 'key' | 'platformIcon'>
 
 const FALLBACK_SERVICES: SosmedServicePreset[] = [
   {
@@ -237,6 +250,20 @@ function normalizePlatform(value: string) {
   return value
 }
 
+export function platformIconKeyFor(platform: string): SosmedPlatformIconKey {
+  const normalized = platform.toLowerCase()
+  if (normalized.includes('instagram')) return 'instagram'
+  if (normalized.includes('facebook')) return 'facebook'
+  if (normalized.includes('shopee')) return 'shopee'
+  if (normalized.includes('spotify')) return 'spotify'
+  if (normalized.includes('telegram')) return 'telegram'
+  if (normalized.includes('tiktok')) return 'tiktok'
+  if (normalized.includes('twitter') || normalized === 'x' || normalized.includes('/x')) return 'twitter-x'
+  if (normalized.includes('youtube')) return 'youtube'
+  if (normalized.includes('website') || normalized.includes('traffic') || normalized.includes('web')) return 'website'
+  return 'generic'
+}
+
 function unitFromService(item: Pick<SosmedService, 'category_code' | 'title' | 'platform_label'>) {
   const haystack = `${item.category_code || ''} ${item.title || ''} ${item.platform_label || ''}`.toLowerCase()
   if (haystack.includes('like')) return 'likes'
@@ -332,6 +359,7 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
     return FALLBACK_SERVICES.map((service, index) => ({
       key: `${service.code}-${index}`,
       ...service,
+      platformIcon: platformIconKeyFor(service.platform),
     }))
   }
 
@@ -360,6 +388,7 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
       code: cleanValue(item.code, fallback.code),
       categoryCode: cleanValue(item.category_code, fallback.categoryCode),
       platform,
+      platformIcon: platformIconKeyFor(platform),
       title,
       buyerTitle: buyerTitleFor(platform, unit),
       summary: cleanValue(item.summary, fallback.summary),
@@ -384,6 +413,7 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
   const missingFallbacks = FALLBACK_SERVICES.filter((f) => !dbCodes.has(f.code)).map((service, index) => ({
     key: `fallback-${service.code}-${index}`,
     ...service,
+    platformIcon: platformIconKeyFor(service.platform),
   }))
 
   return [...dbCards, ...missingFallbacks]

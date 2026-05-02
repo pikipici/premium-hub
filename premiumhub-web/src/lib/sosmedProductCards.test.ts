@@ -33,6 +33,21 @@ describe('sosmed product card view model', () => {
     ])
   })
 
+  it('builds platform-specific icon keys for catalog cards', () => {
+    const twitterService: SosmedService = {
+      ...baseService,
+      id: 'svc-x-test',
+      code: 'twitter-followers-8695',
+      title: 'Twitter Followers',
+      platform_label: 'Twitter/X',
+    }
+
+    const [instagramCard, twitterCard] = buildSosmedServiceCards([baseService, twitterService])
+
+    expect(instagramCard.platformIcon).toBe('instagram')
+    expect(twitterCard.platformIcon).toBe('twitter-x')
+  })
+
   it('builds cards around what the buyer gets, not admin-style service specs', () => {
     const [card] = buildSosmedServiceCards([baseService])
 
