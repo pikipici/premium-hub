@@ -35,3 +35,5 @@ LOCAL_AI_CONTEXT.md
 # Deploy runtime state (local-only)
 .deploy-state/
 premiumhub-api/runtime/
+premiumhub.db
+premiumhub-api/premiumhub.db
