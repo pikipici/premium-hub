@@ -83,3 +83,128 @@ export interface SosmedBundlePackage {
   created_at?: string
   updated_at?: string
 }
+
+export type AdminSosmedBundlePriceMode = 'computed' | 'fixed' | 'computed_with_discount' | string
+export type AdminSosmedBundleTargetStrategy = 'same_target' | string
+
+export interface AdminSosmedBundleItem {
+  id: string
+  bundle_variant_id: string
+  sosmed_service_id: string
+  service_code: string
+  service_title: string
+  label: string
+  quantity_units: number
+  line_price: number
+  target_strategy: AdminSosmedBundleTargetStrategy
+  is_active: boolean
+  sort_order: number
+  service_is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface AdminSosmedBundleVariant {
+  id: string
+  bundle_package_id: string
+  key: string
+  name: string
+  description: string
+  price_mode: AdminSosmedBundlePriceMode
+  fixed_price: number
+  discount_percent: number
+  discount_amount: number
+  discount_amount_calculated: number
+  subtotal_price: number
+  total_price: number
+  original_price: number
+  is_active: boolean
+  sort_order: number
+  items: AdminSosmedBundleItem[]
+  created_at?: string
+  updated_at?: string
+}
+
+export interface AdminSosmedBundlePackage {
+  id: string
+  key: string
+  title: string
+  subtitle: string
+  description: string
+  platform: string
+  badge: string
+  is_highlighted: boolean
+  is_active: boolean
+  sort_order: number
+  variants: AdminSosmedBundleVariant[]
+  created_at?: string
+  updated_at?: string
+}
+
+export interface AdminSosmedBundleListParams {
+  include_inactive?: boolean
+}
+
+export interface CreateAdminSosmedBundlePackagePayload {
+  key: string
+  title: string
+  subtitle?: string
+  description?: string
+  platform: string
+  badge?: string
+  is_highlighted?: boolean
+  is_active?: boolean
+  sort_order?: number
+}
+
+export interface UpdateAdminSosmedBundlePackagePayload {
+  title?: string
+  subtitle?: string
+  description?: string
+  platform?: string
+  badge?: string
+  is_highlighted?: boolean
+  is_active?: boolean
+  sort_order?: number
+}
+
+export interface CreateAdminSosmedBundleVariantPayload {
+  key: string
+  name: string
+  description?: string
+  price_mode?: AdminSosmedBundlePriceMode
+  fixed_price?: number
+  discount_percent?: number
+  discount_amount?: number
+  is_active?: boolean
+  sort_order?: number
+}
+
+export interface UpdateAdminSosmedBundleVariantPayload {
+  name?: string
+  description?: string
+  price_mode?: AdminSosmedBundlePriceMode
+  fixed_price?: number
+  discount_percent?: number
+  discount_amount?: number
+  is_active?: boolean
+  sort_order?: number
+}
+
+export interface CreateAdminSosmedBundleItemPayload {
+  sosmed_service_id: string
+  label?: string
+  quantity_units: number
+  target_strategy?: AdminSosmedBundleTargetStrategy
+  is_active?: boolean
+  sort_order?: number
+}
+
+export interface UpdateAdminSosmedBundleItemPayload {
+  sosmed_service_id?: string
+  label?: string
+  quantity_units?: number
+  target_strategy?: AdminSosmedBundleTargetStrategy
+  is_active?: boolean
+  sort_order?: number
+}

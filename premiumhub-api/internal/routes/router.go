@@ -84,6 +84,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		SetJAPOrderProvider(japSvc)
 	sosmedBundleOrderSvc := service.NewSosmedBundleOrderService(sosmedBundleRepo, sosmedBundleOrderRepo, walletRepo).
 		SetJAPOrderProvider(japSvc)
+	sosmedBundleAdminSvc := service.NewSosmedBundleAdminService(sosmedBundleRepo, sosmedServiceRepo)
 	sosmedPaymentSvc := service.NewSosmedPaymentServiceWithGateway(cfg, sosmedOrderRepo, sosmedOrderSvc, nil)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo).
 		SetStockCredentialCipher(stockCredentialCipher)
@@ -136,6 +137,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	sosmedServiceHandler := handler.NewSosmedServiceHandler(sosmedServiceSvc)
 	sosmedBundleHandler := handler.NewSosmedBundleHandler(sosmedBundleRepo)
 	sosmedBundleOrderHandler := handler.NewSosmedBundleOrderHandler(sosmedBundleOrderSvc)
+	sosmedBundleAdminHandler := handler.NewSosmedBundleAdminHandler(sosmedBundleAdminSvc)
 	japHandler := handler.NewJAPHandler(japSvc)
 	sosmedOrderHandler := handler.NewSosmedOrderHandler(sosmedOrderSvc)
 	sosmedPaymentHandler := handler.NewSosmedPaymentHandler(sosmedPaymentSvc)
@@ -382,6 +384,16 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.DELETE("/product-categories/:id", productCategoryHandler.Delete)
 
 	admin.GET("/sosmed/services", sosmedServiceHandler.AdminList)
+	admin.GET("/sosmed/bundles", sosmedBundleAdminHandler.AdminList)
+	admin.POST("/sosmed/bundles", sosmedBundleAdminHandler.AdminCreatePackage)
+	admin.PUT("/sosmed/bundles/:id", sosmedBundleAdminHandler.AdminUpdatePackage)
+	admin.DELETE("/sosmed/bundles/:id", sosmedBundleAdminHandler.AdminDeletePackage)
+	admin.POST("/sosmed/bundles/:id/variants", sosmedBundleAdminHandler.AdminCreateVariant)
+	admin.PUT("/sosmed/bundle-variants/:variant_id", sosmedBundleAdminHandler.AdminUpdateVariant)
+	admin.DELETE("/sosmed/bundle-variants/:variant_id", sosmedBundleAdminHandler.AdminDeleteVariant)
+	admin.POST("/sosmed/bundle-variants/:variant_id/items", sosmedBundleAdminHandler.AdminCreateItem)
+	admin.PUT("/sosmed/bundle-items/:item_id", sosmedBundleAdminHandler.AdminUpdateItem)
+	admin.DELETE("/sosmed/bundle-items/:item_id", sosmedBundleAdminHandler.AdminDeleteItem)
 	admin.GET(
 		"/sosmed/provider/jap/balance",
 		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak request provider. Coba lagi sebentar."),

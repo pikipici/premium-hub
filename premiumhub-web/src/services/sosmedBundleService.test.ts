@@ -7,11 +7,15 @@ vi.mock('@/lib/api', () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
   },
 }))
 
 const mockedGet = vi.mocked(api.get)
 const mockedPost = vi.mocked(api.post)
+const mockedPut = vi.mocked(api.put)
+const mockedDelete = vi.mocked(api.delete)
 
 const bundleResponse = {
   success: true,
@@ -57,10 +61,72 @@ const bundleResponse = {
   ],
 }
 
+const adminBundleResponse = {
+  success: true,
+  message: 'OK',
+  data: [
+    {
+      id: 'package-1',
+      key: 'umkm-starter',
+      title: 'UMKM Starter',
+      subtitle: 'Paket awal',
+      description: 'Paket admin editable',
+      platform: 'instagram',
+      badge: 'Hemat',
+      is_highlighted: true,
+      is_active: false,
+      sort_order: 10,
+      variants: [
+        {
+          id: 'variant-1',
+          bundle_package_id: 'package-1',
+          key: 'starter',
+          name: 'Starter',
+          description: 'Variant admin',
+          price_mode: 'computed_with_discount',
+          fixed_price: 0,
+          discount_percent: 10,
+          discount_amount: 250,
+          discount_amount_calculated: 500,
+          subtotal_price: 5000,
+          total_price: 4500,
+          original_price: 5000,
+          is_active: false,
+          sort_order: 20,
+          items: [
+            {
+              id: 'item-1',
+              bundle_variant_id: 'variant-1',
+              sosmed_service_id: 'service-1',
+              service_code: 'instagram-followers-6331',
+              service_title: 'Instagram Followers Hemat',
+              label: 'Followers awal',
+              quantity_units: 500,
+              line_price: 2500,
+              target_strategy: 'same_target',
+              is_active: false,
+              sort_order: 30,
+              service_is_active: true,
+              created_at: '2026-05-03T10:00:00Z',
+              updated_at: '2026-05-03T10:00:00Z',
+            },
+          ],
+          created_at: '2026-05-03T10:00:00Z',
+          updated_at: '2026-05-03T10:00:00Z',
+        },
+      ],
+      created_at: '2026-05-03T10:00:00Z',
+      updated_at: '2026-05-03T10:00:00Z',
+    },
+  ],
+}
+
 describe('sosmedBundleService', () => {
   beforeEach(() => {
     mockedGet.mockReset()
     mockedPost.mockReset()
+    mockedPut.mockReset()
+    mockedDelete.mockReset()
   })
 
   it('lists public sosmed bundles from the backend catalog endpoint', async () => {
@@ -163,5 +229,135 @@ describe('sosmedBundleService', () => {
 
     expect(mockedGet).toHaveBeenCalledWith('/sosmed/bundle-orders/SB-20260502-00000001')
     expect(response.data.title_snapshot).toBe('Instagram Starter Pack - Starter 500')
+  })
+
+  it('lists admin sosmed bundles with inactive graph and admin-only fields', async () => {
+    mockedGet.mockResolvedValueOnce({ data: adminBundleResponse })
+
+    const response = await sosmedBundleService.adminList({ include_inactive: true })
+
+    expect(mockedGet).toHaveBeenCalledWith('/admin/sosmed/bundles', {
+      params: { include_inactive: true },
+    })
+    expect(response.data[0].is_active).toBe(false)
+    expect(response.data[0].variants[0].price_mode).toBe('computed_with_discount')
+    expect(response.data[0].variants[0].discount_amount_calculated).toBe(500)
+    expect(response.data[0].variants[0].items[0].sosmed_service_id).toBe('service-1')
+    expect(response.data[0].variants[0].items[0].service_is_active).toBe(true)
+  })
+
+  it('calls admin package CRUD endpoints with backend payload shapes', async () => {
+    const packageResponse = { ...adminBundleResponse, data: adminBundleResponse.data[0] }
+    mockedPost.mockResolvedValueOnce({ data: packageResponse })
+    mockedPut.mockResolvedValueOnce({ data: packageResponse })
+    mockedDelete.mockResolvedValueOnce({ data: packageResponse })
+
+    const createPayload = {
+      key: 'custom-package',
+      title: 'Custom Package',
+      subtitle: 'Sub',
+      description: 'Desc',
+      platform: 'instagram',
+      badge: 'Promo',
+      is_highlighted: true,
+      is_active: false,
+      sort_order: 40,
+    }
+    const updatePayload = {
+      title: 'Custom Package Updated',
+      subtitle: 'Sub updated',
+      description: 'Desc updated',
+      platform: 'tiktok',
+      badge: 'Baru',
+      is_highlighted: false,
+      is_active: true,
+      sort_order: 41,
+    }
+
+    const created = await sosmedBundleService.adminCreatePackage(createPayload)
+    const updated = await sosmedBundleService.adminUpdatePackage('package-1', updatePayload)
+    const deleted = await sosmedBundleService.adminDeletePackage('package-1')
+
+    expect(mockedPost).toHaveBeenCalledWith('/admin/sosmed/bundles', createPayload)
+    expect(mockedPut).toHaveBeenCalledWith('/admin/sosmed/bundles/package-1', updatePayload)
+    expect(mockedDelete).toHaveBeenCalledWith('/admin/sosmed/bundles/package-1')
+    expect(created.data.key).toBe('umkm-starter')
+    expect(updated.data.is_active).toBe(false)
+    expect(deleted.data.variants[0].items[0].is_active).toBe(false)
+  })
+
+  it('calls admin variant CRUD endpoints with pricing payloads', async () => {
+    const variantResponse = { ...adminBundleResponse, data: adminBundleResponse.data[0].variants[0] }
+    mockedPost.mockResolvedValueOnce({ data: variantResponse })
+    mockedPut.mockResolvedValueOnce({ data: variantResponse })
+    mockedDelete.mockResolvedValueOnce({ data: variantResponse })
+
+    const createPayload = {
+      key: 'growth',
+      name: 'Growth',
+      description: 'Naik lebih cepat',
+      price_mode: 'fixed',
+      fixed_price: 15000,
+      discount_percent: 0,
+      discount_amount: 0,
+      is_active: true,
+      sort_order: 50,
+    } as const
+    const updatePayload = {
+      name: 'Growth Updated',
+      description: 'Desc updated',
+      price_mode: 'computed',
+      fixed_price: 0,
+      discount_percent: 0,
+      discount_amount: 0,
+      is_active: false,
+      sort_order: 51,
+    } as const
+
+    const created = await sosmedBundleService.adminCreateVariant('package-1', createPayload)
+    const updated = await sosmedBundleService.adminUpdateVariant('variant-1', updatePayload)
+    const deleted = await sosmedBundleService.adminDeleteVariant('variant-1')
+
+    expect(mockedPost).toHaveBeenCalledWith('/admin/sosmed/bundles/package-1/variants', createPayload)
+    expect(mockedPut).toHaveBeenCalledWith('/admin/sosmed/bundle-variants/variant-1', updatePayload)
+    expect(mockedDelete).toHaveBeenCalledWith('/admin/sosmed/bundle-variants/variant-1')
+    expect(created.data.fixed_price).toBe(0)
+    expect(updated.data.discount_amount_calculated).toBe(500)
+    expect(deleted.data.is_active).toBe(false)
+  })
+
+  it('calls admin item CRUD endpoints with service and quantity payloads', async () => {
+    const itemResponse = { ...adminBundleResponse, data: adminBundleResponse.data[0].variants[0].items[0] }
+    mockedPost.mockResolvedValueOnce({ data: itemResponse })
+    mockedPut.mockResolvedValueOnce({ data: itemResponse })
+    mockedDelete.mockResolvedValueOnce({ data: itemResponse })
+
+    const createPayload = {
+      sosmed_service_id: 'service-1',
+      label: 'Followers awal',
+      quantity_units: 500,
+      target_strategy: 'same_target',
+      is_active: true,
+      sort_order: 60,
+    }
+    const updatePayload = {
+      sosmed_service_id: 'service-2',
+      label: 'Followers update',
+      quantity_units: 750,
+      target_strategy: 'same_target',
+      is_active: false,
+      sort_order: 61,
+    }
+
+    const created = await sosmedBundleService.adminCreateItem('variant-1', createPayload)
+    const updated = await sosmedBundleService.adminUpdateItem('item-1', updatePayload)
+    const deleted = await sosmedBundleService.adminDeleteItem('item-1')
+
+    expect(mockedPost).toHaveBeenCalledWith('/admin/sosmed/bundle-variants/variant-1/items', createPayload)
+    expect(mockedPut).toHaveBeenCalledWith('/admin/sosmed/bundle-items/item-1', updatePayload)
+    expect(mockedDelete).toHaveBeenCalledWith('/admin/sosmed/bundle-items/item-1')
+    expect(created.data.service_title).toBe('Instagram Followers Hemat')
+    expect(updated.data.quantity_units).toBe(500)
+    expect(deleted.data.is_active).toBe(false)
   })
 })

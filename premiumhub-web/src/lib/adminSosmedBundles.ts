@@ -1,4 +1,4 @@
-import type { SosmedBundlePackage } from '@/types/sosmedBundle'
+import type { AdminSosmedBundleItem, AdminSosmedBundlePackage } from '@/types/sosmedBundle'
 
 export interface AdminSosmedBundleRow {
   key: string
@@ -14,6 +14,8 @@ export interface AdminSosmedBundleRow {
   itemTitles: string[]
   statusLabel: string
   sortOrder: number
+  canCheckout: boolean
+  checkoutHref: string | null
 }
 
 export interface AdminSosmedBundleSummary {
@@ -30,15 +32,65 @@ function formatUnitCount(value: number) {
   return Math.max(0, Math.round(value)).toLocaleString('id-ID')
 }
 
-export function buildAdminSosmedBundleRows(bundles: SosmedBundlePackage[]): AdminSosmedBundleRow[] {
+function isBundleItemActive(item: AdminSosmedBundleItem) {
+  return item.is_active && item.service_is_active
+}
+
+function getBundleItemTitle(item: AdminSosmedBundleItem) {
+  const title = item.label || item.service_title || item.service_code
+  return isBundleItemActive(item) ? title : `${title} (nonaktif)`
+}
+
+function getRowStatusLabel(args: {
+  packageActive: boolean
+  packageHighlighted: boolean
+  variantActive: boolean
+  hasInactiveItem: boolean
+}) {
+  if (!args.packageActive) return 'Nonaktif'
+  if (!args.variantActive) return 'Variant Nonaktif'
+  if (args.hasInactiveItem) return 'Ada Item Nonaktif'
+  if (args.packageHighlighted) return 'Highlight'
+  return 'Aktif'
+}
+
+function buildCheckoutHref(packageKey: string, variantKey: string) {
+  return `/product/sosmed/checkout?bundle=${encodeURIComponent(packageKey)}&variant=${encodeURIComponent(variantKey)}`
+}
+
+export function buildAdminSosmedBundleRows(bundles: AdminSosmedBundlePackage[]): AdminSosmedBundleRow[] {
   return [...bundles]
     .sort((left, right) => {
       const sortDiff = (left.sort_order ?? 100) - (right.sort_order ?? 100)
       if (sortDiff !== 0) return sortDiff
       return (left.key || '').localeCompare(right.key || '')
     })
-    .flatMap((bundle) =>
-      [...(bundle.variants || [])]
+    .flatMap((bundle) => {
+      const variants = [...(bundle.variants || [])]
+
+      if (variants.length === 0) {
+        return [
+          {
+            key: `${bundle.key}:__no-variant`,
+            packageKey: bundle.key,
+            variantKey: '-',
+            title: bundle.title,
+            variantName: 'Belum ada variant',
+            platform: bundle.platform || '-',
+            badge: bundle.badge || '-',
+            priceLabel: '-',
+            discountLabel: '-',
+            itemSummary: '0 layanan / 0 unit',
+            itemTitles: [],
+            statusLabel: bundle.is_active ? 'Belum Ada Variant' : 'Nonaktif',
+            sortOrder: bundle.sort_order ?? 100,
+            canCheckout: false,
+            checkoutHref: null,
+          },
+        ]
+      }
+
+      return variants
         .sort((left, right) => {
           const sortDiff = (left.sort_order ?? 100) - (right.sort_order ?? 100)
           if (sortDiff !== 0) return sortDiff
@@ -48,7 +100,12 @@ export function buildAdminSosmedBundleRows(bundles: SosmedBundlePackage[]): Admi
           const items = variant.items || []
           const totalUnits = items.reduce((sum, item) => sum + (item.quantity_units || 0), 0)
           const itemCount = items.length
+          const activeItemCount = items.filter(isBundleItemActive).length
+          const hasInactiveItem = items.some((item) => !isBundleItemActive(item))
           const discount = variant.discount_amount || Math.max(0, (variant.original_price || 0) - (variant.total_price || 0))
+          const packageActive = bundle.is_active
+          const variantActive = variant.is_active
+          const canCheckout = packageActive && variantActive && activeItemCount > 0
 
           return {
             key: `${bundle.key}:${variant.key}`,
@@ -61,15 +118,22 @@ export function buildAdminSosmedBundleRows(bundles: SosmedBundlePackage[]): Admi
             priceLabel: formatRupiah(variant.total_price || 0),
             discountLabel: discount > 0 ? `Diskon ${formatRupiah(discount)}` : 'Tanpa diskon',
             itemSummary: `${itemCount} layanan / ${formatUnitCount(totalUnits)} unit`,
-            itemTitles: items.map((item) => item.title).filter(Boolean),
-            statusLabel: bundle.is_highlighted ? 'Highlight' : 'Aktif',
+            itemTitles: items.map(getBundleItemTitle).filter(Boolean),
+            statusLabel: getRowStatusLabel({
+              packageActive,
+              packageHighlighted: bundle.is_highlighted,
+              variantActive,
+              hasInactiveItem,
+            }),
             sortOrder: bundle.sort_order ?? 100,
+            canCheckout,
+            checkoutHref: canCheckout ? buildCheckoutHref(bundle.key, variant.key) : null,
           }
         })
-    )
+    })
 }
 
-export function getAdminSosmedBundleSummary(bundles: SosmedBundlePackage[]): AdminSosmedBundleSummary {
+export function getAdminSosmedBundleSummary(bundles: AdminSosmedBundlePackage[]): AdminSosmedBundleSummary {
   return bundles.reduce<AdminSosmedBundleSummary>(
     (summary, bundle) => {
       const variants = bundle.variants || []

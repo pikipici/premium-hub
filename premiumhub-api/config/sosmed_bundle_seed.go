@@ -92,23 +92,6 @@ func findOrCreateDefaultSosmedBundlePackage(db *gorm.DB, seed defaultSosmedBundl
 	if err != nil {
 		return nil, err
 	}
-
-	updates := map[string]interface{}{
-		"title":          strings.TrimSpace(seed.Title),
-		"subtitle":       strings.TrimSpace(seed.Subtitle),
-		"description":    strings.TrimSpace(seed.Description),
-		"platform":       strings.TrimSpace(seed.Platform),
-		"badge":          strings.TrimSpace(seed.Badge),
-		"is_highlighted": seed.IsHighlighted,
-		"is_active":      true,
-		"sort_order":     seed.SortOrder,
-	}
-	if err := db.Model(&existing).Updates(updates).Error; err != nil {
-		return nil, err
-	}
-	if err := db.Where("key = ?", key).First(&existing).Error; err != nil {
-		return nil, err
-	}
 	return &existing, nil
 }
 
@@ -122,17 +105,14 @@ func upsertDefaultSosmedBundleVariant(db *gorm.DB, pkg *model.SosmedBundlePackag
 		log.Printf("skip active sosmed bundle variant %s/%s: missing active services %s", pkg.Key, seed.Key, strings.Join(missing, ", "))
 	}
 
-	variant, err := findOrCreateDefaultSosmedBundleVariant(db, pkg.ID, seed, isActive)
+	variant, created, err := findOrCreateDefaultSosmedBundleVariant(db, pkg.ID, seed, isActive)
 	if err != nil {
 		return err
 	}
-	if !isActive {
-		return db.Where("bundle_variant_id = ?", variant.ID).Delete(&model.SosmedBundleItem{}).Error
+	if !created || !isActive {
+		return nil
 	}
 
-	if err := db.Where("bundle_variant_id = ?", variant.ID).Delete(&model.SosmedBundleItem{}).Error; err != nil {
-		return err
-	}
 	for _, itemSeed := range seed.Items {
 		service := services[strings.TrimSpace(itemSeed.ServiceCode)]
 		item := model.SosmedBundleItem{
@@ -151,19 +131,9 @@ func upsertDefaultSosmedBundleVariant(db *gorm.DB, pkg *model.SosmedBundlePackag
 	return nil
 }
 
-func findOrCreateDefaultSosmedBundleVariant(db *gorm.DB, packageID uuid.UUID, seed defaultSosmedBundleVariantSeed, isActive bool) (*model.SosmedBundleVariant, error) {
+func findOrCreateDefaultSosmedBundleVariant(db *gorm.DB, packageID uuid.UUID, seed defaultSosmedBundleVariantSeed, isActive bool) (*model.SosmedBundleVariant, bool, error) {
 	var existing model.SosmedBundleVariant
 	err := db.Where("bundle_package_id = ? AND key = ?", packageID, strings.TrimSpace(seed.Key)).First(&existing).Error
-	updates := map[string]interface{}{
-		"name":             strings.TrimSpace(seed.Name),
-		"description":      strings.TrimSpace(seed.Description),
-		"price_mode":       sosmedBundleSeedPriceModeComputed,
-		"fixed_price":      int64(0),
-		"discount_percent": 0,
-		"discount_amount":  int64(0),
-		"is_active":        isActive,
-		"sort_order":       seed.SortOrder,
-	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		variant := model.SosmedBundleVariant{
 			BundlePackageID: packageID,
@@ -178,23 +148,17 @@ func findOrCreateDefaultSosmedBundleVariant(db *gorm.DB, packageID uuid.UUID, se
 			SortOrder:       seed.SortOrder,
 		}
 		if createErr := db.Create(&variant).Error; createErr != nil {
-			return nil, createErr
+			return nil, false, createErr
 		}
 		if updateErr := db.Model(&variant).Update("is_active", isActive).Error; updateErr != nil {
-			return nil, updateErr
+			return nil, false, updateErr
 		}
-		return &variant, nil
+		return &variant, true, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	if err := db.Model(&existing).Updates(updates).Error; err != nil {
-		return nil, err
-	}
-	if err := db.Where("id = ?", existing.ID).First(&existing).Error; err != nil {
-		return nil, err
-	}
-	return &existing, nil
+	return &existing, false, nil
 }
 
 func loadDefaultSosmedBundleServices(db *gorm.DB, items []defaultSosmedBundleItemSeed) (map[string]model.SosmedService, []string, error) {

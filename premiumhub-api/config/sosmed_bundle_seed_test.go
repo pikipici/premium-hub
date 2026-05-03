@@ -68,6 +68,86 @@ func TestEnsureDefaultSosmedBundlePackagesSeedsIdempotently(t *testing.T) {
 	}
 }
 
+func TestEnsureDefaultSosmedBundlePackagesDoesNotOverwriteExistingAdminManagedBundles(t *testing.T) {
+	db := openBundleSeedTestDB(t)
+	seedBundleServiceFixtures(t, db, defaultSosmedBundleSeedServiceCodes()...)
+
+	if err := ensureDefaultSosmedBundlePackages(db); err != nil {
+		t.Fatalf("seed default bundles: %v", err)
+	}
+
+	var pkg model.SosmedBundlePackage
+	if err := db.Where("key = ?", "umkm-starter").First(&pkg).Error; err != nil {
+		t.Fatalf("load seeded package: %v", err)
+	}
+	if err := db.Model(&pkg).Updates(map[string]interface{}{
+		"title":          "Admin Edited UMKM",
+		"badge":          "Manual Admin",
+		"is_highlighted": false,
+		"is_active":      false,
+		"sort_order":     777,
+	}).Error; err != nil {
+		t.Fatalf("apply admin package edits: %v", err)
+	}
+
+	var variant model.SosmedBundleVariant
+	if err := db.Where("bundle_package_id = ? AND key = ?", pkg.ID, "starter").First(&variant).Error; err != nil {
+		t.Fatalf("load seeded variant: %v", err)
+	}
+	if err := db.Model(&variant).Updates(map[string]interface{}{
+		"name":             "Admin Starter Manual",
+		"price_mode":       "fixed",
+		"fixed_price":      int64(123456),
+		"discount_percent": 0,
+		"discount_amount":  int64(0),
+		"is_active":        false,
+		"sort_order":       778,
+	}).Error; err != nil {
+		t.Fatalf("apply admin variant edits: %v", err)
+	}
+
+	var item model.SosmedBundleItem
+	if err := db.Where("bundle_variant_id = ?", variant.ID).Order("sort_order ASC").First(&item).Error; err != nil {
+		t.Fatalf("load seeded item: %v", err)
+	}
+	if err := db.Model(&item).Updates(map[string]interface{}{
+		"label":          "Admin Manual Item",
+		"quantity_units": int64(4242),
+		"sort_order":     779,
+		"is_active":      false,
+	}).Error; err != nil {
+		t.Fatalf("apply admin item edits: %v", err)
+	}
+
+	if err := ensureDefaultSosmedBundlePackages(db); err != nil {
+		t.Fatalf("seed default bundles second run: %v", err)
+	}
+
+	var gotPkg model.SosmedBundlePackage
+	if err := db.Where("id = ?", pkg.ID).First(&gotPkg).Error; err != nil {
+		t.Fatalf("reload admin edited package: %v", err)
+	}
+	if gotPkg.Title != "Admin Edited UMKM" || gotPkg.Badge != "Manual Admin" || gotPkg.IsHighlighted || gotPkg.IsActive || gotPkg.SortOrder != 777 {
+		t.Fatalf("admin package edits were overwritten: title=%q badge=%q highlighted=%v active=%v sort=%d", gotPkg.Title, gotPkg.Badge, gotPkg.IsHighlighted, gotPkg.IsActive, gotPkg.SortOrder)
+	}
+
+	var gotVariant model.SosmedBundleVariant
+	if err := db.Where("id = ?", variant.ID).First(&gotVariant).Error; err != nil {
+		t.Fatalf("reload admin edited variant: %v", err)
+	}
+	if gotVariant.Name != "Admin Starter Manual" || gotVariant.PriceMode != "fixed" || gotVariant.FixedPrice != 123456 || gotVariant.DiscountPercent != 0 || gotVariant.DiscountAmount != 0 || gotVariant.IsActive || gotVariant.SortOrder != 778 {
+		t.Fatalf("admin variant edits were overwritten: name=%q mode=%q fixed=%d discount_percent=%d discount_amount=%d active=%v sort=%d", gotVariant.Name, gotVariant.PriceMode, gotVariant.FixedPrice, gotVariant.DiscountPercent, gotVariant.DiscountAmount, gotVariant.IsActive, gotVariant.SortOrder)
+	}
+
+	var gotItem model.SosmedBundleItem
+	if err := db.Where("id = ?", item.ID).First(&gotItem).Error; err != nil {
+		t.Fatalf("reload admin edited item: %v", err)
+	}
+	if gotItem.Label != "Admin Manual Item" || gotItem.QuantityUnits != 4242 || gotItem.SortOrder != 779 || gotItem.IsActive {
+		t.Fatalf("admin item edits were overwritten: label=%q quantity=%d active=%v sort=%d", gotItem.Label, gotItem.QuantityUnits, gotItem.IsActive, gotItem.SortOrder)
+	}
+}
+
 func TestEnsureDefaultSosmedBundlePackagesDisablesVariantWhenServiceMissing(t *testing.T) {
 	db := openBundleSeedTestDB(t)
 	seedBundleServiceFixtures(t, db,

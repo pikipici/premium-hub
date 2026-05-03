@@ -120,6 +120,27 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "DELETE", "/api/v1/admin/sosmed/services/:id") {
 		t.Fatalf("admin sosmed service delete route should exist")
 	}
+	adminSosmedBundleRoutes := []struct {
+		method string
+		path   string
+		name   string
+	}{
+		{"GET", "/api/v1/admin/sosmed/bundles", "admin sosmed bundle list"},
+		{"POST", "/api/v1/admin/sosmed/bundles", "admin sosmed bundle package create"},
+		{"PUT", "/api/v1/admin/sosmed/bundles/:id", "admin sosmed bundle package update"},
+		{"DELETE", "/api/v1/admin/sosmed/bundles/:id", "admin sosmed bundle package deactivate"},
+		{"POST", "/api/v1/admin/sosmed/bundles/:id/variants", "admin sosmed bundle variant create"},
+		{"PUT", "/api/v1/admin/sosmed/bundle-variants/:variant_id", "admin sosmed bundle variant update"},
+		{"DELETE", "/api/v1/admin/sosmed/bundle-variants/:variant_id", "admin sosmed bundle variant deactivate"},
+		{"POST", "/api/v1/admin/sosmed/bundle-variants/:variant_id/items", "admin sosmed bundle item create"},
+		{"PUT", "/api/v1/admin/sosmed/bundle-items/:item_id", "admin sosmed bundle item update"},
+		{"DELETE", "/api/v1/admin/sosmed/bundle-items/:item_id", "admin sosmed bundle item deactivate"},
+	}
+	for _, route := range adminSosmedBundleRoutes {
+		if !hasRoute(routes, route.method, route.path) {
+			t.Fatalf("%s route should exist", route.name)
+		}
+	}
 	if !hasRoute(routes, "GET", "/api/v1/admin/maintenance/rules") {
 		t.Fatalf("admin maintenance list route should exist")
 	}
