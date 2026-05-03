@@ -3,7 +3,9 @@
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { buildAdminSosmedBundleRows, getAdminSosmedBundleSummary } from '@/lib/adminSosmedBundles'
 import { productCategoryService } from '@/services/productCategoryService'
+import { sosmedBundleService } from '@/services/sosmedBundleService'
 import {
   sosmedService,
   type AdminJAPBalance,
@@ -13,6 +15,7 @@ import {
   type AdminSosmedServiceUpdatePayload,
 } from '@/services/sosmedService'
 import type { ProductCategory } from '@/types/productCategory'
+import type { SosmedBundlePackage } from '@/types/sosmedBundle'
 import type { SosmedService } from '@/types/sosmedService'
 
 type FormMode = 'create' | 'edit'
@@ -230,8 +233,10 @@ function createEmptyForm(categoryCode: string): SosmedServiceFormState {
 
 export default function SosmedServiceSettingsCard() {
   const [items, setItems] = useState<SosmedService[]>([])
+  const [bundlePackages, setBundlePackages] = useState<SosmedBundlePackage[]>([])
   const [categories, setCategories] = useState<ProductCategory[]>([])
   const [loading, setLoading] = useState(true)
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -309,6 +314,10 @@ export default function SosmedServiceSettingsCard() {
     [items, activePlatformFilter, searchQuery]
   )
 
+  const bundleRows = useMemo(() => buildAdminSosmedBundleRows(bundlePackages), [bundlePackages])
+
+  const bundleSummary = useMemo(() => getAdminSosmedBundleSummary(bundlePackages), [bundlePackages])
+
   const importJAPServiceIds = useMemo(
     () => parseJAPServiceIds(importJAPForm.service_ids_text),
     [importJAPForm.service_ids_text]
@@ -370,9 +379,10 @@ export default function SosmedServiceSettingsCard() {
     setError('')
 
     try {
-      const [serviceRes, categoryRes] = await Promise.all([
+      const [serviceRes, categoryRes, bundleRes] = await Promise.all([
         sosmedService.adminList({ include_inactive: true }),
         productCategoryService.adminList({ scope: 'sosmed', include_inactive: true }),
+        sosmedBundleService.list(),
       ])
 
       if (!serviceRes.success) {
@@ -383,9 +393,14 @@ export default function SosmedServiceSettingsCard() {
         setError(categoryRes.message || 'Gagal memuat kategori sosmed')
         return
       }
+      if (!bundleRes.success) {
+        setError(bundleRes.message || 'Gagal memuat paket spesial sosmed')
+        return
+      }
 
       setItems(serviceRes.data || [])
       setCategories(categoryRes.data || [])
+      setBundlePackages(bundleRes.data || [])
     } catch (err) {
       setError(mapErrorMessage(err, 'Gagal memuat data layanan sosmed'))
     } finally {
@@ -998,6 +1013,90 @@ export default function SosmedServiceSettingsCard() {
                       </tr>
                     )
                   })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <div>
+            <h2>Paket Spesial</h2>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              Bundle yang tampil di tab Paket Spesial /product/sosmed. Untuk sekarang read-only dari bundle catalog.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
+            <span className="status s-lunas">{bundleSummary.packageCount} Paket</span>
+            <span className="status s-lunas">{bundleSummary.variantCount} Variant</span>
+            <span className="status s-lunas">{bundleSummary.itemCount} Item Layanan</span>
+          </div>
+        </div>
+
+        <div style={{ padding: '0 18px 18px' }}>
+          {loading ? (
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memuat paket spesial...</div>
+          ) : bundleRows.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada paket spesial aktif dari bundle catalog.</div>
+          ) : (
+            <div className="table-wrap" style={{ overflowX: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Paket</th>
+                    <th>Variant</th>
+                    <th>Platform</th>
+                    <th>Harga Bundle</th>
+                    <th>Isi Paket</th>
+                    <th>Status</th>
+                    <th style={{ width: 180 }}>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bundleRows.map((bundle) => (
+                    <tr key={bundle.key}>
+                      <td>
+                        <div style={{ fontWeight: 700 }}>{bundle.title}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          <code>{bundle.packageKey}</code> • {bundle.badge}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{bundle.variantName}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          <code>{bundle.variantKey}</code>
+                        </div>
+                      </td>
+                      <td>{bundle.platform}</td>
+                      <td>
+                        <div style={{ fontWeight: 700 }}>{bundle.priceLabel}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{bundle.discountLabel}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{bundle.itemSummary}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          {bundle.itemTitles.slice(0, 3).join(', ')}{bundle.itemTitles.length > 3 ? ` +${bundle.itemTitles.length - 3} lagi` : ''}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`status ${bundle.statusLabel === 'Highlight' ? 's-lunas' : 's-proses'}`}>
+                          {bundle.statusLabel}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <a
+                            className="action-btn"
+                            href={`/product/sosmed/checkout?bundle=${encodeURIComponent(bundle.packageKey)}&variant=${encodeURIComponent(bundle.variantKey)}`}
+                          >
+                            Cek Checkout
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
