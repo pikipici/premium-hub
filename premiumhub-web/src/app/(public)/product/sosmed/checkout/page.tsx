@@ -8,6 +8,7 @@ import { CreditCard, ShieldCheck, WalletCards, Zap } from 'lucide-react'
 import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import { SOSMED_TARGET_INPUT_COPY } from '@/lib/sosmedCheckoutCopy'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
@@ -399,13 +400,14 @@ function SosmedCheckoutContent() {
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6 space-y-4">
             <h3 className="text-sm font-bold">Data Pesanan</h3>
             <div>
-              <label className="block text-xs font-semibold text-[#666] mb-1">Target Link / Username</label>
+              <label className="block text-xs font-semibold text-[#666] mb-1">{SOSMED_TARGET_INPUT_COPY.label}</label>
               <input
                 value={targetLink}
                 onChange={(event) => setTargetLink(event.target.value)}
-                placeholder="contoh: https://instagram.com/username"
+                placeholder={SOSMED_TARGET_INPUT_COPY.placeholder}
                 className="w-full rounded-xl border border-[#E5E5E5] px-3 py-2.5 text-sm"
               />
+              <p className="mt-1 text-xs text-[#888]">{SOSMED_TARGET_INPUT_COPY.helper}</p>
             </div>
             {!isBundleCheckout && (
               <div>
