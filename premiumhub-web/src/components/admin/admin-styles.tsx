@@ -131,10 +131,18 @@ export default function AdminStyles() {
       .topbar-btn:hover { border-color: var(--dark); }
       .topbar-btn.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
       .topbar-btn.primary:hover { opacity: .88; }
+      .admin-catalog-tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 12px; }
+      .admin-catalog-tab { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 800; line-height: 1; padding: 8px 12px; min-height: 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--white); color: var(--dark); cursor: pointer; transition: border-color .15s, background .15s, color .15s, box-shadow .15s; display: inline-flex; align-items: center; justify-content: center; gap: 9px; white-space: nowrap; text-decoration: none; }
+      .admin-catalog-tab:hover { border-color: #CBD5E1; background: #F8FAFC; }
+      .admin-catalog-tab.is-active { background: var(--orange); border-color: var(--orange); color: #fff; box-shadow: 0 8px 18px rgba(255, 88, 55, .18); }
+      .admin-catalog-tab.is-active:hover { background: var(--orange); border-color: var(--orange); opacity: .94; }
+      .admin-catalog-tab-count { display: inline-flex; align-items: center; justify-content: center; padding: 2px 7px; border-radius: 999px; border: 1px solid #E2E8F0; background: #F8FAFC; color: #64748B; font-size: 10px; font-weight: 800; line-height: 1.3; white-space: nowrap; }
+      .admin-catalog-tab-count.is-active { border-color: rgba(255,255,255,.42); background: rgba(255,255,255,.22); color: #fff; }
       .notif-wrap { position: relative; }
       .notif-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--white); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; position: relative; transition: border-color .15s; }
       .notif-btn:hover { border-color: var(--dark); }
       .notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: var(--orange); border-radius: 50%; border: 1.5px solid white; }
+
       .notif-count {
         position: absolute;
         top: -5px;

@@ -1410,33 +1410,26 @@ export default function SosmedServiceSettingsCard() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 12 }}>
+      <div className="card admin-catalog-tabs-card" style={{ marginBottom: 12 }}>
         <div
+          className="admin-catalog-tabs"
           role="tablist"
           aria-label="Kelola katalog sosmed"
-          style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: 12 }}
         >
           {catalogTabs.map((tab) => (
             <button
               key={tab.key}
               id={tab.tabId}
-              className={`topbar-btn${tab.isActive ? ' primary' : ''}`}
+              className={tab.buttonClassName}
               type="button"
               role="tab"
               aria-selected={tab.isActive}
               aria-controls={tab.panelId}
               title={tab.controlsLabel}
               onClick={() => setActiveCatalogTab(tab.key)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                justifyContent: 'space-between',
-                minWidth: 190,
-              }}
             >
               <span>{tab.label}</span>
-              <span className={`status ${tab.isActive ? 's-lunas' : 's-proses'}`}>{tab.countLabel}</span>
+              <span className={tab.countClassName}>{tab.countLabel}</span>
             </button>
           ))}
         </div>

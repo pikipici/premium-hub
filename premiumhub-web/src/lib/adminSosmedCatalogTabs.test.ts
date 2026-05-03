@@ -39,6 +39,30 @@ describe('admin sosmed catalog tabs view model', () => {
     expect(tabs.find((tab) => tab.key === 'bundle')).toMatchObject({ isActive: true })
   })
 
+  it('uses compact catalog tab classes instead of status badge tones for the count chips', () => {
+    const tabs = buildAdminSosmedCatalogTabs({
+      activeTab: normalizeAdminSosmedCatalogTab('single'),
+      singleServiceCount: 41,
+      bundleVariantCount: 12,
+    })
+
+    expect(tabs).toEqual([
+      expect.objectContaining({
+        key: 'single',
+        buttonClassName: 'admin-catalog-tab is-active',
+        countClassName: 'admin-catalog-tab-count is-active',
+      }),
+      expect.objectContaining({
+        key: 'bundle',
+        buttonClassName: 'admin-catalog-tab',
+        countClassName: 'admin-catalog-tab-count',
+      }),
+    ])
+
+    const renderedClasses = tabs.flatMap((tab) => [tab.buttonClassName, tab.countClassName]).join(' ')
+    expect(renderedClasses).not.toMatch(/\b(status|s-lunas|s-proses)\b/)
+  })
+
   it('falls back to Layanan Satuan for unknown tab keys', () => {
     expect(normalizeAdminSosmedCatalogTab('anything-else')).toBe('single')
   })

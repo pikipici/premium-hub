@@ -8,6 +8,8 @@ export interface AdminSosmedCatalogTab {
   tabId: string
   panelId: string
   isActive: boolean
+  buttonClassName: string
+  countClassName: string
 }
 
 export interface AdminSosmedCatalogTabsInput {
@@ -26,6 +28,8 @@ export function normalizeAdminSosmedCatalogTab(value: unknown): AdminSosmedCatal
 
 export function buildAdminSosmedCatalogTabs(input: AdminSosmedCatalogTabsInput): AdminSosmedCatalogTab[] {
   const activeTab = normalizeAdminSosmedCatalogTab(input.activeTab)
+  const singleActive = activeTab === 'single'
+  const bundleActive = activeTab === 'bundle'
 
   return [
     {
@@ -35,7 +39,9 @@ export function buildAdminSosmedCatalogTabs(input: AdminSosmedCatalogTabsInput):
       controlsLabel: 'Kelola layanan satuan sosmed',
       tabId: 'admin-sosmed-tab-single',
       panelId: 'admin-sosmed-panel-single',
-      isActive: activeTab === 'single',
+      isActive: singleActive,
+      buttonClassName: singleActive ? 'admin-catalog-tab is-active' : 'admin-catalog-tab',
+      countClassName: singleActive ? 'admin-catalog-tab-count is-active' : 'admin-catalog-tab-count',
     },
     {
       key: 'bundle' as const,
@@ -44,7 +50,9 @@ export function buildAdminSosmedCatalogTabs(input: AdminSosmedCatalogTabsInput):
       controlsLabel: 'Lihat paket spesial sosmed',
       tabId: 'admin-sosmed-tab-bundle',
       panelId: 'admin-sosmed-panel-bundle',
-      isActive: activeTab === 'bundle',
+      isActive: bundleActive,
+      buttonClassName: bundleActive ? 'admin-catalog-tab is-active' : 'admin-catalog-tab',
+      countClassName: bundleActive ? 'admin-catalog-tab-count is-active' : 'admin-catalog-tab-count',
     },
   ]
 }
