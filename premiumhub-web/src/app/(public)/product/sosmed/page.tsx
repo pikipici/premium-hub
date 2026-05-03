@@ -18,9 +18,11 @@ import {
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
-import { BUNDLING_PACKAGES, type SosmedBundleCard } from '@/lib/sosmedBundlingCards'
+import { buildSosmedBundleCards, type SosmedBundleCard } from '@/lib/sosmedBundlingCards'
 import { buildSosmedServiceCards, type SosmedPlatformIconKey } from '@/lib/sosmedProductCards'
+import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
+import type { SosmedBundlePackage } from '@/types/sosmedBundle'
 import type { SosmedService } from '@/types/sosmedService'
 
 type BrandIconProps = SVGProps<SVGSVGElement>
@@ -134,6 +136,10 @@ function BundleCard({ bundle }: { bundle: SosmedBundleCard }) {
   const isSpecial = bundle.key === 'toko-online-pro'
   
   const selectedPkg = bundle.packages[selectedPkgIndex]
+  const checkoutHref = selectedPkg?.key
+    ? `/product/sosmed/checkout?bundle=${encodeURIComponent(bundle.key)}&variant=${encodeURIComponent(selectedPkg.key)}`
+    : '/product/sosmed'
+  const canCheckoutBundle = Boolean(selectedPkg?.key)
   
   return (
     <article
@@ -231,22 +237,28 @@ function BundleCard({ bundle }: { bundle: SosmedBundleCard }) {
       </div>
 
       <div className="grid grid-cols-[1fr_2fr] gap-0 border-t border-gray-100 bg-[#FAFAFA]">
-        <button
-          onClick={() => alert('Fitur Checkout Bundling Segera Hadir!')}
-          className="inline-flex h-14 items-center justify-center text-[12px] font-bold text-[#666] transition hover:bg-gray-100 hover:text-[#141414]"
-        >
-          Detail
-        </button>
-        <button
-          onClick={() => alert('Fitur Checkout Bundling Segera Hadir!')}
-          className={`inline-flex h-14 items-center justify-center gap-1.5 text-[12px] font-extrabold transition ${
-            isSpecial 
-              ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]' 
-              : 'bg-[#141414] text-white hover:bg-[#333]'
+        <Link
+          href={checkoutHref}
+          aria-disabled={!canCheckoutBundle}
+          className={`inline-flex h-14 items-center justify-center text-[12px] font-bold transition ${
+            canCheckoutBundle ? 'text-[#666] hover:bg-gray-100 hover:text-[#141414]' : 'pointer-events-none text-[#AAA]'
           }`}
         >
-          Pesan {selectedPkg.name} <ArrowRight className="h-3.5 w-3.5" />
-        </button>
+          Detail
+        </Link>
+        <Link
+          href={checkoutHref}
+          aria-disabled={!canCheckoutBundle}
+          className={`inline-flex h-14 items-center justify-center gap-1.5 text-[12px] font-extrabold transition ${
+            !canCheckoutBundle
+              ? 'pointer-events-none bg-gray-200 text-gray-500'
+              : isSpecial
+                ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]'
+                : 'bg-[#141414] text-white hover:bg-[#333]'
+          }`}
+        >
+          {canCheckoutBundle ? `Pesan ${selectedPkg.name}` : 'Checkout Segera Hadir'} <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
     </article>
   )
@@ -255,6 +267,8 @@ function BundleCard({ bundle }: { bundle: SosmedBundleCard }) {
 export default function ProductSosmedLandingPage() {
   const animationRootRef = useRef<HTMLElement | null>(null)
   const [services, setServices] = useState<SosmedService[]>([])
+  const [bundlePackages, setBundlePackages] = useState<SosmedBundlePackage[]>([])
+  const [bundleCatalogState, setBundleCatalogState] = useState<'loading' | 'ready' | 'fallback'>('loading')
   const [activeTab, setActiveTab] = useState<'satuan' | 'bundling'>('satuan')
   const [currentPage, setCurrentPage] = useState(1)
   const [activePlatform, setActivePlatform] = useState('Semua')
@@ -274,12 +288,29 @@ export default function ProductSosmedLandingPage() {
         // fail-open: fallback cards still shown
       })
 
+    sosmedBundleServiceApi
+      .list()
+      .then((res) => {
+        if (!alive) return
+        if (!res.success || !res.data?.length) {
+          setBundleCatalogState('fallback')
+          return
+        }
+        setBundlePackages(res.data)
+        setBundleCatalogState('ready')
+      })
+      .catch(() => {
+        if (!alive) return
+        setBundleCatalogState('fallback')
+      })
+
     return () => {
       alive = false
     }
   }, [])
 
   const cards = useMemo(() => buildSosmedServiceCards(services), [services])
+  const bundleCards = useMemo(() => buildSosmedBundleCards(bundlePackages), [bundlePackages])
   const platforms = useMemo(() => {
     const unique = Array.from(new Set(cards.map(c => c.platform)))
     return ['Semua', ...unique.sort()]
@@ -547,10 +578,27 @@ export default function ProductSosmedLandingPage() {
           )}
 
           {activeTab === 'bundling' && (
-            <div className="grid gap-6 md:grid-cols-2">
-              {BUNDLING_PACKAGES.map((bundle) => (
-                <BundleCard key={bundle.key} bundle={bundle} />
-              ))}
+            <div className="space-y-4">
+              {bundleCatalogState === 'loading' && (
+                <div className="rounded-2xl border border-[#FFE2CF] bg-white px-4 py-3 text-center text-xs font-semibold text-[#9A4B16] shadow-sm">
+                  Lagi ambil katalog Paket Spesial terbaru dari server...
+                </div>
+              )}
+              {bundleCatalogState === 'fallback' && (
+                <div className="rounded-2xl border border-[#FFE2CF] bg-[#FFF8F5] px-4 py-3 text-center text-xs font-semibold text-[#9A4B16] shadow-sm">
+                  Katalog backend belum tersedia, jadi sementara gue tampilin preview paket dulu. Harga final tetap dicek ulang saat checkout.
+                </div>
+              )}
+              {bundleCatalogState === 'ready' && !bundleCards.length && (
+                <div className="rounded-2xl border border-dashed border-[#FFD5C8] bg-white px-4 py-8 text-center text-sm font-semibold text-[#666]">
+                  Paket Spesial belum tersedia sekarang. Cek lagi nanti ya.
+                </div>
+              )}
+              <div className="grid gap-6 md:grid-cols-2">
+                {bundleCards.map((bundle) => (
+                  <BundleCard key={bundle.key} bundle={bundle} />
+                ))}
+              </div>
             </div>
           )}
 

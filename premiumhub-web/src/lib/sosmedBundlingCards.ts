@@ -1,3 +1,5 @@
+import type { SosmedBundlePackage } from '@/types/sosmedBundle'
+
 export type SosmedBundleCard = {
   key: string
   title: string
@@ -10,6 +12,7 @@ export type SosmedBundleCard = {
   startingPriceLabel: string
   features: string[]
   packages: {
+    key?: string
     name: string
     priceLabel: string
     items: string[]
@@ -150,3 +153,83 @@ export const BUNDLING_PACKAGES: SosmedBundleCard[] = [
     ],
   },
 ]
+
+const PLATFORM_TONES: Array<[RegExp, string]> = [
+  [/instagram/i, 'from-[#EEF8FF] to-[#DCEFFF]'],
+  [/tiktok/i, 'from-[#FFF1F3] to-[#FFE1E7]'],
+  [/youtube/i, 'from-[#FFFBEA] to-[#FFF3C9]'],
+  [/shopee/i, 'from-[#FFF4EC] to-[#FFE8D8]'],
+]
+
+function formatBundleRupiah(value: number) {
+  return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
+}
+
+function formatQuantity(value: number) {
+  return Math.max(0, Math.round(value)).toLocaleString('id-ID')
+}
+
+function toneForBundle(bundle: Pick<SosmedBundlePackage, 'platform' | 'key'>) {
+  const haystack = `${bundle.platform || ''} ${bundle.key || ''}`
+  return PLATFORM_TONES.find(([pattern]) => pattern.test(haystack))?.[1] || 'from-[#F4F4F2] to-[#ECECEA]'
+}
+
+function packageItemsForBundleVariant(variant: SosmedBundlePackage['variants'][number]) {
+  return variant.items.map((item) => `${formatQuantity(item.quantity_units)} ${item.title}`)
+}
+
+function featuresForBundle(bundle: SosmedBundlePackage) {
+  const titles = bundle.variants.flatMap((variant) => variant.items.map((item) => item.title.trim()).filter(Boolean))
+  return Array.from(new Set(titles)).slice(0, 4)
+}
+
+function targetAudienceForBundle(bundle: SosmedBundlePackage) {
+  const platform = bundle.platform || bundle.title
+  if (platform.toLowerCase().includes('shopee')) return 'Seller online, UMKM, dan creator yang aktif jualan.'
+  if (platform.toLowerCase().includes('youtube')) return 'Creator, edukator, dan brand yang lagi bangun channel.'
+  if (platform.toLowerCase().includes('tiktok')) return 'Creator TikTok, affiliate, dan brand lokal.'
+  return 'Akun jualan, personal brand, dan campaign sosial media.'
+}
+
+export function buildSosmedBundleCards(bundles: SosmedBundlePackage[]): SosmedBundleCard[] {
+  if (!bundles.length) return BUNDLING_PACKAGES
+
+  return [...bundles]
+    .sort((left, right) => {
+      const leftSort = left.sort_order ?? 100
+      const rightSort = right.sort_order ?? 100
+      if (leftSort !== rightSort) return leftSort - rightSort
+      return left.key.localeCompare(right.key)
+    })
+    .map((bundle) => {
+      const sortedVariants = [...bundle.variants].sort((left, right) => {
+        const leftSort = left.sort_order ?? 100
+        const rightSort = right.sort_order ?? 100
+        if (leftSort !== rightSort) return leftSort - rightSort
+        return left.key.localeCompare(right.key)
+      })
+      const startingPrice = sortedVariants.reduce((lowest, variant) => {
+        if (!variant.total_price || variant.total_price <= 0) return lowest
+        return lowest === 0 ? variant.total_price : Math.min(lowest, variant.total_price)
+      }, 0)
+
+      return {
+        key: bundle.key,
+        title: bundle.title,
+        targetPlatform: bundle.platform,
+        summary: bundle.description || bundle.subtitle || 'Paket bundling sosmed hemat dari katalog terbaru Premium Hub.',
+        targetAudience: targetAudienceForBundle(bundle),
+        bestFor: bundle.subtitle || 'Cocok buat boost awal dengan beberapa layanan sekaligus.',
+        badge: bundle.badge || (bundle.is_highlighted ? 'Paling Direkomendasikan' : 'Paket Hemat'),
+        tone: toneForBundle(bundle),
+        startingPriceLabel: startingPrice > 0 ? formatBundleRupiah(startingPrice) : 'Cek harga',
+        features: featuresForBundle(bundle),
+        packages: sortedVariants.map((variant) => ({
+          key: variant.key,
+          name: variant.name,
+          priceLabel: formatBundleRupiah(variant.total_price),
+          items: packageItemsForBundleVariant(variant),
+        })),
+      }
+    })
+}

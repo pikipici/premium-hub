@@ -1,7 +1,7 @@
 "use client"
 
 import axios from 'axios'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CreditCard, ShieldCheck, WalletCards, Zap } from 'lucide-react'
 
@@ -9,10 +9,12 @@ import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatRupiah } from '@/lib/utils'
+import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
 import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
+import type { SosmedBundlePackage, SosmedBundleVariant } from '@/types/sosmedBundle'
 import type { SosmedService } from '@/types/sosmedService'
 
 function defaultCheckoutPrice(service: SosmedService | null) {
@@ -49,11 +51,16 @@ function SosmedCheckoutContent() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const serviceCode = (searchParams.get('service') || '').trim().toLowerCase()
+  const bundleKey = (searchParams.get('bundle') || '').trim().toLowerCase()
+  const variantKey = (searchParams.get('variant') || '').trim().toLowerCase()
+  const isBundleCheckout = Boolean(bundleKey || variantKey)
 
   const { isAuthenticated, hasHydrated, isBootstrapped } = useAuthStore()
   const authReady = hasHydrated && isBootstrapped
 
   const [service, setService] = useState<SosmedService | null>(null)
+  const [bundlePackage, setBundlePackage] = useState<SosmedBundlePackage | null>(null)
+  const [bundleVariant, setBundleVariant] = useState<SosmedBundleVariant | null>(null)
   const [targetLink, setTargetLink] = useState('')
   const [packageQuantity, setPackageQuantity] = useState(1)
   const [notes, setNotes] = useState('')
@@ -64,10 +71,18 @@ function SosmedCheckoutContent() {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const bundleIdempotencyKeyRef = useRef<string>('')
 
   const checkoutPrice = useMemo(() => defaultCheckoutPrice(service), [service])
-  const totalPrice = useMemo(() => checkoutPrice * packageQuantity, [checkoutPrice, packageQuantity])
-  const estimatedUnits = useMemo(() => packageQuantity * 1000, [packageQuantity])
+  const bundleTotalPrice = bundleVariant?.total_price || 0
+  const totalPrice = useMemo(
+    () => (isBundleCheckout ? bundleTotalPrice : checkoutPrice * packageQuantity),
+    [bundleTotalPrice, checkoutPrice, isBundleCheckout, packageQuantity]
+  )
+  const estimatedUnits = useMemo(
+    () => (isBundleCheckout ? (bundleVariant?.items || []).reduce((sum, item) => sum + (item.quantity_units || 0), 0) : packageQuantity * 1000),
+    [bundleVariant?.items, isBundleCheckout, packageQuantity]
+  )
   const walletBalanceAfter = walletBalance === null ? null : walletBalance - totalPrice
   const walletEnough = walletBalance === null || walletBalanceAfter === null || walletBalanceAfter >= 0
   const canSubmit = walletEnough && targetPublicConfirmed
@@ -80,6 +95,47 @@ function SosmedCheckoutContent() {
       return
     }
 
+    if (isBundleCheckout) {
+      if (!bundleKey || !variantKey) {
+        router.replace('/product/sosmed')
+        return
+      }
+
+      let alive = true
+      setLoadingService(true)
+      setError('')
+      setService(null)
+
+      sosmedBundleServiceApi
+        .getByKey(bundleKey)
+        .then((res) => {
+          if (!alive) return
+          if (!res.success) {
+            setError(res.message || 'Paket bundling sosmed tidak ditemukan')
+            return
+          }
+
+          const matchedVariant = (res.data.variants || []).find((item) => (item.key || '').toLowerCase() === variantKey)
+          if (!matchedVariant) {
+            setError('Varian paket bundling tidak ditemukan')
+            return
+          }
+          setBundlePackage(res.data)
+          setBundleVariant(matchedVariant)
+        })
+        .catch(() => {
+          if (!alive) return
+          setError('Gagal memuat paket bundling sosmed')
+        })
+        .finally(() => {
+          if (alive) setLoadingService(false)
+        })
+
+      return () => {
+        alive = false
+      }
+    }
+
     if (!serviceCode) {
       router.replace('/product/sosmed')
       return
@@ -87,6 +143,9 @@ function SosmedCheckoutContent() {
 
     let alive = true
     setLoadingService(true)
+    setError('')
+    setBundlePackage(null)
+    setBundleVariant(null)
 
     sosmedServiceApi
       .list()
@@ -115,7 +174,7 @@ function SosmedCheckoutContent() {
     return () => {
       alive = false
     }
-  }, [authReady, isAuthenticated, pathname, router, searchParams, serviceCode])
+  }, [authReady, bundleKey, isAuthenticated, isBundleCheckout, pathname, router, searchParams, serviceCode, variantKey])
 
   useEffect(() => {
     if (!authReady || !isAuthenticated) return
@@ -145,15 +204,21 @@ function SosmedCheckoutContent() {
   }, [authReady, isAuthenticated])
 
   const handleCheckout = async () => {
-    if (!service) return
+    if (!isBundleCheckout && !service) return
+    if (isBundleCheckout && (!bundlePackage || !bundleVariant)) return
 
     if (!targetLink.trim()) {
       setError('Target link/username wajib diisi')
       return
     }
 
-    if (checkoutPrice <= 0) {
+    if (!isBundleCheckout && checkoutPrice <= 0) {
       setError('Harga checkout layanan belum diatur, hubungi admin')
+      return
+    }
+
+    if (isBundleCheckout && totalPrice <= 0) {
+      setError('Harga checkout paket bundling belum tersedia, hubungi admin')
       return
     }
 
@@ -176,6 +241,30 @@ function SosmedCheckoutContent() {
     setError('')
 
     try {
+      if (isBundleCheckout && bundlePackage && bundleVariant) {
+        if (!bundleIdempotencyKeyRef.current) {
+          bundleIdempotencyKeyRef.current = `sosmed-bundle:${Date.now()}:${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`
+        }
+        const orderRes = await sosmedBundleServiceApi.createOrder({
+          bundle_key: bundlePackage.key,
+          variant_key: bundleVariant.key,
+          target_link: targetLink.trim(),
+          notes: notes.trim(),
+          payment_method: 'wallet',
+          idempotency_key: bundleIdempotencyKeyRef.current,
+          target_public_confirmed: targetPublicConfirmed,
+        })
+        if (!orderRes.success) {
+          setError(orderRes.message || 'Gagal membuat order bundle sosmed')
+          return
+        }
+
+        router.push(`/product/sosmed/checkout/success?type=bundle&order=${encodeURIComponent(orderRes.data.order_number)}`)
+        return
+      }
+
+      if (!service) return
+
       const orderRes = await sosmedOrderService.create({
         service_id: service.id,
         target_link: targetLink.trim(),
@@ -212,7 +301,7 @@ function SosmedCheckoutContent() {
     )
   }
 
-  if (!service) {
+  if (!isBundleCheckout && !service) {
     return (
       <>
         <Navbar />
@@ -227,38 +316,79 @@ function SosmedCheckoutContent() {
     )
   }
 
+  if (isBundleCheckout && (!bundlePackage || !bundleVariant)) {
+    return (
+      <>
+        <Navbar />
+        <section className="py-16">
+          <div className="mx-auto max-w-lg rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+            <h1 className="text-lg font-extrabold text-red-700">Paket tidak ditemukan</h1>
+            <p className="mt-2 text-sm text-red-600">{error || 'Paket bundling sosmed yang lu pilih tidak tersedia.'}</p>
+          </div>
+        </section>
+        <Footer />
+      </>
+    )
+  }
+
   return (
     <>
       <Navbar />
       <section className="py-12 md:py-16">
         <div className="max-w-2xl mx-auto px-4">
-          <h1 className="text-2xl font-extrabold mb-8 text-center">Checkout Sosmed</h1>
+          <h1 className="text-2xl font-extrabold mb-8 text-center">{isBundleCheckout ? 'Checkout Paket Spesial' : 'Checkout Sosmed'}</h1>
 
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6">
-            <h3 className="text-sm font-bold mb-4">Ringkasan Layanan</h3>
+            <h3 className="text-sm font-bold mb-4">{isBundleCheckout ? 'Ringkasan Paket' : 'Ringkasan Layanan'}</h3>
             <div className="space-y-3">
               <div className="flex justify-between text-sm gap-4">
-                <span className="text-[#888]">Layanan</span>
-                <span className="font-semibold text-right">{service.title}</span>
+                <span className="text-[#888]">{isBundleCheckout ? 'Paket' : 'Layanan'}</span>
+                <span className="font-semibold text-right">{isBundleCheckout ? bundlePackage?.title : service?.title}</span>
               </div>
-              <div className="flex justify-between text-sm gap-4">
-                <span className="text-[#888]">Kategori</span>
-                <span className="font-semibold text-right">{service.category_code || '-'}</span>
-              </div>
-              <div className="flex justify-between text-sm gap-4">
-                <span className="text-[#888]">Platform</span>
-                <span className="font-semibold text-right">{service.platform_label || '-'}</span>
-              </div>
-              <div className="flex justify-between text-sm gap-4">
-                <span className="text-[#888]">Harga per paket</span>
-                <span className="font-semibold text-right">{formatRupiah(checkoutPrice)} / 1K</span>
-              </div>
-              <div className="flex justify-between text-sm gap-4">
-                <span className="text-[#888]">Jumlah paket</span>
-                <span className="font-semibold text-right">
-                  {packageQuantity.toLocaleString('id-ID')} paket ({estimatedUnits.toLocaleString('id-ID')} unit)
-                </span>
-              </div>
+              {isBundleCheckout ? (
+                <>
+                  <div className="flex justify-between text-sm gap-4">
+                    <span className="text-[#888]">Varian</span>
+                    <span className="font-semibold text-right">{bundleVariant?.name}</span>
+                  </div>
+                  <div className="flex justify-between text-sm gap-4">
+                    <span className="text-[#888]">Platform</span>
+                    <span className="font-semibold text-right">{bundlePackage?.platform || '-'}</span>
+                  </div>
+                  <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#888]">Isi Paket</p>
+                    <div className="space-y-2">
+                      {(bundleVariant?.items || []).map((item) => (
+                        <div key={`${item.service_code}-${item.quantity_units}`} className="flex justify-between gap-3 text-xs">
+                          <span className="font-semibold text-[#444]">{item.title}</span>
+                          <span className="text-right font-bold text-[#141414]">{item.quantity_units.toLocaleString('id-ID')} unit</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm gap-4">
+                    <span className="text-[#888]">Kategori</span>
+                    <span className="font-semibold text-right">{service?.category_code || '-'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm gap-4">
+                    <span className="text-[#888]">Platform</span>
+                    <span className="font-semibold text-right">{service?.platform_label || '-'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm gap-4">
+                    <span className="text-[#888]">Harga per paket</span>
+                    <span className="font-semibold text-right">{formatRupiah(checkoutPrice)} / 1K</span>
+                  </div>
+                  <div className="flex justify-between text-sm gap-4">
+                    <span className="text-[#888]">Jumlah paket</span>
+                    <span className="font-semibold text-right">
+                      {packageQuantity.toLocaleString('id-ID')} paket ({estimatedUnits.toLocaleString('id-ID')} unit)
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="border-t border-[#EBEBEB] pt-3 flex justify-between gap-4">
                 <span className="font-bold">Total</span>
                 <span className="text-xl font-extrabold text-[#FF5733]">{formatRupiah(totalPrice)}</span>
@@ -277,41 +407,43 @@ function SosmedCheckoutContent() {
                 className="w-full rounded-xl border border-[#E5E5E5] px-3 py-2.5 text-sm"
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#666] mb-1">Jumlah Paket 1K</label>
-              <div className="flex overflow-hidden rounded-xl border border-[#E5E5E5] bg-white">
-                <input
-                  value={packageQuantity}
-                  onChange={(event) => setPackageQuantity(clampSosmedPackageQuantity(Number(event.target.value)))}
-                  type="number"
-                  min={1}
-                  max={MAX_SOSMED_PACKAGE_QUANTITY}
-                  className="w-full px-3 py-2.5 text-sm outline-none"
-                />
-                <div className="flex min-w-20 items-center justify-center border-l border-[#E5E5E5] bg-[#FAFAF8] px-3 text-xs font-bold text-[#666]">
-                  x 1K
+            {!isBundleCheckout && (
+              <div>
+                <label className="block text-xs font-semibold text-[#666] mb-1">Jumlah Paket 1K</label>
+                <div className="flex overflow-hidden rounded-xl border border-[#E5E5E5] bg-white">
+                  <input
+                    value={packageQuantity}
+                    onChange={(event) => setPackageQuantity(clampSosmedPackageQuantity(Number(event.target.value)))}
+                    type="number"
+                    min={1}
+                    max={MAX_SOSMED_PACKAGE_QUANTITY}
+                    className="w-full px-3 py-2.5 text-sm outline-none"
+                  />
+                  <div className="flex min-w-20 items-center justify-center border-l border-[#E5E5E5] bg-[#FAFAF8] px-3 text-xs font-bold text-[#666]">
+                    x 1K
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-[#888]">
+                  1 paket = 1.000 unit layanan. Contoh: 5 paket berarti sekitar 5.000 followers/unit.
+                </p>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {[1, 5, 10].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setPackageQuantity(preset)}
+                      className={`rounded-full border px-3 py-2 text-xs font-bold transition-colors ${
+                        packageQuantity === preset
+                          ? 'border-[#141414] bg-[#141414] text-white'
+                          : 'border-[#E5E5E5] bg-white text-[#666] hover:border-[#141414]'
+                      }`}
+                    >
+                      {preset.toLocaleString('id-ID')}K
+                    </button>
+                  ))}
                 </div>
               </div>
-              <p className="mt-1 text-xs text-[#888]">
-                1 paket = 1.000 unit layanan. Contoh: 5 paket berarti sekitar 5.000 followers/unit.
-              </p>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {[1, 5, 10].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setPackageQuantity(preset)}
-                    className={`rounded-full border px-3 py-2 text-xs font-bold transition-colors ${
-                      packageQuantity === preset
-                        ? 'border-[#141414] bg-[#141414] text-white'
-                        : 'border-[#E5E5E5] bg-white text-[#666] hover:border-[#141414]'
-                    }`}
-                  >
-                    {preset.toLocaleString('id-ID')}K
-                  </button>
-                ))}
-              </div>
-            </div>
+            )}
             <div>
               <label className="block text-xs font-semibold text-[#666] mb-1">Catatan (opsional)</label>
               <textarea

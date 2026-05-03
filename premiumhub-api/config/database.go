@@ -34,6 +34,11 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.NavbarMenuSetting{},
 		&model.Product{},
 		&model.SosmedService{},
+		&model.SosmedBundlePackage{},
+		&model.SosmedBundleVariant{},
+		&model.SosmedBundleItem{},
+		&model.SosmedBundleOrder{},
+		&model.SosmedBundleOrderItem{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
 		&model.SosmedOrderRefillAttempt{},
@@ -67,6 +72,10 @@ func InitDB(cfg *Config) *gorm.DB {
 
 	if err := ensureDefaultSosmedServices(db); err != nil {
 		log.Fatal("DB sosmed service defaults:", err)
+	}
+
+	if err := ensureDefaultSosmedBundlePackages(db); err != nil {
+		log.Fatal("DB sosmed bundle defaults:", err)
 	}
 
 	if err := ensureDefaultUserSidebarMenuSettings(db); err != nil {

@@ -39,6 +39,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	productRepo := repository.NewProductRepo(db)
 	productCategoryRepo := repository.NewProductCategoryRepo(db)
 	sosmedServiceRepo := repository.NewSosmedServiceRepo(db)
+	sosmedBundleRepo := repository.NewSosmedBundleRepo(db)
+	sosmedBundleOrderRepo := repository.NewSosmedBundleOrderRepo(db)
 	sosmedOrderRepo := repository.NewSosmedOrderRepo(db)
 	stockRepo := repository.NewStockRepo(db)
 	orderRepo := repository.NewOrderRepo(db)
@@ -79,6 +81,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	sosmedServiceSvc.SetJAPCatalogProvider(japSvc)
 	sosmedOrderSvc := service.NewSosmedOrderService(sosmedOrderRepo, sosmedServiceRepo, notifRepo).
 		SetWalletRepo(walletRepo).
+		SetJAPOrderProvider(japSvc)
+	sosmedBundleOrderSvc := service.NewSosmedBundleOrderService(sosmedBundleRepo, sosmedBundleOrderRepo, walletRepo).
 		SetJAPOrderProvider(japSvc)
 	sosmedPaymentSvc := service.NewSosmedPaymentServiceWithGateway(cfg, sosmedOrderRepo, sosmedOrderSvc, nil)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo).
@@ -130,6 +134,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	accountTypeHandler := handler.NewAccountTypeHandler(accountTypeSvc)
 	productCategoryHandler := handler.NewProductCategoryHandler(productCategorySvc)
 	sosmedServiceHandler := handler.NewSosmedServiceHandler(sosmedServiceSvc)
+	sosmedBundleHandler := handler.NewSosmedBundleHandler(sosmedBundleRepo)
+	sosmedBundleOrderHandler := handler.NewSosmedBundleOrderHandler(sosmedBundleOrderSvc)
 	japHandler := handler.NewJAPHandler(japSvc)
 	sosmedOrderHandler := handler.NewSosmedOrderHandler(sosmedOrderSvc)
 	sosmedPaymentHandler := handler.NewSosmedPaymentHandler(sosmedPaymentSvc)
@@ -173,6 +179,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.GET("/public/nokos/countries", nokosPublicHandler.GetCountries)
 	api.GET("/public/navbar-menu", navbarMenuSettingHandler.PublicList)
 	api.GET("/public/sosmed/services", sosmedServiceHandler.PublicList)
+	api.GET("/public/sosmed/bundles", sosmedBundleHandler.PublicList)
+	api.GET("/public/sosmed/bundles/:key", sosmedBundleHandler.PublicDetail)
 	api.GET(
 		"/convert/track/:token",
 		middleware.NewIPRateLimiter(cfg.ConvertTrackRateLimitMax, cfg.ConvertTrackRateLimitWindow, "Terlalu banyak request tracking convert. Coba lagi sebentar."),
@@ -214,6 +222,9 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/sosmed/orders/:id", sosmedOrderHandler.GetByID)
 	protected.DELETE("/sosmed/orders/:id", sosmedOrderHandler.Cancel)
 	protected.POST("/sosmed/orders/:id/refill", sosmedOrderHandler.RequestRefill)
+	protected.POST("/sosmed/bundle-orders", sosmedBundleOrderHandler.Create)
+	protected.GET("/sosmed/bundle-orders", sosmedBundleOrderHandler.List)
+	protected.GET("/sosmed/bundle-orders/:order_number", sosmedBundleOrderHandler.GetByOrderNumber)
 
 	protected.GET("/activities/history", activityHandler.List)
 	protected.GET("/me/sidebar-menu", userSidebarMenuSettingHandler.List)
@@ -409,6 +420,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/orders/:id/send", orderHandler.SendAccount)
 
 	admin.GET("/sosmed/orders", sosmedOrderHandler.AdminList)
+	admin.GET("/sosmed/bundle-orders", sosmedBundleOrderHandler.AdminList)
+	admin.GET("/sosmed/bundle-orders/:order_number", sosmedBundleOrderHandler.AdminGetByOrderNumber)
 	admin.GET("/sosmed/orders/ops-summary", sosmedOrderHandler.AdminOpsSummary)
 	admin.POST(
 		"/sosmed/orders/sync-provider",

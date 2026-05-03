@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -13,7 +14,8 @@ import (
 func openTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	dbName := strings.NewReplacer("/", "_", " ", "_", "-", "_").Replace(t.Name())
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=shared", dbName)), &gorm.Config{})
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "requires cgo") {
 			t.Skipf("sqlite test driver unavailable in this environment: %v", err)

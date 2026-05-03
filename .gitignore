@@ -30,6 +30,7 @@ node_modules/
 PROJECT_SPEC.md
 setup.sh
 LOCAL_AI_CONTEXT.md
+.hermes-tmp/
 
 # Deploy runtime state (local-only)
 .deploy-state/

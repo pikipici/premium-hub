@@ -150,6 +150,12 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/services") {
 		t.Fatalf("public sosmed services route should exist")
 	}
+	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/bundles") {
+		t.Fatalf("public sosmed bundles route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/bundles/:key") {
+		t.Fatalf("public sosmed bundle detail route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/sosmed/orders") {
 		t.Fatalf("sosmed order create route should exist")
 	}
@@ -162,6 +168,15 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "DELETE", "/api/v1/sosmed/orders/:id") {
 		t.Fatalf("sosmed order cancel route should exist")
 	}
+	if !hasRoute(routes, "POST", "/api/v1/sosmed/bundle-orders") {
+		t.Fatalf("sosmed bundle order create route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/sosmed/bundle-orders") {
+		t.Fatalf("sosmed bundle order list route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/sosmed/bundle-orders/:order_number") {
+		t.Fatalf("sosmed bundle order detail route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/sosmed/payments") {
 		t.Fatalf("sosmed payment create route should exist")
 	}
@@ -170,6 +185,12 @@ func TestSetupProductionRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/orders") {
 		t.Fatalf("admin sosmed order list route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/bundle-orders") {
+		t.Fatalf("admin sosmed bundle order list route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/bundle-orders/:order_number") {
+		t.Fatalf("admin sosmed bundle order detail route should exist")
 	}
 	if !hasRoute(routes, "GET", "/api/v1/admin/sosmed/orders/ops-summary") {
 		t.Fatalf("admin sosmed order ops summary route should exist")
@@ -255,6 +276,12 @@ func TestSetupDevelopmentPaymentRoutes(t *testing.T) {
 	}
 	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/services") {
 		t.Fatalf("public sosmed services route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/bundles") {
+		t.Fatalf("public sosmed bundles route should exist")
+	}
+	if !hasRoute(routes, "GET", "/api/v1/public/sosmed/bundles/:key") {
+		t.Fatalf("public sosmed bundle detail route should exist")
 	}
 	if !hasRoute(routes, "POST", "/api/v1/sosmed/payments") {
 		t.Fatalf("sosmed payment create route should exist")

@@ -8,17 +8,23 @@ import { CheckCircle2, Loader2 } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatRupiah } from '@/lib/utils'
+import { sosmedBundleService } from '@/services/sosmedBundleService'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
+import type { SosmedBundleOrder } from '@/types/sosmedBundle'
 import type { SosmedOrderDetail } from '@/types/sosmedOrder'
 
 function orderStatusText(status?: string) {
   switch (status) {
     case 'processing':
       return 'Diproses'
+    case 'partial':
+      return 'Sebagian Diproses'
+    case 'completed':
     case 'success':
       return 'Sukses'
     case 'failed':
       return 'Gagal'
+    case 'cancelled':
     case 'canceled':
       return 'Dibatalkan'
     case 'expired':
@@ -48,12 +54,46 @@ function SosmedCheckoutSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const orderID = searchParams.get('id') || ''
+  const bundleOrderNumber = searchParams.get('order') || ''
+  const isBundleOrder = searchParams.get('type') === 'bundle' || Boolean(bundleOrderNumber)
 
   const [detail, setDetail] = useState<SosmedOrderDetail | null>(null)
+  const [bundleDetail, setBundleDetail] = useState<SosmedBundleOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (isBundleOrder) {
+      if (!bundleOrderNumber) {
+        router.replace('/product/sosmed')
+        return
+      }
+
+      let alive = true
+
+      sosmedBundleService
+        .getOrderByNumber(bundleOrderNumber)
+        .then((res) => {
+          if (!alive) return
+          if (!res.success) {
+            setError(res.message || 'Order bundle sosmed tidak ditemukan')
+            return
+          }
+          setBundleDetail(res.data)
+        })
+        .catch(() => {
+          if (!alive) return
+          setError('Gagal memuat detail order bundle sosmed')
+        })
+        .finally(() => {
+          if (alive) setLoading(false)
+        })
+
+      return () => {
+        alive = false
+      }
+    }
+
     if (!orderID) {
       router.replace('/product/sosmed')
       return
@@ -82,10 +122,10 @@ function SosmedCheckoutSuccessContent() {
     return () => {
       alive = false
     }
-  }, [orderID, router])
+  }, [bundleOrderNumber, isBundleOrder, orderID, router])
 
   const order = detail?.order
-  const status = useMemo(() => orderStatusText(order?.order_status), [order?.order_status])
+  const status = useMemo(() => orderStatusText(isBundleOrder ? bundleDetail?.status : order?.order_status), [bundleDetail?.status, isBundleOrder, order?.order_status])
 
   return (
     <>
@@ -108,6 +148,42 @@ function SosmedCheckoutSuccessContent() {
             </div>
           ) : error ? (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+          ) : bundleDetail ? (
+            <div className="mt-4 rounded-2xl border border-[#EBEBEB] bg-white p-6 space-y-3">
+              <div className="flex items-center justify-between text-sm gap-4">
+                <span className="text-[#888]">Nomor Order</span>
+                <span className="font-semibold text-[#141414] text-right">{bundleDetail.order_number}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm gap-4">
+                <span className="text-[#888]">Paket</span>
+                <span className="font-semibold text-[#141414] text-right">{bundleDetail.title_snapshot}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm gap-4">
+                <span className="text-[#888]">Target</span>
+                <span className="font-semibold text-[#141414] text-right">{bundleDetail.target_link || '-'}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm gap-4">
+                <span className="text-[#888]">Status</span>
+                <span className="font-semibold text-[#141414]">{status}</span>
+              </div>
+              <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#888]">Item Diproses</p>
+                <div className="space-y-2">
+                  {(bundleDetail.items || []).map((item) => (
+                    <div key={item.id} className="flex justify-between gap-3 text-xs">
+                      <span className="font-semibold text-[#444]">{item.service_title_snapshot}</span>
+                      <span className="text-right font-bold text-[#141414]">
+                        {item.quantity_units.toLocaleString('id-ID')} unit • {orderStatusText(item.status)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[#888]">Total</span>
+                <span className="text-lg font-extrabold text-[#FF5733]">{formatRupiah(bundleDetail.total_price)}</span>
+              </div>
+            </div>
           ) : order ? (
             <div className="mt-4 rounded-2xl border border-[#EBEBEB] bg-white p-6 space-y-3">
               <div className="flex items-center justify-between text-sm">
