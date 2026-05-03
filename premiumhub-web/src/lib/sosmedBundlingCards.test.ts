@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { BUNDLING_PACKAGES, buildSosmedBundleCards } from './sosmedBundlingCards'
+import { BUNDLING_PACKAGES, buildSosmedBundleCards, buildSosmedBundleProductCards } from './sosmedBundlingCards'
 import type { SosmedBundlePackage } from '@/types/sosmedBundle'
 
 const backendBundle: SosmedBundlePackage = {
@@ -71,5 +71,29 @@ describe('sosmed bundle catalog card view model', () => {
 
   it('falls back to curated package cards while backend bundle catalog is unavailable', () => {
     expect(buildSosmedBundleCards([])).toEqual(BUNDLING_PACKAGES)
+  })
+
+  it('flattens each bundle variant into a product-style card like Layanan Satuan', () => {
+    const [card] = buildSosmedBundleProductCards([backendBundle])
+
+    expect(card).toMatchObject({
+      key: 'instagram-starter:starter-small',
+      bundleKey: 'instagram-starter',
+      variantKey: 'starter-small',
+      platform: 'Instagram',
+      platformIcon: 'instagram',
+      buyerTitle: 'Instagram Starter Pack - Starter Small',
+      priceLabel: 'Rp 2.550',
+      packageLabel: 'paket bundling isi 2 layanan',
+      tone: 'from-[#EEF8FF] to-[#DCEFFF]',
+      isRecommended: true,
+    })
+    expect(card.benefits).toEqual([
+      '500 Instagram Followers Hemat',
+      '1.000 Instagram Likes',
+      'Tanpa perlu password',
+      'Harga final sudah termasuk diskon bundling',
+    ])
+    expect(card.trustBadges).toEqual(['Backend Badge', '2 Layanan', 'Bundling Hemat'])
   })
 })

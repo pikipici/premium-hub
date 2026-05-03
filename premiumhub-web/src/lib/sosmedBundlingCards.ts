@@ -10,6 +10,7 @@ export type SosmedBundleCard = {
   badge: string
   tone: string
   startingPriceLabel: string
+  isHighlighted?: boolean
   features: string[]
   packages: {
     key?: string
@@ -18,6 +19,35 @@ export type SosmedBundleCard = {
     items: string[]
   }[]
 }
+
+export type SosmedBundleProductCard = {
+  key: string
+  bundleKey: string
+  variantKey?: string
+  platform: string
+  platformIcon: SosmedPlatformIconKey
+  buyerTitle: string
+  bestFor: string
+  badge: string
+  tone: string
+  priceLabel: string
+  packageLabel: string
+  benefits: string[]
+  trustBadges: string[]
+  isRecommended: boolean
+}
+
+export type SosmedPlatformIconKey =
+  | 'instagram'
+  | 'facebook'
+  | 'shopee'
+  | 'spotify'
+  | 'telegram'
+  | 'tiktok'
+  | 'twitter-x'
+  | 'youtube'
+  | 'website'
+  | 'generic'
 
 export const BUNDLING_PACKAGES: SosmedBundleCard[] = [
   {
@@ -223,6 +253,7 @@ export function buildSosmedBundleCards(bundles: SosmedBundlePackage[]): SosmedBu
         badge: bundle.badge || (bundle.is_highlighted ? 'Paling Direkomendasikan' : 'Paket Hemat'),
         tone: toneForBundle(bundle),
         startingPriceLabel: startingPrice > 0 ? formatBundleRupiah(startingPrice) : 'Cek harga',
+        isHighlighted: bundle.is_highlighted,
         features: featuresForBundle(bundle),
         packages: sortedVariants.map((variant) => ({
           key: variant.key,
@@ -232,4 +263,52 @@ export function buildSosmedBundleCards(bundles: SosmedBundlePackage[]): SosmedBu
         })),
       }
     })
+}
+
+function platformIconForBundle(platform: string): SosmedPlatformIconKey {
+  const normalized = platform.toLowerCase()
+  if (normalized.includes('instagram')) return 'instagram'
+  if (normalized.includes('facebook')) return 'facebook'
+  if (normalized.includes('shopee')) return 'shopee'
+  if (normalized.includes('spotify')) return 'spotify'
+  if (normalized.includes('telegram')) return 'telegram'
+  if (normalized.includes('tiktok')) return 'tiktok'
+  if (normalized.includes('twitter') || normalized.includes('/ x') || normalized === 'x') return 'twitter-x'
+  if (normalized.includes('youtube')) return 'youtube'
+  if (normalized.includes('website')) return 'website'
+  return 'generic'
+}
+
+export function buildSosmedBundleProductCards(bundles: SosmedBundlePackage[]): SosmedBundleProductCard[] {
+  const sourceBundles = bundles.length ? buildSosmedBundleCards(bundles) : BUNDLING_PACKAGES
+
+  return sourceBundles.flatMap((bundle) => {
+    const isRecommendedBundle = Boolean(bundle.isHighlighted) || bundle.badge.toLowerCase().includes('rekomendasi') || bundle.key === 'toko-online-pro'
+    return bundle.packages.map((variant, index) => {
+      const variantKey = variant.key
+      const isRecommended = isRecommendedBundle || index === 1
+      const benefits = [
+        ...variant.items.slice(0, 3),
+        'Tanpa perlu password',
+        'Harga final sudah termasuk diskon bundling',
+      ].slice(0, 4)
+
+      return {
+        key: `${bundle.key}:${variantKey || variant.name}`,
+        bundleKey: bundle.key,
+        variantKey,
+        platform: bundle.targetPlatform,
+        platformIcon: platformIconForBundle(bundle.targetPlatform),
+        buyerTitle: `${bundle.title} - ${variant.name}`,
+        bestFor: bundle.bestFor || bundle.summary,
+        badge: bundle.badge,
+        tone: bundle.tone,
+        priceLabel: variant.priceLabel,
+        packageLabel: `paket bundling isi ${variant.items.length} layanan`,
+        benefits,
+        trustBadges: [bundle.badge, `${variant.items.length} Layanan`, 'Bundling Hemat'].filter(Boolean).slice(0, 3),
+        isRecommended,
+      }
+    })
+  })
 }
