@@ -1065,6 +1065,42 @@ func TestSosmedBundleAdminServiceUpdateItemChangesServiceFieldsAndKeepsRowEditab
 	}
 }
 
+func TestSosmedBundleAdminServiceUpdateItemRejectsReactivationWhenExistingServiceInactive(t *testing.T) {
+	ctx := context.Background()
+	db, svc, _ := setupSosmedBundleAdminServiceTest(t)
+	serviceItem := createSosmedBundleAdminServiceFixture(t, db, "item-reactivate-inactive-service", "Inactive Existing Service", "100-1000", true)
+	pkg := createSosmedBundleAdminPackageForVariantTest(t, ctx, svc, "item-reactivate-package")
+	variant, err := svc.CreateVariant(ctx, pkg.ID, CreateSosmedBundleVariantInput{Key: "item-reactivate-variant", Name: "Item Reactivate Variant"})
+	if err != nil {
+		t.Fatalf("create variant: %v", err)
+	}
+	created, err := svc.CreateItem(ctx, variant.ID, CreateSosmedBundleItemInput{
+		SosmedServiceID: serviceItem.ID,
+		Label:           "Inactive Item",
+		QuantityUnits:   500,
+		IsActive:        sosmedBundleAdminBoolPtr(false),
+	})
+	if err != nil {
+		t.Fatalf("create inactive item: %v", err)
+	}
+	if err := db.Model(&serviceItem).Update("is_active", false).Error; err != nil {
+		t.Fatalf("mark linked service inactive: %v", err)
+	}
+
+	_, err = svc.UpdateItem(ctx, created.ID, UpdateSosmedBundleItemInput{IsActive: sosmedBundleAdminBoolPtr(true)})
+	if err == nil || !strings.Contains(err.Error(), "layanan sosmed sedang nonaktif") {
+		t.Fatalf("expected inactive linked service reactivation error, got %v", err)
+	}
+
+	stored, err := svc.GetItem(ctx, created.ID, true)
+	if err != nil {
+		t.Fatalf("reload item after rejected reactivation: %v", err)
+	}
+	if stored.IsActive {
+		t.Fatalf("expected item to remain inactive after rejected reactivation")
+	}
+}
+
 func TestSosmedBundleAdminServiceDeactivateItemSoftDisablesWithoutHardDeleteAndBreaksCheckoutPricing(t *testing.T) {
 	ctx := context.Background()
 	db, svc, bundleRepo := setupSosmedBundleAdminServiceTest(t)

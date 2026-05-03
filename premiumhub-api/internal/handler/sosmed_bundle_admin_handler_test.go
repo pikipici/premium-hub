@@ -315,13 +315,13 @@ func TestSosmedBundleAdminResponseDTOIncludesAdminFieldsWithoutProviderSecrets(t
 	}
 }
 
-func TestSosmedBundleAdminHandlerListReturnsInactiveGraphAndCalculatedFields(t *testing.T) {
+func TestSosmedBundleAdminHandlerListDefaultsToInactiveGraphAndCalculatedFields(t *testing.T) {
 	db := setupSosmedBundleHandlerTestDB(t)
 	fixture := seedSosmedBundleAdminHandlerFixture(t, db)
 	r := setupSosmedBundleAdminHandlerRouter(db)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/sosmed/bundles?include_inactive=true", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/sosmed/bundles", nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {

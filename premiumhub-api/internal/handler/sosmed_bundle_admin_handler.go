@@ -225,7 +225,7 @@ func (h *SosmedBundleAdminHandler) AdminList(c *gin.Context) {
 		return
 	}
 
-	includeInactive := false
+	includeInactive := true
 	if raw := c.Query("include_inactive"); raw != "" {
 		if parsed, err := strconv.ParseBool(raw); err == nil {
 			includeInactive = parsed

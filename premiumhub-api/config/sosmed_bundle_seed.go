@@ -109,14 +109,54 @@ func upsertDefaultSosmedBundleVariant(db *gorm.DB, pkg *model.SosmedBundlePackag
 	if err != nil {
 		return err
 	}
-	if !created || !isActive {
+	if !isActive {
 		return nil
 	}
+	if !created {
+		shouldBackfill, err := shouldBackfillDefaultSosmedBundleVariant(db, variant, seed)
+		if err != nil {
+			return err
+		}
+		if !shouldBackfill {
+			return nil
+		}
+		return db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(variant).Update("is_active", true).Error; err != nil {
+				return err
+			}
+			return createDefaultSosmedBundleItems(tx, variant.ID, seed.Items, services)
+		})
+	}
 
-	for _, itemSeed := range seed.Items {
+	return createDefaultSosmedBundleItems(db, variant.ID, seed.Items, services)
+}
+
+func shouldBackfillDefaultSosmedBundleVariant(db *gorm.DB, variant *model.SosmedBundleVariant, seed defaultSosmedBundleVariantSeed) (bool, error) {
+	if variant == nil || variant.IsActive {
+		return false, nil
+	}
+	var itemCount int64
+	if err := db.Model(&model.SosmedBundleItem{}).Where("bundle_variant_id = ?", variant.ID).Count(&itemCount).Error; err != nil {
+		return false, err
+	}
+	if itemCount != 0 {
+		return false, nil
+	}
+	return strings.TrimSpace(variant.Key) == strings.TrimSpace(seed.Key) &&
+		strings.TrimSpace(variant.Name) == strings.TrimSpace(seed.Name) &&
+		strings.TrimSpace(variant.Description) == strings.TrimSpace(seed.Description) &&
+		strings.TrimSpace(variant.PriceMode) == sosmedBundleSeedPriceModeComputed &&
+		variant.FixedPrice == 0 &&
+		variant.DiscountPercent == 0 &&
+		variant.DiscountAmount == 0 &&
+		variant.SortOrder == seed.SortOrder, nil
+}
+
+func createDefaultSosmedBundleItems(db *gorm.DB, variantID uuid.UUID, itemSeeds []defaultSosmedBundleItemSeed, services map[string]model.SosmedService) error {
+	for _, itemSeed := range itemSeeds {
 		service := services[strings.TrimSpace(itemSeed.ServiceCode)]
 		item := model.SosmedBundleItem{
-			BundleVariantID: variant.ID,
+			BundleVariantID: variantID,
 			SosmedServiceID: service.ID,
 			Label:           strings.TrimSpace(itemSeed.Label),
 			QuantityUnits:   itemSeed.QuantityUnits,

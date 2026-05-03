@@ -175,6 +175,35 @@ func TestEnsureDefaultSosmedBundlePackagesDisablesVariantWhenServiceMissing(t *t
 	if itemCount != 0 {
 		t.Fatalf("expected disabled missing-service variant to have no broken items, got %d", itemCount)
 	}
+
+	seedBundleServiceFixtures(t, db, "jap-9333")
+	if err := ensureDefaultSosmedBundlePackages(db); err != nil {
+		t.Fatalf("seed default bundles after missing service appears: %v", err)
+	}
+
+	var repaired model.SosmedBundleVariant
+	if err := db.Preload("Items.Service").Joins("Package").Where("Package.key = ? AND sosmed_bundle_variants.key = ?", "umkm-starter", "starter").First(&repaired).Error; err != nil {
+		t.Fatalf("reload repaired starter variant: %v", err)
+	}
+	if !repaired.IsActive {
+		t.Fatalf("expected seeded empty starter variant to become active after missing service appears")
+	}
+	if len(repaired.Items) != 3 {
+		t.Fatalf("expected repaired starter variant to backfill 3 seed items, got %d", len(repaired.Items))
+	}
+	for _, item := range repaired.Items {
+		if item.Service.Code == "" || !item.Service.IsActive {
+			t.Fatalf("expected repaired item to link an active service, got %#v", item)
+		}
+	}
+
+	var variantCount int64
+	if err := db.Model(&model.SosmedBundleVariant{}).Where("bundle_package_id = ? AND key = ?", repaired.BundlePackageID, "starter").Count(&variantCount).Error; err != nil {
+		t.Fatalf("count repaired starter variants: %v", err)
+	}
+	if variantCount != 1 {
+		t.Fatalf("expected repair to reuse existing starter variant, got %d rows", variantCount)
+	}
 }
 
 func openBundleSeedTestDB(t *testing.T) *gorm.DB {

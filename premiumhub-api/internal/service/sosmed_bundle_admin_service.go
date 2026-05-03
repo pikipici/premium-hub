@@ -562,6 +562,9 @@ func (s *SosmedBundleAdminService) UpdateItem(ctx context.Context, id uuid.UUID,
 	if input.SortOrder != nil {
 		item.SortOrder = *input.SortOrder
 	}
+	if item.IsActive && !service.IsActive {
+		return nil, errors.New("layanan sosmed sedang nonaktif")
+	}
 	if err := validateSosmedBundleItemQuantity(service, item.QuantityUnits); err != nil {
 		return nil, err
 	}
