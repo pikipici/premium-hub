@@ -3,6 +3,10 @@
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import {
+  buildAdminSosmedCatalogTabs,
+  type AdminSosmedCatalogTabKey,
+} from '@/lib/adminSosmedCatalogTabs'
 import { buildAdminSosmedBundleRows, getAdminSosmedBundleSummary } from '@/lib/adminSosmedBundles'
 import { productCategoryService } from '@/services/productCategoryService'
 import { sosmedBundleService } from '@/services/sosmedBundleService'
@@ -14,6 +18,7 @@ import {
   type AdminSosmedServicePayload,
   type AdminSosmedServiceUpdatePayload,
 } from '@/services/sosmedService'
+
 import type { ProductCategory } from '@/types/productCategory'
 import type { SosmedBundlePackage } from '@/types/sosmedBundle'
 import type { SosmedService } from '@/types/sosmedService'
@@ -234,12 +239,14 @@ function createEmptyForm(categoryCode: string): SosmedServiceFormState {
 export default function SosmedServiceSettingsCard() {
   const [items, setItems] = useState<SosmedService[]>([])
   const [bundlePackages, setBundlePackages] = useState<SosmedBundlePackage[]>([])
+  const [activeCatalogTab, setActiveCatalogTab] = useState<AdminSosmedCatalogTabKey>('single')
   const [categories, setCategories] = useState<ProductCategory[]>([])
   const [loading, setLoading] = useState(true)
-
   const [saving, setSaving] = useState(false)
+
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
   const [japBalance, setJAPBalance] = useState<AdminJAPBalance | null>(null)
   const [japBalanceLoading, setJAPBalanceLoading] = useState(false)
   const [japBalanceError, setJAPBalanceError] = useState('')
@@ -317,6 +324,15 @@ export default function SosmedServiceSettingsCard() {
   const bundleRows = useMemo(() => buildAdminSosmedBundleRows(bundlePackages), [bundlePackages])
 
   const bundleSummary = useMemo(() => getAdminSosmedBundleSummary(bundlePackages), [bundlePackages])
+
+  const catalogTabs = useMemo(
+    () => buildAdminSosmedCatalogTabs({
+      activeTab: activeCatalogTab,
+      singleServiceCount: items.length,
+      bundleVariantCount: bundleRows.length,
+    }),
+    [activeCatalogTab, bundleRows.length, items.length]
+  )
 
   const importJAPServiceIds = useMemo(
     () => parseJAPServiceIds(importJAPForm.service_ids_text),
@@ -861,13 +877,58 @@ export default function SosmedServiceSettingsCard() {
       </div>
 
       <div className="card" style={{ marginBottom: 12 }}>
-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-          <div>
-            <h2>Master Layanan Sosmed</h2>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Konten card di /product/sosmed diambil langsung dari master layanan ini.
+        <div
+          role="tablist"
+          aria-label="Kelola katalog sosmed"
+          style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: 12 }}
+        >
+          {catalogTabs.map((tab) => (
+            <button
+              key={tab.key}
+              id={tab.tabId}
+              className={`topbar-btn${tab.isActive ? ' primary' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={tab.isActive}
+              aria-controls={tab.panelId}
+              title={tab.controlsLabel}
+              onClick={() => setActiveCatalogTab(tab.key)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                justifyContent: 'space-between',
+                minWidth: 190,
+              }}
+            >
+              <span>{tab.label}</span>
+              <span className={`status ${tab.isActive ? 's-lunas' : 's-proses'}`}>{tab.countLabel}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {(error || notice) && (
+        <div className="card" style={{ marginBottom: 12, padding: '12px 18px' }}>
+          {error && (
+            <div style={{ marginBottom: notice ? 8 : 0, fontSize: 12, color: 'var(--red)' }}>
+              {error}
             </div>
-          </div>
+          )}
+          {notice && <div className="alert success">{notice}</div>}
+        </div>
+      )}
+
+      {activeCatalogTab === 'single' && (
+        <div id="admin-sosmed-panel-single" role="tabpanel" aria-labelledby="admin-sosmed-tab-single">
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <div>
+                <h2>Master Layanan Sosmed</h2>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  Konten card di /product/sosmed diambil langsung dari master layanan ini.
+                </div>
+              </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -912,16 +973,6 @@ export default function SosmedServiceSettingsCard() {
           </div>
         </div>
 
-        {(error || notice) && (
-          <div style={{ padding: '0 18px 12px' }}>
-            {error && (
-              <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--red)' }}>
-                {error}
-              </div>
-            )}
-            {notice && <div className="alert success">{notice}</div>}
-          </div>
-        )}
 
         <div style={{ padding: '0 18px 18px' }}>
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -1018,16 +1069,20 @@ export default function SosmedServiceSettingsCard() {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-          <div>
-            <h2>Paket Spesial</h2>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Bundle yang tampil di tab Paket Spesial /product/sosmed. Untuk sekarang read-only dari bundle catalog.
-            </div>
           </div>
+        </div>
+      )}
+
+      {activeCatalogTab === 'bundle' && (
+        <div id="admin-sosmed-panel-bundle" role="tabpanel" aria-labelledby="admin-sosmed-tab-bundle">
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <div>
+                <h2>Paket Spesial</h2>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  Bundle yang tampil di tab Paket Spesial /product/sosmed. Untuk sekarang read-only dari bundle catalog.
+                </div>
+              </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
             <span className="status s-lunas">{bundleSummary.packageCount} Paket</span>
             <span className="status s-lunas">{bundleSummary.variantCount} Variant</span>
@@ -1102,7 +1157,9 @@ export default function SosmedServiceSettingsCard() {
             </div>
           )}
         </div>
-      </div>
+          </div>
+        </div>
+      )}
 
       {importJAPOpen && (
         <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={closeImportJAPForm}>
