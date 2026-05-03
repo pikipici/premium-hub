@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildAdminSosmedBundleRows, getAdminSosmedBundleSummary } from './adminSosmedBundles'
+import {
+  buildAdminSosmedBundleDetail,
+  buildAdminSosmedBundleRows,
+  getAdminSosmedBundleSummary,
+} from './adminSosmedBundles'
 import type { AdminSosmedBundlePackage } from '@/types/sosmedBundle'
 
 const bundles: AdminSosmedBundlePackage[] = [
@@ -316,6 +320,93 @@ describe('admin sosmed bundle list view model', () => {
     })
     expect(rows[2].itemTitles).toEqual(['TikTok Views', 'TikTok Likes'])
     expect(rows[2].itemSummary).toBe('2 layanan / 31.000 unit')
+  })
+
+  it('builds clicked variant detail with layanan satuan audit rows', () => {
+    const detail = buildAdminSosmedBundleDetail(bundles[0], 'pro')
+
+    expect(detail).toMatchObject({
+      key: 'tiktok-booster:pro',
+      packageKey: 'tiktok-booster',
+      packageTitle: 'TikTok Booster',
+      variantKey: 'pro',
+      variantName: 'Pro',
+      platform: 'TikTok',
+      badge: 'Konten Viral',
+      priceLabel: 'Rp 68.000',
+      discountLabel: 'Diskon Rp 12.000',
+      statusLabel: 'Aktif',
+      serviceSummary: '2 layanan / 31.000 unit',
+      checkoutHref: '/product/sosmed/checkout?bundle=tiktok-booster&variant=pro',
+      emptyState: null,
+    })
+    expect(detail.serviceItems).toEqual([
+      {
+        key: 'item-2b1',
+        title: 'TikTok Views',
+        serviceCode: 'tiktok-views-10161',
+        quantityLabel: '30.000 unit',
+        linePriceLabel: 'Rp 50.000',
+        targetStrategyLabel: 'Target yang sama',
+        itemStatusLabel: 'Item Aktif',
+        serviceStatusLabel: 'Master Aktif',
+        isActive: true,
+        serviceIsActive: true,
+      },
+      {
+        key: 'item-2b2',
+        title: 'TikTok Likes',
+        serviceCode: 'tiktok-likes-10098',
+        quantityLabel: '1.000 unit',
+        linePriceLabel: 'Rp 18.000',
+        targetStrategyLabel: 'Target yang sama',
+        itemStatusLabel: 'Item Aktif',
+        serviceStatusLabel: 'Master Aktif',
+        isActive: true,
+        serviceIsActive: true,
+      },
+    ])
+  })
+
+  it('keeps inactive layanan satuan states visible in bundle detail', () => {
+    const detail = buildAdminSosmedBundleDetail(inactiveBundles[1], 'item-warning')
+
+    expect(detail.statusLabel).toBe('Ada Item Nonaktif')
+    expect(detail.serviceItems.map((item) => item.itemStatusLabel)).toEqual(['Item Aktif', 'Item Nonaktif'])
+    expect(detail.serviceItems.map((item) => item.serviceStatusLabel)).toEqual(['Master Aktif', 'Master Aktif'])
+  })
+
+  it('builds a safe empty detail for packages without variants', () => {
+    const detail = buildAdminSosmedBundleDetail(
+      {
+        id: 'bundle-empty',
+        key: 'new-admin-package',
+        title: 'New Admin Package',
+        subtitle: '',
+        description: '',
+        platform: 'Instagram',
+        badge: '',
+        is_highlighted: false,
+        is_active: true,
+        sort_order: 1,
+        variants: [],
+      },
+      '-'
+    )
+
+    expect(detail).toMatchObject({
+      key: 'new-admin-package:__no-variant',
+      packageKey: 'new-admin-package',
+      packageTitle: 'New Admin Package',
+      variantKey: '-',
+      variantName: 'Belum ada variant',
+      serviceSummary: '0 layanan / 0 unit',
+      statusLabel: 'Belum Ada Variant',
+      canCheckout: false,
+      checkoutHref: null,
+      emptyState: 'Belum ada layanan satuan di variant ini.',
+      serviceItems: [],
+    })
   })
 
   it('distinguishes inactive package variant and item states while hiding unsafe checkout links', () => {

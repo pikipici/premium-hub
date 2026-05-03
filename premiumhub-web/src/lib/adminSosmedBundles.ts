@@ -1,4 +1,8 @@
-import type { AdminSosmedBundleItem, AdminSosmedBundlePackage } from '@/types/sosmedBundle'
+import type {
+  AdminSosmedBundleItem,
+  AdminSosmedBundlePackage,
+  AdminSosmedBundleVariant,
+} from '@/types/sosmedBundle'
 
 export interface AdminSosmedBundleRow {
   key: string
@@ -22,6 +26,37 @@ export interface AdminSosmedBundleSummary {
   packageCount: number
   variantCount: number
   itemCount: number
+}
+
+export interface AdminSosmedBundleDetailServiceItem {
+  key: string
+  title: string
+  serviceCode: string
+  quantityLabel: string
+  linePriceLabel: string
+  targetStrategyLabel: string
+  itemStatusLabel: string
+  serviceStatusLabel: string
+  isActive: boolean
+  serviceIsActive: boolean
+}
+
+export interface AdminSosmedBundleDetail {
+  key: string
+  packageKey: string
+  packageTitle: string
+  variantKey: string
+  variantName: string
+  platform: string
+  badge: string
+  priceLabel: string
+  discountLabel: string
+  serviceSummary: string
+  statusLabel: string
+  canCheckout: boolean
+  checkoutHref: string | null
+  emptyState: string | null
+  serviceItems: AdminSosmedBundleDetailServiceItem[]
 }
 
 function formatRupiah(value: number) {
@@ -56,6 +91,82 @@ function getRowStatusLabel(args: {
 
 function buildCheckoutHref(packageKey: string, variantKey: string) {
   return `/product/sosmed/checkout?bundle=${encodeURIComponent(packageKey)}&variant=${encodeURIComponent(variantKey)}`
+}
+
+function getVariantDiscountLabel(variant: AdminSosmedBundleVariant | null) {
+  if (!variant) return '-'
+  const discount = variant.discount_amount || Math.max(0, (variant.original_price || 0) - (variant.total_price || 0))
+  return discount > 0 ? `Diskon ${formatRupiah(discount)}` : 'Tanpa diskon'
+}
+
+function getTargetStrategyLabel(strategy: string | undefined) {
+  if (strategy === 'same_target' || !strategy) return 'Target yang sama'
+  return strategy
+}
+
+function getBundleDetailKey(packageKey: string, variant: AdminSosmedBundleVariant | null) {
+  return variant ? `${packageKey}:${variant.key}` : `${packageKey}:__no-variant`
+}
+
+function buildDetailServiceItems(items: AdminSosmedBundleItem[]): AdminSosmedBundleDetailServiceItem[] {
+  return [...items]
+    .sort((left, right) => {
+      const sortDiff = (left.sort_order ?? 100) - (right.sort_order ?? 100)
+      if (sortDiff !== 0) return sortDiff
+      return (left.service_code || left.id || '').localeCompare(right.service_code || right.id || '')
+    })
+    .map((item) => ({
+      key: item.id || item.service_code,
+      title: item.label || item.service_title || item.service_code || '-',
+      serviceCode: item.service_code || '-',
+      quantityLabel: `${formatUnitCount(item.quantity_units || 0)} unit`,
+      linePriceLabel: formatRupiah(item.line_price || 0),
+      targetStrategyLabel: getTargetStrategyLabel(item.target_strategy),
+      itemStatusLabel: item.is_active ? 'Item Aktif' : 'Item Nonaktif',
+      serviceStatusLabel: item.service_is_active ? 'Master Aktif' : 'Master Nonaktif',
+      isActive: item.is_active,
+      serviceIsActive: item.service_is_active,
+    }))
+}
+
+export function buildAdminSosmedBundleDetail(
+  bundle: AdminSosmedBundlePackage,
+  variantKey: string
+): AdminSosmedBundleDetail {
+  const variants = [...(bundle.variants || [])]
+  const variant = variants.find((item) => item.key === variantKey) || null
+  const items = variant?.items || []
+  const serviceItems = buildDetailServiceItems(items)
+  const totalUnits = items.reduce((sum, item) => sum + (item.quantity_units || 0), 0)
+  const activeItemCount = items.filter(isBundleItemActive).length
+  const hasInactiveItem = items.some((item) => !isBundleItemActive(item))
+  const canCheckout = Boolean(bundle.is_active && variant?.is_active && activeItemCount > 0)
+  const statusLabel = variant
+    ? getRowStatusLabel({
+        packageActive: bundle.is_active,
+        packageHighlighted: bundle.is_highlighted,
+        variantActive: variant.is_active,
+        hasInactiveItem,
+      })
+    : bundle.is_active ? 'Belum Ada Variant' : 'Nonaktif'
+
+  return {
+    key: getBundleDetailKey(bundle.key, variant),
+    packageKey: bundle.key,
+    packageTitle: bundle.title,
+    variantKey: variant?.key || '-',
+    variantName: variant?.name || 'Belum ada variant',
+    platform: bundle.platform || '-',
+    badge: bundle.badge || '-',
+    priceLabel: variant ? formatRupiah(variant.total_price || 0) : '-',
+    discountLabel: getVariantDiscountLabel(variant),
+    serviceSummary: `${items.length} layanan / ${formatUnitCount(totalUnits)} unit`,
+    statusLabel,
+    canCheckout,
+    checkoutHref: canCheckout && variant ? buildCheckoutHref(bundle.key, variant.key) : null,
+    emptyState: serviceItems.length > 0 ? null : 'Belum ada layanan satuan di variant ini.',
+    serviceItems,
+  }
 }
 
 export function buildAdminSosmedBundleRows(bundles: AdminSosmedBundlePackage[]): AdminSosmedBundleRow[] {

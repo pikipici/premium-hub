@@ -7,7 +7,11 @@ import {
   buildAdminSosmedCatalogTabs,
   type AdminSosmedCatalogTabKey,
 } from '@/lib/adminSosmedCatalogTabs'
-import { buildAdminSosmedBundleRows, getAdminSosmedBundleSummary } from '@/lib/adminSosmedBundles'
+import {
+  buildAdminSosmedBundleDetail,
+  buildAdminSosmedBundleRows,
+  getAdminSosmedBundleSummary,
+} from '@/lib/adminSosmedBundles'
 import {
   buildBundleServiceOptions,
   buildCreateItemPayload,
@@ -59,6 +63,10 @@ import type { SosmedService } from '@/types/sosmedService'
 
 type FormMode = 'create' | 'edit'
 type ResellerFXMode = 'fixed' | 'live'
+type BundlePackageDetailTarget = {
+  packageKey: string
+  variantKey: string
+}
 
 type SosmedServiceFormState = {
   category_code: string
@@ -305,7 +313,7 @@ export default function SosmedServiceSettingsCard() {
   const [packageFormMode, setPackageFormMode] = useState<AdminSosmedBundlePackageFormMode>('create')
   const [editingBundlePackage, setEditingBundlePackage] = useState<AdminSosmedBundlePackage | null>(null)
   const [packageForm, setPackageForm] = useState<AdminSosmedBundlePackageForm>(() => createEmptyPackageForm())
-  const [packageDetailTarget, setPackageDetailTarget] = useState<AdminSosmedBundlePackage | null>(null)
+  const [packageDetailTarget, setPackageDetailTarget] = useState<BundlePackageDetailTarget | null>(null)
 
   const [variantManagerPackage, setVariantManagerPackage] = useState<AdminSosmedBundlePackage | null>(null)
   const [variantFormOpen, setVariantFormOpen] = useState(false)
@@ -386,6 +394,18 @@ export default function SosmedServiceSettingsCard() {
   const bundlePackageByKey = useMemo(
     () => new Map(bundlePackages.map((bundle) => [bundle.key, bundle])),
     [bundlePackages]
+  )
+
+  const packageDetailBundle = useMemo(
+    () => packageDetailTarget ? bundlePackageByKey.get(packageDetailTarget.packageKey) || null : null,
+    [bundlePackageByKey, packageDetailTarget]
+  )
+
+  const packageDetailModel = useMemo(
+    () => packageDetailBundle && packageDetailTarget
+      ? buildAdminSosmedBundleDetail(packageDetailBundle, packageDetailTarget.variantKey)
+      : null,
+    [packageDetailBundle, packageDetailTarget]
   )
 
   const packageModalCopy = useMemo(
@@ -609,9 +629,9 @@ export default function SosmedServiceSettingsCard() {
     setPackageForm(createEmptyPackageForm())
   }
 
-  const openPackageDetail = (bundle: AdminSosmedBundlePackage) => {
+  const openPackageDetail = (bundle: AdminSosmedBundlePackage, variantKey: string) => {
     setActiveCatalogTab('bundle')
-    setPackageDetailTarget(bundle)
+    setPackageDetailTarget({ packageKey: bundle.key, variantKey })
   }
 
   const submitPackageForm = async () => {
@@ -1680,7 +1700,7 @@ export default function SosmedServiceSettingsCard() {
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {targetPackage && (
                               <>
-                                <button className="action-btn" type="button" onClick={() => openPackageDetail(targetPackage)}>
+                                <button className="action-btn" type="button" onClick={() => openPackageDetail(targetPackage, bundle.variantKey)}>
                                   Detail
                                 </button>
                                 <button className="action-btn" type="button" onClick={() => openVariantManager(targetPackage)}>
@@ -1843,21 +1863,26 @@ export default function SosmedServiceSettingsCard() {
         </div>
       )}
 
-      {packageDetailTarget && (() => {
-        const detailSummary = getPackageDetailSummary(packageDetailTarget)
-        const packageToggle = getPackageStatusToggle(packageDetailTarget)
+      {packageDetailBundle && packageDetailModel && (() => {
+        const targetPackage = packageDetailBundle
+        const detailSummary = getPackageDetailSummary(targetPackage)
+        const detail = packageDetailModel
+        const packageToggle = getPackageStatusToggle(targetPackage)
+        const activeDetailItemCount = detail.serviceItems.filter((item) => item.isActive && item.serviceIsActive).length
 
         return (
           <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={() => setPackageDetailTarget(null)}>
             <div
               className="modal-card"
-              style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(760px, 96vw)' }}
+              style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(920px, 96vw)' }}
               onClick={(event) => event.stopPropagation()}
             >
               <div className="modal-head" style={MODAL_HEAD_STYLE}>
                 <div>
                   <h3>Detail Paket Spesial</h3>
-                  <div className="modal-sub" style={MODAL_SUB_STYLE}>{detailSummary.key}</div>
+                  <div className="modal-sub" style={MODAL_SUB_STYLE}>
+                    {detail.packageKey} • {detail.variantKey}
+                  </div>
                 </div>
                 <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={() => setPackageDetailTarget(null)}>×</button>
               </div>
@@ -1866,30 +1891,98 @@ export default function SosmedServiceSettingsCard() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12 }}>
                   <div style={{ display: 'grid', gap: 6 }}>
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>Paket</div>
-                    <div style={{ fontWeight: 800 }}>{detailSummary.title || '-'}</div>
+                    <div style={{ fontWeight: 800 }}>{detail.packageTitle || '-'}</div>
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                      {detailSummary.platform} • {packageDetailTarget.badge || '-'}
+                      {detail.platform} • {detail.badge}
                     </div>
-                    <div style={{ fontSize: 13, lineHeight: 1.5 }}>{packageDetailTarget.subtitle || '-'}</div>
-                    <div style={{ fontSize: 13, lineHeight: 1.5 }}>{packageDetailTarget.description || '-'}</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.5 }}>{targetPackage.subtitle || '-'}</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.5 }}>{targetPackage.description || '-'}</div>
                   </div>
                   <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
                     <div>
-                      <span className={`status ${detailSummary.statusLabel === 'Aktif' ? 's-lunas' : 's-gagal'}`}>
-                        {detailSummary.statusLabel}
+                      <span className={`status ${bundleStatusClass(detail.statusLabel)}`}>
+                        {detail.statusLabel}
                       </span>
-                      {packageDetailTarget.is_highlighted && <span className="status s-proses" style={{ marginLeft: 6 }}>Highlight</span>}
+                      {targetPackage.is_highlighted && <span className="status s-proses" style={{ marginLeft: 6 }}>Highlight</span>}
                     </div>
                     <div style={{ fontSize: 13 }}>
-                      Sort order: <strong>{packageDetailTarget.sort_order ?? 100}</strong>
+                      Variant: <strong>{detail.variantName}</strong> <code>{detail.variantKey}</code>
                     </div>
                     <div style={{ fontSize: 13 }}>
-                      Variant: <strong>{detailSummary.variantCount}</strong>
+                      Harga bundle: <strong>{detail.priceLabel}</strong> <span style={{ color: 'var(--muted)' }}>({detail.discountLabel})</span>
                     </div>
                     <div style={{ fontSize: 13 }}>
-                      Item aktif: <strong>{detailSummary.activeItemCount}</strong> / {detailSummary.itemCount}
+                      Layanan variant ini: <strong>{activeDetailItemCount}</strong> aktif / {detail.serviceItems.length} total
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      Total package: <strong>{detailSummary.variantCount}</strong> variant / {detailSummary.itemCount} item
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      Checkout: {detail.checkoutHref ? (
+                        <a href={detail.checkoutHref} style={{ fontWeight: 700 }}>aktif</a>
+                      ) : (
+                        <strong>nonaktif</strong>
+                      )}
                     </div>
                   </div>
+                </div>
+
+                <div className="card" style={{ padding: 12, borderColor: '#E5E7EB' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontWeight: 800 }}>Layanan Satuan Dalam Paket</div>
+                      <div style={{ marginTop: 3, fontSize: 12, color: 'var(--muted)' }}>
+                        {detail.serviceSummary}. Data ini dipakai buat audit komposisi bundle per variant.
+                      </div>
+                    </div>
+                    <span className={`status ${bundleStatusClass(detail.statusLabel)}`}>{detail.statusLabel}</span>
+                  </div>
+
+                  {detail.emptyState ? (
+                    <div style={{ marginTop: 12, fontSize: 13, color: 'var(--muted)' }}>
+                      {detail.emptyState}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+                      {detail.serviceItems.map((serviceItem) => (
+                        <div
+                          key={serviceItem.key}
+                          style={{
+                            border: '1px solid var(--line, #E5E7EB)',
+                            borderRadius: 12,
+                            padding: 12,
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(220px, 1.4fr) minmax(120px, 0.7fr) minmax(130px, 0.8fr) minmax(150px, 0.9fr)',
+                            gap: 10,
+                            alignItems: 'start',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 800 }}>{serviceItem.title}</div>
+                            <div style={{ marginTop: 3, fontSize: 11, color: 'var(--muted)' }}>
+                              <code>{serviceItem.serviceCode}</code>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                            <div style={{ fontWeight: 800, color: 'var(--text)' }}>{serviceItem.quantityLabel}</div>
+                            <div>{serviceItem.linePriceLabel}</div>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                            <div>Target</div>
+                            <div style={{ fontWeight: 700, color: 'var(--text)' }}>{serviceItem.targetStrategyLabel}</div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <span className={`status ${serviceItem.isActive ? 's-lunas' : 's-gagal'}`}>
+                              {serviceItem.itemStatusLabel}
+                            </span>
+                            <span className={`status ${serviceItem.serviceIsActive ? 's-lunas' : 's-gagal'}`}>
+                              {serviceItem.serviceStatusLabel}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1901,14 +1994,14 @@ export default function SosmedServiceSettingsCard() {
                   className="action-btn"
                   type="button"
                   disabled={saving}
-                  onClick={() => void togglePackageActive(packageDetailTarget)}
+                  onClick={() => void togglePackageActive(targetPackage)}
                 >
                   {packageToggle.label}
                 </button>
                 <button
                   className="action-btn"
                   type="button"
-                  onClick={() => openVariantManager(packageDetailTarget)}
+                  onClick={() => openVariantManager(targetPackage)}
                 >
                   Kelola Variant
                 </button>
@@ -1917,7 +2010,7 @@ export default function SosmedServiceSettingsCard() {
                   type="button"
                   onClick={() => {
                     setPackageDetailTarget(null)
-                    openEditPackageForm(packageDetailTarget)
+                    openEditPackageForm(targetPackage)
                   }}
                 >
                   Edit Paket
