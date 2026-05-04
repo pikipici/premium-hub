@@ -44,7 +44,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     categoryCode: 'followers',
     platform: 'Instagram',
     title: 'Instagram Followers [Refill 30 Hari]',
-    buyerTitle: 'Tambah ±1.000 Followers Instagram',
+    buyerTitle: 'Paket Followers Instagram',
     summary: 'Followers awet dengan garansi isi ulang. Cocok buat naikin kredibilitas brand/toko.',
     bestFor: 'Cocok buat akun baru, test awal, atau naik pelan-pelan dengan budget hemat.',
     badge: 'Paling Laris',
@@ -70,7 +70,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     categoryCode: 'likes',
     platform: 'Instagram',
     title: 'Instagram Likes [No Refill]',
-    buyerTitle: 'Tambah ±1.000 Likes Instagram',
+    buyerTitle: 'Paket Likes Instagram',
     summary: 'Likes instan harga super miring untuk nge-boost interaksi post kamu.',
     bestFor: 'Cocok buat test market singkat dengan harga ringan tanpa garansi refill.',
     badge: 'Paling Murah',
@@ -96,7 +96,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     categoryCode: 'views',
     platform: 'TikTok',
     title: 'TikTok Views [Auto Refill]',
-    buyerTitle: 'Tambah ±1.000 Views TikTok',
+    buyerTitle: 'Paket Views TikTok',
     summary: 'Boost views video TikTok biar FYP makin gampang, lengkap dengan auto refill.',
     bestFor: 'Cocok buat content creator atau TikTok Shop affiliate yang butuh push traffic.',
     badge: 'Trending',
@@ -122,7 +122,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     categoryCode: 'followers',
     platform: 'TikTok',
     title: 'TikTok Followers [Refill 30D]',
-    buyerTitle: 'Tambah ±1.000 Followers TikTok',
+    buyerTitle: 'Paket Followers TikTok',
     summary: 'Kejar syarat live TikTok atau nambah kredibilitas jualan dengan follower awet.',
     bestFor: 'Cocok buat akun baru yang butuh fitur live streaming.',
     badge: 'Live Syarat',
@@ -148,7 +148,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     categoryCode: 'followers',
     platform: 'YouTube',
     title: 'YouTube Subscribers [Max 50K]',
-    buyerTitle: 'Tambah ±1.000 YouTube Subs',
+    buyerTitle: 'Paket YouTube Subs',
     summary: 'Syarat monetisasi YouTube makin deket dengan tambahan subscriber berkualitas.',
     bestFor: 'Cocok buat YouTuber pemula yang butuh boost awal biar channel kliatan pro.',
     badge: 'Monetisasi',
@@ -174,7 +174,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     categoryCode: 'views',
     platform: 'Twitter',
     title: 'Twitter / X Tweet Views',
-    buyerTitle: 'Tambah ±1.000 Views Twitter',
+    buyerTitle: 'Paket Views Twitter',
     summary: 'Bikin tweet kamu kelihatan viral dan trending dengan ribuan views instan.',
     bestFor: 'Cocok buat bikin akun Twitter/X terlihat lebih kredibel saat validasi awal.',
     badge: 'Viral Boost',
@@ -200,7 +200,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     categoryCode: 'views',
     platform: 'Shopee',
     title: 'Shopee Live Views [15 Menit]',
-    buyerTitle: 'Tambah ±1.000 Views Shopee',
+    buyerTitle: 'Paket Views Shopee',
     summary: 'Ramein room Shopee Live kamu biar makin di-push algoritma ke calon pembeli.',
     bestFor: 'Cocok untuk seller Shopee Live yang butuh pancingan traffic awal.',
     badge: 'Seller Pro',
@@ -308,7 +308,7 @@ function readableBadge(platform: string, title: string, badge: string) {
 function buyerTitleFor(platform: string, unit: string) {
   const platformName = normalizePlatform(platform)
   const readableUnit = unit === 'komentar' ? 'Komentar' : unit.charAt(0).toUpperCase() + unit.slice(1)
-  return `Tambah ±1.000 ${readableUnit} ${platformName}`
+  return `Paket ${readableUnit} ${platformName}`
 }
 
 function packageLabelFor(unit: string) {

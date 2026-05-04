@@ -48,10 +48,12 @@ describe('sosmed product card view model', () => {
     expect(twitterCard.platformIcon).toBe('twitter-x')
   })
 
-  it('builds cards around what the buyer gets, not admin-style service specs', () => {
+  it('builds cards around package names instead of old add-1000 wording', () => {
     const [card] = buildSosmedServiceCards([baseService])
 
-    expect(card.buyerTitle).toBe('Tambah ±1.000 Followers Instagram')
+    expect(card.buyerTitle).toBe('Paket Followers Instagram')
+    expect(card.buyerTitle).not.toContain('Tambah')
+    expect(card.buyerTitle).not.toContain('±1.000')
     expect(card.bestFor).toBe('Cocok buat akun baru, test awal, atau naik pelan-pelan dengan budget hemat.')
     expect(card.priceLabel).toBe('Rp 19.000')
     expect(card.packageLabel).toBe('per ±1.000 followers')
@@ -60,5 +62,21 @@ describe('sosmed product card view model', () => {
     expect(card.benefits).toContain('Mulai diproses sekitar ± 2 jam')
     expect(card.benefits).toContain('Garansi isi ulang 30 hari')
     expect(card.benefits).not.toContain('No Password')
+  })
+
+  it('keeps fallback catalog titles package-based while backend services load', () => {
+    const fallbackCards = buildSosmedServiceCards([])
+
+    expect(fallbackCards.map((card) => card.buyerTitle)).toEqual([
+      'Paket Followers Instagram',
+      'Paket Likes Instagram',
+      'Paket Views TikTok',
+      'Paket Followers TikTok',
+      'Paket YouTube Subs',
+      'Paket Views Twitter',
+      'Paket Views Shopee',
+    ])
+    expect(fallbackCards.map((card) => card.buyerTitle).join(' ')).not.toContain('Tambah')
+    expect(fallbackCards.map((card) => card.buyerTitle).join(' ')).not.toContain('±1.000')
   })
 })
