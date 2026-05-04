@@ -394,11 +394,10 @@ func (s *SosmedServiceService) buildJAPDraftService(item JAPServiceItem, sortOrd
 	}
 
 	platformLabel := detectJAPPlatformLabel(item)
-	refillValue := extractJAPBracketValue(item.Name, sosmedJAPRefillPattern)
+	refillLabel := buildJAPRefillLabel(item)
 	startTimeValue := formatSosmedStartTimeValue(extractJAPBracketValue(item.Name, sosmedJAPStartTimePattern))
 	etaValue := formatSosmedETAValue(extractJAPBracketValue(item.Name, sosmedJAPSpeedPattern))
 	maxValue := extractJAPBracketValue(item.Name, sosmedJAPMaxPattern)
-	refillLabel := formatSosmedRefillValue(refillValue)
 	title := buildJAPDisplayTitle(baseJAPServiceName(item.Name), refillLabel)
 	badgeText := buildJAPBadgeText(refillLabel, item.Cancel)
 	trustBadges := buildJAPTrustBadges(refillLabel, startTimeValue, item.Cancel)
@@ -505,6 +504,13 @@ func baseJAPServiceName(raw string) string {
 	}
 	base = strings.Join(strings.Fields(base), " ")
 	return base
+}
+
+func buildJAPRefillLabel(item JAPServiceItem) string {
+	if !item.Refill {
+		return "Tidak Ada"
+	}
+	return formatSosmedRefillValue(extractJAPBracketValue(item.Name, sosmedJAPRefillPattern))
 }
 
 func buildJAPDisplayTitle(baseName, refillLabel string) string {
@@ -791,6 +797,23 @@ func (s *SosmedServiceService) SyncAllJAPMetadata(ctx context.Context) (int, err
 		}
 		if item.ProviderTitle != strings.TrimSpace(providerItem.Name) {
 			item.ProviderTitle = strings.TrimSpace(providerItem.Name)
+			changed = true
+		}
+		if item.ProviderRefillSupported != providerItem.Refill {
+			item.ProviderRefillSupported = providerItem.Refill
+			changed = true
+		}
+		if item.ProviderCancelSupported != providerItem.Cancel {
+			item.ProviderCancelSupported = providerItem.Cancel
+			changed = true
+		}
+		if item.ProviderDripfeedSupported != providerItem.Dripfeed {
+			item.ProviderDripfeedSupported = providerItem.Dripfeed
+			changed = true
+		}
+		refillLabel := buildJAPRefillLabel(providerItem)
+		if item.Refill != refillLabel {
+			item.Refill = refillLabel
 			changed = true
 		}
 

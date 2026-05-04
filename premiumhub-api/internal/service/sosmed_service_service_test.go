@@ -414,16 +414,27 @@ func TestSosmedService_ImportSelectedFromJAP_CreatesDrafts(t *testing.T) {
 					Refill:   false,
 					Cancel:   false,
 				},
+				{
+					Service:  "10216",
+					Name:     "Instagram Followers [Refill: 30D] [Max: 50K] [Start Time: 1 Hour] [Speed: 10K/Day]",
+					Type:     "Default",
+					Category: "Instagram Followers",
+					Rate:     "0.30",
+					Min:      "10",
+					Max:      "50000",
+					Refill:   false,
+					Cancel:   false,
+				},
 			},
 		})
 
 	res, err := svc.ImportSelectedFromJAP(context.Background(), ImportSelectedJAPServicesInput{
-		ServiceIDs: []int64{6331, 8695},
+		ServiceIDs: []int64{6331, 8695, 10216},
 	})
 	if err != nil {
 		t.Fatalf("import selected JAP: %v", err)
 	}
-	if res.Created != 2 || res.Updated != 0 || res.Skipped != 0 {
+	if res.Created != 3 || res.Updated != 0 || res.Skipped != 0 {
 		t.Fatalf("unexpected import result: %+v", res)
 	}
 
@@ -477,6 +488,23 @@ func TestSosmedService_ImportSelectedFromJAP_CreatesDrafts(t *testing.T) {
 	}
 	if twitter.IsActive {
 		t.Fatalf("twitter draft should stay inactive after import")
+	}
+
+	blocked, err := repo.FindByProvider("jap", "10216")
+	if err != nil {
+		t.Fatalf("find refill-false draft with period text: %v", err)
+	}
+	if blocked.ProviderRefillSupported {
+		t.Fatalf("expected provider_refill_supported=false for blocked service")
+	}
+	if blocked.Refill != "Tidak Ada" {
+		t.Fatalf("expected official JAP refill=false to force local refill Tidak Ada, got %q", blocked.Refill)
+	}
+	if strings.Contains(strings.ToLower(blocked.Title), "refill") {
+		t.Fatalf("blocked service title must not promise refill, got %q", blocked.Title)
+	}
+	if strings.Contains(strings.ToLower(strings.Join(blocked.TrustBadges, " ")), "refill 30") {
+		t.Fatalf("blocked service trust badges must not promise refill period, got %v", blocked.TrustBadges)
 	}
 }
 
@@ -605,6 +633,12 @@ func TestSosmedService_SyncAllJAPMetadata_BackfillsLegacyPrices(t *testing.T) {
 	}
 	if stored.ProviderRate != "0.25" || stored.ProviderCurrency != "USD" {
 		t.Fatalf("expected provider rate/currency backfilled, got %s/%s", stored.ProviderRate, stored.ProviderCurrency)
+	}
+	if stored.ProviderRefillSupported {
+		t.Fatalf("expected metadata sync to persist JAP refill=false")
+	}
+	if stored.Refill != "Tidak Ada" {
+		t.Fatalf("expected metadata sync to force refill Tidak Ada for JAP refill=false, got %q", stored.Refill)
 	}
 	if stored.PriceStart != "Reseller Rp 4.250/1K" {
 		t.Fatalf("unexpected price_start: %s", stored.PriceStart)

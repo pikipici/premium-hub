@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"premiumhub-api/internal/model"
@@ -42,33 +44,97 @@ type publicSosmedServiceResponse struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+var (
+	publicSosmedRefillBracketPattern  = regexp.MustCompile(`(?i)\[[^\]]*(refill|garansi|guarantee|guaranteed|warranty)[^\]]*\]`)
+	publicSosmedNoRefillPhrasePattern = regexp.MustCompile(`(?i)\b(no|tanpa|tidak ada|non)\s+refill\b`)
+	publicSosmedRefillPhrasePattern   = regexp.MustCompile(`(?i)\b(auto[\s-]*)?refill\b\s*:?\s*[0-9]*\s*(d|day|days|hari)?`)
+	publicSosmedGuaranteePattern      = regexp.MustCompile(`(?i)\b(garansi|guarantee|guaranteed|warranty)\b\s*:?\s*[0-9]*\s*(d|day|days|hari)?`)
+)
+
 func NewSosmedServiceHandler(svc *service.SosmedServiceService) *SosmedServiceHandler {
 	return &SosmedServiceHandler{svc: svc}
 }
 
 func toPublicSosmedServiceResponse(item model.SosmedService) publicSosmedServiceResponse {
+	title := item.Title
+	summary := item.Summary
+	badgeText := item.BadgeText
+	refill := item.Refill
+	trustBadges := item.TrustBadges
+	if isPublicJAPRefillUnsupported(item) {
+		title = stripPublicSosmedRefillClaims(title)
+		summary = stripPublicSosmedRefillClaims(summary)
+		badgeText = sanitizePublicSosmedRefillBadgeText(badgeText)
+		refill = "Tidak Ada"
+		trustBadges = filterPublicSosmedRefillBadges(trustBadges)
+	}
+
 	return publicSosmedServiceResponse{
 		ID:            item.ID,
 		CategoryCode:  item.CategoryCode,
 		Code:          item.Code,
-		Title:         item.Title,
-		Summary:       item.Summary,
+		Title:         title,
+		Summary:       summary,
 		PlatformLabel: item.PlatformLabel,
-		BadgeText:     item.BadgeText,
+		BadgeText:     badgeText,
 		Theme:         item.Theme,
 		MinOrder:      item.MinOrder,
 		StartTime:     item.StartTime,
-		Refill:        item.Refill,
+		Refill:        refill,
 		ETA:           item.ETA,
 		PriceStart:    item.PriceStart,
 		PricePer1K:    item.PricePer1K,
 		CheckoutPrice: item.CheckoutPrice,
-		TrustBadges:   item.TrustBadges,
+		TrustBadges:   trustBadges,
 		SortOrder:     item.SortOrder,
 		IsActive:      item.IsActive,
 		CreatedAt:     item.CreatedAt,
 		UpdatedAt:     item.UpdatedAt,
 	}
+}
+
+func isPublicJAPRefillUnsupported(item model.SosmedService) bool {
+	return strings.EqualFold(strings.TrimSpace(item.ProviderCode), "jap") &&
+		strings.TrimSpace(item.ProviderServiceID) != "" &&
+		!item.ProviderRefillSupported
+}
+
+func stripPublicSosmedRefillClaims(value string) string {
+	cleaned := strings.TrimSpace(value)
+	if cleaned == "" {
+		return ""
+	}
+	cleaned = publicSosmedRefillBracketPattern.ReplaceAllString(cleaned, " ")
+	cleaned = publicSosmedNoRefillPhrasePattern.ReplaceAllString(cleaned, " ")
+	cleaned = publicSosmedRefillPhrasePattern.ReplaceAllString(cleaned, " ")
+	cleaned = publicSosmedGuaranteePattern.ReplaceAllString(cleaned, " ")
+	cleaned = strings.ReplaceAll(cleaned, "  ", " ")
+	cleaned = strings.Trim(cleaned, " -•|,.;")
+	return strings.Join(strings.Fields(cleaned), " ")
+}
+
+func sanitizePublicSosmedRefillBadgeText(value string) string {
+	cleaned := stripPublicSosmedRefillClaims(value)
+	if cleaned == "" && strings.TrimSpace(value) != "" {
+		return "Rekomendasi"
+	}
+	return cleaned
+}
+
+func filterPublicSosmedRefillBadges(items []string) []string {
+	filtered := make([]string, 0, len(items))
+	for _, item := range items {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		normalized := strings.ToLower(trimmed)
+		if strings.Contains(normalized, "refill") || strings.Contains(normalized, "garansi") {
+			continue
+		}
+		filtered = append(filtered, trimmed)
+	}
+	return filtered
 }
 
 func (h *SosmedServiceHandler) PublicList(c *gin.Context) {

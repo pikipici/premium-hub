@@ -129,6 +129,45 @@ func TestPopulateSosmedOrderRefill(t *testing.T) {
 		}
 	})
 
+	t.Run("JAP refill false blocks period text from becoming eligible", func(t *testing.T) {
+		order := &model.SosmedOrder{}
+		svc := &model.SosmedService{
+			ProviderCode:            "jap",
+			ProviderServiceID:       "6331",
+			Refill:                  "30 Hari",
+			ProviderRefillSupported: false,
+		}
+		populateSosmedOrderRefill(order, svc)
+
+		if order.RefillEligible {
+			t.Fatal("expected JAP service with provider_refill_supported=false to stay ineligible even with period text")
+		}
+		if order.RefillPeriodDays != 30 {
+			t.Fatalf("expected RefillPeriodDays=30 for audit, got %d", order.RefillPeriodDays)
+		}
+		if order.RefillDeadline != nil {
+			t.Fatal("expected RefillDeadline=nil when JAP refill support is false")
+		}
+	})
+
+	t.Run("JAP refill true still needs a parseable period", func(t *testing.T) {
+		order := &model.SosmedOrder{}
+		svc := &model.SosmedService{
+			ProviderCode:            "jap",
+			ProviderServiceID:       "9999",
+			Refill:                  "",
+			ProviderRefillSupported: true,
+		}
+		populateSosmedOrderRefill(order, svc)
+
+		if order.RefillEligible {
+			t.Fatal("expected JAP service without refill period to stay ineligible")
+		}
+		if order.RefillDeadline != nil {
+			t.Fatal("expected RefillDeadline=nil without a period")
+		}
+	})
+
 	t.Run("provider supported but no refill string", func(t *testing.T) {
 		order := &model.SosmedOrder{}
 		svc := &model.SosmedService{
@@ -171,6 +210,18 @@ func TestCanUserRequestSosmedRefill(t *testing.T) {
 
 	if err := canUserRequestSosmedRefill(base, time.Now()); err != nil {
 		t.Fatalf("expected base order to be claimable, got %v", err)
+	}
+
+	staleJAPSnapshot := *base
+	staleJAPSnapshot.Service = model.SosmedService{
+		ID:                      uuid.New(),
+		ProviderCode:            "jap",
+		ProviderServiceID:       "6331",
+		Refill:                  "30 Hari",
+		ProviderRefillSupported: false,
+	}
+	if err := canUserRequestSosmedRefill(&staleJAPSnapshot, time.Now()); err == nil || !strings.Contains(err.Error(), "garansi refill") {
+		t.Fatalf("expected loaded JAP service with refill=false to block stale eligible snapshot, got %v", err)
 	}
 
 	supplierRejected := *base
@@ -316,16 +367,17 @@ func TestSosmedOrderService_UserRequestRefill(t *testing.T) {
 		t.Fatalf("expected active refill block, got: %v", err)
 	}
 
-	// Test 3b: Rejected refill can be claimed again and keeps previous history.
+	// Test 3b: A retryable local rejection (not JAP supplier-unavailable Rejected)
+	// can be claimed again and keeps previous history.
 	if err := db.Model(&model.SosmedOrder{}).
 		Where("id = ?", order.ID).
 		Updates(map[string]any{
 			"refill_status":            sosmedRefillStatusRejected,
-			"refill_provider_status":   "Rejected",
-			"refill_provider_error":    "provider rejected previous attempt",
+			"refill_provider_status":   "Failed",
+			"refill_provider_error":    "provider failed previous attempt",
 			"refill_provider_order_id": "REFILL-1001",
 		}).Error; err != nil {
-		t.Fatalf("mark first refill rejected: %v", err)
+		t.Fatalf("mark first refill retryable rejected: %v", err)
 	}
 	rejectedOrder, err := orderSvc.repo.FindByID(order.ID)
 	if err != nil {

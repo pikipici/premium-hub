@@ -536,6 +536,24 @@ func isJAPSosmedOrder(order *model.SosmedOrder) bool {
 	return strings.EqualFold(strings.TrimSpace(order.ProviderCode), "jap") && strings.TrimSpace(order.ProviderServiceID) != ""
 }
 
+func isJAPSosmedService(svc *model.SosmedService) bool {
+	if svc == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(svc.ProviderCode), "jap") && strings.TrimSpace(svc.ProviderServiceID) != ""
+}
+
+func computeSosmedServiceRefillEligibility(svc *model.SosmedService) (eligible bool, periodDays int) {
+	if svc == nil {
+		return false, 0
+	}
+	periodDays = parseSosmedRefillPeriodDays(svc.Refill)
+	if isJAPSosmedService(svc) {
+		return svc.ProviderRefillSupported && periodDays > 0, periodDays
+	}
+	return svc.ProviderRefillSupported || periodDays > 0, periodDays
+}
+
 // populateSosmedOrderRefill sets refill tracking fields on a new order
 // based on the associated service metadata. Call this right after building
 // the order struct in both the wallet-paid and pending-payment checkout paths.
@@ -544,16 +562,14 @@ func populateSosmedOrderRefill(order *model.SosmedOrder, svc *model.SosmedServic
 		return
 	}
 
-	// Determine eligibility: the service must flag provider_refill_supported=true
-	// OR have a parseable refill period string (e.g. "30 Hari").
-	periodDays := parseSosmedRefillPeriodDays(svc.Refill)
-	eligible := svc.ProviderRefillSupported || periodDays > 0
+	eligible, periodDays := computeSosmedServiceRefillEligibility(svc)
 
 	order.RefillEligible = eligible
+	order.RefillPeriodDays = periodDays
+	order.RefillDeadline = nil
 	order.RefillStatus = sosmedRefillStatusNone
 
 	if eligible && periodDays > 0 {
-		order.RefillPeriodDays = periodDays
 		deadline := time.Now().Add(time.Duration(periodDays) * 24 * time.Hour)
 		order.RefillDeadline = &deadline
 	}
@@ -1061,6 +1077,12 @@ func isSosmedSupplierRejectedRefillUnavailable(order *model.SosmedOrder) bool {
 func canUserRequestSosmedRefill(order *model.SosmedOrder, now time.Time) error {
 	if order == nil {
 		return errors.New("order sosmed tidak ditemukan")
+	}
+	if order.Service.ID != uuid.Nil && isJAPSosmedService(&order.Service) {
+		serviceEligible, _ := computeSosmedServiceRefillEligibility(&order.Service)
+		if !serviceEligible {
+			return errors.New("order ini tidak memiliki garansi refill")
+		}
 	}
 	if !order.RefillEligible {
 		return errors.New("order ini tidak memiliki garansi refill")
