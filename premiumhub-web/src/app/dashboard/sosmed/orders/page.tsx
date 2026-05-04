@@ -13,6 +13,7 @@ import {
   getUserRefillTitle,
 } from '@/lib/sosmedRefillUi'
 import { getRefillHistoryToggleLabel, isRefillHistoryExpanded } from '@/lib/sosmedRefillHistoryUi'
+import { buildUserSosmedOrderDisplay } from '@/lib/sosmedOrderDisplay'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
 import type { SosmedOrder } from '@/types/sosmedOrder'
@@ -324,6 +325,7 @@ export default function DashboardSosmedOrdersPage() {
         <section className="space-y-2">
           {orders.map((order) => {
             const status = statusMeta(order)
+            const orderDisplay = buildUserSosmedOrderDisplay(order)
             const refill = getUserRefillMeta(order)
             const refillButton = getUserRefillButtonState(refill, refillLoading === order.id)
             const refillTitle = getUserRefillTitle(order)
@@ -351,7 +353,7 @@ export default function DashboardSosmedOrdersPage() {
                           <span className="text-xs font-semibold text-[#888]">{formatDate(order.created_at)}</span>
                         </div>
                         <h2 className="mt-2 text-base font-black leading-tight text-[#141414] sm:text-lg">
-                          {order.service_title}
+                          {orderDisplay.productTitle}
                         </h2>
                       </div>
 
@@ -367,11 +369,16 @@ export default function DashboardSosmedOrdersPage() {
                       </div>
                     </div>
 
-                    <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-[#EFEFEA] bg-[#FAFAF8] px-3 py-2 text-xs text-[#555]">
-                      <Link2 className="h-3.5 w-3.5 shrink-0 text-[#FF5733]" />
-                      <span className="min-w-0 truncate">
-                        Target: <span className="font-bold text-[#141414]">{target}</span>
-                      </span>
+                    <div className="flex flex-wrap gap-2">
+                      <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-[#EFEFEA] bg-[#FAFAF8] px-3 py-2 text-xs text-[#555]">
+                        <Link2 className="h-3.5 w-3.5 shrink-0 text-[#FF5733]" />
+                        <span className="min-w-0 truncate">
+                          Target: <span className="font-bold text-[#141414]">{target}</span>
+                        </span>
+                      </div>
+                      <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-[#EFEFEA] bg-[#FAFAF8] px-3 py-2 text-xs text-[#555]">
+                        <span className="font-bold text-[#141414]">{orderDisplay.quantityLabel}</span>
+                      </div>
                     </div>
 
                     <div className="rounded-2xl border border-[#EFEFEA] bg-[#FCFCFA] px-4 py-3">
