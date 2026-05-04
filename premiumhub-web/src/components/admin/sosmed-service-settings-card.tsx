@@ -13,6 +13,17 @@ import {
   getAdminSosmedBundleSummary,
 } from '@/lib/adminSosmedBundles'
 import {
+  addBundleBuilderItemRow,
+  buildBundleBuilderCreatePayloads,
+  buildBundleBuilderPreview,
+  createEmptyBundleBuilderForm,
+  removeBundleBuilderItemRow,
+  submitBundleBuilderCreateFlow,
+  updateBundleBuilderItemRow,
+  validateBundleBuilderForm,
+  type AdminSosmedBundleBuilderForm,
+} from '@/lib/adminSosmedBundleBuilder'
+import {
   buildBundleServiceOptions,
   buildCreateItemPayload,
   buildCreatePackagePayload,
@@ -57,6 +68,8 @@ import type { ProductCategory } from '@/types/productCategory'
 import type {
   AdminSosmedBundleItem,
   AdminSosmedBundlePackage,
+  AdminSosmedBundlePriceMode,
+  AdminSosmedBundleTargetStrategy,
   AdminSosmedBundleVariant,
 } from '@/types/sosmedBundle'
 import type { SosmedService } from '@/types/sosmedService'
@@ -315,6 +328,9 @@ export default function SosmedServiceSettingsCard() {
   const [packageForm, setPackageForm] = useState<AdminSosmedBundlePackageForm>(() => createEmptyPackageForm())
   const [packageDetailTarget, setPackageDetailTarget] = useState<BundlePackageDetailTarget | null>(null)
 
+  const [bundleBuilderOpen, setBundleBuilderOpen] = useState(false)
+  const [bundleBuilderForm, setBundleBuilderForm] = useState<AdminSosmedBundleBuilderForm>(() => createEmptyBundleBuilderForm())
+
   const [variantManagerPackage, setVariantManagerPackage] = useState<AdminSosmedBundlePackage | null>(null)
   const [variantFormOpen, setVariantFormOpen] = useState(false)
   const [variantFormMode, setVariantFormMode] = useState<AdminSosmedBundleVariantFormMode>('create')
@@ -425,6 +441,21 @@ export default function SosmedServiceSettingsCard() {
   }, [itemManagerVariant, variantManagerPackageCurrent])
 
   const bundleServiceOptions = useMemo(() => buildBundleServiceOptions(items), [items])
+
+  const bundleBuilderPreview = useMemo(
+    () => buildBundleBuilderPreview(bundleBuilderForm, items),
+    [bundleBuilderForm, items]
+  )
+
+  const bundleBuilderErrors = useMemo(
+    () => validateBundleBuilderForm(bundleBuilderForm),
+    [bundleBuilderForm]
+  )
+
+  const bundleBuilderVariantPriceFieldVisibility = useMemo(
+    () => getVariantPriceFieldVisibility(bundleBuilderForm.variant.price_mode),
+    [bundleBuilderForm.variant.price_mode]
+  )
 
   const variantModalCopy = useMemo(
     () => variantManagerPackageCurrent
@@ -553,7 +584,7 @@ export default function SosmedServiceSettingsCard() {
   }, [loadJAPBalance])
 
   useEffect(() => {
-    if (!formOpen && !confirmOpen && !detailTarget && !importJAPOpen && !packageFormOpen && !packageDetailTarget && !variantManagerPackage) return
+    if (!formOpen && !confirmOpen && !detailTarget && !importJAPOpen && !packageFormOpen && !packageDetailTarget && !bundleBuilderOpen && !variantManagerPackage) return
 
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -561,7 +592,7 @@ export default function SosmedServiceSettingsCard() {
     return () => {
       document.body.style.overflow = previousOverflow
     }
-  }, [confirmOpen, detailTarget, formOpen, importJAPOpen, packageDetailTarget, packageFormOpen, variantManagerPackage])
+  }, [bundleBuilderOpen, confirmOpen, detailTarget, formOpen, importJAPOpen, packageDetailTarget, packageFormOpen, variantManagerPackage])
 
   const openCreateForm = () => {
     setFormMode('create')
@@ -627,6 +658,115 @@ export default function SosmedServiceSettingsCard() {
     setPackageFormOpen(false)
     setEditingBundlePackage(null)
     setPackageForm(createEmptyPackageForm())
+  }
+
+  const openBundleBuilder = () => {
+    setBundleBuilderForm(createEmptyBundleBuilderForm())
+    setActiveCatalogTab('bundle')
+    setError('')
+    setBundleBuilderOpen(true)
+  }
+
+  const closeBundleBuilder = () => {
+    if (saving) return
+    setBundleBuilderOpen(false)
+    setBundleBuilderForm(createEmptyBundleBuilderForm())
+  }
+
+  const updateBundleBuilderPackage = (patch: Partial<AdminSosmedBundleBuilderForm['package']>) => {
+    setBundleBuilderForm((prev) => ({
+      ...prev,
+      package: { ...prev.package, ...patch },
+    }))
+  }
+
+  const updateBundleBuilderVariant = (patch: Partial<AdminSosmedBundleBuilderForm['variant']>) => {
+    setBundleBuilderForm((prev) => ({
+      ...prev,
+      variant: { ...prev.variant, ...patch },
+    }))
+  }
+
+  const addBundleBuilderRow = () => {
+    setBundleBuilderForm((prev) => ({
+      ...prev,
+      items: addBundleBuilderItemRow(prev.items, `row-${prev.items.length + 1}-${Date.now()}`),
+    }))
+  }
+
+  const updateBundleBuilderRow = (
+    rowId: string,
+    patch: Partial<AdminSosmedBundleBuilderForm['items'][number]>
+  ) => {
+    setBundleBuilderForm((prev) => ({
+      ...prev,
+      items: updateBundleBuilderItemRow(prev.items, rowId, patch),
+    }))
+  }
+
+  const removeBundleBuilderRow = (rowId: string) => {
+    setBundleBuilderForm((prev) => ({
+      ...prev,
+      items: removeBundleBuilderItemRow(prev.items, rowId),
+    }))
+  }
+
+  const submitBundleBuilder = async () => {
+    const validationErrors = validateBundleBuilderForm(bundleBuilderForm)
+    if (validationErrors.length > 0) {
+      setError(`Perbaiki Bundle Builder dulu: ${validationErrors.join(', ')}`)
+      return
+    }
+
+    const payloads = buildBundleBuilderCreatePayloads(bundleBuilderForm)
+    setSaving(true)
+    setError('')
+    setNotice('')
+
+    try {
+      const result = await submitBundleBuilderCreateFlow(payloads, {
+        createPackage: (payload) => sosmedBundleService.adminCreatePackage(payload),
+        createVariant: (packageId, payload) => sosmedBundleService.adminCreateVariant(packageId, payload),
+        createItem: (variantId, payload) => sosmedBundleService.adminCreateItem(variantId, payload),
+      })
+
+      setActiveCatalogTab('bundle')
+
+      if (result.status === 'success') {
+        setNotice(result.message)
+        setBundleBuilderOpen(false)
+        setBundleBuilderForm(createEmptyBundleBuilderForm())
+        setPackageDetailTarget({
+          packageKey: result.createdPackage.key || payloads.packagePayload.key,
+          variantKey: result.createdVariant.key || payloads.variantPayload.key,
+        })
+        await loadData()
+        return
+      }
+
+      if (result.status === 'partial_failure') {
+        setError(result.message)
+        setNotice('Sebagian data Bundle Builder sudah tersimpan. Cek tabel Paket Spesial untuk lanjut recovery lewat Kelola Variant / Kelola Item.')
+        setBundleBuilderOpen(false)
+        setBundleBuilderForm(createEmptyBundleBuilderForm())
+        if (result.createdPackage?.key && result.createdVariant?.key) {
+          setPackageDetailTarget({
+            packageKey: result.createdPackage.key,
+            variantKey: result.createdVariant.key,
+          })
+        } else {
+          setPackageDetailTarget(null)
+        }
+        await loadData()
+        return
+      }
+
+      setError(result.message)
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal submit Bundle Builder'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const openPackageDetail = (bundle: AdminSosmedBundlePackage, variantKey: string) => {
@@ -1636,6 +1776,9 @@ export default function SosmedServiceSettingsCard() {
               <span className="status s-lunas">{bundleSummary.variantCount} Variant</span>
               <span className="status s-lunas">{bundleSummary.itemCount} Item Layanan</span>
             </div>
+            <button className="topbar-btn" type="button" onClick={openBundleBuilder} disabled={saving || loading}>
+              Buat Paket dari Layanan Satuan
+            </button>
             <button className="topbar-btn primary" type="button" onClick={openCreatePackageForm} disabled={saving || loading}>
               + Tambah Paket
             </button>
@@ -1738,6 +1881,365 @@ export default function SosmedServiceSettingsCard() {
             </div>
           )}
         </div>
+          </div>
+        </div>
+      )}
+
+      {bundleBuilderOpen && (
+        <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={closeBundleBuilder}>
+          <div
+            className="modal-card"
+            style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(1080px, 96vw)' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head" style={MODAL_HEAD_STYLE}>
+              <div>
+                <h3>Bundle Builder: Buat Paket dari Layanan Satuan</h3>
+                <div className="modal-sub" style={MODAL_SUB_STYLE}>
+                  Isi package, variant pertama, dan beberapa layanan satuan dari satu modal. Preview dan validasi update otomatis sebelum submit.
+                </div>
+              </div>
+              <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={closeBundleBuilder}>×</button>
+            </div>
+
+            <div className="modal-body" style={MODAL_BODY_STYLE}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12 }}>
+                <div className="card" style={{ padding: 12, borderColor: '#BFDBFE' }}>
+                  <div style={{ fontWeight: 800, marginBottom: 8 }}>1. Info Paket</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr', gap: 8 }}>
+                    <div>
+                      <label className="form-label">Key Paket</label>
+                      <input
+                        className="form-input"
+                        value={bundleBuilderForm.package.key}
+                        onChange={(event) => updateBundleBuilderPackage({ key: event.target.value })}
+                        placeholder="contoh: umkm-combo"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Platform</label>
+                      <input
+                        className="form-input"
+                        value={bundleBuilderForm.package.platform}
+                        onChange={(event) => updateBundleBuilderPackage({ platform: event.target.value })}
+                        placeholder="Instagram / Multi Platform"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Urutan</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        value={bundleBuilderForm.package.sort_order}
+                        onChange={(event) => updateBundleBuilderPackage({ sort_order: event.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <label className="form-label">Judul Paket</label>
+                    <input
+                      className="form-input"
+                      value={bundleBuilderForm.package.title}
+                      onChange={(event) => updateBundleBuilderPackage({ title: event.target.value })}
+                      placeholder="Contoh: UMKM Combo"
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                    <div>
+                      <label className="form-label">Subtitle</label>
+                      <input
+                        className="form-input"
+                        value={bundleBuilderForm.package.subtitle}
+                        onChange={(event) => updateBundleBuilderPackage({ subtitle: event.target.value })}
+                        placeholder="Paket awal jualan"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Badge</label>
+                      <input
+                        className="form-input"
+                        value={bundleBuilderForm.package.badge}
+                        onChange={(event) => updateBundleBuilderPackage({ badge: event.target.value })}
+                        placeholder="Rekomendasi"
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <label className="form-label">Deskripsi Paket</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={2}
+                      value={bundleBuilderForm.package.description}
+                      onChange={(event) => updateBundleBuilderPackage({ description: event.target.value })}
+                      placeholder="Ringkasan benefit paket"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 10 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={bundleBuilderForm.package.is_highlighted}
+                        onChange={(event) => updateBundleBuilderPackage({ is_highlighted: event.target.checked })}
+                      />
+                      Highlight
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={bundleBuilderForm.package.is_active}
+                        onChange={(event) => updateBundleBuilderPackage({ is_active: event.target.checked })}
+                      />
+                      Paket aktif
+                    </label>
+                  </div>
+                </div>
+
+                <div className="card" style={{ padding: 12, borderColor: '#DDD6FE' }}>
+                  <div style={{ fontWeight: 800, marginBottom: 8 }}>2. Variant Pertama</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr', gap: 8 }}>
+                    <div>
+                      <label className="form-label">Key Variant</label>
+                      <input
+                        className="form-input"
+                        value={bundleBuilderForm.variant.key}
+                        onChange={(event) => updateBundleBuilderVariant({ key: event.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Nama Variant</label>
+                      <input
+                        className="form-input"
+                        value={bundleBuilderForm.variant.name}
+                        onChange={(event) => updateBundleBuilderVariant({ name: event.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Urutan</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        value={bundleBuilderForm.variant.sort_order}
+                        onChange={(event) => updateBundleBuilderVariant({ sort_order: event.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <label className="form-label">Deskripsi Variant</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={2}
+                      value={bundleBuilderForm.variant.description}
+                      onChange={(event) => updateBundleBuilderVariant({ description: event.target.value })}
+                      placeholder="Deskripsi pilihan checkout"
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
+                    <div>
+                      <label className="form-label">Price Mode</label>
+                      <select
+                        className="form-select"
+                        value={bundleBuilderForm.variant.price_mode}
+                        onChange={(event) => updateBundleBuilderVariant({ price_mode: event.target.value as AdminSosmedBundlePriceMode })}
+                      >
+                        <option value="computed">Computed dari item aktif</option>
+                        <option value="fixed">Fixed price</option>
+                        <option value="computed_with_discount">Computed + discount</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Fixed Price</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min="0"
+                        value={bundleBuilderForm.variant.fixed_price}
+                        onChange={(event) => updateBundleBuilderVariant({ fixed_price: event.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Discount %</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={bundleBuilderForm.variant.discount_percent}
+                        onChange={(event) => updateBundleBuilderVariant({ discount_percent: event.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Discount Rp</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min="0"
+                        value={bundleBuilderForm.variant.discount_amount}
+                        onChange={(event) => updateBundleBuilderVariant({ discount_amount: event.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
+                    {bundleBuilderVariantPriceFieldVisibility.helpText}
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginTop: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={bundleBuilderForm.variant.is_active}
+                      onChange={(event) => updateBundleBuilderVariant({ is_active: event.target.checked })}
+                    />
+                    Variant aktif untuk checkout publik
+                  </label>
+                </div>
+              </div>
+
+              <div className="card" style={{ padding: 12, borderColor: '#BBF7D0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontWeight: 800 }}>3. Layanan Satuan Dalam Paket</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      Pilih beberapa layanan master, quantity unit, label override, urutan, dan status item sebelum submit.
+                    </div>
+                  </div>
+                  <button className="action-btn" type="button" onClick={addBundleBuilderRow}>
+                    + Tambah Layanan
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {bundleBuilderForm.items.map((row, index) => (
+                    <div
+                      key={row.row_id}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.35fr 0.9fr 0.65fr 0.75fr 0.55fr 0.65fr',
+                        gap: 8,
+                        alignItems: 'end',
+                        padding: 10,
+                        border: '1px solid #DCFCE7',
+                        borderRadius: 12,
+                        background: '#FAFFFC',
+                      }}
+                    >
+                      <div>
+                        <label className="form-label">Master Layanan #{index + 1}</label>
+                        <select
+                          className="form-select"
+                          value={row.sosmed_service_id}
+                          onChange={(event) => updateBundleBuilderRow(row.row_id, { sosmed_service_id: event.target.value })}
+                        >
+                          <option value="">Pilih layanan sosmed...</option>
+                          {bundleServiceOptions.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="form-label">Label Override</label>
+                        <input
+                          className="form-input"
+                          value={row.label}
+                          onChange={(event) => updateBundleBuilderRow(row.row_id, { label: event.target.value })}
+                          placeholder="Opsional"
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label">Quantity Units</label>
+                        <input
+                          className="form-input"
+                          type="number"
+                          min="1"
+                          value={row.quantity_units}
+                          onChange={(event) => updateBundleBuilderRow(row.row_id, { quantity_units: event.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label">Target Strategy</label>
+                        <select
+                          className="form-select"
+                          value={row.target_strategy}
+                          onChange={(event) => updateBundleBuilderRow(row.row_id, { target_strategy: event.target.value as AdminSosmedBundleTargetStrategy })}
+                        >
+                          <option value="same_target">Same target checkout</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="form-label">Urutan</label>
+                        <input
+                          className="form-input"
+                          type="number"
+                          min="1"
+                          value={row.sort_order}
+                          onChange={(event) => updateBundleBuilderRow(row.row_id, { sort_order: event.target.value })}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingBottom: 8 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                          <input
+                            type="checkbox"
+                            checked={row.is_active}
+                            onChange={(event) => updateBundleBuilderRow(row.row_id, { is_active: event.target.checked })}
+                          />
+                          Aktif
+                        </label>
+                        <button
+                          className="action-btn"
+                          type="button"
+                          onClick={() => removeBundleBuilderRow(row.row_id)}
+                          disabled={bundleBuilderForm.items.length <= 1}
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card" style={{ padding: 12, background: '#f8fafc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontWeight: 800 }}>Preview Builder</div>
+                    <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>
+                      {bundleBuilderPreview.readinessLabel} • {bundleBuilderPreview.priceModeLabel}
+                    </div>
+                    {bundleBuilderPreview.warnings.length > 0 && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: 'var(--red)' }}>
+                        {bundleBuilderPreview.warnings.join(' ')}
+                      </div>
+                    )}
+                    {bundleBuilderErrors.length > 0 && (
+                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--red)' }}>
+                        <strong>Validasi:</strong>
+                        <ul style={{ margin: '4px 0 0 18px', padding: 0 }}>
+                          {bundleBuilderErrors.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {bundleBuilderPreview.summaryLines.map((line) => (
+                      <span key={line} className="status s-proses">{line}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions" style={MODAL_ACTIONS_STYLE}>
+              <button className="action-btn" type="button" onClick={closeBundleBuilder} disabled={saving}>
+                Tutup
+              </button>
+              <button
+                className="topbar-btn primary"
+                type="button"
+                onClick={() => void submitBundleBuilder()}
+                disabled={saving || bundleBuilderErrors.length > 0}
+              >
+                {saving ? 'Menyimpan...' : 'Buat Paket Sekarang'}
+              </button>
+            </div>
           </div>
         </div>
       )}
