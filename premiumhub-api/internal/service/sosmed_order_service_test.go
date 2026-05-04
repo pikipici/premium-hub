@@ -636,6 +636,107 @@ func TestSosmedOrderService_AdminSyncProviderStatus(t *testing.T) {
 	}
 }
 
+func TestSosmedOrderService_ListByUserSyncsCanceledJAPProviderOrder(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+	); err != nil {
+		t.Fatalf("migrate user list sync models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:       uuid.New(),
+		Name:     "Buyer User List Sync",
+		Email:    "buyer-user-list-sync@example.com",
+		Password: "hashed",
+		Role:     "user",
+		IsActive: true,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-9274",
+		Title:             "Facebook Profile Followers",
+		ProviderCode:      "jap",
+		ProviderServiceID: "9274",
+		CheckoutPrice:     10500,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            buyer.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://www.facebook.com/fikriramaa",
+		Quantity:          1,
+		UnitPrice:         10500,
+		TotalPrice:        10500,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusProcessing,
+		ProviderCode:      "jap",
+		ProviderServiceID: "9274",
+		ProviderOrderID:   "955388723",
+		ProviderStatus:    "submitted",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{
+		statusRes: &JAPOrderStatusResponse{
+			Status:     "Canceled",
+			Charge:     "0.00",
+			StartCount: "0",
+			Remains:    "1000",
+			Currency:   "USD",
+		},
+	}
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetJAPOrderProvider(fakeJAP)
+
+	orders, total, err := orderSvc.ListByUser(buyer.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("list by user: %v", err)
+	}
+	if total != 1 || len(orders) != 1 {
+		t.Fatalf("expected one order, total=%d len=%d", total, len(orders))
+	}
+	if len(fakeJAP.statusInputs) != 1 || fakeJAP.statusInputs[0] != "955388723" {
+		t.Fatalf("expected list to sync provider status, inputs=%+v", fakeJAP.statusInputs)
+	}
+	if orders[0].OrderStatus != sosmedOrderStatusFailed {
+		t.Fatalf("expected canceled supplier order -> failed, got %s", orders[0].OrderStatus)
+	}
+	if orders[0].ProviderStatus != "Canceled" {
+		t.Fatalf("expected provider status Canceled, got %q", orders[0].ProviderStatus)
+	}
+	if orders[0].ProviderSyncedAt == nil {
+		t.Fatalf("expected provider_synced_at to be set")
+	}
+
+	var event model.SosmedOrderEvent
+	if err := db.First(&event, "order_id = ? AND reason LIKE ?", order.ID, "%provider status canceled%").Error; err != nil {
+		t.Fatalf("expected provider sync event: %v", err)
+	}
+	if event.ActorType != "system" || event.FromStatus != sosmedOrderStatusProcessing || event.ToStatus != sosmedOrderStatusFailed {
+		t.Fatalf("unexpected event after user-list sync: %+v", event)
+	}
+}
+
 func TestSosmedOrderService_AdminSyncProcessingProviderOrders(t *testing.T) {
 	db := setupCoreDB(t)
 	if err := db.AutoMigrate(

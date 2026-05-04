@@ -941,6 +941,11 @@ func (s *SosmedOrderService) GetByID(id, userID uuid.UUID) (*SosmedOrderDetail, 
 	if order.UserID != userID {
 		return nil, errors.New("akses ditolak")
 	}
+	if synced := s.syncActiveJAPProviderOrderStatusForUserRead(order); synced != nil {
+		order = synced
+	} else if synced := s.syncActiveJAPRefillStatusForUserList(order); synced != nil {
+		order = synced
+	}
 	return s.buildDetail(order)
 }
 
@@ -951,8 +956,15 @@ func (s *SosmedOrderService) ListByUser(userID uuid.UUID, page, limit int) ([]mo
 	}
 
 	for idx := range orders {
-		if synced := s.syncActiveJAPRefillStatusForUserList(&orders[idx]); synced != nil {
+		providerSynced := false
+		if synced := s.syncActiveJAPProviderOrderStatusForUserRead(&orders[idx]); synced != nil {
 			orders[idx] = *synced
+			providerSynced = true
+		}
+		if !providerSynced {
+			if synced := s.syncActiveJAPRefillStatusForUserList(&orders[idx]); synced != nil {
+				orders[idx] = *synced
+			}
 		}
 		if created := s.ensureLegacySosmedRefillHistory(&orders[idx]); created {
 			if fresh, err := s.repo.FindByID(orders[idx].ID); err == nil {
@@ -962,6 +974,30 @@ func (s *SosmedOrderService) ListByUser(userID uuid.UUID, page, limit int) ([]mo
 	}
 
 	return orders, total, nil
+}
+
+func (s *SosmedOrderService) syncActiveJAPProviderOrderStatusForUserRead(order *model.SosmedOrder) *model.SosmedOrder {
+	if s == nil || s.japOrderProvider == nil || order == nil {
+		return nil
+	}
+	if !isJAPSosmedOrder(order) {
+		return nil
+	}
+	if strings.TrimSpace(order.ProviderOrderID) == "" {
+		return nil
+	}
+	if strings.TrimSpace(order.PaymentStatus) != "paid" {
+		return nil
+	}
+	if normalizeSosmedOrderStatus(order.OrderStatus) != sosmedOrderStatusProcessing {
+		return nil
+	}
+
+	synced, _, err := s.syncJAPProviderOrder(context.Background(), order, "system", nil)
+	if err != nil {
+		return nil
+	}
+	return synced
 }
 
 func (s *SosmedOrderService) syncActiveJAPRefillStatusForUserList(order *model.SosmedOrder) *model.SosmedOrder {
