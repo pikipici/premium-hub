@@ -9,6 +9,7 @@ import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { SOSMED_TARGET_INPUT_COPY } from '@/lib/sosmedCheckoutCopy'
+import { buildSosmedCheckoutServiceDisplay } from '@/lib/sosmedCheckoutDisplay'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
@@ -80,9 +81,9 @@ function SosmedCheckoutContent() {
     () => (isBundleCheckout ? bundleTotalPrice : checkoutPrice * packageQuantity),
     [bundleTotalPrice, checkoutPrice, isBundleCheckout, packageQuantity]
   )
-  const estimatedUnits = useMemo(
-    () => (isBundleCheckout ? (bundleVariant?.items || []).reduce((sum, item) => sum + (item.quantity_units || 0), 0) : packageQuantity * 1000),
-    [bundleVariant?.items, isBundleCheckout, packageQuantity]
+  const serviceDisplay = useMemo(
+    () => (service ? buildSosmedCheckoutServiceDisplay(service, packageQuantity) : null),
+    [packageQuantity, service]
   )
   const walletBalanceAfter = walletBalance === null ? null : walletBalance - totalPrice
   const walletEnough = walletBalance === null || walletBalanceAfter === null || walletBalanceAfter >= 0
@@ -343,8 +344,8 @@ function SosmedCheckoutContent() {
             <h3 className="text-sm font-bold mb-4">{isBundleCheckout ? 'Ringkasan Paket' : 'Ringkasan Layanan'}</h3>
             <div className="space-y-3">
               <div className="flex justify-between text-sm gap-4">
-                <span className="text-[#888]">{isBundleCheckout ? 'Paket' : 'Layanan'}</span>
-                <span className="font-semibold text-right">{isBundleCheckout ? bundlePackage?.title : service?.title}</span>
+                <span className="text-[#888]">Paket</span>
+                <span className="font-semibold text-right">{isBundleCheckout ? bundlePackage?.title : serviceDisplay?.productTitle}</span>
               </div>
               {isBundleCheckout ? (
                 <>
@@ -384,9 +385,7 @@ function SosmedCheckoutContent() {
                   </div>
                   <div className="flex justify-between text-sm gap-4">
                     <span className="text-[#888]">Jumlah paket</span>
-                    <span className="font-semibold text-right">
-                      {packageQuantity.toLocaleString('id-ID')} paket ({estimatedUnits.toLocaleString('id-ID')} unit)
-                    </span>
+                    <span className="font-semibold text-right">{serviceDisplay?.quantityLabel}</span>
                   </div>
                 </>
               )}
