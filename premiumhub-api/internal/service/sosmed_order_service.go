@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -254,6 +255,91 @@ func sosmedOrderWalletRetryChargeRef(orderID uuid.UUID, attempt int64) string {
 
 func sosmedOrderWalletRetryRefundRef(orderID uuid.UUID, attempt int64) string {
 	return fmt.Sprintf("sosmed_order:%s:retry:%d:refund", orderID.String(), attempt)
+}
+
+type sosmedOrderWalletChargeRefundTarget struct {
+	chargeLedger model.WalletLedger
+	refundRef    string
+}
+
+func parseSosmedOrderWalletRetryChargeAttempt(orderID uuid.UUID, reference string) (int64, bool) {
+	prefix := fmt.Sprintf("sosmed_order:%s:retry:", orderID.String())
+	suffix := ":charge"
+	trimmed := strings.TrimSpace(reference)
+	if !strings.HasPrefix(trimmed, prefix) || !strings.HasSuffix(trimmed, suffix) {
+		return 0, false
+	}
+	attemptText := strings.TrimSuffix(strings.TrimPrefix(trimmed, prefix), suffix)
+	attempt, err := strconv.ParseInt(attemptText, 10, 64)
+	if err != nil || attempt <= 0 {
+		return 0, false
+	}
+	return attempt, true
+}
+
+func validateSosmedWalletChargeLedger(order *model.SosmedOrder, ledger *model.WalletLedger) error {
+	if order == nil || ledger == nil {
+		return errors.New("ledger debit wallet sosmed tidak ditemukan")
+	}
+	if ledger.UserID != order.UserID || ledger.Type != "debit" || ledger.Category != "sosmed_purchase" || ledger.Amount <= 0 {
+		return errors.New("ledger debit wallet sosmed tidak valid")
+	}
+	return nil
+}
+
+func (s *SosmedOrderService) latestSosmedOrderWalletChargeRefundTargetTx(tx *gorm.DB, order *model.SosmedOrder) (*sosmedOrderWalletChargeRefundTarget, bool, error) {
+	if s == nil || s.walletRepo == nil || tx == nil || order == nil {
+		return nil, false, errors.New("wallet repo belum siap")
+	}
+
+	var retryCharges []model.WalletLedger
+	retryPattern := fmt.Sprintf("sosmed_order:%s:retry:%%:charge", order.ID.String())
+	if err := tx.Where("user_id = ? AND type = ? AND category = ? AND reference LIKE ?", order.UserID, "debit", "sosmed_purchase", retryPattern).
+		Find(&retryCharges).Error; err != nil {
+		return nil, false, errors.New("gagal cek ledger retry wallet")
+	}
+
+	var latestRetry *model.WalletLedger
+	var latestAttempt int64
+	for idx := range retryCharges {
+		attempt, ok := parseSosmedOrderWalletRetryChargeAttempt(order.ID, retryCharges[idx].Reference)
+		if !ok || attempt <= latestAttempt {
+			continue
+		}
+		latestAttempt = attempt
+		latestRetry = &retryCharges[idx]
+	}
+	if latestRetry != nil {
+		if err := validateSosmedWalletChargeLedger(order, latestRetry); err != nil {
+			return nil, false, err
+		}
+		refundRef := sosmedOrderWalletRetryRefundRef(order.ID, latestAttempt)
+		if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, refundRef); err == nil {
+			return nil, true, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, errors.New("gagal cek ledger refund retry")
+		}
+		return &sosmedOrderWalletChargeRefundTarget{chargeLedger: *latestRetry, refundRef: refundRef}, false, nil
+	}
+
+	refundRef := sosmedOrderWalletRefundRef(order.ID)
+	if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, refundRef); err == nil {
+		return nil, true, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, false, errors.New("gagal cek ledger refund wallet")
+	}
+
+	chargeLedger, err := s.walletRepo.FindLedgerByReferenceTx(tx, sosmedOrderWalletChargeRef(order.ID))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, errors.New("ledger debit wallet sosmed tidak ditemukan")
+		}
+		return nil, false, errors.New("gagal cek ledger debit wallet")
+	}
+	if err := validateSosmedWalletChargeLedger(order, chargeLedger); err != nil {
+		return nil, false, err
+	}
+	return &sosmedOrderWalletChargeRefundTarget{chargeLedger: *chargeLedger, refundRef: refundRef}, false, nil
 }
 
 func (s *SosmedOrderService) buildDetail(order *model.SosmedOrder) (*SosmedOrderDetail, error) {
@@ -759,6 +845,118 @@ func (s *SosmedOrderService) failAndRefundWalletOrder(orderID uuid.UUID, provide
 	return errors.New(providerError)
 }
 
+func isWalletRefundableTerminalSosmedOrderStatus(status string) bool {
+	switch normalizeSosmedOrderStatus(status) {
+	case sosmedOrderStatusFailed, sosmedOrderStatusCanceled:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *SosmedOrderService) refundWalletPaidTerminalSosmedOrderIfNeeded(orderID uuid.UUID, reason string) (bool, error) {
+	if s == nil || s.walletRepo == nil {
+		return false, nil
+	}
+
+	refunded := false
+	err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		var order model.SosmedOrder
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&order, "id = ?", orderID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("order sosmed tidak ditemukan")
+			}
+			return errors.New("gagal memuat order sosmed")
+		}
+
+		if !isWalletRefundableTerminalSosmedOrderStatus(order.OrderStatus) {
+			return nil
+		}
+		if !strings.EqualFold(strings.TrimSpace(order.PaymentMethod), "wallet") || strings.TrimSpace(order.PaymentStatus) != "paid" {
+			return nil
+		}
+
+		refundTarget, alreadyRefunded, err := s.latestSosmedOrderWalletChargeRefundTargetTx(tx, &order)
+		if err != nil {
+			return err
+		}
+		if alreadyRefunded {
+			order.PaymentStatus = "failed"
+			if err := tx.Save(&order).Error; err != nil {
+				return errors.New("gagal update order sosmed")
+			}
+			return nil
+		}
+		if refundTarget == nil {
+			return errors.New("ledger debit wallet sosmed tidak ditemukan")
+		}
+
+		chargeLedger := refundTarget.chargeLedger
+
+		user, err := s.walletRepo.LockUserByIDTx(tx, order.UserID)
+		if err != nil {
+			return errors.New("user tidak ditemukan")
+		}
+
+		before := user.WalletBalance
+		after := before + chargeLedger.Amount
+		user.WalletBalance = after
+		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+			return errors.New("gagal refund saldo wallet")
+		}
+
+		description := strings.TrimSpace(reason)
+		if description == "" {
+			description = fmt.Sprintf("Refund otomatis order sosmed %s karena order gagal", shortSosmedWalletRef(order.ID.String()))
+		}
+		ledger := &model.WalletLedger{
+			ID:            uuid.New(),
+			UserID:        user.ID,
+			Type:          "credit",
+			Category:      "sosmed_refund",
+			Amount:        chargeLedger.Amount,
+			BalanceBefore: before,
+			BalanceAfter:  after,
+			Reference:     refundTarget.refundRef,
+			Description:   truncateSosmedProviderText(description, 2000),
+		}
+		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
+			return errors.New("gagal menulis ledger refund wallet")
+		}
+
+		order.PaymentStatus = "failed"
+		if err := tx.Save(&order).Error; err != nil {
+			return errors.New("gagal update order sosmed")
+		}
+
+		refunded = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return refunded, nil
+}
+
+func (s *SosmedOrderService) refundWalletPaidTerminalSosmedOrderForUserRead(order *model.SosmedOrder) *model.SosmedOrder {
+	if s == nil || s.repo == nil || order == nil || !isWalletRefundableTerminalSosmedOrderStatus(order.OrderStatus) {
+		return nil
+	}
+	if !strings.EqualFold(strings.TrimSpace(order.PaymentMethod), "wallet") || strings.TrimSpace(order.PaymentStatus) != "paid" {
+		return nil
+	}
+
+	reason := fmt.Sprintf("Refund otomatis order sosmed %s karena status order %s", shortSosmedWalletRef(order.ID.String()), normalizeSosmedOrderStatus(order.OrderStatus))
+	if _, err := s.refundWalletPaidTerminalSosmedOrderIfNeeded(order.ID, reason); err != nil {
+		return nil
+	}
+	stored, err := s.repo.FindByID(order.ID)
+	if err != nil {
+		return nil
+	}
+	return stored
+}
+
 func truncateSosmedProviderText(value string, max int) string {
 	trimmed := strings.TrimSpace(value)
 	if max <= 0 || len(trimmed) <= max {
@@ -925,6 +1123,13 @@ func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *mo
 		}
 	}
 
+	if isWalletRefundableTerminalSosmedOrderStatus(nextOrderStatus) {
+		reason := fmt.Sprintf("Refund otomatis order sosmed %s karena sync JAP provider status %s", shortSosmedWalletRef(order.ID.String()), humanizeSosmedProviderStatus(providerStatus))
+		if _, err := s.refundWalletPaidTerminalSosmedOrderIfNeeded(order.ID, reason); err != nil {
+			return nil, false, err
+		}
+	}
+
 	stored, err := s.repo.FindByID(order.ID)
 	if err != nil {
 		return nil, false, errors.New("gagal memuat order sosmed hasil sync")
@@ -945,6 +1150,9 @@ func (s *SosmedOrderService) GetByID(id, userID uuid.UUID) (*SosmedOrderDetail, 
 		order = synced
 	} else if synced := s.syncActiveJAPRefillStatusForUserList(order); synced != nil {
 		order = synced
+	}
+	if refunded := s.refundWalletPaidTerminalSosmedOrderForUserRead(order); refunded != nil {
+		order = refunded
 	}
 	return s.buildDetail(order)
 }
@@ -970,6 +1178,9 @@ func (s *SosmedOrderService) ListByUser(userID uuid.UUID, page, limit int) ([]mo
 			if fresh, err := s.repo.FindByID(orders[idx].ID); err == nil {
 				orders[idx] = *fresh
 			}
+		}
+		if refunded := s.refundWalletPaidTerminalSosmedOrderForUserRead(&orders[idx]); refunded != nil {
+			orders[idx] = *refunded
 		}
 	}
 

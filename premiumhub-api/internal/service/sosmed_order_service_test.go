@@ -644,17 +644,19 @@ func TestSosmedOrderService_ListByUserSyncsCanceledJAPProviderOrder(t *testing.T
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
 		&model.SosmedOrderRefillAttempt{},
+		&model.WalletLedger{},
 	); err != nil {
 		t.Fatalf("migrate user list sync models: %v", err)
 	}
 
 	buyer := &model.User{
-		ID:       uuid.New(),
-		Name:     "Buyer User List Sync",
-		Email:    "buyer-user-list-sync@example.com",
-		Password: "hashed",
-		Role:     "user",
-		IsActive: true,
+		ID:            uuid.New(),
+		Name:          "Buyer User List Sync",
+		Email:         "buyer-user-list-sync@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 905500,
 	}
 	if err := db.Create(buyer).Error; err != nil {
 		t.Fatalf("create buyer: %v", err)
@@ -695,6 +697,20 @@ func TestSosmedOrderService_ListByUserSyncsCanceledJAPProviderOrder(t *testing.T
 	if err := db.Create(order).Error; err != nil {
 		t.Fatalf("create order: %v", err)
 	}
+	chargeLedger := &model.WalletLedger{
+		ID:            uuid.New(),
+		UserID:        buyer.ID,
+		Type:          "debit",
+		Category:      "sosmed_purchase",
+		Amount:        10500,
+		BalanceBefore: 916000,
+		BalanceAfter:  905500,
+		Reference:     sosmedOrderWalletChargeRef(order.ID),
+		Description:   "Pembelian layanan sosmed order 6286E732 via wallet",
+	}
+	if err := db.Create(chargeLedger).Error; err != nil {
+		t.Fatalf("create charge ledger: %v", err)
+	}
 
 	fakeJAP := &fakeSosmedJAPOrderProvider{
 		statusRes: &JAPOrderStatusResponse{
@@ -706,6 +722,7 @@ func TestSosmedOrderService_ListByUserSyncsCanceledJAPProviderOrder(t *testing.T
 		},
 	}
 	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetWalletRepo(repository.NewWalletRepo(db)).
 		SetJAPOrderProvider(fakeJAP)
 
 	orders, total, err := orderSvc.ListByUser(buyer.ID, 1, 10)
@@ -727,6 +744,46 @@ func TestSosmedOrderService_ListByUserSyncsCanceledJAPProviderOrder(t *testing.T
 	if orders[0].ProviderSyncedAt == nil {
 		t.Fatalf("expected provider_synced_at to be set")
 	}
+	if orders[0].PaymentStatus != "failed" {
+		t.Fatalf("expected payment status marked failed after wallet refund, got %s", orders[0].PaymentStatus)
+	}
+
+	var storedUser model.User
+	if err := db.First(&storedUser, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("reload buyer: %v", err)
+	}
+	if storedUser.WalletBalance != 916000 {
+		t.Fatalf("expected canceled supplier sync to refund wallet to 916000, got %d", storedUser.WalletBalance)
+	}
+
+	var refundLedger model.WalletLedger
+	if err := db.First(&refundLedger, "reference = ?", sosmedOrderWalletRefundRef(order.ID)).Error; err != nil {
+		t.Fatalf("expected wallet refund ledger: %v", err)
+	}
+	if refundLedger.Type != "credit" || refundLedger.Category != "sosmed_refund" || refundLedger.Amount != 10500 || refundLedger.BalanceBefore != 905500 || refundLedger.BalanceAfter != 916000 {
+		t.Fatalf("unexpected refund ledger: %+v", refundLedger)
+	}
+
+	orders, _, err = orderSvc.ListByUser(buyer.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("list by user second time: %v", err)
+	}
+	if orders[0].PaymentStatus != "failed" {
+		t.Fatalf("expected second list to keep payment status failed, got %s", orders[0].PaymentStatus)
+	}
+	var refundCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", sosmedOrderWalletRefundRef(order.ID)).Count(&refundCount).Error; err != nil {
+		t.Fatalf("count refund ledgers: %v", err)
+	}
+	if refundCount != 1 {
+		t.Fatalf("expected exactly one wallet refund ledger after repeated list, got %d", refundCount)
+	}
+	if err := db.First(&storedUser, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("reload buyer after repeated list: %v", err)
+	}
+	if storedUser.WalletBalance != 916000 {
+		t.Fatalf("expected repeated list not to double refund wallet, got %d", storedUser.WalletBalance)
+	}
 
 	var event model.SosmedOrderEvent
 	if err := db.First(&event, "order_id = ? AND reason LIKE ?", order.ID, "%provider status canceled%").Error; err != nil {
@@ -734,6 +791,299 @@ func TestSosmedOrderService_ListByUserSyncsCanceledJAPProviderOrder(t *testing.T
 	}
 	if event.ActorType != "system" || event.FromStatus != sosmedOrderStatusProcessing || event.ToStatus != sosmedOrderStatusFailed {
 		t.Fatalf("unexpected event after user-list sync: %+v", event)
+	}
+}
+
+func TestSosmedOrderService_ListByUserRepairsFailedWalletPaidOrderRefund(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+		&model.WalletLedger{},
+	); err != nil {
+		t.Fatalf("migrate failed refund repair models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:            uuid.New(),
+		Name:          "Buyer Failed Refund Repair",
+		Email:         "buyer-failed-refund-repair@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 895000,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-9274",
+		Title:             "Facebook Profile Followers",
+		ProviderCode:      "jap",
+		ProviderServiceID: "9274",
+		CheckoutPrice:     10500,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            buyer.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://www.facebook.com/fikriramaa",
+		Quantity:          1,
+		UnitPrice:         10500,
+		TotalPrice:        10500,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusFailed,
+		ProviderCode:      "jap",
+		ProviderServiceID: "9274",
+		ProviderOrderID:   "955388723",
+		ProviderStatus:    "Canceled",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	chargeLedger := &model.WalletLedger{
+		ID:            uuid.New(),
+		UserID:        buyer.ID,
+		Type:          "debit",
+		Category:      "sosmed_purchase",
+		Amount:        10500,
+		BalanceBefore: 916000,
+		BalanceAfter:  905500,
+		Reference:     sosmedOrderWalletChargeRef(order.ID),
+		Description:   "Pembelian layanan sosmed order 6286E732 via wallet",
+	}
+	if err := db.Create(chargeLedger).Error; err != nil {
+		t.Fatalf("create charge ledger: %v", err)
+	}
+
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetWalletRepo(repository.NewWalletRepo(db))
+
+	orders, total, err := orderSvc.ListByUser(buyer.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("list by user: %v", err)
+	}
+	if total != 1 || len(orders) != 1 {
+		t.Fatalf("expected one order, total=%d len=%d", total, len(orders))
+	}
+	if orders[0].OrderStatus != sosmedOrderStatusFailed || orders[0].PaymentStatus != "failed" {
+		t.Fatalf("expected failed order with failed payment status after refund repair, got order=%s payment=%s", orders[0].OrderStatus, orders[0].PaymentStatus)
+	}
+
+	var storedUser model.User
+	if err := db.First(&storedUser, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("reload buyer: %v", err)
+	}
+	if storedUser.WalletBalance != 905500 {
+		t.Fatalf("expected failed paid order repair to add one refund to current balance, got %d", storedUser.WalletBalance)
+	}
+
+	var refundLedger model.WalletLedger
+	if err := db.First(&refundLedger, "reference = ?", sosmedOrderWalletRefundRef(order.ID)).Error; err != nil {
+		t.Fatalf("expected refund ledger from failed order repair: %v", err)
+	}
+	if refundLedger.Type != "credit" || refundLedger.Category != "sosmed_refund" || refundLedger.Amount != 10500 || refundLedger.BalanceBefore != 895000 || refundLedger.BalanceAfter != 905500 {
+		t.Fatalf("unexpected repair refund ledger: %+v", refundLedger)
+	}
+
+	orders, _, err = orderSvc.ListByUser(buyer.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("list by user second time: %v", err)
+	}
+	if orders[0].PaymentStatus != "failed" {
+		t.Fatalf("expected second list to keep payment status failed, got %s", orders[0].PaymentStatus)
+	}
+	var refundCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", sosmedOrderWalletRefundRef(order.ID)).Count(&refundCount).Error; err != nil {
+		t.Fatalf("count refund ledgers: %v", err)
+	}
+	if refundCount != 1 {
+		t.Fatalf("expected exactly one refund ledger after repair retry, got %d", refundCount)
+	}
+	if err := db.First(&storedUser, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("reload buyer after retry: %v", err)
+	}
+	if storedUser.WalletBalance != 905500 {
+		t.Fatalf("expected repair retry not to double refund, got %d", storedUser.WalletBalance)
+	}
+}
+
+func TestSosmedOrderService_ListByUserRefundsLatestRetryChargeWhenProviderCancels(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+		&model.WalletLedger{},
+	); err != nil {
+		t.Fatalf("migrate retry refund models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:            uuid.New(),
+		Name:          "Buyer Retry Refund",
+		Email:         "buyer-retry-refund@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 89500,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-9274",
+		Title:             "Facebook Profile Followers",
+		ProviderCode:      "jap",
+		ProviderServiceID: "9274",
+		CheckoutPrice:     10500,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            buyer.ID,
+		ServiceID:         serviceItem.ID,
+		ServiceCode:       serviceItem.Code,
+		ServiceTitle:      serviceItem.Title,
+		TargetLink:        "https://www.facebook.com/fikriramaa",
+		Quantity:          1,
+		UnitPrice:         10500,
+		TotalPrice:        10500,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusProcessing,
+		ProviderCode:      "jap",
+		ProviderServiceID: "9274",
+		ProviderOrderID:   "RETRY-JAP-1",
+		ProviderStatus:    "submitted",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	ledgers := []*model.WalletLedger{
+		{
+			ID:            uuid.New(),
+			UserID:        buyer.ID,
+			Type:          "debit",
+			Category:      "sosmed_purchase",
+			Amount:        10500,
+			BalanceBefore: 100000,
+			BalanceAfter:  89500,
+			Reference:     sosmedOrderWalletChargeRef(order.ID),
+			Description:   "Pembelian awal layanan sosmed via wallet",
+		},
+		{
+			ID:            uuid.New(),
+			UserID:        buyer.ID,
+			Type:          "credit",
+			Category:      "sosmed_refund",
+			Amount:        10500,
+			BalanceBefore: 89500,
+			BalanceAfter:  100000,
+			Reference:     sosmedOrderWalletRefundRef(order.ID),
+			Description:   "Refund awal layanan sosmed",
+		},
+		{
+			ID:            uuid.New(),
+			UserID:        buyer.ID,
+			Type:          "debit",
+			Category:      "sosmed_purchase",
+			Amount:        10500,
+			BalanceBefore: 100000,
+			BalanceAfter:  89500,
+			Reference:     sosmedOrderWalletRetryChargeRef(order.ID, 1),
+			Description:   "Retry admin layanan sosmed via wallet",
+		},
+	}
+	if err := db.Create(&ledgers).Error; err != nil {
+		t.Fatalf("create ledgers: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{
+		statusRes: &JAPOrderStatusResponse{Status: "Canceled"},
+	}
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(fakeJAP)
+
+	orders, total, err := orderSvc.ListByUser(buyer.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("list by user: %v", err)
+	}
+	if total != 1 || len(orders) != 1 {
+		t.Fatalf("expected one order, total=%d len=%d", total, len(orders))
+	}
+	if orders[0].OrderStatus != sosmedOrderStatusFailed || orders[0].PaymentStatus != "failed" {
+		t.Fatalf("expected canceled retry order to become failed/failed, got order=%s payment=%s", orders[0].OrderStatus, orders[0].PaymentStatus)
+	}
+
+	var storedUser model.User
+	if err := db.First(&storedUser, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("reload buyer: %v", err)
+	}
+	if storedUser.WalletBalance != 100000 {
+		t.Fatalf("expected retry provider cancel to refund latest retry debit to 100000, got %d", storedUser.WalletBalance)
+	}
+
+	var originalRefundCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", sosmedOrderWalletRefundRef(order.ID)).Count(&originalRefundCount).Error; err != nil {
+		t.Fatalf("count original refunds: %v", err)
+	}
+	if originalRefundCount != 1 {
+		t.Fatalf("expected original refund ledger to remain exactly one, got %d", originalRefundCount)
+	}
+
+	var retryRefund model.WalletLedger
+	if err := db.First(&retryRefund, "reference = ?", sosmedOrderWalletRetryRefundRef(order.ID, 1)).Error; err != nil {
+		t.Fatalf("expected retry refund ledger: %v", err)
+	}
+	if retryRefund.Type != "credit" || retryRefund.Category != "sosmed_refund" || retryRefund.Amount != 10500 || retryRefund.BalanceBefore != 89500 || retryRefund.BalanceAfter != 100000 {
+		t.Fatalf("unexpected retry refund ledger: %+v", retryRefund)
+	}
+
+	orders, _, err = orderSvc.ListByUser(buyer.ID, 1, 10)
+	if err != nil {
+		t.Fatalf("list by user second time: %v", err)
+	}
+	if orders[0].PaymentStatus != "failed" {
+		t.Fatalf("expected second list to keep payment status failed, got %s", orders[0].PaymentStatus)
+	}
+	var retryRefundCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", sosmedOrderWalletRetryRefundRef(order.ID, 1)).Count(&retryRefundCount).Error; err != nil {
+		t.Fatalf("count retry refunds: %v", err)
+	}
+	if retryRefundCount != 1 {
+		t.Fatalf("expected exactly one retry refund ledger after repeated list, got %d", retryRefundCount)
+	}
+	if err := db.First(&storedUser, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("reload buyer after repeated list: %v", err)
+	}
+	if storedUser.WalletBalance != 100000 {
+		t.Fatalf("expected repeated list not to double refund retry, got %d", storedUser.WalletBalance)
 	}
 }
 
