@@ -6,7 +6,7 @@ import type { SosmedService } from '@/types/sosmedService'
 const baseService: SosmedService = {
   id: 'svc-ig-hemat',
   category_code: 'followers',
-  code: 'instagram-followers-6331',
+  code: 'jap-6331',
   title: 'Instagram Followers Hemat',
   summary: 'Paket followers Instagram refill 30 hari dengan harga paling ringan buat naikin social proof bertahap.',
   platform_label: 'Instagram',
@@ -37,7 +37,7 @@ describe('sosmed product card view model', () => {
     const twitterService: SosmedService = {
       ...baseService,
       id: 'svc-x-test',
-      code: 'twitter-followers-8695',
+      code: 'jap-8695',
       title: 'Twitter Followers',
       platform_label: 'Twitter/X',
     }

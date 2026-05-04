@@ -28,7 +28,7 @@ const backendBundle: SosmedBundlePackage = {
         {
           id: 'item-followers',
           service_id: 'svc-followers',
-          service_code: 'instagram-followers-6331',
+          service_code: 'jap-6331',
           title: 'Instagram Followers Hemat',
           quantity_units: 500,
           line_price: 2500,

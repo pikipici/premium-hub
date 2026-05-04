@@ -46,7 +46,7 @@ const bundleResponse = {
             {
               id: 'item-1',
               service_id: 'service-1',
-              service_code: 'instagram-followers-6331',
+              service_code: 'jap-6331',
               title: 'Instagram Followers Hemat',
               quantity_units: 500,
               line_price: 2500,
@@ -98,7 +98,7 @@ const adminBundleResponse = {
               id: 'item-1',
               bundle_variant_id: 'variant-1',
               sosmed_service_id: 'service-1',
-              service_code: 'instagram-followers-6331',
+              service_code: 'jap-6331',
               service_title: 'Instagram Followers Hemat',
               label: 'Followers awal',
               quantity_units: 500,
@@ -172,7 +172,7 @@ describe('sosmedBundleService', () => {
         items: [
           {
             id: 'bundle-order-item-1',
-            service_code_snapshot: 'instagram-followers-6331',
+            service_code_snapshot: 'jap-6331',
             service_title_snapshot: 'Instagram Followers Hemat',
             quantity_units: 500,
             line_price: 2500,

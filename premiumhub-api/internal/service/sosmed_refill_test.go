@@ -191,7 +191,7 @@ func seedSosmedRefillService(t *testing.T, db *gorm.DB, id uuid.UUID) *model.Sos
 	serviceItem := &model.SosmedService{
 		ID:                      id,
 		CategoryCode:            "followers",
-		Code:                    "instagram-followers-6331",
+		Code:                    "jap-6331",
 		Title:                   "Instagram Followers Hemat",
 		ProviderCode:            "jap",
 		ProviderServiceID:       "6331",

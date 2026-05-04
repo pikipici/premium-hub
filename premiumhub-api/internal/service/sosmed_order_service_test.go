@@ -326,7 +326,7 @@ func TestSosmedOrderService_CreateWalletPaidJAPOrder(t *testing.T) {
 	serviceItem := &model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-6331",
+		Code:              "jap-6331",
 		Title:             "Instagram Followers Hemat",
 		ProviderCode:      "jap",
 		ProviderServiceID: "6331",
@@ -417,7 +417,7 @@ func TestSosmedOrderService_CreateWalletPaidJAPFailureRefunds(t *testing.T) {
 	serviceItem := &model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-6331",
+		Code:              "jap-6331",
 		Title:             "Instagram Followers Hemat",
 		ProviderCode:      "jap",
 		ProviderServiceID: "6331",
@@ -499,7 +499,7 @@ func TestSosmedOrderService_CreateWalletPaidInsufficientBalance(t *testing.T) {
 	serviceItem := &model.SosmedService{
 		ID:            uuid.New(),
 		CategoryCode:  "followers",
-		Code:          "instagram-followers-6331",
+		Code:          "jap-6331",
 		Title:         "Instagram Followers Hemat",
 		CheckoutPrice: 19000,
 		IsActive:      true,
@@ -562,7 +562,7 @@ func TestSosmedOrderService_AdminSyncProviderStatus(t *testing.T) {
 	serviceItem := &model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-6331",
+		Code:              "jap-6331",
 		Title:             "Instagram Followers Hemat",
 		ProviderCode:      "jap",
 		ProviderServiceID: "6331",
@@ -663,7 +663,7 @@ func TestSosmedOrderService_AdminSyncProcessingProviderOrders(t *testing.T) {
 	serviceItem := &model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-6331",
+		Code:              "jap-6331",
 		Title:             "Instagram Followers Hemat",
 		ProviderCode:      "jap",
 		ProviderServiceID: "6331",
@@ -796,7 +796,7 @@ func TestSosmedOrderService_AdminOpsSummary(t *testing.T) {
 	serviceItem := &model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-6331",
+		Code:              "jap-6331",
 		Title:             "Instagram Followers Hemat",
 		ProviderCode:      "jap",
 		ProviderServiceID: "6331",
@@ -906,7 +906,7 @@ func TestSosmedOrderService_AdminRetryProviderOrderDebitsWalletAndSubmits(t *tes
 	serviceItem := &model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-6331",
+		Code:              "jap-6331",
 		Title:             "Instagram Followers Hemat",
 		ProviderCode:      "jap",
 		ProviderServiceID: "6331",
@@ -1005,7 +1005,7 @@ func TestSosmedOrderService_AdminRetryProviderOrderRefundsOnFailure(t *testing.T
 	serviceItem := &model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-6331",
+		Code:              "jap-6331",
 		Title:             "Instagram Followers Hemat",
 		ProviderCode:      "jap",
 		ProviderServiceID: "6331",

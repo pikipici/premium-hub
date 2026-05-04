@@ -415,7 +415,7 @@ func (s *SosmedServiceService) buildJAPDraftService(item JAPServiceItem, sortOrd
 	idrText := formatIDRThousands(idrPer1K)
 	usdText := normalizeUSDText(rateUSD)
 
-	code := buildJAPLocalCode(platformLabel, categoryCode, serviceID)
+	code := buildJAPLocalCode(serviceID)
 	summary := buildJAPSummary(platformLabel, categoryCode, refillLabel, maxValue)
 	theme := detectJAPTheme(platformLabel)
 
@@ -688,13 +688,8 @@ func detectJAPTheme(platformLabel string) string {
 	}
 }
 
-func buildJAPLocalCode(platformLabel, categoryCode, serviceID string) string {
-	parts := []string{
-		detectJAPPlatformCodeSlug(platformLabel),
-		strings.TrimSpace(categoryCode),
-		strings.TrimSpace(serviceID),
-	}
-	return normalizeSosmedServiceCode(strings.Join(parts, "-"))
+func buildJAPLocalCode(serviceID string) string {
+	return normalizeSosmedServiceCode("jap-" + strings.TrimSpace(serviceID))
 }
 
 func formatSosmedStartTimeValue(raw string) string {

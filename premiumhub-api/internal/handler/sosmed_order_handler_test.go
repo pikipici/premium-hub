@@ -108,7 +108,7 @@ func TestCreateSosmedOrderWalletJAPSmoke(t *testing.T) {
 	serviceRow := &model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-6331",
+		Code:              "jap-6331",
 		Title:             "Instagram Followers Hemat",
 		ProviderCode:      "jap",
 		ProviderServiceID: "6331",
@@ -225,7 +225,7 @@ func TestCreateSosmedOrderWalletJAPRefundSmoke(t *testing.T) {
 	serviceRow := &model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-6331",
+		Code:              "jap-6331",
 		Title:             "Instagram Followers Hemat",
 		ProviderCode:      "jap",
 		ProviderServiceID: "6331",

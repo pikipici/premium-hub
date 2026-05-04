@@ -17,7 +17,7 @@ const services: SosmedService[] = [
   {
     id: 'svc-followers',
     category_code: 'instagram',
-    code: 'instagram-followers-6331',
+    code: 'jap-6331',
     title: 'Instagram Followers Hemat',
     platform_label: 'Instagram',
     checkout_price: 19000,
@@ -35,7 +35,7 @@ const services: SosmedService[] = [
   {
     id: 'svc-inactive',
     category_code: 'twitter',
-    code: 'twitter-followers-8695',
+    code: 'jap-8695',
     title: 'Twitter Followers',
     platform_label: 'X/Twitter',
     checkout_price: 18000,

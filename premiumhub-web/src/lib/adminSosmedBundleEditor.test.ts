@@ -68,7 +68,7 @@ const adminItem: AdminSosmedBundleItem = {
   id: 'item-1',
   bundle_variant_id: 'variant-1',
   sosmed_service_id: 'svc-1',
-  service_code: 'instagram-followers-6331',
+  service_code: 'jap-6331',
   service_title: 'Instagram Followers Hemat',
   label: 'Followers Hemat',
   quantity_units: 1000,
@@ -83,7 +83,7 @@ const services: SosmedService[] = [
   {
     id: 'svc-active',
     category_code: 'instagram',
-    code: 'instagram-followers-6331',
+    code: 'jap-6331',
     title: 'Instagram Followers Hemat',
     platform_label: 'Instagram',
     checkout_price: 19000,
@@ -92,7 +92,7 @@ const services: SosmedService[] = [
   {
     id: 'svc-inactive',
     category_code: 'twitter',
-    code: 'twitter-followers-8695',
+    code: 'jap-8695',
     title: 'Twitter Followers',
     platform_label: 'X/Twitter',
     checkout_price: 18000,
@@ -236,16 +236,16 @@ describe('admin sosmed bundle editor helper', () => {
     expect(buildBundleServiceOptions(services)).toEqual([
       {
         value: 'svc-active',
-        label: '[instagram-followers-6331] Instagram Followers Hemat • Instagram • Rp 19.000/1K',
-        serviceCode: 'instagram-followers-6331',
+        label: '[jap-6331] Instagram Followers Hemat • Instagram • Rp 19.000/1K',
+        serviceCode: 'jap-6331',
         title: 'Instagram Followers Hemat',
         platformLabel: 'Instagram',
         isActive: true,
       },
       {
         value: 'svc-inactive',
-        label: '[twitter-followers-8695] Twitter Followers • X/Twitter • Rp 18.000/1K (nonaktif)',
-        serviceCode: 'twitter-followers-8695',
+        label: '[jap-8695] Twitter Followers • X/Twitter • Rp 18.000/1K (nonaktif)',
+        serviceCode: 'jap-8695',
         title: 'Twitter Followers',
         platformLabel: 'X/Twitter',
         isActive: false,

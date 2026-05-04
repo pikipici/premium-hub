@@ -14,7 +14,7 @@ func TestPublicSosmedServiceResponseOmitsProviderMetadata(t *testing.T) {
 	item := model.SosmedService{
 		ID:                uuid.New(),
 		CategoryCode:      "followers",
-		Code:              "instagram-followers-10242",
+		Code:              "jap-10242",
 		Title:             "Instagram Followers Prioritas",
 		ProviderCode:      "jap",
 		ProviderServiceID: "10242",
