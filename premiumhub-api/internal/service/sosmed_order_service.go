@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,6 +40,7 @@ const (
 
 	defaultSosmedOpsStaleSyncMinutes = 30
 	maxSosmedOpsStaleSyncMinutes     = 1440
+	maxSosmedOrderIdempotencyKeyLen  = 80
 )
 
 var sosmedAdminTransitionMatrix = map[string]map[string]bool{
@@ -98,6 +100,7 @@ type CreateSosmedOrderInput struct {
 	Quantity              int64  `json:"quantity"`
 	Notes                 string `json:"notes"`
 	TargetPublicConfirmed bool   `json:"target_public_confirmed"`
+	IdempotencyKey        string `json:"idempotency_key"`
 }
 
 type AdminUpdateSosmedOrderStatusInput struct {
@@ -236,6 +239,38 @@ func normalizeSosmedOrderTargetLink(value string) string {
 		return strings.TrimSpace(trimmed[:255])
 	}
 	return trimmed
+}
+
+func normalizeSosmedOrderIdempotencyKey(value string) (string, error) {
+	key := strings.TrimSpace(value)
+	if key == "" {
+		return "", errors.New("idempotency_key wajib diisi")
+	}
+	if len(key) > maxSosmedOrderIdempotencyKeyLen {
+		return "", fmt.Errorf("idempotency_key maksimal %d karakter", maxSosmedOrderIdempotencyKeyLen)
+	}
+	return key, nil
+}
+
+func buildSosmedOrderIdempotencyRequestHash(serviceID uuid.UUID, targetLink string, quantity int64, input CreateSosmedOrderInput) string {
+	payload := struct {
+		Flow                  string `json:"flow"`
+		ServiceID             string `json:"service_id"`
+		TargetLink            string `json:"target_link"`
+		Quantity              int64  `json:"quantity"`
+		Notes                 string `json:"notes"`
+		TargetPublicConfirmed bool   `json:"target_public_confirmed"`
+	}{
+		Flow:                  "sosmed_order",
+		ServiceID:             serviceID.String(),
+		TargetLink:            targetLink,
+		Quantity:              quantity,
+		Notes:                 strings.TrimSpace(input.Notes),
+		TargetPublicConfirmed: input.TargetPublicConfirmed,
+	}
+	raw, _ := json.Marshal(payload)
+	sum := sha256.Sum256(raw)
+	return fmt.Sprintf("%x", sum)
 }
 
 func shortSosmedWalletRef(raw string) string {
@@ -538,33 +573,50 @@ func (s *SosmedOrderService) createWalletPaidOrder(
 	totalPrice int64,
 	input CreateSosmedOrderInput,
 ) (*SosmedOrderDetail, error) {
+	idempotencyKey, err := normalizeSosmedOrderIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		return nil, err
+	}
+	idempotencyRequestHash := buildSosmedOrderIdempotencyRequestHash(sosmedService.ID, targetLink, quantity, input)
+	if existing, err := s.repo.FindByUserAndIdempotencyKey(userID, idempotencyKey); err == nil {
+		if strings.TrimSpace(existing.IdempotencyRequestHash) != idempotencyRequestHash {
+			return nil, errors.New("idempotency_key sudah dipakai untuk checkout sosmed berbeda")
+		}
+		return s.buildDetail(existing)
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("gagal cek idempotency checkout sosmed")
+	}
+
 	orderID := uuid.New()
 	chargeRef := sosmedOrderWalletChargeRef(orderID)
 	now := time.Now()
 
 	order := &model.SosmedOrder{
-		ID:                orderID,
-		UserID:            userID,
-		ServiceID:         sosmedService.ID,
-		ServiceCode:       strings.TrimSpace(sosmedService.Code),
-		ServiceTitle:      strings.TrimSpace(sosmedService.Title),
-		TargetLink:        targetLink,
-		Quantity:          quantity,
-		UnitPrice:         sosmedService.CheckoutPrice,
-		TotalPrice:        totalPrice,
-		PaymentMethod:     "wallet",
-		PaymentStatus:     "paid",
-		OrderStatus:       sosmedOrderStatusProcessing,
-		ProviderCode:      strings.TrimSpace(sosmedService.ProviderCode),
-		ProviderServiceID: strings.TrimSpace(sosmedService.ProviderServiceID),
-		ProviderStatus:    "queued",
-		Notes:             strings.TrimSpace(input.Notes),
-		PaidAt:            &now,
+		ID:                     orderID,
+		UserID:                 userID,
+		ServiceID:              sosmedService.ID,
+		ServiceCode:            strings.TrimSpace(sosmedService.Code),
+		ServiceTitle:           strings.TrimSpace(sosmedService.Title),
+		TargetLink:             targetLink,
+		Quantity:               quantity,
+		UnitPrice:              sosmedService.CheckoutPrice,
+		TotalPrice:             totalPrice,
+		PaymentMethod:          "wallet",
+		PaymentStatus:          "paid",
+		OrderStatus:            sosmedOrderStatusProcessing,
+		IdempotencyKey:         &idempotencyKey,
+		IdempotencyRequestHash: idempotencyRequestHash,
+		ProviderCode:           strings.TrimSpace(sosmedService.ProviderCode),
+		ProviderServiceID:      strings.TrimSpace(sosmedService.ProviderServiceID),
+		ProviderStatus:         "queued",
+		Notes:                  strings.TrimSpace(input.Notes),
+		PaidAt:                 &now,
 	}
 
 	populateSosmedOrderRefill(order, sosmedService)
 
-	err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
+	var replayOrder *model.SosmedOrder
+	err = s.walletRepo.Transaction(func(tx *gorm.DB) error {
 		if ctx != nil {
 			select {
 			case <-ctx.Done():
@@ -579,6 +631,19 @@ func (s *SosmedOrderService) createWalletPaidOrder(
 		}
 		if !user.IsActive {
 			return errors.New("akun diblokir")
+		}
+
+		var existing model.SosmedOrder
+		if err := tx.Preload("User").Preload("Service").Preload("RefillHistory", func(db *gorm.DB) *gorm.DB {
+			return db.Order("attempt_number ASC")
+		}).Where("user_id = ? AND idempotency_key = ?", userID, idempotencyKey).First(&existing).Error; err == nil {
+			if strings.TrimSpace(existing.IdempotencyRequestHash) != idempotencyRequestHash {
+				return errors.New("idempotency_key sudah dipakai untuk checkout sosmed berbeda")
+			}
+			replayOrder = &existing
+			return nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("gagal cek idempotency checkout sosmed")
 		}
 
 		if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, chargeRef); err == nil {
@@ -646,6 +711,9 @@ func (s *SosmedOrderService) createWalletPaidOrder(
 	})
 	if err != nil {
 		return nil, err
+	}
+	if replayOrder != nil {
+		return s.buildDetail(replayOrder)
 	}
 
 	if isJAPSosmedOrder(order) {

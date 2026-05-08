@@ -1,11 +1,12 @@
 "use client"
 
 import axios from 'axios'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CreditCard, ShieldCheck, WalletCards, Zap } from 'lucide-react'
 
 import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
+import { clearCheckoutIdempotencyKey, getOrCreateCheckoutIdempotencyKey } from '@/lib/checkoutIdempotency'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { SOSMED_TARGET_INPUT_COPY } from '@/lib/sosmedCheckoutCopy'
@@ -30,6 +31,12 @@ const MAX_SOSMED_PACKAGE_QUANTITY = 1000
 function clampSosmedPackageQuantity(value: number) {
   if (!Number.isFinite(value)) return 1
   return Math.min(MAX_SOSMED_PACKAGE_QUANTITY, Math.max(1, Math.floor(value)))
+}
+
+function buildCheckoutIdempotencyFingerprint(parts: Array<boolean | number | string | null | undefined>) {
+  return parts
+    .map((part) => String(part ?? '').trim())
+    .join('|')
 }
 
 export default function SosmedCheckoutPage() {
@@ -73,7 +80,6 @@ function SosmedCheckoutContent() {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const bundleIdempotencyKeyRef = useRef<string>('')
 
   const checkoutPrice = useMemo(() => defaultCheckoutPrice(service), [service])
   const bundleTotalPrice = bundleVariant?.total_price || 0
@@ -209,7 +215,10 @@ function SosmedCheckoutContent() {
     if (!isBundleCheckout && !service) return
     if (isBundleCheckout && (!bundlePackage || !bundleVariant)) return
 
-    if (!targetLink.trim()) {
+    const normalizedTargetLink = targetLink.trim()
+    const normalizedNotes = notes.trim()
+
+    if (!normalizedTargetLink) {
       setError('Target link/username wajib diisi')
       return
     }
@@ -244,16 +253,26 @@ function SosmedCheckoutContent() {
 
     try {
       if (isBundleCheckout && bundlePackage && bundleVariant) {
-        if (!bundleIdempotencyKeyRef.current) {
-          bundleIdempotencyKeyRef.current = `sosmed-bundle:${Date.now()}:${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`
-        }
+        const idempotencyFingerprint = buildCheckoutIdempotencyFingerprint([
+          'bundle',
+          bundlePackage.key,
+          bundleVariant.key,
+          normalizedTargetLink,
+          normalizedNotes,
+          'wallet',
+          targetPublicConfirmed,
+        ])
+        const checkoutIdempotencyKey = getOrCreateCheckoutIdempotencyKey({
+          flow: 'sosmed-bundle',
+          fingerprint: idempotencyFingerprint,
+        })
         const orderRes = await sosmedBundleServiceApi.createOrder({
           bundle_key: bundlePackage.key,
           variant_key: bundleVariant.key,
-          target_link: targetLink.trim(),
-          notes: notes.trim(),
+          target_link: normalizedTargetLink,
+          notes: normalizedNotes,
           payment_method: 'wallet',
-          idempotency_key: bundleIdempotencyKeyRef.current,
+          idempotency_key: checkoutIdempotencyKey,
           target_public_confirmed: targetPublicConfirmed,
         })
         if (!orderRes.success) {
@@ -261,18 +280,35 @@ function SosmedCheckoutContent() {
           return
         }
 
+        clearCheckoutIdempotencyKey({
+          flow: 'sosmed-bundle',
+          fingerprint: idempotencyFingerprint,
+        })
         router.push(`/product/sosmed/checkout/success?type=bundle&order=${encodeURIComponent(orderRes.data.order_number)}`)
         return
       }
 
       if (!service) return
 
+      const idempotencyFingerprint = buildCheckoutIdempotencyFingerprint([
+        'order',
+        service.id,
+        normalizedTargetLink,
+        normalizedQuantity,
+        normalizedNotes,
+        targetPublicConfirmed,
+      ])
+      const checkoutIdempotencyKey = getOrCreateCheckoutIdempotencyKey({
+        flow: 'sosmed-order',
+        fingerprint: idempotencyFingerprint,
+      })
       const orderRes = await sosmedOrderService.create({
         service_id: service.id,
-        target_link: targetLink.trim(),
+        target_link: normalizedTargetLink,
         quantity: normalizedQuantity,
-        notes: notes.trim(),
+        notes: normalizedNotes,
         target_public_confirmed: targetPublicConfirmed,
+        idempotency_key: checkoutIdempotencyKey,
       })
       if (!orderRes.success) {
         setError(orderRes.message || 'Gagal membuat order sosmed')
@@ -280,6 +316,10 @@ function SosmedCheckoutContent() {
       }
 
       const order = orderRes.data.order
+      clearCheckoutIdempotencyKey({
+        flow: 'sosmed-order',
+        fingerprint: idempotencyFingerprint,
+      })
       router.push(`/product/sosmed/checkout/success?id=${encodeURIComponent(order.id)}`)
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {

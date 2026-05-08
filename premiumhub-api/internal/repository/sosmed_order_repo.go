@@ -52,6 +52,14 @@ func (r *SosmedOrderRepo) FindByID(id uuid.UUID) (*model.SosmedOrder, error) {
 	return &order, err
 }
 
+func (r *SosmedOrderRepo) FindByUserAndIdempotencyKey(userID uuid.UUID, idempotencyKey string) (*model.SosmedOrder, error) {
+	var order model.SosmedOrder
+	err := r.db.Preload("User").Preload("Service").Preload("RefillHistory", func(db *gorm.DB) *gorm.DB {
+		return db.Order("attempt_number ASC")
+	}).Where("user_id = ? AND idempotency_key = ?", userID, strings.TrimSpace(idempotencyKey)).First(&order).Error
+	return &order, err
+}
+
 func (r *SosmedOrderRepo) FindByGatewayOrderID(gatewayOrderID string) (*model.SosmedOrder, error) {
 	var order model.SosmedOrder
 	err := r.db.Where("gateway_order_id = ?", gatewayOrderID).First(&order).Error

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import api from '@/lib/api'
+import type { CreateSosmedBundleOrderPayload } from '@/types/sosmedBundle'
 import { sosmedBundleService } from './sosmedBundleService'
 
 vi.mock('@/lib/api', () => ({
@@ -183,22 +184,21 @@ describe('sosmedBundleService', () => {
     }
     mockedPost.mockResolvedValueOnce({ data: createdOrderResponse })
 
-    const response = await sosmedBundleService.createOrder({
+    const payload: CreateSosmedBundleOrderPayload = {
       bundle_key: 'instagram-starter',
       variant_key: 'starter-500',
       target_link: 'https://instagram.com/example',
       notes: 'gas bundle',
       payment_method: 'wallet',
+      idempotency_key: 'sosmed-bundle-abc123',
       target_public_confirmed: true,
-    })
+    }
 
-    expect(mockedPost).toHaveBeenCalledWith('/sosmed/bundle-orders', {
-      bundle_key: 'instagram-starter',
-      variant_key: 'starter-500',
-      target_link: 'https://instagram.com/example',
-      notes: 'gas bundle',
-      payment_method: 'wallet',
-      target_public_confirmed: true,
+    const response = await sosmedBundleService.createOrder(payload)
+
+    expect(mockedPost).toHaveBeenCalledWith('/sosmed/bundle-orders', payload)
+    expect(mockedPost.mock.calls[0]?.[1]).toMatchObject({
+      idempotency_key: 'sosmed-bundle-abc123',
     })
     expect(response.data.order_number).toBe('SB-20260502-00000001')
     expect(response.data.items[0].quantity_units).toBe(500)

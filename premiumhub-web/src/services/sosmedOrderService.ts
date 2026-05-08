@@ -8,6 +8,7 @@ export interface CreateSosmedOrderPayload {
   quantity?: number
   notes?: string
   target_public_confirmed?: boolean
+  idempotency_key?: string
 }
 
 export interface CreateSosmedPaymentPayload {

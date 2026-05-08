@@ -134,7 +134,7 @@ func TestCreateSosmedOrderWalletJAPSmoke(t *testing.T) {
 	})
 	router.POST("/api/v1/sosmed/orders", NewSosmedOrderHandler(orderSvc).Create)
 
-	body := `{"service_id":"` + serviceRow.ID.String() + `","target_link":"https://instagram.com/example","quantity":2,"notes":"smoke test wallet jap","target_public_confirmed":true}`
+	body := `{"service_id":"` + serviceRow.ID.String() + `","target_link":"https://instagram.com/example","quantity":2,"notes":"smoke test wallet jap","target_public_confirmed":true,"idempotency_key":"handler-idem-success"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/sosmed/orders", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -182,6 +182,12 @@ func TestCreateSosmedOrderWalletJAPSmoke(t *testing.T) {
 	if storedOrder.TotalPrice != 38000 || storedOrder.ProviderOrderID != "JAP-SMOKE-1001" {
 		t.Fatalf("stored order mismatch: %+v", storedOrder)
 	}
+	if storedOrder.IdempotencyKey == nil || *storedOrder.IdempotencyKey != "handler-idem-success" || storedOrder.IdempotencyRequestHash == "" {
+		t.Fatalf("stored idempotency fields missing or wrong: key=%v hash=%q", storedOrder.IdempotencyKey, storedOrder.IdempotencyRequestHash)
+	}
+	if strings.Contains(rec.Body.String(), "idempotency") {
+		t.Fatalf("idempotency internals should not be exposed in user response: %s", rec.Body.String())
+	}
 
 	var eventCount int64
 	if err := db.Model(&model.SosmedOrderEvent{}).
@@ -201,6 +207,100 @@ func TestCreateSosmedOrderWalletJAPSmoke(t *testing.T) {
 	}
 	if chargeCount != 1 {
 		t.Fatalf("expected 1 wallet charge ledger, got %d", chargeCount)
+	}
+}
+
+func TestCreateSosmedOrderWalletJAPRequiresIdempotencyKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := setupSosmedOrderHandlerDB(t)
+
+	user := &model.User{
+		ID:            uuid.New(),
+		Name:          "Missing Idempotency User",
+		Email:         "missing-idempotency-user@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 100000,
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	serviceRow := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-6331",
+		Title:             "Instagram Followers Hemat",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     19000,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceRow).Error; err != nil {
+		t.Fatalf("create sosmed service: %v", err)
+	}
+
+	fakeJAP := &fakeHandlerJAPOrderProvider{}
+	orderSvc := service.NewSosmedOrderService(
+		repository.NewSosmedOrderRepo(db),
+		repository.NewSosmedServiceRepo(db),
+		repository.NewNotificationRepo(db),
+	).SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(fakeJAP)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", user.ID)
+		c.Next()
+	})
+	router.POST("/api/v1/sosmed/orders", NewSosmedOrderHandler(orderSvc).Create)
+
+	body := `{"service_id":"` + serviceRow.ID.String() + `","target_link":"https://instagram.com/example","quantity":1,"notes":"missing idempotency key","target_public_confirmed":true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/sosmed/orders", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var payload handlerErrorEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode error response: %v body=%s", err, rec.Body.String())
+	}
+	if payload.Success || !strings.Contains(payload.Message, "idempotency_key wajib diisi") {
+		t.Fatalf("expected idempotency validation error, got: %+v body=%s", payload, rec.Body.String())
+	}
+	if len(fakeJAP.inputs) != 0 {
+		t.Fatalf("provider should not be called without idempotency key, got %d calls", len(fakeJAP.inputs))
+	}
+
+	var storedUser model.User
+	if err := db.First(&storedUser, "id = ?", user.ID).Error; err != nil {
+		t.Fatalf("reload user: %v", err)
+	}
+	if storedUser.WalletBalance != 100000 {
+		t.Fatalf("wallet should remain 100000, got %d", storedUser.WalletBalance)
+	}
+
+	var orderCount int64
+	if err := db.Model(&model.SosmedOrder{}).Where("user_id = ?", user.ID).Count(&orderCount).Error; err != nil {
+		t.Fatalf("count orders: %v", err)
+	}
+	if orderCount != 0 {
+		t.Fatalf("expected no order without idempotency key, got %d", orderCount)
+	}
+
+	var ledgerCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("user_id = ?", user.ID).Count(&ledgerCount).Error; err != nil {
+		t.Fatalf("count ledgers: %v", err)
+	}
+	if ledgerCount != 0 {
+		t.Fatalf("expected no wallet ledgers without idempotency key, got %d", ledgerCount)
 	}
 }
 
@@ -251,7 +351,7 @@ func TestCreateSosmedOrderWalletJAPRefundSmoke(t *testing.T) {
 	})
 	router.POST("/api/v1/sosmed/orders", NewSosmedOrderHandler(orderSvc).Create)
 
-	body := `{"service_id":"` + serviceRow.ID.String() + `","target_link":"https://instagram.com/example","quantity":1,"notes":"smoke test refund jap","target_public_confirmed":true}`
+	body := `{"service_id":"` + serviceRow.ID.String() + `","target_link":"https://instagram.com/example","quantity":1,"notes":"smoke test refund jap","target_public_confirmed":true,"idempotency_key":"handler-idem-refund"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/sosmed/orders", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()

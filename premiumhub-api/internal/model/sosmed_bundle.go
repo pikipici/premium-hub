@@ -118,11 +118,12 @@ type SosmedBundleOrder struct {
 	CostPriceSnapshot int64 `gorm:"default:0" json:"cost_price_snapshot"`
 	MarginSnapshot    int64 `gorm:"default:0" json:"margin_snapshot"`
 
-	Status              string     `gorm:"size:30;not null;default:pending_payment;index" json:"status"`
-	PaymentMethod       string     `gorm:"size:50" json:"payment_method"`
-	IdempotencyKey      string     `gorm:"size:80;not null;default:'';uniqueIndex:idx_sosmed_bundle_orders_user_idem" json:"idempotency_key,omitempty"`
-	WalletTransactionID *uuid.UUID `gorm:"type:uuid;index" json:"wallet_transaction_id,omitempty"`
-	FailureReason       string     `gorm:"type:text" json:"failure_reason,omitempty"`
+	Status                 string     `gorm:"size:30;not null;default:pending_payment;index" json:"status"`
+	PaymentMethod          string     `gorm:"size:50" json:"payment_method"`
+	IdempotencyKey         string     `gorm:"size:80;not null;default:'';uniqueIndex:idx_sosmed_bundle_orders_user_idem" json:"idempotency_key,omitempty"`
+	IdempotencyRequestHash string     `gorm:"size:64" json:"-"`
+	WalletTransactionID    *uuid.UUID `gorm:"type:uuid;index" json:"wallet_transaction_id,omitempty"`
+	FailureReason          string     `gorm:"type:text" json:"failure_reason,omitempty"`
 
 	Items []SosmedBundleOrderItem `gorm:"foreignKey:BundleOrderID" json:"items,omitempty"`
 

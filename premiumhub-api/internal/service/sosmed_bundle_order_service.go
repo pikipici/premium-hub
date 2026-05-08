@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -15,12 +17,13 @@ import (
 )
 
 const (
-	SosmedBundleOrderStatusProcessing    = "processing"
-	SosmedBundleOrderStatusPartial       = "partial"
-	SosmedBundleOrderStatusFailed        = "failed"
-	SosmedBundleOrderItemStatusQueued    = "queued"
-	SosmedBundleOrderItemStatusSubmitted = "submitted"
-	SosmedBundleOrderItemStatusFailed    = "failed"
+	SosmedBundleOrderStatusProcessing     = "processing"
+	SosmedBundleOrderStatusPartial        = "partial"
+	SosmedBundleOrderStatusFailed         = "failed"
+	SosmedBundleOrderItemStatusQueued     = "queued"
+	SosmedBundleOrderItemStatusSubmitted  = "submitted"
+	SosmedBundleOrderItemStatusFailed     = "failed"
+	maxSosmedBundleOrderIdempotencyKeyLen = 80
 )
 
 type SosmedBundleOrderService struct {
@@ -82,11 +85,15 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 	if paymentMethod != "wallet" {
 		return nil, errors.New("checkout bundle saat ini hanya mendukung wallet")
 	}
-	idempotencyKey := normalizeSosmedBundleIdempotencyKey(input.IdempotencyKey)
-	if idempotencyKey == "" {
-		return nil, errors.New("idempotency key wajib diisi")
+	idempotencyKey, err := normalizeSosmedBundleIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		return nil, err
 	}
+	idempotencyRequestHash := buildSosmedBundleOrderIdempotencyRequestHash(bundleKey, variantKey, targetLink, paymentMethod, input)
 	if existing, err := s.orderRepo.GetBundleOrderByIdempotencyKeyForUser(ctx, userID, idempotencyKey); err == nil {
+		if storedHash := strings.TrimSpace(existing.IdempotencyRequestHash); storedHash != "" && storedHash != idempotencyRequestHash {
+			return nil, errors.New("idempotency_key sudah dipakai untuk checkout bundle sosmed berbeda")
+		}
 		return existing, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errors.New("gagal cek order bundle sosmed")
@@ -110,29 +117,31 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 	now := time.Now()
 	orderID := uuid.New()
 	order := &model.SosmedBundleOrder{
-		ID:                 orderID,
-		OrderNumber:        generateSosmedBundleOrderNumber(now, orderID),
-		UserID:             userID,
-		BundlePackageID:    variant.Package.ID,
-		BundleVariantID:    variant.ID,
-		PackageKeySnapshot: strings.TrimSpace(variant.Package.Key),
-		VariantKeySnapshot: strings.TrimSpace(variant.Key),
-		TitleSnapshot:      buildSosmedBundleOrderTitleSnapshot(variant),
-		TargetLink:         targetLink,
-		TargetUsername:     strings.TrimSpace(input.TargetUsername),
-		Notes:              strings.TrimSpace(input.Notes),
-		SubtotalPrice:      pricing.SubtotalPrice,
-		DiscountAmount:     pricing.DiscountAmount,
-		TotalPrice:         pricing.TotalPrice,
-		CostPriceSnapshot:  pricing.CostPriceSnapshot,
-		MarginSnapshot:     pricing.MarginSnapshot,
-		Status:             SosmedBundleOrderStatusProcessing,
-		PaymentMethod:      paymentMethod,
-		IdempotencyKey:     idempotencyKey,
-		PaidAt:             &now,
+		ID:                     orderID,
+		OrderNumber:            generateSosmedBundleOrderNumber(now, orderID),
+		UserID:                 userID,
+		BundlePackageID:        variant.Package.ID,
+		BundleVariantID:        variant.ID,
+		PackageKeySnapshot:     strings.TrimSpace(variant.Package.Key),
+		VariantKeySnapshot:     strings.TrimSpace(variant.Key),
+		TitleSnapshot:          buildSosmedBundleOrderTitleSnapshot(variant),
+		TargetLink:             targetLink,
+		TargetUsername:         strings.TrimSpace(input.TargetUsername),
+		Notes:                  strings.TrimSpace(input.Notes),
+		SubtotalPrice:          pricing.SubtotalPrice,
+		DiscountAmount:         pricing.DiscountAmount,
+		TotalPrice:             pricing.TotalPrice,
+		CostPriceSnapshot:      pricing.CostPriceSnapshot,
+		MarginSnapshot:         pricing.MarginSnapshot,
+		Status:                 SosmedBundleOrderStatusProcessing,
+		PaymentMethod:          paymentMethod,
+		IdempotencyKey:         idempotencyKey,
+		IdempotencyRequestHash: idempotencyRequestHash,
+		PaidAt:                 &now,
 	}
 	items := buildSosmedBundleOrderItems(variant, pricing, targetLink)
 	chargeRef := sosmedBundleOrderWalletChargeRef(orderID)
+	var replayOrder *model.SosmedBundleOrder
 
 	err = s.walletRepo.Transaction(func(tx *gorm.DB) error {
 		if ctx != nil {
@@ -150,6 +159,20 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 		if !user.IsActive {
 			return errors.New("akun diblokir")
 		}
+
+		var existing model.SosmedBundleOrder
+		if err := tx.Preload("User").Preload("Package").Preload("Variant").Preload("Items", func(db *gorm.DB) *gorm.DB {
+			return db.Order("created_at ASC")
+		}).Preload("Items.Service").Where("user_id = ? AND idempotency_key = ?", userID, idempotencyKey).First(&existing).Error; err == nil {
+			if storedHash := strings.TrimSpace(existing.IdempotencyRequestHash); storedHash != "" && storedHash != idempotencyRequestHash {
+				return errors.New("idempotency_key sudah dipakai untuk checkout bundle sosmed berbeda")
+			}
+			replayOrder = &existing
+			return nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("gagal cek order bundle sosmed")
+		}
+
 		if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, chargeRef); err == nil {
 			return errors.New("transaksi wallet bundle sosmed sudah diproses")
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -195,6 +218,9 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if replayOrder != nil {
+		return replayOrder, nil
 	}
 
 	stored, err := s.orderRepo.GetBundleOrderByNumberForUser(ctx, userID, order.OrderNumber)
@@ -366,18 +392,46 @@ func sosmedBundleOrderWalletChargeRef(orderID uuid.UUID) string {
 	return fmt.Sprintf("sosmed_bundle_order:%s:charge", orderID.String())
 }
 
-func normalizeSosmedBundleIdempotencyKey(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" || len(value) > 80 {
-		return ""
+func normalizeSosmedBundleIdempotencyKey(value string) (string, error) {
+	key := strings.TrimSpace(value)
+	if key == "" {
+		return "", errors.New("idempotency_key wajib diisi")
 	}
-	for _, r := range value {
+	if len(key) > maxSosmedBundleOrderIdempotencyKeyLen {
+		return "", fmt.Errorf("idempotency_key maksimal %d karakter", maxSosmedBundleOrderIdempotencyKeyLen)
+	}
+	for _, r := range key {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == ':' {
 			continue
 		}
-		return ""
+		return "", errors.New("idempotency_key tidak valid")
 	}
-	return value
+	return key, nil
+}
+
+func buildSosmedBundleOrderIdempotencyRequestHash(bundleKey, variantKey, targetLink, paymentMethod string, input CreateSosmedBundleOrderInput) string {
+	payload := struct {
+		Flow                  string `json:"flow"`
+		BundleKey             string `json:"bundle_key"`
+		VariantKey            string `json:"variant_key"`
+		TargetLink            string `json:"target_link"`
+		TargetUsername        string `json:"target_username"`
+		Notes                 string `json:"notes"`
+		PaymentMethod         string `json:"payment_method"`
+		TargetPublicConfirmed bool   `json:"target_public_confirmed"`
+	}{
+		Flow:                  "sosmed_bundle_order",
+		BundleKey:             strings.TrimSpace(bundleKey),
+		VariantKey:            strings.TrimSpace(variantKey),
+		TargetLink:            normalizeSosmedOrderTargetLink(targetLink),
+		TargetUsername:        strings.TrimSpace(input.TargetUsername),
+		Notes:                 strings.TrimSpace(input.Notes),
+		PaymentMethod:         strings.ToLower(strings.TrimSpace(paymentMethod)),
+		TargetPublicConfirmed: input.TargetPublicConfirmed,
+	}
+	raw, _ := json.Marshal(payload)
+	sum := sha256.Sum256(raw)
+	return fmt.Sprintf("%x", sum)
 }
 
 func generateSosmedBundleOrderNumber(now time.Time, orderID uuid.UUID) string {

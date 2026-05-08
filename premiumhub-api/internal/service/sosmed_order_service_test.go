@@ -567,6 +567,7 @@ func TestSosmedOrderService_CreateWalletPaidJAPOrder(t *testing.T) {
 		TargetLink:            "https://instagram.com/example",
 		Quantity:              5,
 		TargetPublicConfirmed: true,
+		IdempotencyKey:        "idem-wallet-paid-jap-order",
 	})
 	if err != nil {
 		t.Fatalf("create wallet paid JAP order: %v", err)
@@ -604,6 +605,296 @@ func TestSosmedOrderService_CreateWalletPaidJAPOrder(t *testing.T) {
 	}
 	if chargeCount != 1 {
 		t.Fatalf("expected 1 charge ledger, got %d", chargeCount)
+	}
+}
+
+func TestSosmedOrderService_CreateWalletOrderIdempotencyReturnsExistingOrder(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+		&model.WalletLedger{},
+		&model.Notification{},
+	); err != nil {
+		t.Fatalf("migrate wallet sosmed models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:            uuid.New(),
+		Name:          "Buyer Wallet Idempotent Sosmed",
+		Email:         "buyer-wallet-idempotent-sosmed@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 100000,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-6331",
+		Title:             "Instagram Followers Hemat",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     19000,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{res: &JAPAddOrderResponse{Order: "JAP-IDEM-1001"}}
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), repository.NewNotificationRepo(db)).
+		SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(fakeJAP)
+
+	input := CreateSosmedOrderInput{
+		ServiceID:             serviceItem.ID.String(),
+		TargetLink:            "https://instagram.com/idempotent-example",
+		Quantity:              2,
+		Notes:                 "first submit may timeout",
+		TargetPublicConfirmed: true,
+		IdempotencyKey:        "idem-sosmed-wallet-001",
+	}
+
+	first, err := orderSvc.Create(context.Background(), buyer.ID, input)
+	if err != nil {
+		t.Fatalf("first create wallet sosmed: %v", err)
+	}
+	second, err := orderSvc.Create(context.Background(), buyer.ID, input)
+	if err != nil {
+		t.Fatalf("second idempotent create wallet sosmed: %v", err)
+	}
+
+	if first.Order.ID != second.Order.ID {
+		t.Fatalf("expected replay to return same order id, got %s then %s", first.Order.ID, second.Order.ID)
+	}
+	if len(fakeJAP.inputs) != 1 {
+		t.Fatalf("expected one JAP add call, got %d", len(fakeJAP.inputs))
+	}
+
+	var userAfter model.User
+	if err := db.First(&userAfter, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("load user after replay: %v", err)
+	}
+	if userAfter.WalletBalance != 62000 {
+		t.Fatalf("wallet should be debited once to 62000, got %d", userAfter.WalletBalance)
+	}
+
+	var purchaseLedgerCount int64
+	if err := db.Model(&model.WalletLedger{}).
+		Where("user_id = ? AND category = ? AND type = ?", buyer.ID, "sosmed_purchase", "debit").
+		Count(&purchaseLedgerCount).Error; err != nil {
+		t.Fatalf("count purchase ledgers: %v", err)
+	}
+	if purchaseLedgerCount != 1 {
+		t.Fatalf("expected one wallet purchase ledger, got %d", purchaseLedgerCount)
+	}
+}
+
+func TestSosmedOrderService_CreateWalletOrderIdempotencyRejectsInvalidKeyBeforeSideEffects(t *testing.T) {
+	cases := []struct {
+		name      string
+		key       string
+		wantError string
+	}{
+		{
+			name:      "missing key",
+			key:       "",
+			wantError: "idempotency_key wajib diisi",
+		},
+		{
+			name:      "overlong key",
+			key:       strings.Repeat("x", maxSosmedOrderIdempotencyKeyLen+1),
+			wantError: "idempotency_key maksimal 80 karakter",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupCoreDB(t)
+			if err := db.AutoMigrate(
+				&model.User{},
+				&model.SosmedService{},
+				&model.SosmedOrder{},
+				&model.SosmedOrderEvent{},
+				&model.SosmedOrderRefillAttempt{},
+				&model.WalletLedger{},
+			); err != nil {
+				t.Fatalf("migrate wallet sosmed models: %v", err)
+			}
+
+			buyer := &model.User{
+				ID:            uuid.New(),
+				Name:          "Buyer Invalid Idempotency Sosmed",
+				Email:         "buyer-invalid-idempotency-sosmed@example.com",
+				Password:      "hashed",
+				Role:          "user",
+				IsActive:      true,
+				WalletBalance: 100000,
+			}
+			if err := db.Create(buyer).Error; err != nil {
+				t.Fatalf("create buyer: %v", err)
+			}
+
+			serviceItem := &model.SosmedService{
+				ID:                uuid.New(),
+				CategoryCode:      "followers",
+				Code:              "jap-6331",
+				Title:             "Instagram Followers Hemat",
+				ProviderCode:      "jap",
+				ProviderServiceID: "6331",
+				CheckoutPrice:     19000,
+				IsActive:          true,
+			}
+			if err := db.Create(serviceItem).Error; err != nil {
+				t.Fatalf("create service: %v", err)
+			}
+
+			fakeJAP := &fakeSosmedJAPOrderProvider{res: &JAPAddOrderResponse{Order: "JAP-INVALID-IDEM"}}
+			orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+				SetWalletRepo(repository.NewWalletRepo(db)).
+				SetJAPOrderProvider(fakeJAP)
+
+			_, err := orderSvc.Create(context.Background(), buyer.ID, CreateSosmedOrderInput{
+				ServiceID:             serviceItem.ID.String(),
+				TargetLink:            "https://instagram.com/invalid-idempotency",
+				Quantity:              1,
+				TargetPublicConfirmed: true,
+				IdempotencyKey:        tc.key,
+			})
+			if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("expected %q error, got: %v", tc.wantError, err)
+			}
+			if len(fakeJAP.inputs) != 0 {
+				t.Fatalf("JAP should not be called for invalid idempotency key, got %d calls", len(fakeJAP.inputs))
+			}
+
+			var userAfter model.User
+			if err := db.First(&userAfter, "id = ?", buyer.ID).Error; err != nil {
+				t.Fatalf("load user after invalid key: %v", err)
+			}
+			if userAfter.WalletBalance != 100000 {
+				t.Fatalf("wallet should remain 100000, got %d", userAfter.WalletBalance)
+			}
+
+			var orderCount int64
+			if err := db.Model(&model.SosmedOrder{}).Where("user_id = ?", buyer.ID).Count(&orderCount).Error; err != nil {
+				t.Fatalf("count orders: %v", err)
+			}
+			if orderCount != 0 {
+				t.Fatalf("expected no orders for invalid idempotency key, got %d", orderCount)
+			}
+
+			var ledgerCount int64
+			if err := db.Model(&model.WalletLedger{}).Where("user_id = ?", buyer.ID).Count(&ledgerCount).Error; err != nil {
+				t.Fatalf("count wallet ledgers: %v", err)
+			}
+			if ledgerCount != 0 {
+				t.Fatalf("expected no wallet ledgers for invalid idempotency key, got %d", ledgerCount)
+			}
+		})
+	}
+}
+
+func TestSosmedOrderService_CreateWalletOrderIdempotencyRejectsPayloadMismatchBeforeSideEffects(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+		&model.WalletLedger{},
+	); err != nil {
+		t.Fatalf("migrate wallet sosmed models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:            uuid.New(),
+		Name:          "Buyer Idempotency Mismatch Sosmed",
+		Email:         "buyer-idempotency-mismatch-sosmed@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 100000,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-6331",
+		Title:             "Instagram Followers Hemat",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     19000,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{res: &JAPAddOrderResponse{Order: "JAP-IDEM-MISMATCH"}}
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(fakeJAP)
+
+	firstInput := CreateSosmedOrderInput{
+		ServiceID:             serviceItem.ID.String(),
+		TargetLink:            "https://instagram.com/idempotency-mismatch",
+		Quantity:              1,
+		Notes:                 "first payload",
+		TargetPublicConfirmed: true,
+		IdempotencyKey:        "idem-sosmed-wallet-mismatch",
+	}
+	if _, err := orderSvc.Create(context.Background(), buyer.ID, firstInput); err != nil {
+		t.Fatalf("first create wallet sosmed: %v", err)
+	}
+
+	mismatchInput := firstInput
+	mismatchInput.Quantity = 2
+	mismatchInput.Notes = "different payload"
+	_, err := orderSvc.Create(context.Background(), buyer.ID, mismatchInput)
+	if err == nil || !strings.Contains(err.Error(), "idempotency_key sudah dipakai untuk checkout sosmed berbeda") {
+		t.Fatalf("expected idempotency mismatch error, got: %v", err)
+	}
+	if len(fakeJAP.inputs) != 1 {
+		t.Fatalf("JAP should not be called again for idempotency mismatch, got %d calls", len(fakeJAP.inputs))
+	}
+
+	var userAfter model.User
+	if err := db.First(&userAfter, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("load user after mismatch: %v", err)
+	}
+	if userAfter.WalletBalance != 81000 {
+		t.Fatalf("wallet should only include the first debit to 81000, got %d", userAfter.WalletBalance)
+	}
+
+	var orderCount int64
+	if err := db.Model(&model.SosmedOrder{}).Where("user_id = ?", buyer.ID).Count(&orderCount).Error; err != nil {
+		t.Fatalf("count orders: %v", err)
+	}
+	if orderCount != 1 {
+		t.Fatalf("expected only the first order after mismatch, got %d", orderCount)
+	}
+
+	var purchaseLedgerCount int64
+	if err := db.Model(&model.WalletLedger{}).
+		Where("user_id = ? AND category = ? AND type = ?", buyer.ID, "sosmed_purchase", "debit").
+		Count(&purchaseLedgerCount).Error; err != nil {
+		t.Fatalf("count purchase ledgers: %v", err)
+	}
+	if purchaseLedgerCount != 1 {
+		t.Fatalf("expected only the first wallet purchase ledger after mismatch, got %d", purchaseLedgerCount)
 	}
 }
 
@@ -657,6 +948,7 @@ func TestSosmedOrderService_CreateWalletPaidJAPFailureRefunds(t *testing.T) {
 		TargetLink:            "https://instagram.com/example",
 		Quantity:              1,
 		TargetPublicConfirmed: true,
+		IdempotencyKey:        "idem-wallet-provider-failure",
 	})
 	if err == nil || !strings.Contains(err.Error(), "saldo wallet sudah direfund") {
 		t.Fatalf("expected refunded provider error, got: %v", err)
@@ -737,6 +1029,7 @@ func TestSosmedOrderService_CreateWalletPaidInsufficientBalance(t *testing.T) {
 		TargetLink:            "https://instagram.com/example",
 		Quantity:              1,
 		TargetPublicConfirmed: true,
+		IdempotencyKey:        "idem-wallet-insufficient-balance",
 	})
 	if err == nil || !strings.Contains(err.Error(), "saldo wallet tidak cukup") {
 		t.Fatalf("expected insufficient wallet error, got: %v", err)

@@ -10,7 +10,7 @@ import (
 type SosmedOrder struct {
 	ID uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 
-	UserID uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
+	UserID uuid.UUID `gorm:"type:uuid;not null;index;uniqueIndex:idx_sosmed_order_idempotency" json:"user_id"`
 	User   User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 
 	ServiceID uuid.UUID     `gorm:"type:uuid;not null;index" json:"service_id"`
@@ -29,6 +29,9 @@ type SosmedOrder struct {
 	OrderStatus    string `gorm:"size:30;default:pending_payment;index" json:"order_status"`
 	GatewayOrderID string `gorm:"size:120;index" json:"gateway_order_id"`
 	PaymentPayload string `gorm:"type:text" json:"payment_payload,omitempty"`
+
+	IdempotencyKey         *string `gorm:"size:80;uniqueIndex:idx_sosmed_order_idempotency" json:"-"`
+	IdempotencyRequestHash string  `gorm:"size:128" json:"-"`
 
 	ProviderCode      string     `gorm:"size:32;index" json:"provider_code,omitempty"`
 	ProviderServiceID string     `gorm:"size:64;index" json:"provider_service_id,omitempty"`

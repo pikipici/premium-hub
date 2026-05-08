@@ -220,6 +220,12 @@ func TestSosmedBundleOrderServiceCreateDebitsWalletAndCreatesParentWithItems(t *
 	if order.Status != "processing" || order.PaymentMethod != "wallet" || order.PaidAt == nil {
 		t.Fatalf("expected wallet-paid processing order, got status=%q method=%q paidAt=%v", order.Status, order.PaymentMethod, order.PaidAt)
 	}
+	if order.IdempotencyKey != idempotencyKey {
+		t.Fatalf("expected stored idempotency key %q, got %q", idempotencyKey, order.IdempotencyKey)
+	}
+	if len(strings.TrimSpace(order.IdempotencyRequestHash)) != 64 {
+		t.Fatalf("expected stored bundle idempotency request hash, got %q", order.IdempotencyRequestHash)
+	}
 	if len(order.Items) != 2 {
 		t.Fatalf("expected two child items, got %d", len(order.Items))
 	}
@@ -252,6 +258,7 @@ func TestSosmedBundleOrderServiceCreateDebitsWalletAndCreatesParentWithItems(t *
 		BundleKey:             pkg.Key,
 		VariantKey:            variant.Key,
 		TargetLink:            "https://instagram.com/example",
+		Notes:                 "boost pelan",
 		PaymentMethod:         "wallet",
 		IdempotencyKey:        idempotencyKey,
 		TargetPublicConfirmed: true,
@@ -277,12 +284,13 @@ func TestSosmedBundleOrderServiceCreateSubmitsBundleItemsWithExactQuantityUnits(
 	fakeJAP := &fakeSosmedBundleJAPOrderProvider{responses: []string{"JAP-500", "JAP-100"}}
 	svc := newSosmedBundleOrderServiceForTest(db).SetJAPOrderProvider(fakeJAP)
 
+	idempotencyKey := uuid.NewString()
 	order, err := svc.Create(context.Background(), buyer.ID, CreateSosmedBundleOrderInput{
 		BundleKey:             pkg.Key,
 		VariantKey:            variant.Key,
 		TargetLink:            "https://instagram.com/example",
 		PaymentMethod:         "wallet",
-		IdempotencyKey:        uuid.NewString(),
+		IdempotencyKey:        idempotencyKey,
 		TargetPublicConfirmed: true,
 	})
 	if err != nil {
@@ -308,6 +316,24 @@ func TestSosmedBundleOrderServiceCreateSubmitsBundleItemsWithExactQuantityUnits(
 	}
 	if order.Items[1].Status != "submitted" || order.Items[1].ProviderOrderID != "JAP-100" || order.Items[1].ProviderStatus != "submitted" || order.Items[1].SubmittedAt == nil {
 		t.Fatalf("unexpected second submitted item: %+v", order.Items[1])
+	}
+
+	duplicate, err := svc.Create(context.Background(), buyer.ID, CreateSosmedBundleOrderInput{
+		BundleKey:             pkg.Key,
+		VariantKey:            variant.Key,
+		TargetLink:            "https://instagram.com/example",
+		PaymentMethod:         "wallet",
+		IdempotencyKey:        idempotencyKey,
+		TargetPublicConfirmed: true,
+	})
+	if err != nil {
+		t.Fatalf("repeat provider-backed bundle create: %v", err)
+	}
+	if duplicate.ID != order.ID || duplicate.OrderNumber != order.OrderNumber {
+		t.Fatalf("expected provider-backed idempotent retry to return original order, got original=%s duplicate=%s", order.ID, duplicate.ID)
+	}
+	if len(fakeJAP.inputs) != 2 {
+		t.Fatalf("provider-backed idempotent retry should not resubmit provider items, got %d provider calls", len(fakeJAP.inputs))
 	}
 }
 
@@ -385,6 +411,103 @@ func TestSosmedBundleOrderServiceCreateMarksFailedWhenAllProviderSubmissionsFail
 		if item.Status != SosmedBundleOrderItemStatusFailed || !strings.Contains(item.ProviderError, "provider down") {
 			t.Fatalf("expected failed provider item, got %+v", item)
 		}
+	}
+}
+
+func TestSosmedBundleOrderServiceCreateRejectsSameIdempotencyKeyDifferentPayload(t *testing.T) {
+	db := setupSosmedBundleOrderServiceTestDB(t)
+	buyer, pkg, variant := seedSosmedBundleOrderServiceGraph(t, db, 10000)
+	fakeJAP := &fakeSosmedBundleJAPOrderProvider{responses: []string{"JAP-500", "JAP-100"}}
+	svc := newSosmedBundleOrderServiceForTest(db).SetJAPOrderProvider(fakeJAP)
+
+	idempotencyKey := uuid.NewString()
+	first, err := svc.Create(context.Background(), buyer.ID, CreateSosmedBundleOrderInput{
+		BundleKey:             pkg.Key,
+		VariantKey:            variant.Key,
+		TargetLink:            "https://instagram.com/example",
+		Notes:                 "same checkout attempt",
+		PaymentMethod:         "wallet",
+		IdempotencyKey:        idempotencyKey,
+		TargetPublicConfirmed: true,
+	})
+	if err != nil {
+		t.Fatalf("initial bundle create: %v", err)
+	}
+	if first.ID == uuid.Nil {
+		t.Fatal("expected created bundle order")
+	}
+	if len(fakeJAP.inputs) != 2 {
+		t.Fatalf("expected initial create to submit two provider items, got %d", len(fakeJAP.inputs))
+	}
+
+	_, err = svc.Create(context.Background(), buyer.ID, CreateSosmedBundleOrderInput{
+		BundleKey:             pkg.Key,
+		VariantKey:            variant.Key,
+		TargetLink:            "https://instagram.com/other-target",
+		Notes:                 "same checkout attempt",
+		PaymentMethod:         "wallet",
+		IdempotencyKey:        idempotencyKey,
+		TargetPublicConfirmed: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "idempotency_key sudah dipakai") {
+		t.Fatalf("expected idempotency payload mismatch error, got %v", err)
+	}
+	if len(fakeJAP.inputs) != 2 {
+		t.Fatalf("mismatched idempotency replay should not submit provider again, got %d provider calls", len(fakeJAP.inputs))
+	}
+
+	var storedBuyer model.User
+	if err := db.First(&storedBuyer, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("reload buyer: %v", err)
+	}
+	if storedBuyer.WalletBalance != 6250 {
+		t.Fatalf("expected only first wallet debit, got balance %d", storedBuyer.WalletBalance)
+	}
+	var orderCount int64
+	if err := db.Model(&model.SosmedBundleOrder{}).Where("user_id = ?", buyer.ID).Count(&orderCount).Error; err != nil {
+		t.Fatalf("count bundle orders: %v", err)
+	}
+	if orderCount != 1 {
+		t.Fatalf("expected one bundle order after mismatched replay, got %d", orderCount)
+	}
+	var ledgerCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("user_id = ?", buyer.ID).Count(&ledgerCount).Error; err != nil {
+		t.Fatalf("count wallet ledgers: %v", err)
+	}
+	if ledgerCount != 1 {
+		t.Fatalf("expected one wallet ledger after mismatched replay, got %d", ledgerCount)
+	}
+}
+
+func TestSosmedBundleOrderServiceCreateRejectsInvalidIdempotencyKeyBeforeSideEffects(t *testing.T) {
+	cases := []struct {
+		name        string
+		key         string
+		wantMessage string
+	}{
+		{name: "missing", key: "   ", wantMessage: "idempotency_key wajib diisi"},
+		{name: "overlong", key: strings.Repeat("a", maxSosmedBundleOrderIdempotencyKeyLen+1), wantMessage: "idempotency_key maksimal"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupSosmedBundleOrderServiceTestDB(t)
+			buyer, pkg, variant := seedSosmedBundleOrderServiceGraph(t, db, 10000)
+			svc := newSosmedBundleOrderServiceForTest(db)
+
+			_, err := svc.Create(context.Background(), buyer.ID, CreateSosmedBundleOrderInput{
+				BundleKey:             pkg.Key,
+				VariantKey:            variant.Key,
+				TargetLink:            "https://instagram.com/example",
+				PaymentMethod:         "wallet",
+				IdempotencyKey:        tc.key,
+				TargetPublicConfirmed: true,
+			})
+			if err == nil || !strings.Contains(err.Error(), tc.wantMessage) {
+				t.Fatalf("expected %q error, got %v", tc.wantMessage, err)
+			}
+			assertNoBundleOrderSideEffects(t, db, buyer.ID, 10000)
+		})
 	}
 }
 
