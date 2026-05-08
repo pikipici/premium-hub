@@ -43,6 +43,12 @@ export interface SosmedOrder {
   provider_payload?: string
   provider_error?: string
   provider_synced_at?: string
+  provider_cancel_status?: 'requested' | 'completed' | 'failed' | string
+  provider_cancel_payload?: string
+  provider_cancel_error?: string
+  provider_canceled_at?: string
+  cancel_eligible?: boolean
+  cancel_unavailable_reason?: string
   refill_eligible?: boolean
   refill_period_days?: number
   refill_deadline?: string

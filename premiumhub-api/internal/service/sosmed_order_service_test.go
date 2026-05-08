@@ -32,6 +32,9 @@ type fakeSosmedJAPOrderProvider struct {
 	refillStatusInputs []string
 	refillStatusRes    *JAPRefillStatusResponse
 	refillStatusErr    error
+	cancelInputs       []string
+	cancelRes          *JAPCancelOrderResponse
+	cancelErr          error
 }
 
 func (f *fakeSosmedJAPOrderProvider) AddOrder(_ context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error) {
@@ -105,6 +108,222 @@ func (f *fakeSosmedJAPOrderProvider) GetRefillStatus(_ context.Context, refillID
 		return res, nil
 	}
 	return &JAPRefillStatusResponse{Status: "Processing"}, nil
+}
+
+func (f *fakeSosmedJAPOrderProvider) CancelOrder(_ context.Context, orderID string) (*JAPCancelOrderResponse, error) {
+	f.mu.Lock()
+	f.cancelInputs = append(f.cancelInputs, orderID)
+	res := f.cancelRes
+	err := f.cancelErr
+	f.mu.Unlock()
+
+	if err != nil {
+		return nil, err
+	}
+	if res != nil {
+		return res, nil
+	}
+	return &JAPCancelOrderResponse{Order: JAPFlexibleValue(orderID), Cancel: JAPCancelResult{Accepted: true}}, nil
+}
+
+func TestSosmedOrderService_CancelJAPProcessingOrderRequestsProviderAndRefundsOnCanceledStatus(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.ProductCategory{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+		&model.Notification{},
+		&model.WalletLedger{},
+	); err != nil {
+		t.Fatalf("migrate sosmed cancel models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:            uuid.New(),
+		Name:          "Buyer Cancel",
+		Email:         "buyer-cancel@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 0,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	svcRow := &model.SosmedService{
+		ID:                      uuid.New(),
+		CategoryCode:            "followers",
+		Code:                    "jap-cancel-1",
+		Title:                   "JAP Cancelable",
+		ProviderCode:            "jap",
+		ProviderServiceID:       "6331",
+		ProviderCancelSupported: true,
+		CheckoutPrice:           12000,
+		IsActive:                true,
+	}
+	if err := db.Create(svcRow).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            buyer.ID,
+		ServiceID:         svcRow.ID,
+		ServiceCode:       svcRow.Code,
+		ServiceTitle:      svcRow.Title,
+		TargetLink:        "https://instagram.com/example",
+		Quantity:          1,
+		UnitPrice:         12000,
+		TotalPrice:        12000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusProcessing,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		ProviderOrderID:   "991122",
+		ProviderStatus:    "In Progress",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	if err := db.Create(&model.WalletLedger{
+		ID:            uuid.New(),
+		UserID:        buyer.ID,
+		Type:          "debit",
+		Category:      "sosmed_purchase",
+		Amount:        12000,
+		BalanceBefore: 12000,
+		BalanceAfter:  0,
+		Reference:     sosmedOrderWalletChargeRef(order.ID),
+		Description:   "charge sosmed test",
+	}).Error; err != nil {
+		t.Fatalf("create charge ledger: %v", err)
+	}
+
+	provider := &fakeSosmedJAPOrderProvider{
+		cancelRes: &JAPCancelOrderResponse{Order: JAPFlexibleValue("991122"), Cancel: JAPCancelResult{Accepted: true}},
+		statusRes: &JAPOrderStatusResponse{Status: "Canceled"},
+	}
+	svc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), repository.NewNotificationRepo(db)).
+		SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(provider)
+
+	detail, err := svc.Cancel(context.Background(), order.ID, buyer.ID)
+	if err != nil {
+		t.Fatalf("cancel jap order: %v", err)
+	}
+	if len(provider.cancelInputs) != 1 || provider.cancelInputs[0] != "991122" {
+		t.Fatalf("expected one provider cancel for 991122, got %#v", provider.cancelInputs)
+	}
+	if detail.Order.OrderStatus != sosmedOrderStatusCanceled {
+		t.Fatalf("expected local order canceled after provider status Canceled, got %q", detail.Order.OrderStatus)
+	}
+	if detail.Order.PaymentStatus != "failed" {
+		t.Fatalf("expected payment failed after wallet refund, got %q", detail.Order.PaymentStatus)
+	}
+	if detail.Order.ProviderCancelStatus != "completed" {
+		t.Fatalf("expected provider cancel completed, got %q", detail.Order.ProviderCancelStatus)
+	}
+
+	var storedBuyer model.User
+	if err := db.First(&storedBuyer, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("load buyer: %v", err)
+	}
+	if storedBuyer.WalletBalance != 12000 {
+		t.Fatalf("expected wallet refunded to 12000, got %d", storedBuyer.WalletBalance)
+	}
+	var refundCount int64
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", sosmedOrderWalletRefundRef(order.ID)).Count(&refundCount).Error; err != nil {
+		t.Fatalf("count refund ledger: %v", err)
+	}
+	if refundCount != 1 {
+		t.Fatalf("expected one refund ledger, got %d", refundCount)
+	}
+
+	if _, err := svc.Cancel(context.Background(), order.ID, buyer.ID); err == nil {
+		t.Fatalf("expected duplicate cancel to be blocked")
+	}
+	if len(provider.cancelInputs) != 1 {
+		t.Fatalf("expected duplicate cancel not to hit provider, got %#v", provider.cancelInputs)
+	}
+	if err := db.Model(&model.WalletLedger{}).Where("reference = ?", sosmedOrderWalletRefundRef(order.ID)).Count(&refundCount).Error; err != nil {
+		t.Fatalf("count refund ledger after duplicate: %v", err)
+	}
+	if refundCount != 1 {
+		t.Fatalf("expected one refund ledger after duplicate, got %d", refundCount)
+	}
+}
+
+func TestSosmedOrderService_CancelJAPProcessingOrderBlocksUnsupportedServiceBeforeProvider(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.ProductCategory{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+		&model.Notification{},
+	); err != nil {
+		t.Fatalf("migrate sosmed cancel unsupported models: %v", err)
+	}
+
+	buyer := &model.User{ID: uuid.New(), Name: "Buyer Cancel Unsupported", Email: "buyer-cancel-unsupported@example.com", Password: "hashed", Role: "user", IsActive: true}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+	svcRow := &model.SosmedService{
+		ID:                      uuid.New(),
+		CategoryCode:            "followers",
+		Code:                    "jap-no-cancel",
+		Title:                   "JAP No Cancel",
+		ProviderCode:            "jap",
+		ProviderServiceID:       "6332",
+		ProviderCancelSupported: false,
+		CheckoutPrice:           12000,
+		IsActive:                true,
+	}
+	if err := db.Create(svcRow).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+	order := &model.SosmedOrder{
+		ID:                uuid.New(),
+		UserID:            buyer.ID,
+		ServiceID:         svcRow.ID,
+		ServiceCode:       svcRow.Code,
+		ServiceTitle:      svcRow.Title,
+		TargetLink:        "https://instagram.com/example",
+		Quantity:          1,
+		UnitPrice:         12000,
+		TotalPrice:        12000,
+		PaymentMethod:     "wallet",
+		PaymentStatus:     "paid",
+		OrderStatus:       sosmedOrderStatusProcessing,
+		ProviderCode:      "jap",
+		ProviderServiceID: "6332",
+		ProviderOrderID:   "991123",
+		ProviderStatus:    "In Progress",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	provider := &fakeSosmedJAPOrderProvider{}
+	svc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), repository.NewNotificationRepo(db)).
+		SetJAPOrderProvider(provider)
+
+	_, err := svc.Cancel(context.Background(), order.ID, buyer.ID)
+	if err == nil {
+		t.Fatalf("expected unsupported cancel error")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "support cancel") {
+		t.Fatalf("expected support cancel error, got %q", err.Error())
+	}
+	if len(provider.cancelInputs) != 0 {
+		t.Fatalf("expected provider not called, got %#v", provider.cancelInputs)
+	}
 }
 
 func TestSosmedOrderService_CreateAndConfirm(t *testing.T) {
@@ -279,11 +498,11 @@ func TestSosmedOrderService_CancelValidation(t *testing.T) {
 		t.Fatalf("create order: %v", err)
 	}
 
-	if err := orderSvc.Cancel(created.Order.ID, other.ID); err == nil || !strings.Contains(err.Error(), "akses ditolak") {
+	if _, err := orderSvc.Cancel(context.Background(), created.Order.ID, other.ID); err == nil || !strings.Contains(err.Error(), "akses ditolak") {
 		t.Fatalf("expected access denied when other user cancel order, got: %v", err)
 	}
 
-	if err := orderSvc.Cancel(created.Order.ID, buyer.ID); err != nil {
+	if _, err := orderSvc.Cancel(context.Background(), created.Order.ID, buyer.ID); err != nil {
 		t.Fatalf("cancel order: %v", err)
 	}
 

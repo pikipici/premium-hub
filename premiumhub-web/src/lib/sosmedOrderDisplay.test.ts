@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildSosmedServiceCards } from './sosmedProductCards'
-import { buildUserSosmedOrderDisplay } from './sosmedOrderDisplay'
+import { buildUserSosmedOrderDisplay, getUserSosmedOrderCancelAction } from './sosmedOrderDisplay'
 import type { SosmedOrder } from '@/types/sosmedOrder'
 import type { SosmedService } from '@/types/sosmedService'
 
@@ -88,5 +88,43 @@ describe('user sosmed order display view model', () => {
 
     expect(display.productTitle).toBe('Paket Followers Instagram')
     expect(display.quantityLabel).toBe('Jumlah: ±1.000 followers (1 paket)')
+  })
+
+  it('shows provider cancel CTA only when backend marks a processing JAP order eligible', () => {
+    const order: SosmedOrder = {
+      ...baseOrder,
+      cancel_eligible: true,
+      order_status: 'processing',
+      payment_status: 'paid',
+    }
+
+    const action = getUserSosmedOrderCancelAction(order)
+    const display = buildUserSosmedOrderDisplay(order)
+
+    expect(action?.kind).toBe('provider')
+    expect(action?.label).toBe('Ajukan Cancel')
+    expect(display.cancelAction?.label).toBe('Ajukan Cancel')
+  })
+
+  it('keeps raw supplier cancel errors out of the user cancel copy', () => {
+    const display = buildUserSosmedOrderDisplay({
+      ...baseOrder,
+      cancel_eligible: false,
+      cancel_unavailable_reason: 'Incorrect order ID from JAP provider response',
+      provider_cancel_error: 'Incorrect API key from supplier',
+    })
+
+    expect(display.cancelAction).toBeUndefined()
+    expect(display.cancelStatus?.label).toBeUndefined()
+  })
+
+  it('shows friendly status when supplier cancel is already being processed', () => {
+    const display = buildUserSosmedOrderDisplay({
+      ...baseOrder,
+      provider_cancel_status: 'requested',
+      cancel_eligible: false,
+    })
+
+    expect(display.cancelStatus?.label).toBe('Cancel supplier diproses')
   })
 })

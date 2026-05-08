@@ -20,6 +20,8 @@ type JAPClient interface {
 	GetServices(ctx context.Context) ([]JAPServiceItem, error)
 	AddOrder(ctx context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error)
 	GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error)
+	CancelOrders(ctx context.Context, orderIDs []string) ([]JAPCancelOrderResponse, error)
+	CancelOrder(ctx context.Context, orderID string) (*JAPCancelOrderResponse, error)
 	RequestRefill(ctx context.Context, orderID string) (*JAPRefillResponse, error)
 	GetRefillStatus(ctx context.Context, refillID string) (*JAPRefillStatusResponse, error)
 }
@@ -110,6 +112,91 @@ type JAPRefillResponse struct {
 
 type JAPRefillStatusResponse struct {
 	Status string `json:"status"`
+}
+
+type JAPCancelResult struct {
+	Accepted bool
+	Error    string
+}
+
+func (r *JAPCancelResult) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		*r = JAPCancelResult{}
+		return nil
+	}
+
+	if trimmed[0] == '{' {
+		var payload map[string]any
+		if err := json.Unmarshal(trimmed, &payload); err != nil {
+			return err
+		}
+		for _, key := range []string{"error", "message", "msg", "detail"} {
+			if value, ok := payload[key]; ok {
+				if text := strings.TrimSpace(fmt.Sprint(value)); text != "" && text != "<nil>" {
+					*r = JAPCancelResult{Error: text}
+					return nil
+				}
+			}
+		}
+		for _, key := range []string{"cancel", "accepted", "success"} {
+			if value, ok := payload[key]; ok && parseJAPCancelAccepted(value) {
+				*r = JAPCancelResult{Accepted: true}
+				return nil
+			}
+		}
+		*r = JAPCancelResult{}
+		return nil
+	}
+
+	var boolValue bool
+	if err := json.Unmarshal(trimmed, &boolValue); err == nil {
+		*r = JAPCancelResult{Accepted: boolValue}
+		return nil
+	}
+
+	var numberValue float64
+	if err := json.Unmarshal(trimmed, &numberValue); err == nil {
+		*r = JAPCancelResult{Accepted: numberValue != 0}
+		return nil
+	}
+
+	var stringValue string
+	if err := json.Unmarshal(trimmed, &stringValue); err == nil {
+		if parseJAPCancelAccepted(stringValue) {
+			*r = JAPCancelResult{Accepted: true}
+			return nil
+		}
+		*r = JAPCancelResult{Error: strings.TrimSpace(stringValue)}
+		return nil
+	}
+
+	return fmt.Errorf("response cancel JAP tidak valid")
+}
+
+func parseJAPCancelAccepted(value any) bool {
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case float64:
+		return typed != 0
+	case int:
+		return typed != 0
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "1", "true", "yes", "ok", "accepted", "success", "successful":
+			return true
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+}
+
+type JAPCancelOrderResponse struct {
+	Order  JAPFlexibleValue `json:"order"`
+	Cancel JAPCancelResult  `json:"cancel"`
 }
 
 type JAPAPIError struct {
@@ -241,6 +328,58 @@ func (c *japHTTPClient) GetOrderStatus(ctx context.Context, orderID string) (*JA
 	}
 
 	return &out, nil
+}
+
+func (c *japHTTPClient) CancelOrders(ctx context.Context, orderIDs []string) ([]JAPCancelOrderResponse, error) {
+	cleaned := make([]string, 0, len(orderIDs))
+	for _, orderID := range orderIDs {
+		if trimmed := strings.TrimSpace(orderID); trimmed != "" {
+			cleaned = append(cleaned, trimmed)
+		}
+	}
+	if len(cleaned) == 0 {
+		return nil, &JAPAPIError{StatusCode: http.StatusBadRequest, Message: "provider order id JAP wajib diisi untuk cancel"}
+	}
+
+	extra := url.Values{}
+	extra.Set("orders", strings.Join(cleaned, ","))
+
+	raw, err := c.request(ctx, "cancel", extra)
+	if err != nil {
+		return nil, err
+	}
+	if msg := extractJAPProviderMessage(raw); isJAPProviderErrorMessage(msg) {
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: msg}
+	}
+
+	var rows []JAPCancelOrderResponse
+	if err := json.Unmarshal(raw, &rows); err != nil {
+		var single JAPCancelOrderResponse
+		if singleErr := json.Unmarshal(raw, &single); singleErr != nil {
+			return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response cancel JAP tidak valid", Retryable: true}
+		}
+		rows = []JAPCancelOrderResponse{single}
+	}
+	if len(rows) == 0 {
+		return nil, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "response cancel JAP kosong", Retryable: true}
+	}
+
+	return rows, nil
+}
+
+func (c *japHTTPClient) CancelOrder(ctx context.Context, orderID string) (*JAPCancelOrderResponse, error) {
+	rows, err := c.CancelOrders(ctx, []string{orderID})
+	if err != nil {
+		return nil, err
+	}
+	row := rows[0]
+	if strings.TrimSpace(row.Cancel.Error) != "" {
+		return &row, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: strings.TrimSpace(row.Cancel.Error)}
+	}
+	if !row.Cancel.Accepted {
+		return &row, &JAPAPIError{StatusCode: http.StatusBadGateway, Message: "cancel order JAP tidak diterima", Retryable: true}
+	}
+	return &row, nil
 }
 
 func (c *japHTTPClient) RequestRefill(ctx context.Context, orderID string) (*JAPRefillResponse, error) {

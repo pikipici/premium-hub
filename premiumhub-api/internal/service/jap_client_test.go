@@ -245,6 +245,55 @@ func TestJAPClientGetRefillStatus(t *testing.T) {
 	}
 }
 
+func TestJAPClientCancelOrders(t *testing.T) {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST request, got %s", r.Method)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		assertJAPFormValue(t, r.Form, "key", "secret-key")
+		assertJAPFormValue(t, r.Form, "action", "cancel")
+		assertJAPFormValue(t, r.Form, "orders", "9,2")
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[
+			{"order": 9, "cancel": {"error": "Incorrect order ID"}},
+			{"order": 2, "cancel": 1}
+		]`))
+	}))
+	defer server.Close()
+
+	client := NewJAPClient(&config.Config{
+		JAPAPIURL:         server.URL,
+		JAPAPIKey:         "secret-key",
+		JAPHTTPTimeoutSec: "5",
+	})
+
+	res, err := client.CancelOrders(context.Background(), []string{"9", "2"})
+	if err != nil {
+		t.Fatalf("cancel orders: %v", err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("expected 2 cancel rows, got %d", len(res))
+	}
+	if res[0].Order != "9" {
+		t.Fatalf("expected first order 9, got %q", res[0].Order)
+	}
+	if res[0].Cancel.Error != "Incorrect order ID" {
+		t.Fatalf("expected first cancel error, got %q", res[0].Cancel.Error)
+	}
+	if res[1].Order != "2" {
+		t.Fatalf("expected second order 2, got %q", res[1].Order)
+	}
+	if !res[1].Cancel.Accepted {
+		t.Fatalf("expected second cancel accepted")
+	}
+}
+
 func TestJAPClientRequestRefillErrorPayload(t *testing.T) {
 	t.Helper()
 

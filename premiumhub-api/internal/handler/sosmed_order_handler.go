@@ -81,12 +81,13 @@ func (h *SosmedOrderHandler) Cancel(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.Cancel(id, userID); err != nil {
+	detail, err := h.svc.Cancel(c.Request.Context(), id, userID)
+	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	response.Success(c, "Order sosmed dibatalkan", nil)
+	response.Success(c, "Order sosmed dibatalkan", detail)
 }
 
 func (h *SosmedOrderHandler) AdminList(c *gin.Context) {

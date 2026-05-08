@@ -33,6 +33,10 @@ const (
 	sosmedRefillStatusFailed     = "failed"
 	sosmedRefillStatusRejected   = "rejected"
 
+	sosmedProviderCancelStatusRequested = "requested"
+	sosmedProviderCancelStatusCompleted = "completed"
+	sosmedProviderCancelStatusFailed    = "failed"
+
 	defaultSosmedOpsStaleSyncMinutes = 30
 	maxSosmedOpsStaleSyncMinutes     = 1440
 )
@@ -64,6 +68,10 @@ type SosmedJAPOrderProvider interface {
 	GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error)
 	RequestRefill(ctx context.Context, orderID string) (*JAPRefillResponse, error)
 	GetRefillStatus(ctx context.Context, refillID string) (*JAPRefillStatusResponse, error)
+}
+
+type SosmedJAPOrderCancelProvider interface {
+	CancelOrder(ctx context.Context, orderID string) (*JAPCancelOrderResponse, error)
 }
 
 func NewSosmedOrderService(
@@ -342,6 +350,43 @@ func (s *SosmedOrderService) latestSosmedOrderWalletChargeRefundTargetTx(tx *gor
 	return &sosmedOrderWalletChargeRefundTarget{chargeLedger: *chargeLedger, refundRef: refundRef}, false, nil
 }
 
+func evaluateSosmedOrderCancelEligibility(order *model.SosmedOrder) (bool, string) {
+	if order == nil {
+		return false, "order sosmed tidak ditemukan"
+	}
+	if strings.TrimSpace(order.PaymentStatus) == "pending" && normalizeSosmedOrderStatus(order.OrderStatus) == sosmedOrderStatusPendingPayment {
+		return true, ""
+	}
+	if !isJAPSosmedOrder(order) {
+		return false, "order tidak bisa dibatalkan"
+	}
+	if strings.TrimSpace(order.PaymentStatus) != "paid" || normalizeSosmedOrderStatus(order.OrderStatus) != sosmedOrderStatusProcessing {
+		return false, "order tidak bisa dibatalkan"
+	}
+	if strings.TrimSpace(order.ProviderOrderID) == "" {
+		return false, "provider order id belum tersedia untuk cancel"
+	}
+	if order.Service.ID == uuid.Nil || !isJAPSosmedService(&order.Service) || !order.Service.ProviderCancelSupported {
+		return false, "layanan ini belum support cancel dari supplier"
+	}
+	switch strings.TrimSpace(order.ProviderCancelStatus) {
+	case sosmedProviderCancelStatusRequested:
+		return false, "cancel order supplier sedang diproses"
+	case sosmedProviderCancelStatusCompleted:
+		return false, "order sudah dibatalkan di supplier"
+	}
+	return true, ""
+}
+
+func populateSosmedOrderCancelEligibility(order *model.SosmedOrder) {
+	if order == nil {
+		return
+	}
+	eligible, reason := evaluateSosmedOrderCancelEligibility(order)
+	order.CancelEligible = eligible
+	order.CancelUnavailableReason = reason
+}
+
 func (s *SosmedOrderService) buildDetail(order *model.SosmedOrder) (*SosmedOrderDetail, error) {
 	if order != nil {
 		if created := s.ensureLegacySosmedRefillHistory(order); created {
@@ -349,6 +394,7 @@ func (s *SosmedOrderService) buildDetail(order *model.SosmedOrder) (*SosmedOrder
 				order = fresh
 			}
 		}
+		populateSosmedOrderCancelEligibility(order)
 	}
 	events, err := s.repo.ListEventsByOrder(order.ID)
 	if err != nil {
@@ -1025,6 +1071,41 @@ func parseSosmedProviderStartCount(value JAPFlexibleValue) (int64, bool) {
 	return int64(math.Trunc(parsed)), true
 }
 
+func buildSosmedProviderCancelPayload(order *model.SosmedOrder, cancelRes *JAPCancelOrderResponse, statusRes *JAPOrderStatusResponse) string {
+	payload := map[string]any{
+		"provider":          "jap",
+		"action":            "cancel",
+		"local_order_id":    "",
+		"provider_order_id": "",
+		"cancel_response":   cancelRes,
+	}
+	if statusRes != nil {
+		payload["status_response"] = statusRes
+	}
+	if order != nil {
+		payload["local_order_id"] = order.ID.String()
+		payload["provider_order_id"] = order.ProviderOrderID
+		payload["service_code"] = order.ServiceCode
+	}
+	raw, _ := json.Marshal(payload)
+	return string(raw)
+}
+
+func mapSosmedProviderOrderStatusAfterUserCancel(providerStatus string) (string, bool) {
+	switch normalizeSosmedProviderStatus(providerStatus) {
+	case "canceled", "cancelled":
+		return sosmedOrderStatusCanceled, true
+	case "partial", "partially completed", "partial completed", "failed", "fail", "error":
+		return sosmedOrderStatusFailed, true
+	case "completed", "complete", "success", "delivered":
+		return sosmedOrderStatusSuccess, true
+	case "pending", "processing", "in progress", "inprogress", "queued", "queue", "active", "refilling":
+		return sosmedOrderStatusProcessing, false
+	default:
+		return sosmedOrderStatusProcessing, false
+	}
+}
+
 func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *model.SosmedOrder, actorType string, actorID *uuid.UUID) (*model.SosmedOrder, bool, error) {
 	if s.japOrderProvider == nil {
 		return nil, false, errors.New("konfigurasi JAP order provider belum siap")
@@ -1203,6 +1284,7 @@ func (s *SosmedOrderService) ListByUser(userID uuid.UUID, page, limit int) ([]mo
 		if refunded := s.refundWalletPaidTerminalSosmedOrderForUserRead(&orders[idx]); refunded != nil {
 			orders[idx] = *refunded
 		}
+		populateSosmedOrderCancelEligibility(&orders[idx])
 	}
 
 	return orders, total, nil
@@ -1296,40 +1378,237 @@ func (s *SosmedOrderService) syncActiveJAPRefillStatusForUserList(order *model.S
 	return stored
 }
 
-func (s *SosmedOrderService) Cancel(id, userID uuid.UUID) error {
+func (s *SosmedOrderService) Cancel(ctx context.Context, id, userID uuid.UUID) (*SosmedOrderDetail, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	order, err := s.repo.FindByID(id)
 	if err != nil {
-		return errors.New("order sosmed tidak ditemukan")
+		return nil, errors.New("order sosmed tidak ditemukan")
 	}
 	if order.UserID != userID {
-		return errors.New("akses ditolak")
+		return nil, errors.New("akses ditolak")
 	}
-	if order.PaymentStatus != "pending" || order.OrderStatus != sosmedOrderStatusPendingPayment {
+
+	if strings.TrimSpace(order.PaymentStatus) == "pending" && normalizeSosmedOrderStatus(order.OrderStatus) == sosmedOrderStatusPendingPayment {
+		return s.cancelPendingPaymentSosmedOrder(ctx, order, userID)
+	}
+
+	return s.cancelJAPProcessingSosmedOrder(ctx, order, userID)
+}
+
+func (s *SosmedOrderService) cancelPendingPaymentSosmedOrder(ctx context.Context, order *model.SosmedOrder, userID uuid.UUID) (*SosmedOrderDetail, error) {
+	previousStatus := normalizeSosmedOrderStatus(order.OrderStatus)
+	now := time.Now()
+	db := s.repo.DB()
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.SosmedOrder{}).
+			Where("id = ?", order.ID).
+			Updates(map[string]any{
+				"payment_status": "failed",
+				"order_status":   sosmedOrderStatusCanceled,
+				"updated_at":     now,
+			}).Error; err != nil {
+			return errors.New("gagal membatalkan order sosmed")
+		}
+
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: previousStatus,
+			ToStatus:   sosmedOrderStatusCanceled,
+			Reason:     "dibatalkan user",
+			ActorType:  "user",
+			ActorID:    &userID,
+			CreatedAt:  now,
+		}
+		if err := tx.Create(event).Error; err != nil {
+			return errors.New("gagal mencatat event cancel")
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	stored, err := s.repo.FindByID(order.ID)
+	if err != nil {
+		return nil, errors.New("gagal memuat order sosmed setelah cancel")
+	}
+	return s.buildDetail(stored)
+}
+
+func canCancelJAPProcessingSosmedOrder(order *model.SosmedOrder) error {
+	if order == nil {
+		return errors.New("order sosmed tidak ditemukan")
+	}
+	if !isJAPSosmedOrder(order) {
 		return errors.New("order tidak bisa dibatalkan")
 	}
-
-	previousStatus := order.OrderStatus
-	now := time.Now()
-	order.PaymentStatus = "failed"
-	order.OrderStatus = sosmedOrderStatusCanceled
-	if err := s.repo.Update(order); err != nil {
-		return errors.New("gagal membatalkan order sosmed")
+	if strings.TrimSpace(order.PaymentStatus) != "paid" {
+		return errors.New("order tidak bisa dibatalkan")
 	}
-
-	event := &model.SosmedOrderEvent{
-		OrderID:    order.ID,
-		FromStatus: previousStatus,
-		ToStatus:   sosmedOrderStatusCanceled,
-		Reason:     "dibatalkan user",
-		ActorType:  "user",
-		ActorID:    &userID,
-		CreatedAt:  now,
+	if normalizeSosmedOrderStatus(order.OrderStatus) != sosmedOrderStatusProcessing {
+		return errors.New("order tidak bisa dibatalkan")
 	}
-	if err := s.repo.CreateEvent(event); err != nil {
-		return errors.New("gagal mencatat event cancel")
+	if strings.TrimSpace(order.ProviderOrderID) == "" {
+		return errors.New("provider order id belum tersedia untuk cancel")
 	}
-
+	if order.Service.ID == uuid.Nil || !isJAPSosmedService(&order.Service) || !order.Service.ProviderCancelSupported {
+		return errors.New("layanan ini belum support cancel dari supplier")
+	}
+	switch strings.TrimSpace(order.ProviderCancelStatus) {
+	case sosmedProviderCancelStatusRequested:
+		return errors.New("cancel order supplier sedang diproses")
+	case sosmedProviderCancelStatusCompleted:
+		return errors.New("order sudah dibatalkan di supplier")
+	}
 	return nil
+}
+
+func (s *SosmedOrderService) markJAPCancelFailed(ctx context.Context, order *model.SosmedOrder, cancelRes *JAPCancelOrderResponse, message string) error {
+	message = truncateSosmedProviderText(message, 2000)
+	if message == "" {
+		message = "cancel order JAP tidak diterima"
+	}
+	payload := truncateSosmedProviderText(buildSosmedProviderCancelPayload(order, cancelRes, nil), 4000)
+	db := s.repo.DB()
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+	if err := db.Model(&model.SosmedOrder{}).
+		Where("id = ?", order.ID).
+		Updates(map[string]any{
+			"provider_cancel_status":  sosmedProviderCancelStatusFailed,
+			"provider_cancel_error":   message,
+			"provider_cancel_payload": payload,
+			"provider_error":          message,
+			"updated_at":              time.Now(),
+		}).Error; err != nil {
+		return errors.New("gagal menyimpan error cancel supplier")
+	}
+	return nil
+}
+
+func (s *SosmedOrderService) cancelJAPProcessingSosmedOrder(ctx context.Context, order *model.SosmedOrder, userID uuid.UUID) (*SosmedOrderDetail, error) {
+	if err := canCancelJAPProcessingSosmedOrder(order); err != nil {
+		return nil, err
+	}
+
+	cancelProvider, ok := s.japOrderProvider.(SosmedJAPOrderCancelProvider)
+	if s.japOrderProvider == nil || !ok {
+		return nil, errors.New("konfigurasi JAP cancel provider belum siap")
+	}
+
+	providerOrderID := strings.TrimSpace(order.ProviderOrderID)
+	cancelRes, err := cancelProvider.CancelOrder(ctx, providerOrderID)
+	if err != nil {
+		_ = s.markJAPCancelFailed(ctx, order, cancelRes, err.Error())
+		return nil, err
+	}
+	if cancelRes == nil || strings.TrimSpace(cancelRes.Cancel.Error) != "" || !cancelRes.Cancel.Accepted {
+		message := "cancel order JAP tidak diterima"
+		if cancelRes != nil && strings.TrimSpace(cancelRes.Cancel.Error) != "" {
+			message = strings.TrimSpace(cancelRes.Cancel.Error)
+		}
+		_ = s.markJAPCancelFailed(ctx, order, cancelRes, message)
+		return nil, errors.New(message)
+	}
+
+	var statusRes *JAPOrderStatusResponse
+	var statusErrText string
+	if s.japOrderProvider != nil {
+		if res, statusErr := s.japOrderProvider.GetOrderStatus(ctx, providerOrderID); statusErr != nil {
+			statusErrText = truncateSosmedProviderText(statusErr.Error(), 1000)
+		} else {
+			statusRes = res
+		}
+	}
+
+	now := time.Now()
+	providerStatus := strings.TrimSpace(order.ProviderStatus)
+	nextOrderStatus := sosmedOrderStatusProcessing
+	providerCancelStatus := sosmedProviderCancelStatusRequested
+	providerCancelError := statusErrText
+	if statusRes != nil {
+		providerStatus = strings.TrimSpace(statusRes.Status)
+		nextOrderStatus, _ = mapSosmedProviderOrderStatusAfterUserCancel(providerStatus)
+		if nextOrderStatus != sosmedOrderStatusProcessing {
+			providerCancelStatus = sosmedProviderCancelStatusCompleted
+			providerCancelError = ""
+		}
+	}
+
+	payload := truncateSosmedProviderText(buildSosmedProviderCancelPayload(order, cancelRes, statusRes), 4000)
+	previousStatus := normalizeSosmedOrderStatus(order.OrderStatus)
+	db := s.repo.DB()
+	if ctx != nil {
+		db = db.WithContext(ctx)
+	}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		updates := map[string]any{
+			"order_status":            nextOrderStatus,
+			"provider_status":         providerStatus,
+			"provider_payload":        truncateSosmedProviderText(buildSosmedProviderSyncPayload(order, statusRes), 4000),
+			"provider_error":          providerCancelError,
+			"provider_synced_at":      &now,
+			"provider_cancel_status":  providerCancelStatus,
+			"provider_cancel_payload": payload,
+			"provider_cancel_error":   providerCancelError,
+			"updated_at":              now,
+		}
+		if providerCancelStatus == sosmedProviderCancelStatusCompleted {
+			updates["provider_canceled_at"] = &now
+		}
+		if statusRes == nil {
+			delete(updates, "provider_payload")
+			delete(updates, "provider_synced_at")
+		}
+		if err := tx.Model(&model.SosmedOrder{}).
+			Where("id = ?", order.ID).
+			Updates(updates).Error; err != nil {
+			return errors.New("gagal menyimpan cancel supplier")
+		}
+
+		reason := "cancel JAP: supplier menerima request cancel"
+		if statusRes != nil {
+			reason = fmt.Sprintf("cancel JAP: provider status %s, order jadi %s", humanizeSosmedProviderStatus(providerStatus), nextOrderStatus)
+		}
+		if statusErrText != "" {
+			reason = fmt.Sprintf("cancel JAP diterima, sync status gagal: %s", statusErrText)
+		}
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: previousStatus,
+			ToStatus:   nextOrderStatus,
+			Reason:     truncateSosmedProviderText(reason, 1000),
+			ActorType:  "user",
+			ActorID:    &userID,
+			CreatedAt:  now,
+		}
+		if err := tx.Create(event).Error; err != nil {
+			return errors.New("gagal mencatat event cancel supplier")
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	if isWalletRefundableTerminalSosmedOrderStatus(nextOrderStatus) {
+		reason := fmt.Sprintf("Refund otomatis order sosmed %s karena cancel JAP provider status %s", shortSosmedWalletRef(order.ID.String()), humanizeSosmedProviderStatus(providerStatus))
+		if _, err := s.refundWalletPaidTerminalSosmedOrderIfNeeded(order.ID, reason); err != nil {
+			return nil, err
+		}
+	}
+
+	stored, err := s.repo.FindByID(order.ID)
+	if err != nil {
+		return nil, errors.New("gagal memuat order sosmed setelah cancel supplier")
+	}
+	return s.buildDetail(stored)
 }
 
 func isSosmedSupplierRejectedRefillUnavailable(order *model.SosmedOrder) bool {
@@ -1902,7 +2181,14 @@ func (s *SosmedOrderService) ConfirmPayment(orderID uuid.UUID) error {
 }
 
 func (s *SosmedOrderService) AdminList(status string, page, limit int) ([]model.SosmedOrder, int64, error) {
-	return s.repo.AdminList(normalizeSosmedOrderStatus(status), page, limit)
+	orders, total, err := s.repo.AdminList(normalizeSosmedOrderStatus(status), page, limit)
+	if err != nil {
+		return orders, total, err
+	}
+	for idx := range orders {
+		populateSosmedOrderCancelEligibility(&orders[idx])
+	}
+	return orders, total, nil
 }
 
 func (s *SosmedOrderService) AdminOpsSummary(staleMinutes int) (*repository.SosmedOrderOpsSummary, error) {

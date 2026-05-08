@@ -80,6 +80,11 @@ export const sosmedOrderService = {
     return res.data
   },
 
+  requestCancel: async (id: string) => {
+    const res = await api.post<ApiResponse<SosmedOrderDetail>>(`/sosmed/orders/${id}/cancel`)
+    return res.data
+  },
+
   requestRefill: async (id: string) => {
     const res = await api.post<ApiResponse<SosmedOrderDetail>>(`/sosmed/orders/${id}/refill`)
     return res.data

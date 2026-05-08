@@ -134,6 +134,7 @@ export default function DashboardSosmedOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [cancelLoading, setCancelLoading] = useState<string | null>(null)
   const [refillLoading, setRefillLoading] = useState<string | null>(null)
   const [refillTarget, setRefillTarget] = useState<SosmedOrder | null>(null)
   const [refillAgreement, setRefillAgreement] = useState(false)
@@ -222,24 +223,31 @@ export default function DashboardSosmedOrdersPage() {
   }, [refillTarget])
 
   const handleCancel = async (order: SosmedOrder) => {
-    if (order.order_status !== 'pending_payment') return
+    if (cancelLoading === order.id) return
 
-    const confirmed = window.confirm(`Batalkan order ${order.id}?`)
+    const action = buildUserSosmedOrderDisplay(order).cancelAction
+    if (!action) return
+
+    const confirmed = window.confirm(action.confirmMessage)
     if (!confirmed) return
 
+    setCancelLoading(order.id)
     setRefreshing(true)
     setError('')
 
     try {
-      const res = await sosmedOrderService.cancel(order.id)
+      const res = action.kind === 'provider'
+        ? await sosmedOrderService.requestCancel(order.id)
+        : await sosmedOrderService.cancel(order.id)
       if (!res.success) {
-        setError(res.message || 'Gagal membatalkan order sosmed')
+        setError(res.message || (action.kind === 'provider' ? 'Gagal mengajukan cancel supplier' : 'Gagal membatalkan order sosmed'))
         return
       }
       await loadOrders(true)
     } catch {
-      setError('Gagal membatalkan order sosmed')
+      setError(action.kind === 'provider' ? 'Gagal mengajukan cancel supplier' : 'Gagal membatalkan order sosmed')
     } finally {
+      setCancelLoading(null)
       setRefreshing(false)
     }
   }
@@ -358,14 +366,19 @@ export default function DashboardSosmedOrdersPage() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${status.className}`}>
-                        {status.label}
-                      </span>
-                      {refill ? (
-                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${refill.className}`}>
-                          {refill.label}
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${status.className}`}>
+                          {status.label}
                         </span>
-                      ) : null}
+                        {refill ? (
+                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${refill.className}`}>
+                            {refill.label}
+                          </span>
+                        ) : null}
+                        {orderDisplay.cancelStatus?.label ? (
+                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${orderDisplay.cancelStatus.className}`}>
+                            {orderDisplay.cancelStatus.label}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
 
@@ -550,13 +563,19 @@ export default function DashboardSosmedOrdersPage() {
                         Order Lagi
                       </Link>
 
-                      {order.order_status === 'pending_payment' ? (
+                      {orderDisplay.cancelAction ? (
                         <button
                           type="button"
                           onClick={() => void handleCancel(order)}
-                          className="rounded-xl border border-red-200 bg-white px-3 py-2 text-[11px] font-black text-red-600 hover:bg-red-50"
+                          disabled={cancelLoading === order.id}
+                          className={`inline-flex items-center justify-center gap-1.5 rounded-xl border bg-white px-3 py-2 text-[11px] font-black disabled:cursor-not-allowed disabled:opacity-60 ${
+                            orderDisplay.cancelAction.kind === 'provider'
+                              ? 'border-amber-200 text-amber-700 hover:bg-amber-50'
+                              : 'border-red-200 text-red-600 hover:bg-red-50'
+                          }`}
                         >
-                          Batalkan
+                          {cancelLoading === order.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                          {cancelLoading === order.id ? 'Memproses...' : orderDisplay.cancelAction.label}
                         </button>
                       ) : null}
                     </div>

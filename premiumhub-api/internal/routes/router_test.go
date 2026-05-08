@@ -189,6 +189,9 @@ func TestSetupProductionRoutes(t *testing.T) {
 	if !hasRoute(routes, "DELETE", "/api/v1/sosmed/orders/:id") {
 		t.Fatalf("sosmed order cancel route should exist")
 	}
+	if !hasRoute(routes, "POST", "/api/v1/sosmed/orders/:id/cancel") {
+		t.Fatalf("sosmed order provider cancel route should exist")
+	}
 	if !hasRoute(routes, "POST", "/api/v1/sosmed/bundle-orders") {
 		t.Fatalf("sosmed bundle order create route should exist")
 	}

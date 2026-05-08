@@ -2,10 +2,23 @@ import { buildSosmedServiceCards } from './sosmedProductCards'
 import type { SosmedOrder } from '@/types/sosmedOrder'
 import type { SosmedService } from '@/types/sosmedService'
 
+export interface UserSosmedOrderCancelAction {
+  kind: 'local' | 'provider'
+  label: string
+  confirmMessage: string
+}
+
+export interface UserSosmedOrderCancelStatus {
+  label?: string
+  className: string
+}
+
 export interface UserSosmedOrderDisplay {
   productTitle: string
   quantityLabel: string
   startCountLabel?: string
+  cancelAction?: UserSosmedOrderCancelAction
+  cancelStatus?: UserSosmedOrderCancelStatus
 }
 
 function clean(value: string | null | undefined) {
@@ -89,6 +102,52 @@ function formatStartCountLabel(value: number | null | undefined) {
   return `Start count: ${count.toLocaleString('id-ID')}`
 }
 
+function shortDisplayOrderID(id: string) {
+  return id ? `#${id.slice(0, 8).toUpperCase()}` : 'order ini'
+}
+
+export function getUserSosmedOrderCancelAction(order: SosmedOrder): UserSosmedOrderCancelAction | undefined {
+  if (order.order_status === 'pending_payment') {
+    return {
+      kind: 'local',
+      label: 'Batalkan',
+      confirmMessage: `Batalkan order ${shortDisplayOrderID(order.id)}? Order yang belum dibayar akan ditutup.`,
+    }
+  }
+
+  if (order.cancel_eligible && order.order_status === 'processing') {
+    return {
+      kind: 'provider',
+      label: 'Ajukan Cancel',
+      confirmMessage: `Ajukan cancel supplier untuk order ${shortDisplayOrderID(order.id)}? Kalau supplier sudah mengonfirmasi cancel/gagal, refund wallet akan diproses otomatis.`,
+    }
+  }
+
+  return undefined
+}
+
+function getUserSosmedOrderCancelStatus(order: SosmedOrder): UserSosmedOrderCancelStatus | undefined {
+  switch (clean(order.provider_cancel_status).toLowerCase()) {
+    case 'requested':
+      return {
+        label: 'Cancel supplier diproses',
+        className: 'border-amber-200 bg-amber-50 text-amber-700',
+      }
+    case 'completed':
+      return {
+        label: 'Cancel supplier selesai',
+        className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      }
+    case 'failed':
+      return {
+        label: 'Cancel supplier gagal',
+        className: 'border-red-200 bg-red-50 text-red-700',
+      }
+    default:
+      return undefined
+  }
+}
+
 export function buildUserSosmedOrderDisplay(order: SosmedOrder): UserSosmedOrderDisplay {
   const service = serviceForOrderDisplay(order)
   const [catalogCard] = buildSosmedServiceCards([service])
@@ -99,5 +158,7 @@ export function buildUserSosmedOrderDisplay(order: SosmedOrder): UserSosmedOrder
     productTitle,
     quantityLabel: formatQuantityLabel(order.quantity, unit),
     startCountLabel: formatStartCountLabel(order.start_count),
+    cancelAction: getUserSosmedOrderCancelAction(order),
+    cancelStatus: getUserSosmedOrderCancelStatus(order),
   }
 }

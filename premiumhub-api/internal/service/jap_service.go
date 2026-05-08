@@ -91,6 +91,23 @@ func (s *JAPService) GetOrderStatus(ctx context.Context, orderID string) (*JAPOr
 	return res, nil
 }
 
+func (s *JAPService) CancelOrder(ctx context.Context, orderID string) (*JAPCancelOrderResponse, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
+
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, errors.New("provider order id JAP wajib diisi untuk cancel")
+	}
+
+	res, err := s.client.CancelOrder(ctx, orderID)
+	if err != nil {
+		return res, s.normalizeProviderErr(err)
+	}
+	return res, nil
+}
+
 func (s *JAPService) RequestRefill(ctx context.Context, orderID string) (*JAPRefillResponse, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, err

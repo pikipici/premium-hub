@@ -223,6 +223,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/sosmed/orders", sosmedOrderHandler.List)
 	protected.GET("/sosmed/orders/:id", sosmedOrderHandler.GetByID)
 	protected.DELETE("/sosmed/orders/:id", sosmedOrderHandler.Cancel)
+	protected.POST(
+		"/sosmed/orders/:id/cancel",
+		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak aksi order provider. Coba lagi sebentar."),
+		sosmedOrderHandler.Cancel,
+	)
 	protected.POST("/sosmed/orders/:id/refill", sosmedOrderHandler.RequestRefill)
 	protected.POST("/sosmed/bundle-orders", sosmedBundleOrderHandler.Create)
 	protected.GET("/sosmed/bundle-orders", sosmedBundleOrderHandler.List)

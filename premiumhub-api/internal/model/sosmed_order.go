@@ -39,6 +39,14 @@ type SosmedOrder struct {
 	ProviderError     string     `gorm:"type:text" json:"provider_error,omitempty"`
 	ProviderSyncedAt  *time.Time `json:"provider_synced_at"`
 
+	ProviderCancelStatus  string     `gorm:"size:30;index" json:"provider_cancel_status,omitempty"`
+	ProviderCancelPayload string     `gorm:"type:text" json:"provider_cancel_payload,omitempty"`
+	ProviderCancelError   string     `gorm:"type:text" json:"provider_cancel_error,omitempty"`
+	ProviderCanceledAt    *time.Time `json:"provider_canceled_at"`
+
+	CancelEligible          bool   `gorm:"-" json:"cancel_eligible"`
+	CancelUnavailableReason string `gorm:"-" json:"cancel_unavailable_reason,omitempty"`
+
 	// Refill tracking — populated at checkout from SosmedService metadata.
 	RefillEligible        bool                       `gorm:"default:false" json:"refill_eligible"`
 	RefillPeriodDays      int                        `gorm:"default:0" json:"refill_period_days"`
