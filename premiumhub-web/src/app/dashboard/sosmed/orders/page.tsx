@@ -379,6 +379,11 @@ export default function DashboardSosmedOrdersPage() {
                       <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-[#EFEFEA] bg-[#FAFAF8] px-3 py-2 text-xs text-[#555]">
                         <span className="font-bold text-[#141414]">{orderDisplay.quantityLabel}</span>
                       </div>
+                      {orderDisplay.startCountLabel ? (
+                        <div className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-[#EFEFEA] bg-[#FAFAF8] px-3 py-2 text-xs text-[#555]">
+                          <span className="font-bold text-[#141414]">{orderDisplay.startCountLabel}</span>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="rounded-2xl border border-[#EFEFEA] bg-[#FCFCFA] px-4 py-3">

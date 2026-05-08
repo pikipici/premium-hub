@@ -5,6 +5,7 @@ import type { SosmedService } from '@/types/sosmedService'
 export interface UserSosmedOrderDisplay {
   productTitle: string
   quantityLabel: string
+  startCountLabel?: string
 }
 
 function clean(value: string | null | undefined) {
@@ -82,6 +83,12 @@ function formatQuantityLabel(quantity: number, unit: string) {
   return `Jumlah: ±${approximateUnits.toLocaleString('id-ID')} ${unit} (${packageText})`
 }
 
+function formatStartCountLabel(value: number | null | undefined) {
+  const count = Math.trunc(Number(value))
+  if (!Number.isFinite(count) || count <= 0) return undefined
+  return `Start count: ${count.toLocaleString('id-ID')}`
+}
+
 export function buildUserSosmedOrderDisplay(order: SosmedOrder): UserSosmedOrderDisplay {
   const service = serviceForOrderDisplay(order)
   const [catalogCard] = buildSosmedServiceCards([service])
@@ -91,5 +98,6 @@ export function buildUserSosmedOrderDisplay(order: SosmedOrder): UserSosmedOrder
   return {
     productTitle,
     quantityLabel: formatQuantityLabel(order.quantity, unit),
+    startCountLabel: formatStartCountLabel(order.start_count),
   }
 }

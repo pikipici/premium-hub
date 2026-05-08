@@ -34,6 +34,7 @@ type SosmedOrder struct {
 	ProviderServiceID string     `gorm:"size:64;index" json:"provider_service_id,omitempty"`
 	ProviderOrderID   string     `gorm:"size:80;index" json:"provider_order_id,omitempty"`
 	ProviderStatus    string     `gorm:"size:40;index" json:"provider_status,omitempty"`
+	StartCount        int64      `gorm:"not null;default:0" json:"start_count,omitempty"`
 	ProviderPayload   string     `gorm:"type:text" json:"provider_payload,omitempty"`
 	ProviderError     string     `gorm:"type:text" json:"provider_error,omitempty"`
 	ProviderSyncedAt  *time.Time `json:"provider_synced_at"`

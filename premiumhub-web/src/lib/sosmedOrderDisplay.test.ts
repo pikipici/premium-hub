@@ -60,6 +60,24 @@ describe('user sosmed order display view model', () => {
     expect(display.quantityLabel).toBe('Jumlah: ±2.000 followers (2 paket)')
   })
 
+  it('shows the supplier start count when JAP has synced it', () => {
+    const display = buildUserSosmedOrderDisplay({
+      ...baseOrder,
+      start_count: 399,
+    })
+
+    expect(display.startCountLabel).toBe('Start count: 399')
+  })
+
+  it('keeps the start count chip hidden until the supplier sends a positive value', () => {
+    const display = buildUserSosmedOrderDisplay({
+      ...baseOrder,
+      start_count: 0,
+    })
+
+    expect(display.startCountLabel).toBeUndefined()
+  })
+
   it('can infer package display from an older order snapshot without preloaded service metadata', () => {
     const display = buildUserSosmedOrderDisplay({
       ...baseOrder,

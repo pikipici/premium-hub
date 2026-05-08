@@ -624,6 +624,17 @@ func TestSosmedOrderService_AdminSyncProviderStatus(t *testing.T) {
 	if detail.Order.ProviderSyncedAt == nil {
 		t.Fatalf("provider_synced_at should be filled")
 	}
+	if detail.Order.StartCount != 3572 {
+		t.Fatalf("expected supplier start count 3572 to be exposed, got %d", detail.Order.StartCount)
+	}
+
+	var persisted model.SosmedOrder
+	if err := db.First(&persisted, "id = ?", order.ID).Error; err != nil {
+		t.Fatalf("reload synced order: %v", err)
+	}
+	if persisted.StartCount != 3572 {
+		t.Fatalf("expected persisted supplier start count 3572, got %d", persisted.StartCount)
+	}
 
 	var eventCount int64
 	if err := db.Model(&model.SosmedOrderEvent{}).

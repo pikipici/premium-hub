@@ -39,6 +39,7 @@ export interface SosmedOrder {
   provider_service_id?: string
   provider_order_id?: string
   provider_status?: string
+  start_count?: number
   provider_payload?: string
   provider_error?: string
   provider_synced_at?: string

@@ -1012,6 +1012,19 @@ func buildSosmedProviderSyncPayload(order *model.SosmedOrder, response *JAPOrder
 	return string(raw)
 }
 
+func parseSosmedProviderStartCount(value JAPFlexibleValue) (int64, bool) {
+	raw := strings.TrimSpace(string(value))
+	if raw == "" {
+		return 0, false
+	}
+	raw = strings.ReplaceAll(raw, ",", "")
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) || parsed < 0 {
+		return 0, false
+	}
+	return int64(math.Trunc(parsed)), true
+}
+
 func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *model.SosmedOrder, actorType string, actorID *uuid.UUID) (*model.SosmedOrder, bool, error) {
 	if s.japOrderProvider == nil {
 		return nil, false, errors.New("konfigurasi JAP order provider belum siap")
@@ -1040,11 +1053,15 @@ func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *mo
 	providerStatus := strings.TrimSpace(providerRes.Status)
 	previousOrderStatus := normalizeSosmedOrderStatus(order.OrderStatus)
 	previousProviderStatus := strings.TrimSpace(order.ProviderStatus)
+	previousStartCount := order.StartCount
 	previousRefillStatus := normalizeSosmedRefillStatus(order.RefillStatus)
 	previousRefillProviderStatus := strings.TrimSpace(order.RefillProviderStatus)
 	nextOrderStatus := mapSosmedProviderOrderStatus(previousOrderStatus, providerStatus)
 
 	order.ProviderStatus = providerStatus
+	if startCount, ok := parseSosmedProviderStartCount(providerRes.StartCount); ok {
+		order.StartCount = startCount
+	}
 	order.ProviderPayload = truncateSosmedProviderText(buildSosmedProviderSyncPayload(order, providerRes), 4000)
 	order.ProviderError = ""
 	order.ProviderSyncedAt = &syncedAt
@@ -1078,10 +1095,14 @@ func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *mo
 
 	statusChanged := previousOrderStatus != nextOrderStatus
 	providerChanged := previousProviderStatus != providerStatus
-	if statusChanged || providerChanged {
+	startCountChanged := previousStartCount != order.StartCount
+	if statusChanged || providerChanged || startCountChanged {
 		reason := fmt.Sprintf("sync JAP: provider status %s", humanizeSosmedProviderStatus(providerStatus))
 		if statusChanged {
 			reason = fmt.Sprintf("%s, order jadi %s", reason, nextOrderStatus)
+		}
+		if startCountChanged {
+			reason = fmt.Sprintf("%s, start count %d", reason, order.StartCount)
 		}
 
 		event := &model.SosmedOrderEvent{
@@ -1135,7 +1156,7 @@ func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *mo
 		return nil, false, errors.New("gagal memuat order sosmed hasil sync")
 	}
 
-	return stored, statusChanged || providerChanged || refillChanged, nil
+	return stored, statusChanged || providerChanged || startCountChanged || refillChanged, nil
 }
 
 func (s *SosmedOrderService) GetByID(id, userID uuid.UUID) (*SosmedOrderDetail, error) {
