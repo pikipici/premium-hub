@@ -8,6 +8,12 @@ import {
   type AdminSosmedCatalogTabKey,
 } from '@/lib/adminSosmedCatalogTabs'
 import {
+  buildJapBalanceAlert,
+  buildSosmedMarginRisks,
+  DEFAULT_MIN_MARGIN_IDR,
+  getMarginRiskCopy,
+} from '@/lib/adminJapRiskAlerts'
+import {
   buildAdminSosmedBundleDetail,
   buildAdminSosmedBundleRows,
   getAdminSosmedBundleSummary,
@@ -401,6 +407,15 @@ export default function SosmedServiceSettingsCard() {
       })
     },
     [items, activePlatformFilter, searchQuery]
+  )
+
+  const japBalanceAlert = useMemo(() => buildJapBalanceAlert(japBalance), [japBalance])
+
+  const marginRisks = useMemo(() => buildSosmedMarginRisks(items), [items])
+
+  const criticalMarginRisks = useMemo(
+    () => marginRisks.filter((risk) => risk.level === 'danger').length,
+    [marginRisks]
   )
 
   const bundleRows = useMemo(() => buildAdminSosmedBundleRows(bundlePackages), [bundlePackages])
@@ -1567,6 +1582,89 @@ export default function SosmedServiceSettingsCard() {
               </div>
             </div>
           </div>
+
+          {(japBalanceAlert || marginRisks.length > 0) && (
+            <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+              {japBalanceAlert && (
+                <div
+                  style={{
+                    border: `1px solid ${japBalanceAlert.level === 'danger' ? '#fecaca' : '#fed7aa'}`,
+                    borderRadius: 14,
+                    padding: 14,
+                    background: japBalanceAlert.level === 'danger' ? '#fef2f2' : '#fff7ed',
+                    color: japBalanceAlert.level === 'danger' ? '#991b1b' : '#9a3412',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 900 }}>{japBalanceAlert.title}</div>
+                  <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.45 }}>{japBalanceAlert.message}</div>
+                </div>
+              )}
+
+              {marginRisks.length > 0 && (
+                <div
+                  style={{
+                    border: `1px solid ${criticalMarginRisks > 0 ? '#fecaca' : '#fed7aa'}`,
+                    borderRadius: 14,
+                    padding: 14,
+                    background: criticalMarginRisks > 0 ? '#fef2f2' : '#fff7ed',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 900, color: criticalMarginRisks > 0 ? '#991b1b' : '#9a3412' }}>
+                        {criticalMarginRisks > 0 ? 'Margin rugi / checkout perlu update' : 'Margin tipis perlu dicek'}
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)', lineHeight: 1.45 }}>
+                        {marginRisks.length} layanan punya margin di bawah Rp {DEFAULT_MIN_MARGIN_IDR.toLocaleString('id-ID')} atau checkout price kosong.
+                      </div>
+                    </div>
+                    <button
+                      className="action-btn"
+                      type="button"
+                      disabled={saving || loading}
+                      onClick={repriceResellerToIDR}
+                      style={{ background: 'var(--accent)', color: '#fff' }}
+                    >
+                      Sync Harga Sekarang
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                    {marginRisks.slice(0, 5).map((risk) => (
+                      <div
+                        key={risk.service.id}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(0, 1fr) auto',
+                          gap: 10,
+                          alignItems: 'center',
+                          borderRadius: 12,
+                          padding: '10px 12px',
+                          background: '#fff',
+                          border: '1px solid rgba(148, 163, 184, 0.28)',
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: '#111827' }}>{risk.service.title}</div>
+                          <div style={{ marginTop: 2, fontSize: 12, color: 'var(--muted)' }}>
+                            {getMarginRiskCopy(risk)}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 900, color: risk.level === 'danger' ? '#dc2626' : '#d97706', whiteSpace: 'nowrap' }}>
+                          Margin Rp {Math.round(risk.margin).toLocaleString('id-ID')}
+                        </div>
+                      </div>
+                    ))}
+                    {marginRisks.length > 5 && (
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                        +{marginRisks.length - 5} layanan lain perlu audit harga.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
