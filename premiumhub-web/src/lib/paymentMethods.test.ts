@@ -14,6 +14,7 @@ describe('payment method helpers', () => {
   it('falls back when gateway methods are empty', () => {
     expect(normalizePaymentMethodOptions([])).toEqual(FALLBACK_PAYMENT_METHODS)
     expect(normalizePaymentMethodOptions(undefined)).toEqual(FALLBACK_PAYMENT_METHODS)
+    expect(FALLBACK_PAYMENT_METHODS.every((method) => Boolean(method.image))).toBe(true)
   })
 
   it('normalizes gateway methods and removes duplicates', () => {
@@ -30,7 +31,7 @@ describe('payment method helpers', () => {
     ).toEqual([
       { method: 'SP', name: 'ShopeePay QRIS', image: 'https://example.test/sp.png', fee: '0' },
       { method: 'QRIS', name: 'QRIS', image: '/icons/payments/qris.png', fee: undefined },
-      { method: 'BR', name: 'BR', image: undefined, fee: undefined },
+      { method: 'BR', name: 'BR', image: '/icons/payments/bri.png', fee: undefined },
       { method: 'BNI_VA', name: 'BNI VA', image: '/icons/payments/bni.png', fee: undefined },
       { method: 'CIMB_NIAGA_VA', name: 'CIMB Niaga VA', image: '/icons/payments/cimb.png', fee: undefined },
       { method: 'PAYPAL', name: 'PayPal', image: '/icons/apps/paypal.svg', fee: undefined },

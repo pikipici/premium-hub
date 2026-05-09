@@ -3,27 +3,46 @@ import type { PaymentMethodOption } from '../types/wallet'
 export const MIN_TOPUP_DEFAULT = 10000
 export const MIN_TOPUP_QRIS = 5000
 
-export const FALLBACK_PAYMENT_METHODS: PaymentMethodOption[] = [
-  { method: 'SP', name: 'QRIS', fee: 'Sesuai channel' },
-  { method: 'BR', name: 'BRI VA', fee: 'Sesuai channel' },
-  { method: 'I1', name: 'BNI VA', fee: 'Sesuai channel' },
-  { method: 'BT', name: 'Permata VA', fee: 'Sesuai channel' },
-]
-
 const PAYMENT_METHOD_IMAGE_BY_CODE: Record<string, string> = {
   QRIS: '/icons/payments/qris.png',
+  SP: '/icons/payments/qris.png',
+  NQ: '/icons/payments/qris.png',
+  GQ: '/icons/payments/qris.png',
+  SQ: '/icons/payments/qris.png',
+  BQ: '/icons/payments/qris.png',
+  IQ: '/icons/payments/qris.png',
+  DQ: '/icons/payments/qris.png',
+  QD: '/icons/payments/qris.png',
+  LQ: '/icons/payments/qris.png',
   MAYBANK_VA: '/icons/payments/maybank.png',
+  M2: '/icons/payments/maybank.png',
   BNI_VA: '/icons/payments/bni.png',
+  I1: '/icons/payments/bni.png',
   PERMATA_VA: '/icons/payments/permata.png',
+  BT: '/icons/payments/permata.png',
   CIMB_NIAGA_VA: '/icons/payments/cimb.png',
+  B1: '/icons/payments/cimb.png',
   ATM_BERSAMA_VA: '/icons/payments/atmbersama.png',
+  A1: '/icons/payments/atmbersama.png',
   ARTHA_GRAHA_VA: '/icons/payments/arthagraha.png',
+  AG: '/icons/payments/arthagraha.png',
   BRI_VA: '/icons/payments/bri.png',
+  BR: '/icons/payments/bri.png',
   BNC_VA: '/icons/payments/bnc.png',
+  NC: '/icons/payments/bnc.png',
   SAMPOERNA_VA: '/icons/payments/sampoerna.png',
+  S1: '/icons/payments/sampoerna.png',
   BCA_VA: '/icons/payments/bca.png',
+  BC: '/icons/payments/bca.png',
   PAYPAL: '/icons/apps/paypal.svg',
 }
+
+export const FALLBACK_PAYMENT_METHODS: PaymentMethodOption[] = [
+  { method: 'SP', name: 'QRIS', image: PAYMENT_METHOD_IMAGE_BY_CODE.SP, fee: 'Sesuai channel' },
+  { method: 'BR', name: 'BRI VA', image: PAYMENT_METHOD_IMAGE_BY_CODE.BR, fee: 'Sesuai channel' },
+  { method: 'I1', name: 'BNI VA', image: PAYMENT_METHOD_IMAGE_BY_CODE.I1, fee: 'Sesuai channel' },
+  { method: 'BT', name: 'Permata VA', image: PAYMENT_METHOD_IMAGE_BY_CODE.BT, fee: 'Sesuai channel' },
+]
 
 const QR_METHODS = new Set(['SP', 'QRIS', 'NQ', 'GQ', 'SQ', 'BQ', 'IQ', 'DQ', 'QD', 'LQ'])
 const VA_METHODS = new Set([
