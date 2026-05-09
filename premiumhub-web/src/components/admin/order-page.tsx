@@ -6,13 +6,13 @@ import { accountTypeService } from '@/services/accountTypeService'
 import { orderService, type AdminOrderStatus } from '@/services/orderService'
 import { productService } from '@/services/productService'
 import type { AccountType } from '@/types/accountType'
+import { ADMIN_PAGE_LIMIT, LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import type { Order } from '@/types/order'
 
 type OrderFilter = 'all' | AdminOrderStatus
 
 type ProductLookup = Record<string, { name: string; icon: string }>
 
-const PAGE_LIMIT = 20
 
 const FALLBACK_ACCOUNT_TYPE_LABELS: Record<string, string> = {
   shared: 'Shared · Akun Bersama',
@@ -224,7 +224,7 @@ export default function OrderPage() {
 
   const loadProductLookup = useCallback(async () => {
     try {
-      const res = await productService.adminList({ page: 1, limit: 200 })
+      const res = await productService.adminList({ page: 1, limit: LOOKUP_PRELOAD_LIMIT })
       if (!res.success) return
 
       const mapped = res.data.reduce<ProductLookup>((acc, product) => {
@@ -266,7 +266,7 @@ export default function OrderPage() {
       try {
         const res = await orderService.adminList({
           page,
-          limit: PAGE_LIMIT,
+          limit: ADMIN_PAGE_LIMIT,
           status: statusFilter === 'all' ? undefined : statusFilter,
         })
 

@@ -1,5 +1,6 @@
 "use client"
 
+import { LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -445,7 +446,7 @@ export default function ProdukPage() {
     setError('')
 
     try {
-      const res = await productService.adminList({ page: 1, limit: 200 })
+      const res = await productService.adminList({ page: 1, limit: LOOKUP_PRELOAD_LIMIT })
       if (!res.success) {
         setError(res.message || 'Gagal memuat produk')
         return

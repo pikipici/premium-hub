@@ -1,5 +1,6 @@
 "use client"
 
+import { AUDIT_REPORT_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useState } from 'react'
 
 import {
@@ -9,7 +10,7 @@ import {
   walletReconciliationService,
 } from '@/services/walletReconciliationService'
 
-const DEFAULT_FILTERS: WalletReconciliationFilters = { limit: 200 }
+const DEFAULT_FILTERS: WalletReconciliationFilters = { limit: AUDIT_REPORT_LIMIT }
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)

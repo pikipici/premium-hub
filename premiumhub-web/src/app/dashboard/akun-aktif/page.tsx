@@ -1,5 +1,6 @@
 "use client"
 
+import { CUSTOMER_LOOKUP_SCAN_LIMIT, LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Check, Copy, Eye, EyeOff, Loader2, PackageOpen, RefreshCw, ShoppingBag } from 'lucide-react'
@@ -10,7 +11,6 @@ import type { Order } from '@/types/order'
 
 type ProductLookup = Record<string, { name: string; icon: string }>
 
-const ORDER_PAGE_LIMIT = 50
 const MAX_ORDER_PAGES = 10
 
 function shortOrderCode(id: string) {
@@ -83,7 +83,7 @@ export default function AkunAktifPage() {
 
   const loadProducts = useCallback(async () => {
     try {
-      const res = await productService.list({ page: 1, limit: 200 })
+      const res = await productService.list({ page: 1, limit: LOOKUP_PRELOAD_LIMIT })
       if (!res.success) return
 
       const mapped = res.data.reduce<ProductLookup>((acc, item) => {
@@ -113,7 +113,7 @@ export default function AkunAktifPage() {
       let totalPages = 1
 
       while (currentPage <= totalPages && currentPage <= MAX_ORDER_PAGES) {
-        const res = await orderService.list({ page: currentPage, limit: ORDER_PAGE_LIMIT })
+        const res = await orderService.list({ page: currentPage, limit: CUSTOMER_LOOKUP_SCAN_LIMIT })
         if (!res.success) {
           setError(res.message || 'Gagal memuat daftar akun aktif')
           return

@@ -1,5 +1,6 @@
 "use client"
 
+import { CUSTOMER_PAGE_LIMIT } from '@/config/pagination'
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { animate, createScope, stagger } from 'animejs'
@@ -18,7 +19,6 @@ import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
 import type { SosmedOrder } from '@/types/sosmedOrder'
 
-const PAGE_SIZE = 10
 
 function statusMeta(order: SosmedOrder) {
   if (order.order_status === 'success') {
@@ -140,7 +140,7 @@ export default function DashboardSosmedOrdersPage() {
   const [refillAgreement, setRefillAgreement] = useState(false)
   const [openRefillHistoryOrderID, setOpenRefillHistoryOrderID] = useState<string | null>(null)
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / CUSTOMER_PAGE_LIMIT)), [total])
 
   const loadOrders = async (silent = false) => {
     if (silent) setRefreshing(true)
@@ -148,7 +148,7 @@ export default function DashboardSosmedOrdersPage() {
     setError('')
 
     try {
-      const res = await sosmedOrderService.list({ page, limit: PAGE_SIZE })
+      const res = await sosmedOrderService.list({ page, limit: CUSTOMER_PAGE_LIMIT })
       if (!res.success) {
         setError(res.message || 'Gagal memuat order sosmed')
         return

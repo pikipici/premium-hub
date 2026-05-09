@@ -3,6 +3,11 @@
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import {
+  ADMIN_DASHBOARD_MAX_ORDER_PAGES,
+  ADMIN_DASHBOARD_ORDER_PAGE_LIMIT,
+  LOOKUP_PRELOAD_LIMIT,
+} from '@/config/pagination'
 import { adminUserService } from '@/services/adminUserService'
 import { claimService } from '@/services/claimService'
 import { orderService } from '@/services/orderService'
@@ -33,12 +38,12 @@ type DashboardProps = {
   onNavigate: (page: string) => void
 }
 
-const MAX_ORDER_PAGES = 20
-const ORDER_PAGE_LIMIT = 100
+const MAX_ORDER_PAGES = ADMIN_DASHBOARD_MAX_ORDER_PAGES
+const ORDER_PAGE_LIMIT = ADMIN_DASHBOARD_ORDER_PAGE_LIMIT
 const MAX_CLAIM_PAGES = 12
-const CLAIM_PAGE_LIMIT = 200
+const CLAIM_PAGE_LIMIT = LOOKUP_PRELOAD_LIMIT
 const MAX_STOCK_PAGES = 15
-const STOCK_PAGE_LIMIT = 200
+const STOCK_PAGE_LIMIT = LOOKUP_PRELOAD_LIMIT
 
 function toSafeNumber(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -368,7 +373,7 @@ export default function DashboardPage({ onNavigate }: DashboardProps) {
         let totalPages = 1
 
         while (page <= totalPages && page <= 6) {
-          const res = await productService.adminList({ page, limit: 200 })
+          const res = await productService.adminList({ page, limit: LOOKUP_PRELOAD_LIMIT })
           if (!res.success) break
 
           res.data.forEach((product) => {

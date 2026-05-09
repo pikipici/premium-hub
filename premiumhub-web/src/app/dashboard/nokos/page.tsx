@@ -1,5 +1,6 @@
 "use client"
 
+import { CUSTOMER_PAGE_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -72,7 +73,6 @@ interface SMSState {
 }
 
 const DEFAULT_OPERATOR = 'any'
-const ORDER_PAGE_LIMIT = 10
 const OTP_WAITING_WINDOW_MS = 15 * 60 * 1000
 const ORDER_STATUS_FILTERS: { key: OrderStatusFilter; label: string }[] = [
   { key: 'all', label: 'Semua' },
@@ -847,7 +847,7 @@ export default function NomorVirtualPage() {
   const loadOrders = useCallback(async (page: number) => {
     setOrdersLoading(true)
     try {
-      const res = await fiveSimService.listOrders({ page, limit: ORDER_PAGE_LIMIT })
+      const res = await fiveSimService.listOrders({ page, limit: CUSTOMER_PAGE_LIMIT })
       if (!res.success) {
         pushToast('error', res.message || 'Gagal memuat riwayat order')
         return

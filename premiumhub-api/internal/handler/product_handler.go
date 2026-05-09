@@ -21,7 +21,7 @@ func NewProductHandler(productSvc *service.ProductService) *ProductHandler {
 
 func (h *ProductHandler) List(c *gin.Context) {
 	category := c.Query("category")
-	page, limit := parsePageLimit(c, 12, 100)
+	page, limit := parsePageLimit(c, DefaultPublicPageLimit, MaxPageLimit)
 
 	products, total, err := h.productSvc.List(category, page, limit)
 	if err != nil {
@@ -58,7 +58,7 @@ func (h *ProductHandler) GetPrices(c *gin.Context) {
 }
 
 func (h *ProductHandler) AdminList(c *gin.Context) {
-	page, limit := parsePageLimit(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 	products, total, err := h.productSvc.AdminList(page, limit)
 	if err != nil {
 		response.InternalError(c)

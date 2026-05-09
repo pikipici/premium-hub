@@ -1,5 +1,6 @@
 "use client"
 
+import { ADMIN_PAGE_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -8,7 +9,6 @@ import type { AdminUser } from '@/types/adminUser'
 
 type StatusFilter = 'all' | AdminUserStatusFilter
 
-const PAGE_LIMIT = 20
 
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'Semua Status' },
@@ -164,7 +164,7 @@ export default function PenggunaPage() {
       try {
         const res = await adminUserService.list({
           page,
-          limit: PAGE_LIMIT,
+          limit: ADMIN_PAGE_LIMIT,
           search: search || undefined,
           status: statusFilter === 'all' ? undefined : statusFilter,
         })

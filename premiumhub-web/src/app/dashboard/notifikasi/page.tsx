@@ -1,5 +1,6 @@
 "use client"
 
+import { CUSTOMER_HISTORY_PAGE_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useMemo, useState, type SVGProps } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -19,7 +20,6 @@ import { notificationService, type NotificationItem } from '@/services/notificat
 type NotificationFilter = 'all' | 'unread' | 'order' | 'wallet' | 'claim'
 type NotificationKind = 'order' | 'wallet' | 'claim' | 'other'
 
-const PAGE_LIMIT = 20
 
 const FILTER_OPTIONS: { key: NotificationFilter; label: string }[] = [
   { key: 'all', label: 'Semua' },
@@ -237,7 +237,7 @@ export default function NotifikasiPage() {
       setError('')
 
       try {
-        const res = await notificationService.myList({ page, limit: PAGE_LIMIT })
+        const res = await notificationService.myList({ page, limit: CUSTOMER_HISTORY_PAGE_LIMIT })
         if (!res.success) {
           setError(res.message || 'Gagal memuat notifikasi')
           return

@@ -1,5 +1,6 @@
 "use client"
 
+import { ADMIN_PAGE_LIMIT, BATCH_ACTION_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
@@ -12,7 +13,6 @@ import { canAdminTriggerRefill, formatProviderStatus, getAdminRefillStatusLabel,
 import { sosmedOrderService, type AdminSosmedOpsSummary } from '@/services/sosmedOrderService'
 import type { SosmedOrder, SosmedOrderDetail } from '@/types/sosmedOrder'
 
-const PAGE_LIMIT = 20
 
 type StatusFilter = 'all' | 'pending_payment' | 'processing' | 'success' | 'failed' | 'canceled' | 'expired'
 
@@ -95,7 +95,7 @@ export default function SosmedOrderPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_LIMIT)), [total])
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / ADMIN_PAGE_LIMIT)), [total])
   const opsRiskCount = opsSummary
     ? opsSummary.retryable +
       opsSummary.missing_provider_order_id +
@@ -113,7 +113,7 @@ export default function SosmedOrderPage() {
         sosmedOrderService.adminList({
           status: statusFilter === 'all' ? undefined : statusFilter,
           page,
-          limit: PAGE_LIMIT,
+          limit: ADMIN_PAGE_LIMIT,
         }),
         sosmedOrderService.adminOpsSummary({ stale_minutes: 30 }),
       ])
@@ -232,7 +232,7 @@ export default function SosmedOrderPage() {
     setError('')
 
     try {
-      const res = await sosmedOrderService.adminSyncProcessingProviders({ limit: PAGE_LIMIT })
+      const res = await sosmedOrderService.adminSyncProcessingProviders({ limit: BATCH_ACTION_LIMIT })
       if (!res.success || !res.data) {
         setError(res.message || 'Gagal sync massal provider')
         return

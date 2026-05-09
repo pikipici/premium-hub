@@ -59,7 +59,7 @@ func (h *WalletHandler) CreateTopup(c *gin.Context) {
 
 func (h *WalletHandler) ListTopups(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, limit := parsePagination(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 
 	res, err := h.walletSvc.ListTopups(userID, page, limit)
 	if err != nil {
@@ -109,7 +109,7 @@ func (h *WalletHandler) CheckTopup(c *gin.Context) {
 
 func (h *WalletHandler) ListLedger(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, limit := parsePagination(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 
 	res, err := h.walletSvc.ListLedger(userID, page, limit)
 	if err != nil {
@@ -141,12 +141,12 @@ func (h *WalletHandler) AdminRecheckTopup(c *gin.Context) {
 }
 
 func (h *WalletHandler) ReconcilePending(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(DefaultAuditReportLimit)))
 	if limit <= 0 {
-		limit = 200
+		limit = DefaultAuditReportLimit
 	}
-	if limit > 1000 {
-		limit = 1000
+	if limit > MaxBatchActionLimit {
+		limit = MaxBatchActionLimit
 	}
 
 	res, err := h.walletSvc.ReconcilePending(c.Request.Context(), limit)
@@ -198,7 +198,7 @@ func (h *WalletHandler) AdminRepairReconciliation(c *gin.Context) {
 }
 
 func parseWalletReconciliationFilter(c *gin.Context) (service.WalletReconciliationFilter, error) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
+	limit := parseLimit(c, DefaultAuditReportLimit, MaxAuditReportLimit)
 	filter := service.WalletReconciliationFilter{Limit: limit}
 	if raw := strings.TrimSpace(c.Query("from")); raw != "" {
 		from, err := parseWalletReconciliationTime(raw)
@@ -239,19 +239,4 @@ func parseWalletReconciliationTime(raw string) (time.Time, error) {
 		return t, nil
 	}
 	return time.Time{}, strconv.ErrSyntax
-}
-
-func parsePagination(c *gin.Context, defaultLimit, maxLimit int) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(defaultLimit)))
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = defaultLimit
-	}
-	if limit > maxLimit {
-		limit = maxLimit
-	}
-	return page, limit
 }

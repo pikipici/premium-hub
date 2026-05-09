@@ -35,7 +35,7 @@ func (h *ClaimHandler) Create(c *gin.Context) {
 
 func (h *ClaimHandler) List(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, limit := parsePageLimit(c, 10, 100)
+	page, limit := parsePageLimit(c, DefaultCustomerPageLimit, MaxPageLimit)
 	claims, total, err := h.claimSvc.ListByUser(userID, page, limit)
 	if err != nil {
 		response.InternalError(c)
@@ -64,7 +64,7 @@ func (h *ClaimHandler) GetByID(c *gin.Context) {
 
 func (h *ClaimHandler) AdminList(c *gin.Context) {
 	status := c.Query("status")
-	page, limit := parsePageLimit(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 	claims, total, err := h.claimSvc.AdminList(status, page, limit)
 	if err != nil {
 		response.InternalError(c)

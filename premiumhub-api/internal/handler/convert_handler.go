@@ -86,7 +86,7 @@ func (h *ConvertHandler) CreateGuestOrder(c *gin.Context) {
 
 func (h *ConvertHandler) ListOrders(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, limit := parseConvertPagination(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultCustomerPageLimit, MaxPageLimit)
 
 	res, err := h.svc.ListOrdersByUser(userID, page, limit, service.ConvertListFilterInput{
 		AssetType: c.Query("asset_type"),
@@ -260,7 +260,7 @@ func (h *ConvertHandler) UploadProof(c *gin.Context) {
 }
 
 func (h *ConvertHandler) AdminListOrders(c *gin.Context) {
-	page, limit := parseConvertPagination(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 
 	res, err := h.svc.AdminListOrders(page, limit, service.ConvertListFilterInput{
 		AssetType: c.Query("asset_type"),
@@ -343,12 +343,12 @@ func (h *ConvertHandler) AdminUploadSettlementProof(c *gin.Context) {
 }
 
 func (h *ConvertHandler) AdminExpirePending(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(DefaultAuditReportLimit)))
 	if limit <= 0 {
-		limit = 200
+		limit = DefaultAuditReportLimit
 	}
-	if limit > 1000 {
-		limit = 1000
+	if limit > MaxBatchActionLimit {
+		limit = MaxBatchActionLimit
 	}
 
 	res, err := h.svc.ExpirePendingOrders(c.Request.Context(), limit)
@@ -410,21 +410,6 @@ func (h *ConvertHandler) AdminUpdateLimitRules(c *gin.Context) {
 	}
 
 	response.Success(c, "Limit convert diperbarui", res)
-}
-
-func parseConvertPagination(c *gin.Context, defaultLimit, maxLimit int) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(defaultLimit)))
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = defaultLimit
-	}
-	if limit > maxLimit {
-		limit = maxLimit
-	}
-	return page, limit
 }
 
 func (h *ConvertHandler) parseConvertProofInput(c *gin.Context) (service.UploadConvertProofInput, error) {

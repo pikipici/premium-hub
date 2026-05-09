@@ -19,7 +19,7 @@ func NewStockHandler(stockSvc *service.StockService) *StockHandler {
 }
 
 func (h *StockHandler) List(c *gin.Context) {
-	page, limit := parsePageLimit(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 	status := c.Query("status")
 
 	var productID *uuid.UUID

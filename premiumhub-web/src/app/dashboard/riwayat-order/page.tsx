@@ -1,5 +1,6 @@
 "use client"
 
+import { CUSTOMER_HISTORY_PAGE_LIMIT } from '@/config/pagination'
 import Link from 'next/link'
 import { useCallback, useEffect, useState, type SVGProps } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
@@ -8,7 +9,6 @@ import { formatRupiah } from '@/lib/utils'
 import { activityService } from '@/services/activityService'
 import type { ActivityHistoryItem } from '@/types/activity'
 
-const PAGE_LIMIT = 20
 
 function TransactionDollarIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -123,7 +123,7 @@ export default function RiwayatOrderPage() {
     setError('')
 
     try {
-      const res = await activityService.listHistory({ page, limit: PAGE_LIMIT })
+      const res = await activityService.listHistory({ page, limit: CUSTOMER_HISTORY_PAGE_LIMIT })
       if (!res.success) {
         setError(res.message || 'Gagal memuat riwayat aktivitas')
         return

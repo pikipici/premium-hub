@@ -1,5 +1,6 @@
 "use client"
 
+import { LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
@@ -14,7 +15,6 @@ type PageMeta = {
   sub: string
 }
 
-const STOCK_PAGE_LIMIT = 200
 const MAX_STOCK_PAGES = 15
 
 function resolveCorePageMeta(pathname: string): PageMeta {
@@ -66,7 +66,7 @@ async function countCriticalStockProducts() {
   while (page <= totalPages && page <= MAX_STOCK_PAGES) {
     const res = await stockService.adminList({
       page,
-      limit: STOCK_PAGE_LIMIT,
+      limit: LOOKUP_PRELOAD_LIMIT,
       status: 'available',
     })
 

@@ -126,7 +126,7 @@ func (h *SosmedBundleOrderHandler) Create(c *gin.Context) {
 
 func (h *SosmedBundleOrderHandler) List(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, limit := parsePageLimit(c, 10, 100)
+	page, limit := parsePageLimit(c, DefaultCustomerPageLimit, MaxPageLimit)
 
 	orders, total, err := h.svc.ListByUser(c.Request.Context(), userID, page, limit)
 	if err != nil {
@@ -159,7 +159,7 @@ func (h *SosmedBundleOrderHandler) GetByOrderNumber(c *gin.Context) {
 
 func (h *SosmedBundleOrderHandler) AdminList(c *gin.Context) {
 	status := strings.TrimSpace(c.Query("status"))
-	page, limit := parsePageLimit(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 
 	orders, total, err := h.svc.AdminList(c.Request.Context(), status, page, limit)
 	if err != nil {

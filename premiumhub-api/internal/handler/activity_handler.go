@@ -2,7 +2,6 @@ package handler
 
 import (
 	"math"
-	"strconv"
 
 	"premiumhub-api/internal/service"
 	"premiumhub-api/pkg/response"
@@ -22,17 +21,7 @@ func NewActivityHandler(activitySvc *service.ActivityService) *ActivityHandler {
 func (h *ActivityHandler) List(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 20
-	}
-	if limit > 20 {
-		limit = 20
-	}
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 
 	items, total, err := h.activitySvc.ListByUser(userID, page, limit)
 	if err != nil {

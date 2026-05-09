@@ -1,5 +1,6 @@
 "use client"
 
+import { ADMIN_DENSE_PAGE_LIMIT, LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { accountTypeService } from '@/services/accountTypeService'
@@ -43,7 +44,6 @@ type StockSummary = {
   total: number
 }
 
-const PAGE_LIMIT = 30
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -367,7 +367,7 @@ export default function StokPage() {
 
   const loadProducts = useCallback(async () => {
     try {
-      const res = await productService.adminList({ page: 1, limit: 200 })
+      const res = await productService.adminList({ page: 1, limit: LOOKUP_PRELOAD_LIMIT })
       if (!res.success) return
 
       setProducts(res.data)
@@ -411,7 +411,7 @@ export default function StokPage() {
       try {
         const res = await stockService.adminList({
           page,
-          limit: PAGE_LIMIT,
+          limit: ADMIN_DENSE_PAGE_LIMIT,
           status: statusFilter === 'all' ? undefined : statusFilter,
           product_id: productFilter === 'all' ? undefined : productFilter,
         })

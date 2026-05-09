@@ -119,7 +119,7 @@ func (h *FiveSimHandler) ReuseNumber(c *gin.Context) {
 
 func (h *FiveSimHandler) ListOrders(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, limit := parsePageLimit(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 
 	rows, total, err := h.svc.ListLocalOrders(userID, page, limit)
 	if err != nil {
@@ -177,7 +177,7 @@ func (h *FiveSimHandler) GetProviderProfile(c *gin.Context) {
 }
 
 func (h *FiveSimHandler) GetProviderOrderHistory(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	limit := parseLimit(c, DefaultBatchActionLimit, MaxBatchActionLimit)
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	reverse := c.DefaultQuery("reverse", "true")
 

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"math"
-	"strconv"
 	"strings"
 	"time"
 
@@ -59,7 +58,7 @@ func (h *AdminHandler) Dashboard(c *gin.Context) {
 }
 
 func (h *AdminHandler) ListUsers(c *gin.Context) {
-	page, limit := parsePageLimit(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 	search := strings.TrimSpace(c.Query("search"))
 	status := strings.TrimSpace(c.Query("status"))
 
@@ -138,8 +137,7 @@ func NewUserHandler(authSvc *service.AuthService, notifSvc *service.Notification
 
 func (h *UserHandler) GetNotifications(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 	notifs, total, err := h.notifSvc.List(userID, page, limit)
 	if err != nil {
 		response.InternalError(c)

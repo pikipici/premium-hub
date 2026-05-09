@@ -1,5 +1,6 @@
 "use client"
 
+import { ADMIN_PAGE_LIMIT } from '@/config/pagination'
 import Link from 'next/link'
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, RefreshCcw, UploadCloud } from 'lucide-react'
@@ -15,7 +16,6 @@ type QueueAction = {
   label: string
 }
 
-const PAGE_SIZE = 20
 
 function formatRupiah(value: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -139,7 +139,7 @@ export default function ConvertOrdersPage() {
   const [settlementProofFile, setSettlementProofFile] = useState<File | null>(null)
   const [uploadingSettlementProof, setUploadingSettlementProof] = useState(false)
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / ADMIN_PAGE_LIMIT)), [total])
   const { userProofs, adminSettlementProofs } = useMemo(() => splitProofs(selectedDetail), [selectedDetail])
 
   useEffect(() => {
@@ -166,7 +166,7 @@ export default function ConvertOrdersPage() {
     try {
       const res = await convertService.adminListOrders({
         page,
-        limit: PAGE_SIZE,
+        limit: ADMIN_PAGE_LIMIT,
         asset_type: assetFilter === 'all' ? undefined : assetFilter,
         status: statusFilter === 'all' ? undefined : statusFilter,
         q: debouncedSearch || undefined,

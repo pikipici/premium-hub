@@ -40,7 +40,7 @@ func (h *SosmedOrderHandler) Create(c *gin.Context) {
 
 func (h *SosmedOrderHandler) List(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, limit := parsePageLimit(c, 10, 100)
+	page, limit := parsePageLimit(c, DefaultCustomerPageLimit, MaxPageLimit)
 
 	orders, total, err := h.svc.ListByUser(userID, page, limit)
 	if err != nil {
@@ -92,7 +92,7 @@ func (h *SosmedOrderHandler) Cancel(c *gin.Context) {
 
 func (h *SosmedOrderHandler) AdminList(c *gin.Context) {
 	status := strings.TrimSpace(c.Query("status"))
-	page, limit := parsePageLimit(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 
 	orders, total, err := h.svc.AdminList(status, page, limit)
 	if err != nil {
@@ -178,7 +178,7 @@ func (h *SosmedOrderHandler) AdminSyncProvider(c *gin.Context) {
 
 func (h *SosmedOrderHandler) AdminSyncProcessingProviders(c *gin.Context) {
 	adminID := c.MustGet("user_id").(uuid.UUID)
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	limit := parseLimit(c, DefaultBatchActionLimit, MaxBatchActionLimit)
 
 	result, err := h.svc.AdminSyncProcessingProviderOrders(c.Request.Context(), adminID, limit)
 	if err != nil {

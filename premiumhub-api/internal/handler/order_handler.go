@@ -35,7 +35,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 
 func (h *OrderHandler) List(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	page, limit := parsePageLimit(c, 10, 100)
+	page, limit := parsePageLimit(c, DefaultCustomerPageLimit, MaxPageLimit)
 
 	orders, total, err := h.orderSvc.ListByUser(userID, page, limit)
 	if err != nil {
@@ -79,7 +79,7 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 
 func (h *OrderHandler) AdminList(c *gin.Context) {
 	status := c.Query("status")
-	page, limit := parsePageLimit(c, 20, 100)
+	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
 	orders, total, err := h.orderSvc.AdminList(status, page, limit)
 	if err != nil {
 		response.InternalError(c)

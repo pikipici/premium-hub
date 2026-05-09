@@ -1,5 +1,6 @@
 "use client"
 
+import { LOCAL_MUTATION_PAGE_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -20,7 +21,6 @@ import { useAuthStore } from '@/store/authStore'
 import type { PaymentMethodOption, WalletLedger, WalletTopup } from '@/types/wallet'
 
 const QUICK_AMOUNTS = [25000, 50000, 100000, 200000]
-const MUTATION_PAGE_SIZE = 8
 
 type TxFilter = 'all' | 'topup' | 'purchase' | 'refund'
 type LedgerGroup = 'topup' | 'purchase' | 'refund' | 'other'
@@ -231,12 +231,12 @@ export default function WalletPage() {
   }, [topups])
 
   const mutationTotalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(filteredMutationRows.length / MUTATION_PAGE_SIZE))
+    return Math.max(1, Math.ceil(filteredMutationRows.length / LOCAL_MUTATION_PAGE_LIMIT))
   }, [filteredMutationRows.length])
 
   const paginatedMutationRows = useMemo(() => {
-    const start = (txPage - 1) * MUTATION_PAGE_SIZE
-    return filteredMutationRows.slice(start, start + MUTATION_PAGE_SIZE)
+    const start = (txPage - 1) * LOCAL_MUTATION_PAGE_LIMIT
+    return filteredMutationRows.slice(start, start + LOCAL_MUTATION_PAGE_LIMIT)
   }, [filteredMutationRows, txPage])
 
   const fetchAll = useCallback(async (silent = false) => {
@@ -589,7 +589,7 @@ export default function WalletPage() {
               )}
             </div>
 
-            {filteredMutationRows.length > MUTATION_PAGE_SIZE ? (
+            {filteredMutationRows.length > LOCAL_MUTATION_PAGE_LIMIT ? (
               <div className="flex items-center justify-between border-t border-[#EBEBEB] px-5 py-3">
                 <button
                   type="button"

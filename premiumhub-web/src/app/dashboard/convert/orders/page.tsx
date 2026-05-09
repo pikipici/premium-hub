@@ -1,5 +1,6 @@
 "use client"
 
+import { CUSTOMER_PAGE_LIMIT } from '@/config/pagination'
 import Link from 'next/link'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -16,7 +17,6 @@ const FILTERS: { key: 'all' | ConvertAssetType; label: string; href: string }[] 
   { key: 'crypto', label: 'Crypto', href: '/dashboard/convert/orders?asset=crypto' },
 ]
 
-const PAGE_SIZE = 10
 
 function formatRupiah(value: number) {
   return `Rp ${Math.max(0, Math.round(value)).toLocaleString('id-ID')}`
@@ -68,7 +68,7 @@ function DashboardConvertOrdersPageContent() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total])
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / CUSTOMER_PAGE_LIMIT)), [total])
 
   useEffect(() => {
     setPage(1)
@@ -82,7 +82,7 @@ function DashboardConvertOrdersPageContent() {
       try {
         const res = await convertService.listOrders({
           page,
-          limit: PAGE_SIZE,
+          limit: CUSTOMER_PAGE_LIMIT,
           asset_type: currentAsset === 'all' ? undefined : currentAsset,
         })
 
@@ -109,7 +109,7 @@ function DashboardConvertOrdersPageContent() {
     try {
       const res = await convertService.listOrders({
         page,
-        limit: PAGE_SIZE,
+        limit: CUSTOMER_PAGE_LIMIT,
         asset_type: currentAsset === 'all' ? undefined : currentAsset,
       })
 
