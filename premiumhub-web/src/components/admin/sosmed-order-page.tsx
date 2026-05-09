@@ -1,5 +1,6 @@
 "use client"
 
+import { ListPagination } from '@/components/shared/list-pagination'
 import { ADMIN_PAGE_LIMIT, BATCH_ACTION_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -566,30 +567,15 @@ export default function SosmedOrderPage() {
         </div>
 
         {!loading && total > 0 ? (
-          <div style={{ padding: '0 18px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Menampilkan {items.length} dari total {total}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button
-                type="button"
-                className="action-btn"
-                disabled={page <= 1 || loading}
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              >
-                ← Prev
-              </button>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>Page {page} / {totalPages}</span>
-              <button
-                type="button"
-                className="action-btn"
-                disabled={page >= totalPages || loading}
-                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              >
-                Next →
-              </button>
-            </div>
-          </div>
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            itemLabel="order"
+            loading={loading}
+            onPageChange={setPage}
+            tone="admin"
+          />
         ) : null}
       </div>
 

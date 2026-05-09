@@ -131,6 +131,8 @@ export default function AdminStyles() {
       .topbar-btn:hover { border-color: var(--dark); }
       .topbar-btn.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
       .topbar-btn.primary:hover { opacity: .88; }
+      .pagination-controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding: 12px 20px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+      .pagination-controls span { color: var(--muted); }
       .admin-catalog-tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 12px; }
       .admin-catalog-tab { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 800; line-height: 1; padding: 8px 12px; min-height: 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--white); color: var(--dark); cursor: pointer; transition: border-color .15s, background .15s, color .15s, box-shadow .15s; display: inline-flex; align-items: center; justify-content: center; gap: 9px; white-space: nowrap; text-decoration: none; }
       .admin-catalog-tab:hover { border-color: #CBD5E1; background: #F8FAFC; }

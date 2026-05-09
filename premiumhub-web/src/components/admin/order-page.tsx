@@ -6,6 +6,7 @@ import { accountTypeService } from '@/services/accountTypeService'
 import { orderService, type AdminOrderStatus } from '@/services/orderService'
 import { productService } from '@/services/productService'
 import type { AccountType } from '@/types/accountType'
+import { ListPagination } from '@/components/shared/list-pagination'
 import { ADMIN_PAGE_LIMIT, LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import type { Order } from '@/types/order'
 
@@ -626,40 +627,15 @@ export default function OrderPage() {
             </table>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 8,
-              borderTop: '1px solid var(--border)',
-              padding: '12px 20px',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Menampilkan <strong style={{ color: 'var(--dark)' }}>{filteredOrders.length}</strong> item · Page{' '}
-              <strong style={{ color: 'var(--dark)' }}>{page}</strong> /{' '}
-              <strong style={{ color: 'var(--dark)' }}>{totalPages}</strong>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="topbar-btn"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={page <= 1 || loading || syncing}
-              >
-                Sebelumnya
-              </button>
-              <button
-                className="topbar-btn"
-                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={page >= totalPages || loading || syncing}
-              >
-                Berikutnya
-              </button>
-            </div>
-          </div>
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={filteredOrders.length}
+            itemLabel="item"
+            loading={loading || syncing}
+            onPageChange={setPage}
+            tone="admin"
+          />
         </div>
       </div>
 

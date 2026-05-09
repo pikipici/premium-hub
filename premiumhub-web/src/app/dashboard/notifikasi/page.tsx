@@ -6,8 +6,6 @@ import { useRouter } from 'next/navigation'
 import {
   Bell,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   RefreshCcw,
   ShieldBan,
@@ -15,6 +13,7 @@ import {
   Wallet,
 } from 'lucide-react'
 
+import { ListPagination } from '@/components/shared/list-pagination'
 import { notificationService, type NotificationItem } from '@/services/notificationService'
 
 type NotificationFilter = 'all' | 'unread' | 'order' | 'wallet' | 'claim'
@@ -470,32 +469,15 @@ export default function NotifikasiPage() {
             })}
           </div>
 
-          <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-[#EBEBEB] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-[#888]">
-              Menampilkan halaman <span className="font-semibold text-[#141414]">{page}</span> dari{' '}
-              <span className="font-semibold text-[#141414]">{totalPages}</span> • total {total} notifikasi
-            </p>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={page <= 1 || loading}
-                className="inline-flex items-center gap-1 rounded-xl border border-[#E2E2E2] px-3 py-2 text-xs font-semibold text-[#555] hover:bg-[#F7F7F5] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" /> Sebelumnya
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={page >= totalPages || loading}
-                className="inline-flex items-center gap-1 rounded-xl border border-[#E2E2E2] px-3 py-2 text-xs font-semibold text-[#555] hover:bg-[#F7F7F5] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Selanjutnya <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            itemLabel="notifikasi"
+            loading={loading}
+            onPageChange={setPage}
+            tone="customer"
+          />
         </>
       )}
     </div>
