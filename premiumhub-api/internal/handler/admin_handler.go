@@ -17,6 +17,7 @@ type AdminHandler struct {
 	orderRepo *repository.OrderRepo
 	claimRepo *repository.ClaimRepo
 	userRepo  *repository.UserRepo
+	stockRepo *repository.StockRepo
 	notifSvc  *service.NotificationService
 }
 
@@ -37,8 +38,8 @@ type AdminUserListItem struct {
 	LastOrderAt   *time.Time `json:"last_order_at"`
 }
 
-func NewAdminHandler(orderRepo *repository.OrderRepo, claimRepo *repository.ClaimRepo, userRepo *repository.UserRepo, notifSvc *service.NotificationService) *AdminHandler {
-	return &AdminHandler{orderRepo: orderRepo, claimRepo: claimRepo, userRepo: userRepo, notifSvc: notifSvc}
+func NewAdminHandler(orderRepo *repository.OrderRepo, claimRepo *repository.ClaimRepo, userRepo *repository.UserRepo, stockRepo *repository.StockRepo, notifSvc *service.NotificationService) *AdminHandler {
+	return &AdminHandler{orderRepo: orderRepo, claimRepo: claimRepo, userRepo: userRepo, stockRepo: stockRepo, notifSvc: notifSvc}
 }
 
 func (h *AdminHandler) Dashboard(c *gin.Context) {
@@ -46,15 +47,69 @@ func (h *AdminHandler) Dashboard(c *gin.Context) {
 	pendingOrders, _ := h.orderRepo.CountByStatus("pending")
 	completedOrders, _ := h.orderRepo.CountByStatus("completed")
 	totalRevenue, _ := h.orderRepo.TotalRevenue()
-	pendingClaims, _ := h.claimRepo.CountPending()
+	pendingClaimsTotal, _ := h.claimRepo.CountPending()
+
+	today := startOfDay(time.Now())
+	monthStart := startOfMonth(today)
+	analyticsSince := today.AddDate(0, 0, -120)
+
+	recentOrders, err := h.orderRepo.AdminRecent(5)
+	if err != nil {
+		response.InternalError(c)
+		return
+	}
+
+	analyticsOrders, err := h.orderRepo.AdminAnalyticsSince(analyticsSince)
+	if err != nil {
+		response.InternalError(c)
+		return
+	}
+
+	pendingClaims, _, err := h.claimRepo.AdminList("pending", 1, 5)
+	if err != nil {
+		response.InternalError(c)
+		return
+	}
+
+	monthlyClaimsCount, err := h.claimRepo.CountSince(monthStart)
+	if err != nil {
+		response.InternalError(c)
+		return
+	}
+
+	stockSummary, err := h.stockRepo.AvailableSummaryByProduct()
+	if err != nil {
+		response.InternalError(c)
+		return
+	}
+
+	_, activeUsersTotal, err := h.userRepo.List(1, 1, "", "active")
+	if err != nil {
+		response.InternalError(c)
+		return
+	}
 
 	response.Success(c, "OK", gin.H{
-		"active_orders":    activeOrders,
-		"pending_orders":   pendingOrders,
-		"completed_orders": completedOrders,
-		"total_revenue":    totalRevenue,
-		"pending_claims":   pendingClaims,
+		"active_orders":        activeOrders,
+		"pending_orders":       pendingOrders,
+		"completed_orders":     completedOrders,
+		"total_revenue":        totalRevenue,
+		"pending_claims":       pendingClaimsTotal,
+		"recent_orders":        recentOrders,
+		"analytics_orders":     analyticsOrders,
+		"pending_claim_rows":   pendingClaims,
+		"monthly_claims_count": monthlyClaimsCount,
+		"stock_summary":        stockSummary,
+		"active_users_total":   activeUsersTotal,
 	})
+}
+
+func startOfDay(value time.Time) time.Time {
+	return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, value.Location())
+}
+
+func startOfMonth(value time.Time) time.Time {
+	return time.Date(value.Year(), value.Month(), 1, 0, 0, 0, 0, value.Location())
 }
 
 func (h *AdminHandler) ListUsers(c *gin.Context) {

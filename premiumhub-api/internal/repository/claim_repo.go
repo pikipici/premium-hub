@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"premiumhub-api/internal/model"
 
 	"github.com/google/uuid"
@@ -59,5 +61,11 @@ func (r *ClaimRepo) AdminList(status string, page, limit int) ([]model.Claim, in
 func (r *ClaimRepo) CountPending() (int64, error) {
 	var count int64
 	err := r.db.Model(&model.Claim{}).Where("status = ?", "pending").Count(&count).Error
+	return count, err
+}
+
+func (r *ClaimRepo) CountSince(since time.Time) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.Claim{}).Where("created_at >= ?", since).Count(&count).Error
 	return count, err
 }

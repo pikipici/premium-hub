@@ -3,16 +3,8 @@
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import {
-  ADMIN_DASHBOARD_MAX_ORDER_PAGES,
-  ADMIN_DASHBOARD_ORDER_PAGE_LIMIT,
-  LOOKUP_PRELOAD_LIMIT,
-} from '@/config/pagination'
-import { adminUserService } from '@/services/adminUserService'
+import { adminDashboardService } from '@/services/adminDashboardService'
 import { claimService } from '@/services/claimService'
-import { orderService } from '@/services/orderService'
-import { productService } from '@/services/productService'
-import { stockService } from '@/services/stockService'
 import type { Claim, Order } from '@/types/order'
 
 type ChartTab = '7 Hari' | '30 Hari' | '3 Bulan'
@@ -38,12 +30,6 @@ type DashboardProps = {
   onNavigate: (page: string) => void
 }
 
-const MAX_ORDER_PAGES = ADMIN_DASHBOARD_MAX_ORDER_PAGES
-const ORDER_PAGE_LIMIT = ADMIN_DASHBOARD_ORDER_PAGE_LIMIT
-const MAX_CLAIM_PAGES = 12
-const CLAIM_PAGE_LIMIT = LOOKUP_PRELOAD_LIMIT
-const MAX_STOCK_PAGES = 15
-const STOCK_PAGE_LIMIT = LOOKUP_PRELOAD_LIMIT
 
 function toSafeNumber(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -367,228 +353,44 @@ export default function DashboardPage({ onNavigate }: DashboardProps) {
 
       setError('')
 
-      const fetchProductLookup = async () => {
-        const lookup: ProductLookup = {}
-        let page = 1
-        let totalPages = 1
-
-        while (page <= totalPages && page <= 6) {
-          const res = await productService.adminList({ page, limit: LOOKUP_PRELOAD_LIMIT })
-          if (!res.success) break
-
-          res.data.forEach((product) => {
-            lookup[product.id] = {
-              name: product.name,
-              icon: product.icon || '📦',
-            }
-          })
-
-          totalPages = res.meta?.total_pages ?? 1
-          if (page >= totalPages) break
-          page += 1
-        }
-
-        return lookup
-      }
-
-      const fetchOrdersSnapshot = async () => {
-        const cutoff = addDays(startOfDay(new Date()), -120)
-        const allOrders: Order[] = []
-        let recent: Order[] = []
-
-        let page = 1
-        let totalPages = 1
-
-        while (page <= totalPages && page <= MAX_ORDER_PAGES) {
-          const res = await orderService.adminList({ page, limit: ORDER_PAGE_LIMIT })
-          if (!res.success) break
-
-          if (page === 1) {
-            recent = res.data.slice(0, 5)
-          }
-
-          if (res.data.length === 0) break
-
-          allOrders.push(...res.data)
-          totalPages = res.meta?.total_pages ?? 1
-
-          const oldest = res.data[res.data.length - 1]
-          const oldestDate = parseDate(oldest?.created_at)
-          if (oldestDate && oldestDate < cutoff && page >= 2) {
-            break
-          }
-
-          if (page >= totalPages) break
-          page += 1
-        }
-
-        return { allOrders, recent }
-      }
-
-      const fetchPendingClaims = async () => {
-        const res = await claimService.adminList({ status: 'pending', page: 1, limit: 5 })
-        if (!res.success) {
-          return { rows: [] as Claim[], total: 0 }
-        }
-
-        return {
-          rows: res.data,
-          total: res.meta?.total ?? res.data.length,
-        }
-      }
-
-      const fetchMonthlyClaimsCount = async () => {
-        const monthStart = startOfMonth(new Date())
-        let page = 1
-        let totalPages = 1
-        let total = 0
-
-        while (page <= totalPages && page <= MAX_CLAIM_PAGES) {
-          const res = await claimService.adminList({ page, limit: CLAIM_PAGE_LIMIT })
-          if (!res.success) break
-
-          if (res.data.length === 0) break
-
-          for (const claim of res.data) {
-            const createdAt = parseDate(claim.created_at)
-            if (createdAt && createdAt >= monthStart) {
-              total += 1
-            }
-          }
-
-          totalPages = res.meta?.total_pages ?? 1
-
-          const oldest = res.data[res.data.length - 1]
-          const oldestDate = parseDate(oldest?.created_at)
-          if (oldestDate && oldestDate < monthStart && page >= 2) {
-            break
-          }
-
-          if (page >= totalPages) break
-          page += 1
-        }
-
-        return total
-      }
-
-      const fetchStockSummary = async () => {
-        const counts = new Map<string, StockSummary>()
-        let page = 1
-        let totalPages = 1
-
-        while (page <= totalPages && page <= MAX_STOCK_PAGES) {
-          const res = await stockService.adminList({
-            page,
-            limit: STOCK_PAGE_LIMIT,
-            status: 'available',
-          })
-          if (!res.success) break
-
-          for (const stock of res.data) {
-            const productID = stock.product_id || stock.product?.id
-            if (!productID) continue
-
-            const existing = counts.get(productID)
-            if (!existing) {
-              counts.set(productID, {
-                product_id: productID,
-                name: stock.product?.name || `Produk ${productID.slice(0, 8)}`,
-                icon: stock.product?.icon || '📦',
-                available: 1,
-              })
-              continue
-            }
-
-            existing.available += 1
-          }
-
-          totalPages = res.meta?.total_pages ?? 1
-          if (page >= totalPages) break
-          page += 1
-        }
-
-        return Array.from(counts.values()).sort((left, right) => {
-          if (left.available !== right.available) {
-            return left.available - right.available
-          }
-          return left.name.localeCompare(right.name)
-        })
-      }
-
-      const fetchActiveUsersTotal = async () => {
-        const res = await adminUserService.list({
-          page: 1,
-          limit: 1,
-          status: 'active',
-        })
-
-        if (!res.success) return 0
-        return res.meta?.total ?? 0
-      }
-
       try {
-        const [productResult, orderResult, pendingClaimResult, monthlyClaimResult, stockResult, userResult] =
-          await Promise.allSettled([
-            fetchProductLookup(),
-            fetchOrdersSnapshot(),
-            fetchPendingClaims(),
-            fetchMonthlyClaimsCount(),
-            fetchStockSummary(),
-            fetchActiveUsersTotal(),
-          ])
+        const res = await adminDashboardService.summary()
 
-        if (productResult.status === 'fulfilled') {
-          setProductLookup(productResult.value)
-        } else {
+        if (!res.success) {
+          setError(res.message || 'Gagal memuat data dashboard admin')
           setProductLookup({})
-        }
-
-        if (orderResult.status === 'fulfilled') {
-          setOrdersForAnalytics(orderResult.value.allOrders)
-          setRecentOrders(orderResult.value.recent)
-        } else {
           setOrdersForAnalytics([])
           setRecentOrders([])
-        }
-
-        if (pendingClaimResult.status === 'fulfilled') {
-          setPendingClaims(pendingClaimResult.value.rows)
-          setPendingClaimsTotal(pendingClaimResult.value.total)
-        } else {
           setPendingClaims([])
           setPendingClaimsTotal(0)
-        }
-
-        if (monthlyClaimResult.status === 'fulfilled') {
-          setMonthlyClaimsCount(monthlyClaimResult.value)
-        } else {
           setMonthlyClaimsCount(0)
-        }
-
-        if (stockResult.status === 'fulfilled') {
-          setStockSummary(stockResult.value)
-        } else {
           setStockSummary([])
-        }
-
-        if (userResult.status === 'fulfilled') {
-          setActiveUsersTotal(userResult.value)
-        } else {
           setActiveUsersTotal(0)
+          return
         }
 
-        const failedCount = [
-          productResult,
-          orderResult,
-          pendingClaimResult,
-          monthlyClaimResult,
-          stockResult,
-          userResult,
-        ].filter((result) => result.status === 'rejected').length
+        const lookup: ProductLookup = {}
+        res.data.analytics_orders.forEach((order) => {
+          const productID = order.price?.product_id || order.product?.id
+          if (!productID) return
+          const product = order.product || { name: `Produk ${productID.slice(0, 8)}`, icon: '📦' }
+          lookup[productID] = {
+            name: product.name,
+            icon: product.icon || '📦',
+          }
+        })
+        res.data.stock_summary.forEach((stock) => {
+          lookup[stock.product_id] = { name: stock.name, icon: stock.icon || '📦' }
+        })
 
-        if (failedCount > 0) {
-          setError('Sebagian data dashboard gagal dimuat. Coba refresh untuk sinkron ulang.')
-        }
+        setProductLookup(lookup)
+        setOrdersForAnalytics(res.data.analytics_orders)
+        setRecentOrders(res.data.recent_orders)
+        setPendingClaims(res.data.pending_claim_rows)
+        setPendingClaimsTotal(res.data.pending_claims)
+        setMonthlyClaimsCount(res.data.monthly_claims_count)
+        setStockSummary(res.data.stock_summary)
+        setActiveUsersTotal(res.data.active_users_total)
       } catch (err) {
         setError(mapErrorMessage(err, 'Gagal memuat data dashboard admin'))
       } finally {

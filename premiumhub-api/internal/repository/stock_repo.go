@@ -160,3 +160,22 @@ func (r *StockRepo) CountAvailableByProductAndDurations(productID uuid.UUID) ([]
 
 	return rows, nil
 }
+
+type ProductStockSummary struct {
+	ProductID uuid.UUID `json:"product_id"`
+	Name      string    `json:"name"`
+	Icon      string    `json:"icon"`
+	Available int64     `json:"available"`
+}
+
+func (r *StockRepo) AvailableSummaryByProduct() ([]ProductStockSummary, error) {
+	rows := make([]ProductStockSummary, 0)
+	err := applyUsableCredentialScope(r.db.Model(&model.Stock{})).
+		Select("stocks.product_id, products.name, products.icon, COUNT(*) as available").
+		Joins("LEFT JOIN products ON products.id = stocks.product_id").
+		Where("stocks.status = ?", "available").
+		Group("stocks.product_id, products.name, products.icon").
+		Order("available ASC, products.name ASC").
+		Scan(&rows).Error
+	return rows, err
+}

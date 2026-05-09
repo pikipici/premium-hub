@@ -147,7 +147,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	userSidebarMenuSettingHandler := handler.NewUserSidebarMenuSettingHandler(userSidebarMenuSettingSvc)
 	navbarMenuSettingHandler := handler.NewNavbarMenuSettingHandler(navbarMenuSettingSvc)
 	activityHandler := handler.NewActivityHandler(activitySvc)
-	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, notifSvc)
+	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, stockRepo, notifSvc)
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
 
 	api := r.Group("/api/v1")

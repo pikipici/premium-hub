@@ -67,6 +67,29 @@ func (r *OrderRepo) AdminList(status string, page, limit int) ([]model.Order, in
 	return orders, total, err
 }
 
+func (r *OrderRepo) AdminRecent(limit int) ([]model.Order, error) {
+	var orders []model.Order
+	if limit < 1 {
+		limit = 5
+	}
+	err := r.db.Model(&model.Order{}).
+		Preload("User").Preload("Price").
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&orders).Error
+	return orders, err
+}
+
+func (r *OrderRepo) AdminAnalyticsSince(since time.Time) ([]model.Order, error) {
+	var orders []model.Order
+	err := r.db.Model(&model.Order{}).
+		Preload("User").Preload("Price").
+		Where("created_at >= ? OR paid_at >= ?", since, since).
+		Order("created_at DESC").
+		Find(&orders).Error
+	return orders, err
+}
+
 func (r *OrderRepo) StatsByUserIDs(userIDs []uuid.UUID) (map[uuid.UUID]UserOrderStats, error) {
 	statsMap := make(map[uuid.UUID]UserOrderStats)
 	if len(userIDs) == 0 {
