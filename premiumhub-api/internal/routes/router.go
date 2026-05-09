@@ -94,6 +94,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
 	paymentSvc := service.NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, nil)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
+	walletReconSvc := service.NewWalletReconciliationService(walletRepo)
 	paymentSvc.SetWalletService(walletSvc)
 	paymentWebhookSvc := service.NewPaymentWebhookService(orderRepo, sosmedOrderRepo, walletRepo, paymentSvc, sosmedPaymentSvc, walletSvc)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
@@ -127,7 +128,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	productHandler := handler.NewProductHandler(productSvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc, paymentWebhookSvc)
-	walletHandler := handler.NewWalletHandler(walletSvc)
+	walletHandler := handler.NewWalletHandler(walletSvc).SetReconciliationService(walletReconSvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
 	nokosPublicHandler := handler.NewNokosPublicHandler(nokosLandingSvc)
 	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage, cfg)
@@ -481,6 +482,12 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		"/wallet/topups/reconcile",
 		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak reconcile topup. Coba lagi sebentar."),
 		walletHandler.ReconcilePending,
+	)
+	admin.GET("/wallet/reconciliation", walletHandler.AdminReconciliationReport)
+	admin.POST(
+		"/wallet/reconciliation/repair",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak repair wallet. Coba lagi sebentar."),
+		walletHandler.AdminRepairReconciliation,
 	)
 
 	admin.GET("/convert/orders", convertHandler.AdminListOrders)

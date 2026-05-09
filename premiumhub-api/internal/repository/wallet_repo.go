@@ -16,6 +16,10 @@ func NewWalletRepo(db *gorm.DB) *WalletRepo {
 	return &WalletRepo{db: db}
 }
 
+func (r *WalletRepo) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *WalletRepo) CreateTopup(topup *model.WalletTopup) error {
 	return r.db.Create(topup).Error
 }

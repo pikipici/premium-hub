@@ -16,7 +16,10 @@ const ITEMS: Item[] = [
     href: '/admin/order',
     label: 'Order',
     icon: '◉',
-    match: (pathname) => pathname.startsWith('/admin/order') || pathname.startsWith('/admin/sosmed/orders'),
+    match: (pathname) =>
+      pathname.startsWith('/admin/order') ||
+      pathname.startsWith('/admin/sosmed/orders') ||
+      pathname.startsWith('/admin/wallet-reconciliation'),
   },
   { href: '/admin/produk', label: 'Produk', icon: '◈' },
   { href: '/admin/stok', label: 'Stok', icon: '◧' },
