@@ -1198,6 +1198,7 @@ func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *mo
 	providerRes, err := s.japOrderProvider.GetOrderStatus(ctx, order.ProviderOrderID)
 	if err != nil {
 		order.ProviderError = truncateSosmedProviderText(err.Error(), 2000)
+		order.ProviderLastSyncResult = "failed"
 		order.ProviderSyncedAt = &syncedAt
 		if saveErr := s.repo.Update(order); saveErr != nil {
 			return nil, false, errors.New("gagal menyimpan error sync provider")
@@ -1219,6 +1220,7 @@ func (s *SosmedOrderService) syncJAPProviderOrder(ctx context.Context, order *mo
 	}
 	order.ProviderPayload = truncateSosmedProviderText(buildSosmedProviderSyncPayload(order, providerRes), 4000)
 	order.ProviderError = ""
+	order.ProviderLastSyncResult = "synced"
 	order.ProviderSyncedAt = &syncedAt
 	order.OrderStatus = nextOrderStatus
 

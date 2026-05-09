@@ -25,6 +25,7 @@ type SosmedOrderOpsSummary struct {
 	StaleSync              int64 `json:"stale_sync"`
 	MissingProviderOrderID int64 `json:"missing_provider_order_id"`
 	ProviderErrors         int64 `json:"provider_errors"`
+	StuckOver24h           int64 `json:"stuck_over_24h"`
 	StaleSyncMinutes       int   `json:"stale_sync_minutes"`
 }
 
@@ -141,10 +142,12 @@ func (r *SosmedOrderRepo) FindStaleSyncableProviderOrders(providerCode string, s
 		Where("provider_order_id IS NOT NULL AND TRIM(provider_order_id) <> ''").
 		Where("payment_status = ?", "paid").
 		Where("order_status = ?", "processing").
-		Where("(provider_synced_at IS NULL OR provider_synced_at < ?)", staleBefore).
+		Where("(provider_synced_at IS NULL OR provider_synced_at < ? OR provider_status IS NULL OR TRIM(provider_status) = '' OR provider_cancel_status IN ? OR refill_status IN ?)", staleBefore, []string{"requested", "processing"}, []string{"requested", "processing"}).
+		Order("CASE WHEN provider_cancel_status IN ('requested', 'processing') OR refill_status IN ('requested', 'processing') THEN 0 ELSE 1 END ASC").
+		Order("CASE WHEN provider_status IS NULL OR TRIM(provider_status) = '' THEN 0 ELSE 1 END ASC").
 		Order("CASE WHEN provider_synced_at IS NULL THEN 0 ELSE 1 END ASC").
 		Order("provider_synced_at ASC").
-		Order("updated_at ASC")
+		Order("created_at ASC")
 
 	if limit > 0 {
 		q = q.Limit(limit)
@@ -156,6 +159,7 @@ func (r *SosmedOrderRepo) FindStaleSyncableProviderOrders(providerCode string, s
 
 func (r *SosmedOrderRepo) AdminOpsSummary(staleBefore time.Time) (*SosmedOrderOpsSummary, error) {
 	summary := &SosmedOrderOpsSummary{}
+	stuckBefore := time.Now().Add(-24 * time.Hour)
 	count := func(dest *int64, scope func(*gorm.DB) *gorm.DB) error {
 		q := r.db.Model(&model.SosmedOrder{})
 		if scope != nil {
@@ -212,6 +216,11 @@ func (r *SosmedOrderRepo) AdminOpsSummary(staleBefore time.Time) (*SosmedOrderOp
 		}},
 		{&summary.ProviderErrors, func(q *gorm.DB) *gorm.DB {
 			return q.Where("provider_error IS NOT NULL AND provider_error <> ''")
+		}},
+		{&summary.StuckOver24h, func(q *gorm.DB) *gorm.DB {
+			return q.Where("payment_status = ?", "paid").
+				Where("order_status NOT IN ?", []string{"success", "failed", "canceled", "expired"}).
+				Where("created_at < ?", stuckBefore)
 		}},
 	}
 

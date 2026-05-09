@@ -1224,6 +1224,12 @@ func TestSosmedOrderService_AutoSyncStaleProviderOrdersSyncsOnlyStaleProcessingR
 	stale := baseOrder("JAP-STALE")
 	stale.ProviderSyncedAt = &staleSyncedAt
 	neverSynced := baseOrder("JAP-NEVER")
+	emptyProviderStatus := baseOrder("JAP-EMPTY-STATUS")
+	emptyProviderStatus.ProviderStatus = ""
+	emptyProviderStatus.ProviderSyncedAt = &freshSyncedAt
+	activeCancel := baseOrder("JAP-CANCEL-ACTIVE")
+	activeCancel.ProviderCancelStatus = "requested"
+	activeCancel.ProviderSyncedAt = &freshSyncedAt
 	fresh := baseOrder("JAP-FRESH")
 	fresh.ProviderSyncedAt = &freshSyncedAt
 	missingProviderID := baseOrder("")
@@ -1234,7 +1240,7 @@ func TestSosmedOrderService_AutoSyncStaleProviderOrdersSyncsOnlyStaleProcessingR
 	failedOrder.OrderStatus = sosmedOrderStatusFailed
 	failedOrder.ProviderSyncedAt = &staleSyncedAt
 
-	for _, order := range []model.SosmedOrder{stale, neverSynced, fresh, missingProviderID, otherProvider, failedOrder} {
+	for _, order := range []model.SosmedOrder{stale, neverSynced, emptyProviderStatus, activeCancel, fresh, missingProviderID, otherProvider, failedOrder} {
 		row := order
 		if err := db.Create(&row).Error; err != nil {
 			t.Fatalf("create auto-sync order: %v", err)
@@ -1243,8 +1249,10 @@ func TestSosmedOrderService_AutoSyncStaleProviderOrdersSyncsOnlyStaleProcessingR
 
 	fakeJAP := &fakeSosmedJAPOrderProvider{
 		statusByOrderID: map[string]*JAPOrderStatusResponse{
-			"JAP-STALE": {Status: "Completed", StartCount: "111"},
-			"JAP-NEVER": {Status: "In Progress", StartCount: "222"},
+			"JAP-STALE":         {Status: "Completed", StartCount: "111"},
+			"JAP-NEVER":         {Status: "In Progress", StartCount: "222"},
+			"JAP-EMPTY-STATUS":  {Status: "In Progress", StartCount: "333"},
+			"JAP-CANCEL-ACTIVE": {Status: "Canceled", StartCount: "444"},
 		},
 	}
 	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
@@ -1258,11 +1266,11 @@ func TestSosmedOrderService_AutoSyncStaleProviderOrdersSyncsOnlyStaleProcessingR
 	if err != nil {
 		t.Fatalf("auto-sync stale provider orders: %v", err)
 	}
-	if result.Requested != 2 || result.Synced != 2 || result.Updated != 2 || result.Failed != 0 || result.Skipped != 0 {
+	if result.Requested != 4 || result.Synced != 4 || result.Updated != 4 || result.Failed != 0 || result.Skipped != 0 {
 		t.Fatalf("unexpected auto-sync result: %+v", result)
 	}
-	if strings.Join(fakeJAP.statusInputs, ",") != "JAP-NEVER,JAP-STALE" {
-		t.Fatalf("expected only never/stale provider orders synced in oldest order, got %+v", fakeJAP.statusInputs)
+	if strings.Join(fakeJAP.statusInputs, ",") != "JAP-CANCEL-ACTIVE,JAP-EMPTY-STATUS,JAP-NEVER,JAP-STALE" {
+		t.Fatalf("expected active cancel, empty status, never, then stale provider orders, got %+v", fakeJAP.statusInputs)
 	}
 	if len(fakeJAP.inputs) != 0 {
 		t.Fatalf("auto-sync must not submit/retry provider orders, got %d add calls", len(fakeJAP.inputs))
@@ -1285,6 +1293,9 @@ func TestSosmedOrderService_AutoSyncStaleProviderOrdersSyncsOnlyStaleProcessingR
 	}
 	if staleAfter.OrderStatus != sosmedOrderStatusSuccess || staleAfter.ProviderStatus != "Completed" || staleAfter.StartCount != 111 {
 		t.Fatalf("stale order not updated from provider: %+v", staleAfter)
+	}
+	if staleAfter.ProviderLastSyncResult != "synced" {
+		t.Fatalf("expected successful sync result stored, got %q", staleAfter.ProviderLastSyncResult)
 	}
 
 	var systemEvent model.SosmedOrderEvent
@@ -1887,6 +1898,9 @@ func TestSosmedOrderService_AdminSyncProcessingProviderOrders(t *testing.T) {
 	if failedAfter.ProviderSyncedAt == nil {
 		t.Fatalf("failed sync should still store provider_synced_at")
 	}
+	if failedAfter.ProviderLastSyncResult != "failed" {
+		t.Fatalf("expected failed sync result stored, got %q", failedAfter.ProviderLastSyncResult)
+	}
 }
 
 func TestSosmedOrderService_AdminOpsSummary(t *testing.T) {
@@ -1944,6 +1958,7 @@ func TestSosmedOrderService_AdminOpsSummary(t *testing.T) {
 
 	syncableStale := baseOrder(sosmedOrderStatusProcessing)
 	syncableStale.ProviderOrderID = "JAP-STALE"
+	syncableStale.CreatedAt = now.Add(-25 * time.Hour)
 
 	missingProviderID := baseOrder(sosmedOrderStatusProcessing)
 
@@ -1987,8 +2002,8 @@ func TestSosmedOrderService_AdminOpsSummary(t *testing.T) {
 	if summary.Syncable != 2 || summary.StaleSync != 1 || summary.MissingProviderOrderID != 1 {
 		t.Fatalf("unexpected provider ops totals: %+v", summary)
 	}
-	if summary.Retryable != 1 || summary.ProviderErrors != 1 || summary.StaleSyncMinutes != 30 {
-		t.Fatalf("unexpected retry/error totals: %+v", summary)
+	if summary.Retryable != 1 || summary.ProviderErrors != 1 || summary.StaleSyncMinutes != 30 || summary.StuckOver24h != 1 {
+		t.Fatalf("unexpected retry/error/stuck totals: %+v", summary)
 	}
 }
 

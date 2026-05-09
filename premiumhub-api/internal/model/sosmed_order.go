@@ -33,14 +33,15 @@ type SosmedOrder struct {
 	IdempotencyKey         *string `gorm:"size:80;uniqueIndex:idx_sosmed_order_idempotency" json:"-"`
 	IdempotencyRequestHash string  `gorm:"size:128" json:"-"`
 
-	ProviderCode      string     `gorm:"size:32;index" json:"provider_code,omitempty"`
-	ProviderServiceID string     `gorm:"size:64;index" json:"provider_service_id,omitempty"`
-	ProviderOrderID   string     `gorm:"size:80;index" json:"provider_order_id,omitempty"`
-	ProviderStatus    string     `gorm:"size:40;index" json:"provider_status,omitempty"`
-	StartCount        int64      `gorm:"not null;default:0" json:"start_count,omitempty"`
-	ProviderPayload   string     `gorm:"type:text" json:"provider_payload,omitempty"`
-	ProviderError     string     `gorm:"type:text" json:"provider_error,omitempty"`
-	ProviderSyncedAt  *time.Time `json:"provider_synced_at"`
+	ProviderCode           string     `gorm:"size:32;index" json:"provider_code,omitempty"`
+	ProviderServiceID      string     `gorm:"size:64;index" json:"provider_service_id,omitempty"`
+	ProviderOrderID        string     `gorm:"size:80;index" json:"provider_order_id,omitempty"`
+	ProviderStatus         string     `gorm:"size:40;index" json:"provider_status,omitempty"`
+	StartCount             int64      `gorm:"not null;default:0" json:"start_count,omitempty"`
+	ProviderPayload        string     `gorm:"type:text" json:"provider_payload,omitempty"`
+	ProviderError          string     `gorm:"type:text" json:"provider_error,omitempty"`
+	ProviderLastSyncResult string     `gorm:"size:20;index" json:"provider_last_sync_result,omitempty"`
+	ProviderSyncedAt       *time.Time `json:"provider_synced_at"`
 
 	ProviderCancelStatus  string     `gorm:"size:30;index" json:"provider_cancel_status,omitempty"`
 	ProviderCancelPayload string     `gorm:"type:text" json:"provider_cancel_payload,omitempty"`

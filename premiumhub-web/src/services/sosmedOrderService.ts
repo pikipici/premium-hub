@@ -57,6 +57,7 @@ export interface AdminSosmedOpsSummary {
   stale_sync: number
   missing_provider_order_id: number
   provider_errors: number
+  stuck_over_24h: number
   stale_sync_minutes: number
 }
 

@@ -97,7 +97,11 @@ export default function SosmedOrderPage() {
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_LIMIT)), [total])
   const opsRiskCount = opsSummary
-    ? opsSummary.retryable + opsSummary.missing_provider_order_id + opsSummary.stale_sync + opsSummary.provider_errors
+    ? opsSummary.retryable +
+      opsSummary.missing_provider_order_id +
+      opsSummary.stale_sync +
+      opsSummary.provider_errors +
+      opsSummary.stuck_over_24h
     : 0
 
   const loadData = useCallback(async () => {
@@ -344,6 +348,7 @@ export default function SosmedOrderPage() {
                 { label: 'Retryable', value: opsSummary.retryable, hint: 'Gagal tanpa provider ID' },
                 { label: 'Provider Kosong', value: opsSummary.missing_provider_order_id, hint: 'Paid tapi belum submit' },
                 { label: 'Provider Error', value: opsSummary.provider_errors, hint: 'Ada pesan error' },
+                { label: 'Stuck > 24 Jam', value: opsSummary.stuck_over_24h, hint: 'Paid belum terminal' },
               ].map((item) => (
                 <div
                   key={item.label}
@@ -376,7 +381,7 @@ export default function SosmedOrderPage() {
               }}
             >
               {opsRiskCount > 0
-                ? `${opsRiskCount} sinyal perlu dicek: sync provider, retry order gagal, atau submit JAP yang belum punya provider order id.`
+                ? `${opsRiskCount} sinyal perlu dicek: sync provider, provider gagal, order stuck >24 jam, atau submit JAP yang belum punya provider order id.`
                 : 'Operasional sosmed aman: belum ada sinyal order nyangkut dari ringkasan saat ini.'}
             </div>
           </div>
@@ -460,6 +465,7 @@ export default function SosmedOrderPage() {
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                             Sync: {order.provider_synced_at ? formatDate(order.provider_synced_at) : '-'}
+                            {order.provider_last_sync_result ? ` (${order.provider_last_sync_result})` : ''}
                           </div>
                           {order.refill_eligible ? (
                             <div style={{ marginTop: 4, fontSize: 11, color: getAdminRefillStatusLabel(order).color, fontWeight: 600 }}>

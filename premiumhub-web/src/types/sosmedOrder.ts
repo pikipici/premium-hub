@@ -42,6 +42,7 @@ export interface SosmedOrder {
   start_count?: number
   provider_payload?: string
   provider_error?: string
+  provider_last_sync_result?: string
   provider_synced_at?: string
   provider_cancel_status?: 'requested' | 'completed' | 'failed' | string
   provider_cancel_payload?: string
