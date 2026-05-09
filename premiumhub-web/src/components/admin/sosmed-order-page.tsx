@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import {
+  buildMissingProviderOrderIdRecoveryPayload,
+  canRetrySosmedProvider,
+  getMissingProviderOrderIdNotice,
+  isMissingProviderOrderIdRecoveryCandidate,
+} from '@/lib/adminSosmedOrderRecovery'
 import { canAdminTriggerRefill, formatProviderStatus, getAdminRefillStatusLabel, isJAPRefillCooldown } from '@/lib/sosmedRefillUi'
 import { sosmedOrderService, type AdminSosmedOpsSummary } from '@/services/sosmedOrderService'
 import type { SosmedOrder, SosmedOrderDetail } from '@/types/sosmedOrder'
@@ -68,12 +74,7 @@ function nextStatusActions(order: SosmedOrder) {
 }
 
 function canRetryProvider(order: SosmedOrder) {
-  return (
-    order.order_status === 'failed' &&
-    order.payment_method === 'wallet' &&
-    order.provider_code === 'jap' &&
-    !order.provider_order_id
-  )
+  return canRetrySosmedProvider(order)
 }
 
 function canTriggerRefill(order: SosmedOrder) {
@@ -169,6 +170,34 @@ export default function SosmedOrderPage() {
       await loadData()
     } catch {
       setError('Gagal update status order sosmed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const prepareMissingProviderRecovery = async (order: SosmedOrder) => {
+    const confirmed = window.confirm(
+      `${getMissingProviderOrderIdNotice(order)}\n\nLanjut tandai gagal agar tombol Retry Provider muncul?`
+    )
+    if (!confirmed) return
+
+    setSaving(true)
+    setError('')
+
+    try {
+      const res = await sosmedOrderService.adminUpdateStatus(order.id, buildMissingProviderOrderIdRecoveryPayload())
+      if (!res.success) {
+        setError(res.message || 'Gagal menyiapkan recovery provider kosong')
+        return
+      }
+
+      setNotice(`Order ${order.id.slice(0, 8)} siap diretry manual setelah cek supplier`)
+      if (detail?.order.id === order.id && res.data) {
+        setDetail(res.data)
+      }
+      await loadData()
+    } catch {
+      setError('Gagal menyiapkan recovery provider kosong')
     } finally {
       setSaving(false)
     }
@@ -437,6 +466,11 @@ export default function SosmedOrderPage() {
                               Refill: {getAdminRefillStatusLabel(order).text}
                             </div>
                           ) : null}
+                          {isMissingProviderOrderIdRecoveryCandidate(order) ? (
+                            <div style={{ marginTop: 4, fontSize: 11, color: '#9a3412', fontWeight: 700 }}>
+                              Cek JAP dulu, lalu siapkan retry manual
+                            </div>
+                          ) : null}
                           {order.provider_error ? (
                             <div style={{ marginTop: 4, fontSize: 11, color: 'var(--red)' }}>
                               {order.provider_error}
@@ -462,6 +496,16 @@ export default function SosmedOrderPage() {
                                 onClick={() => void syncProvider(order)}
                               >
                                 Sync Provider
+                              </button>
+                            ) : null}
+                            {isMissingProviderOrderIdRecoveryCandidate(order) ? (
+                              <button
+                                className="action-btn"
+                                type="button"
+                                disabled={saving}
+                                onClick={() => void prepareMissingProviderRecovery(order)}
+                              >
+                                Siapkan Retry Aman
                               </button>
                             ) : null}
                             {canTriggerRefill(order) ? (
@@ -656,6 +700,12 @@ export default function SosmedOrderPage() {
                 </div>
               ) : null}
 
+              {isMissingProviderOrderIdRecoveryCandidate(detail.order) ? (
+                <div style={{ padding: 12, borderRadius: 8, background: '#fff7ed', color: '#9a3412', fontSize: 13, fontWeight: 700 }}>
+                  {getMissingProviderOrderIdNotice(detail.order)}
+                </div>
+              ) : null}
+
               {detail.order.provider_error ? (
                 <div style={{ padding: 12, borderRadius: 8, background: '#FFF1F2', color: 'var(--red)', fontSize: 13 }}>
                   {detail.order.provider_error}
@@ -666,6 +716,11 @@ export default function SosmedOrderPage() {
                 {detail.order.provider_code === 'jap' && detail.order.provider_order_id ? (
                   <button className="action-btn" type="button" disabled={saving} onClick={() => void syncProvider(detail.order)}>
                     Sync Provider
+                  </button>
+                ) : null}
+                {isMissingProviderOrderIdRecoveryCandidate(detail.order) ? (
+                  <button className="action-btn" type="button" disabled={saving} onClick={() => void prepareMissingProviderRecovery(detail.order)}>
+                    Siapkan Retry Aman
                   </button>
                 ) : null}
                 {canRetryProvider(detail.order) ? (
