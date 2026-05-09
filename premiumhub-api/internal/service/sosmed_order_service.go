@@ -111,6 +111,8 @@ type AdminUpdateSosmedOrderStatusInput struct {
 
 type AdminSyncSosmedProviderResult struct {
 	Requested int                                 `json:"requested"`
+	Limit     int                                 `json:"limit"`
+	Limited   bool                                `json:"limited"`
 	Synced    int                                 `json:"synced"`
 	Updated   int                                 `json:"updated"`
 	Failed    int                                 `json:"failed"`
@@ -127,6 +129,7 @@ type AdminSyncSosmedProviderResultItem struct {
 	OrderStatus     string    `json:"order_status"`
 	Result          string    `json:"result"`
 	Message         string    `json:"message,omitempty"`
+	Code            string    `json:"code,omitempty"`
 }
 
 type AutoSyncSosmedProviderInput struct {
@@ -2378,7 +2381,10 @@ func (s *SosmedOrderService) AdminSyncProcessingProviderOrders(ctx context.Conte
 		return nil, errors.New("gagal memuat order sync provider")
 	}
 
-	return s.syncSosmedProviderOrderBatch(ctx, orders, "admin", &actorID), nil
+	result := s.syncSosmedProviderOrderBatch(ctx, orders, "admin", &actorID)
+	result.Limit = limit
+	result.Limited = len(orders) == limit
+	return result, nil
 }
 
 func (s *SosmedOrderService) AutoSyncStaleProviderOrders(ctx context.Context, input AutoSyncSosmedProviderInput) (*AdminSyncSosmedProviderResult, error) {
@@ -2411,6 +2417,29 @@ func (s *SosmedOrderService) AutoSyncStaleProviderOrders(ctx context.Context, in
 	return s.syncSosmedProviderOrderBatch(ctx, orders, "system", nil), nil
 }
 
+func classifySosmedProviderSyncError(err error) string {
+	if err == nil {
+		return ""
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	switch {
+	case strings.Contains(message, "provider") && strings.Contains(message, "belum siap"):
+		return "provider_not_configured"
+	case strings.Contains(message, "bukan order supplier"):
+		return "unsupported_provider"
+	case strings.Contains(message, "provider order id"):
+		return "missing_provider_order_id"
+	case strings.Contains(message, "belum dibayar"):
+		return "unpaid_order"
+	case strings.Contains(message, "tidak ditemukan"):
+		return "not_found"
+	case strings.Contains(message, "context canceled") || strings.Contains(message, "deadline exceeded"):
+		return "context_canceled"
+	default:
+		return "provider_sync_failed"
+	}
+}
+
 func (s *SosmedOrderService) syncSosmedProviderOrderBatch(ctx context.Context, orders []model.SosmedOrder, actorType string, actorID *uuid.UUID) *AdminSyncSosmedProviderResult {
 	result := &AdminSyncSosmedProviderResult{
 		Requested: len(orders),
@@ -2428,9 +2457,23 @@ func (s *SosmedOrderService) syncSosmedProviderOrderBatch(ctx context.Context, o
 			OrderStatus:     order.OrderStatus,
 		}
 
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				row.Result = "failed"
+				row.Code = "context_canceled"
+				row.Message = ctx.Err().Error()
+				result.Failed++
+				result.Items = append(result.Items, row)
+				continue
+			default:
+			}
+		}
+
 		stored, changed, syncErr := s.syncJAPProviderOrder(ctx, &order, actorType, actorID)
 		if syncErr != nil {
 			row.Result = "failed"
+			row.Code = classifySosmedProviderSyncError(syncErr)
 			row.Message = syncErr.Error()
 			result.Failed++
 			result.Items = append(result.Items, row)

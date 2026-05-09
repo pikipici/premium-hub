@@ -35,10 +35,13 @@ export interface AdminSyncSosmedProviderResultItem {
   order_status: string
   result: string
   message?: string
+  code?: string
 }
 
 export interface AdminSyncSosmedProviderResult {
   requested: number
+  limit: number
+  limited: boolean
   synced: number
   updated: number
   failed: number

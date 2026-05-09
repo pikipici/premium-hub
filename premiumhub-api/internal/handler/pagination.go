@@ -14,7 +14,7 @@ const (
 	DefaultAuditReportLimit  = 200
 	MaxAuditReportLimit      = 500
 	DefaultBatchActionLimit  = 20
-	MaxBatchActionLimit      = 1000
+	MaxBatchActionLimit      = 100
 )
 
 func parsePageLimit(c *gin.Context, defaultLimit, maxLimit int) (int, int) {

@@ -238,8 +238,15 @@ export default function SosmedOrderPage() {
         return
       }
 
+      const failedPreview = (res.data.items || [])
+        .filter((item) => item.result === 'failed')
+        .slice(0, 3)
+        .map((item) => `${String(item.order_id).slice(0, 8)}: ${item.message || item.code || 'gagal'}`)
+        .join('; ')
+      const limitedText = res.data.limited ? ` Batch dibatasi ${res.data.limit} order; jalankan lagi kalau masih ada antrean.` : ''
+      const failedText = failedPreview ? ` Gagal awal: ${failedPreview}` : ''
       setNotice(
-        `Sync provider selesai: ${res.data.synced} sukses, ${res.data.updated} update status, ${res.data.failed} gagal, ${res.data.skipped} tetap`
+        `Sync provider selesai: ${res.data.synced} sukses, ${res.data.updated} update status, ${res.data.failed} gagal, ${res.data.skipped} tetap.${limitedText}${failedText}`
       )
       await loadData()
     } catch {
