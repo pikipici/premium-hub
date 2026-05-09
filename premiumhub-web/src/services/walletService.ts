@@ -18,8 +18,8 @@ export const walletService = {
     const res = await api.get<ApiResponse<WalletBalance>>('/wallet/balance')
     return {
       balance: res.data.data.balance,
-      total_topup: 0,
-      total_spent: 0,
+      total_topup: res.data.data.total_topup ?? 0,
+      total_spent: res.data.data.total_spent ?? 0,
       updated_at: new Date().toISOString(),
     }
   },

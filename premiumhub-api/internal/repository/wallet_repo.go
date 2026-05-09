@@ -82,6 +82,16 @@ func (r *WalletRepo) ListLedgerByUser(userID uuid.UUID, page, limit int) ([]mode
 	return rows, total, err
 }
 
+func (r *WalletRepo) SumLedgerAmountByUser(userID uuid.UUID, ledgerType string, categories []string) (int64, error) {
+	var total int64
+	q := r.db.Model(&model.WalletLedger{}).Where("user_id = ? AND type = ?", userID, ledgerType)
+	if len(categories) > 0 {
+		q = q.Where("category IN ?", categories)
+	}
+	err := q.Select("COALESCE(SUM(amount), 0)").Scan(&total).Error
+	return total, err
+}
+
 func (r *WalletRepo) FindLedgerByReference(reference string) (*model.WalletLedger, error) {
 	var row model.WalletLedger
 	err := r.db.Where("reference = ?", reference).First(&row).Error

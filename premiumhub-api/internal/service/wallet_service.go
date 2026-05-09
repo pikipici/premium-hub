@@ -50,7 +50,9 @@ func NewWalletService(
 }
 
 type WalletBalanceResponse struct {
-	Balance int64 `json:"balance"`
+	Balance    int64 `json:"balance"`
+	TotalTopup int64 `json:"total_topup"`
+	TotalSpent int64 `json:"total_spent"`
 }
 
 type WalletOrderPaymentResult struct {
@@ -151,7 +153,17 @@ func (s *WalletService) GetBalance(userID uuid.UUID) (*WalletBalanceResponse, er
 	if err != nil {
 		return nil, err
 	}
-	return &WalletBalanceResponse{Balance: user.WalletBalance}, nil
+
+	totalTopup, err := s.walletRepo.SumLedgerAmountByUser(userID, "credit", []string{"topup"})
+	if err != nil {
+		return nil, errors.New("gagal menghitung total topup wallet")
+	}
+	totalSpent, err := s.walletRepo.SumLedgerAmountByUser(userID, "debit", []string{"product_purchase", "sosmed_purchase", "sosmed_bundle_purchase", "5sim_purchase"})
+	if err != nil {
+		return nil, errors.New("gagal menghitung total penggunaan wallet")
+	}
+
+	return &WalletBalanceResponse{Balance: user.WalletBalance, TotalTopup: totalTopup, TotalSpent: totalSpent}, nil
 }
 
 func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID uuid.UUID) (*WalletOrderPaymentResult, error) {
