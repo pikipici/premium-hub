@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type SVGProps } from 'react'
-import { AlertTriangle, CheckCircle, Clock, ShoppingBag } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 
 import WalletCard from '@/components/shared/WalletCard'
 import { formatRupiah } from '@/lib/utils'
@@ -130,7 +130,6 @@ export default function DashboardPage() {
       .finally(() => setWalletLoading(false))
   }, [setWalletBalance])
 
-  const activeOrders = orders.filter((o) => o.order_status === 'active')
   const pendingOrders = orders.filter((o) => o.payment_status === 'pending')
 
   return (
@@ -145,9 +144,8 @@ export default function DashboardPage() {
         onTopUp={() => router.push('/dashboard/wallet')}
       />
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {[
-          { icon: ShoppingBag, label: 'Akun Aktif', value: activeOrders.length, color: '#C5EFD8', iconColor: '#22c55e' },
           { icon: Clock, label: 'Pending', value: pendingOrders.length, color: '#FAE88A', iconColor: '#eab308' },
           { icon: CheckCircle, label: 'Total Order', value: orders.length, color: '#C8E6F5', iconColor: '#3b82f6' },
         ].map((s, i) => (
