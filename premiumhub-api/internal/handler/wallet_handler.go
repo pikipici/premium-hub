@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -173,6 +176,52 @@ func (h *WalletHandler) AdminReconciliationReport(c *gin.Context) {
 		return
 	}
 	response.Success(c, "OK", res)
+}
+
+func (h *WalletHandler) AdminReconciliationExport(c *gin.Context) {
+	if h.reconSvc == nil {
+		response.BadRequest(c, "wallet reconciliation belum siap")
+		return
+	}
+	filter, err := parseWalletReconciliationFilter(c)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	report, err := h.reconSvc.Report(filter)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	_ = writer.Write([]string{"wallet_reconciliation_export", time.Now().Format(time.RFC3339)})
+	_ = writer.Write([]string{"filter_from", report.Filters.From})
+	_ = writer.Write([]string{"filter_to", report.Filters.To})
+	_ = writer.Write([]string{"filter_user_id", report.Filters.UserID})
+	_ = writer.Write([]string{"filter_order_id", report.Filters.OrderID})
+	_ = writer.Write([]string{"filter_limit", strconv.Itoa(report.Filters.Limit)})
+	_ = writer.Write([]string{})
+	_ = writer.Write([]string{"total_issues", strconv.Itoa(report.Summary.TotalIssues)})
+	_ = writer.Write([]string{"paid_missing_debit", strconv.Itoa(report.Summary.PaidMissingDebit)})
+	_ = writer.Write([]string{"terminal_missing_refund", strconv.Itoa(report.Summary.TerminalMissingRefund)})
+	_ = writer.Write([]string{"duplicate_refund", strconv.Itoa(report.Summary.DuplicateRefund)})
+	_ = writer.Write([]string{"payment_order_mismatch", strconv.Itoa(report.Summary.PaymentOrderMismatch)})
+	_ = writer.Write([]string{})
+	_ = writer.Write([]string{"issue_key", "type", "severity", "order_id", "user_id", "payment_status", "order_status", "amount", "expected_ref", "ledger_refs", "repairable", "repair_action", "created_at", "description"})
+	for _, issue := range report.Issues {
+		_ = writer.Write([]string{issue.Key, issue.Type, issue.Severity, issue.OrderID, issue.UserID, issue.PaymentStatus, issue.OrderStatus, strconv.FormatInt(issue.Amount, 10), issue.ExpectedRef, strings.Join(issue.LedgerRefs, ";"), strconv.FormatBool(issue.Repairable), issue.RepairAction, issue.CreatedAt.Format(time.RFC3339), issue.Description})
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		response.BadRequest(c, "gagal membuat export rekonsiliasi wallet")
+		return
+	}
+
+	filename := fmt.Sprintf("wallet-reconciliation-%s.csv", time.Now().Format("20060102-150405"))
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	c.Data(200, "text/csv; charset=utf-8", buf.Bytes())
 }
 
 func (h *WalletHandler) AdminRepairReconciliation(c *gin.Context) {

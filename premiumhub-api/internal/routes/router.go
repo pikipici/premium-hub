@@ -485,6 +485,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		walletHandler.ReconcilePending,
 	)
 	admin.GET("/wallet/reconciliation", walletHandler.AdminReconciliationReport)
+	admin.GET("/wallet/reconciliation/export", walletHandler.AdminReconciliationExport)
 	admin.POST(
 		"/wallet/reconciliation/repair",
 		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak repair wallet. Coba lagi sebentar."),

@@ -67,6 +67,14 @@ export const walletReconciliationService = {
     return data.data
   },
 
+  async exportCsv(filters: WalletReconciliationFilters = {}) {
+    const { data } = await api.get<Blob>('/admin/wallet/reconciliation/export', {
+      params: filters,
+      responseType: 'blob',
+    })
+    return data
+  },
+
   async repair(issueKey: string, action: string) {
     const { data } = await api.post<ApiResponse<WalletReconciliationRepairResult>>(
       '/admin/wallet/reconciliation/repair',

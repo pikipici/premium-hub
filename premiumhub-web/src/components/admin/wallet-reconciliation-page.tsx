@@ -31,6 +31,7 @@ export default function WalletReconciliationPage() {
   const [report, setReport] = useState<WalletReconciliationReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [repairingKey, setRepairingKey] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
 
   const loadReport = useCallback(async (nextFilters = filters) => {
@@ -56,6 +57,26 @@ export default function WalletReconciliationPage() {
 
   const applyFilters = () => {
     void loadReport(filters)
+  }
+
+  const exportEvidence = async () => {
+    setExporting(true)
+    setError('')
+    try {
+      const blob = await walletReconciliationService.exportCsv(filters)
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `wallet-reconciliation-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal export evidence rekonsiliasi')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const repairIssue = async (issue: WalletReconciliationIssue) => {
@@ -85,9 +106,14 @@ export default function WalletReconciliationPage() {
           <h1>Wallet Reconciliation</h1>
           <p>Audit order wallet sosmed: debit hilang, refund hilang/dobel, dan status payment yang tidak sinkron.</p>
         </div>
-        <button type="button" className="primary-btn" onClick={() => void loadReport(filters)} disabled={loading}>
-          {loading ? 'Memuat...' : 'Refresh Report'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="secondary-btn" onClick={() => void exportEvidence()} disabled={loading || exporting}>
+            {exporting ? 'Exporting...' : 'Export Evidence CSV'}
+          </button>
+          <button type="button" className="primary-btn" onClick={() => void loadReport(filters)} disabled={loading}>
+            {loading ? 'Memuat...' : 'Refresh Report'}
+          </button>
+        </div>
       </div>
 
       <div className="filter-card">
