@@ -1159,6 +1159,143 @@ func TestSosmedOrderService_AdminSyncProviderStatus(t *testing.T) {
 	}
 }
 
+func TestSosmedOrderService_AutoSyncStaleProviderOrdersSyncsOnlyStaleProcessingRows(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+	); err != nil {
+		t.Fatalf("migrate auto-sync models: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:       uuid.New(),
+		Name:     "Buyer Auto Sync Sosmed",
+		Email:    "buyer-auto-sync-sosmed@example.com",
+		Password: "hashed",
+		Role:     "user",
+		IsActive: true,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	serviceItem := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-auto-sync",
+		Title:             "Instagram Auto Sync",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     19000,
+		IsActive:          true,
+	}
+	if err := db.Create(serviceItem).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	now := time.Now()
+	staleSyncedAt := now.Add(-2 * time.Hour)
+	freshSyncedAt := now.Add(-5 * time.Minute)
+	baseOrder := func(providerOrderID string) model.SosmedOrder {
+		return model.SosmedOrder{
+			ID:                uuid.New(),
+			UserID:            buyer.ID,
+			ServiceID:         serviceItem.ID,
+			ServiceCode:       serviceItem.Code,
+			ServiceTitle:      serviceItem.Title,
+			TargetLink:        "https://instagram.com/auto-sync",
+			Quantity:          1,
+			UnitPrice:         19000,
+			TotalPrice:        19000,
+			PaymentMethod:     "wallet",
+			PaymentStatus:     "paid",
+			OrderStatus:       sosmedOrderStatusProcessing,
+			ProviderCode:      "jap",
+			ProviderServiceID: "6331",
+			ProviderOrderID:   providerOrderID,
+			ProviderStatus:    "In Progress",
+		}
+	}
+
+	stale := baseOrder("JAP-STALE")
+	stale.ProviderSyncedAt = &staleSyncedAt
+	neverSynced := baseOrder("JAP-NEVER")
+	fresh := baseOrder("JAP-FRESH")
+	fresh.ProviderSyncedAt = &freshSyncedAt
+	missingProviderID := baseOrder("")
+	otherProvider := baseOrder("OTHER-STALE")
+	otherProvider.ProviderCode = "other"
+	otherProvider.ProviderSyncedAt = &staleSyncedAt
+	failedOrder := baseOrder("JAP-FAILED")
+	failedOrder.OrderStatus = sosmedOrderStatusFailed
+	failedOrder.ProviderSyncedAt = &staleSyncedAt
+
+	for _, order := range []model.SosmedOrder{stale, neverSynced, fresh, missingProviderID, otherProvider, failedOrder} {
+		row := order
+		if err := db.Create(&row).Error; err != nil {
+			t.Fatalf("create auto-sync order: %v", err)
+		}
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{
+		statusByOrderID: map[string]*JAPOrderStatusResponse{
+			"JAP-STALE": {Status: "Completed", StartCount: "111"},
+			"JAP-NEVER": {Status: "In Progress", StartCount: "222"},
+		},
+	}
+	orderSvc := NewSosmedOrderService(repository.NewSosmedOrderRepo(db), repository.NewSosmedServiceRepo(db), nil).
+		SetJAPOrderProvider(fakeJAP)
+
+	result, err := orderSvc.AutoSyncStaleProviderOrders(context.Background(), AutoSyncSosmedProviderInput{
+		ProviderCode: "jap",
+		StaleAfter:   30 * time.Minute,
+		Limit:        10,
+	})
+	if err != nil {
+		t.Fatalf("auto-sync stale provider orders: %v", err)
+	}
+	if result.Requested != 2 || result.Synced != 2 || result.Updated != 2 || result.Failed != 0 || result.Skipped != 0 {
+		t.Fatalf("unexpected auto-sync result: %+v", result)
+	}
+	if strings.Join(fakeJAP.statusInputs, ",") != "JAP-NEVER,JAP-STALE" {
+		t.Fatalf("expected only never/stale provider orders synced in oldest order, got %+v", fakeJAP.statusInputs)
+	}
+	if len(fakeJAP.inputs) != 0 {
+		t.Fatalf("auto-sync must not submit/retry provider orders, got %d add calls", len(fakeJAP.inputs))
+	}
+	if len(fakeJAP.refillInputs) != 0 {
+		t.Fatalf("auto-sync must not request refills, got %d refill calls", len(fakeJAP.refillInputs))
+	}
+
+	var freshAfter model.SosmedOrder
+	if err := db.First(&freshAfter, "id = ?", fresh.ID).Error; err != nil {
+		t.Fatalf("load fresh order: %v", err)
+	}
+	if !freshAfter.ProviderSyncedAt.Equal(freshSyncedAt) {
+		t.Fatalf("fresh order should not be auto-synced, got synced_at=%v want %v", freshAfter.ProviderSyncedAt, freshSyncedAt)
+	}
+
+	var staleAfter model.SosmedOrder
+	if err := db.First(&staleAfter, "id = ?", stale.ID).Error; err != nil {
+		t.Fatalf("load stale order: %v", err)
+	}
+	if staleAfter.OrderStatus != sosmedOrderStatusSuccess || staleAfter.ProviderStatus != "Completed" || staleAfter.StartCount != 111 {
+		t.Fatalf("stale order not updated from provider: %+v", staleAfter)
+	}
+
+	var systemEvent model.SosmedOrderEvent
+	if err := db.First(&systemEvent, "order_id = ?", stale.ID).Error; err != nil {
+		t.Fatalf("load system event: %v", err)
+	}
+	if systemEvent.ActorType != "system" || systemEvent.ActorID != nil {
+		t.Fatalf("expected system actor event without actor id, got actor_type=%q actor_id=%v", systemEvent.ActorType, systemEvent.ActorID)
+	}
+}
+
 func TestSosmedOrderService_ListByUserSyncsCanceledJAPProviderOrder(t *testing.T) {
 	db := setupCoreDB(t)
 	if err := db.AutoMigrate(

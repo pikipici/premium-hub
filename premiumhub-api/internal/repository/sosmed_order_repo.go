@@ -120,9 +120,30 @@ func (r *SosmedOrderRepo) FindSyncableProviderOrders(providerCode string, limit 
 
 	q := r.db.Model(&model.SosmedOrder{}).
 		Where("provider_code = ?", strings.TrimSpace(providerCode)).
-		Where("provider_order_id IS NOT NULL AND provider_order_id <> ''").
+		Where("provider_order_id IS NOT NULL AND TRIM(provider_order_id) <> ''").
 		Where("payment_status = ?", "paid").
 		Where("(order_status = ? OR refill_status IN ?)", "processing", []string{"requested", "processing"}).
+		Order("updated_at ASC")
+
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+
+	err := q.Find(&orders).Error
+	return orders, err
+}
+
+func (r *SosmedOrderRepo) FindStaleSyncableProviderOrders(providerCode string, staleBefore time.Time, limit int) ([]model.SosmedOrder, error) {
+	var orders []model.SosmedOrder
+
+	q := r.db.Model(&model.SosmedOrder{}).
+		Where("provider_code = ?", strings.TrimSpace(providerCode)).
+		Where("provider_order_id IS NOT NULL AND TRIM(provider_order_id) <> ''").
+		Where("payment_status = ?", "paid").
+		Where("order_status = ?", "processing").
+		Where("(provider_synced_at IS NULL OR provider_synced_at < ?)", staleBefore).
+		Order("CASE WHEN provider_synced_at IS NULL THEN 0 ELSE 1 END ASC").
+		Order("provider_synced_at ASC").
 		Order("updated_at ASC")
 
 	if limit > 0 {

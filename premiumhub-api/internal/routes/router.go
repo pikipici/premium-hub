@@ -107,6 +107,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
 	service.StartWalletTopupReconcileWorker(cfg, walletSvc)
 	service.StartNokosLandingSummaryWorker(cfg, nokosLandingSvc)
+	service.StartSosmedProviderSyncWorker(cfg, sosmedOrderSvc)
 
 	convertProofStorage, err := storage.NewConvertProofStorage(cfg)
 	if err != nil {

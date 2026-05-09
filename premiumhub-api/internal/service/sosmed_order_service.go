@@ -129,6 +129,12 @@ type AdminSyncSosmedProviderResultItem struct {
 	Message         string    `json:"message,omitempty"`
 }
 
+type AutoSyncSosmedProviderInput struct {
+	ProviderCode string
+	StaleAfter   time.Duration
+	Limit        int
+}
+
 type SosmedOrderDetail struct {
 	Order  *model.SosmedOrder       `json:"order"`
 	Events []model.SosmedOrderEvent `json:"events"`
@@ -2370,6 +2376,40 @@ func (s *SosmedOrderService) AdminSyncProcessingProviderOrders(ctx context.Conte
 		return nil, errors.New("gagal memuat order sync provider")
 	}
 
+	return s.syncSosmedProviderOrderBatch(ctx, orders, "admin", &actorID), nil
+}
+
+func (s *SosmedOrderService) AutoSyncStaleProviderOrders(ctx context.Context, input AutoSyncSosmedProviderInput) (*AdminSyncSosmedProviderResult, error) {
+	providerCode := strings.ToLower(strings.TrimSpace(input.ProviderCode))
+	if providerCode == "" {
+		providerCode = "jap"
+	}
+	if providerCode != "jap" {
+		return nil, errors.New("auto-sync provider saat ini hanya mendukung JAP")
+	}
+
+	staleAfter := input.StaleAfter
+	if staleAfter <= 0 {
+		staleAfter = time.Duration(defaultSosmedOpsStaleSyncMinutes) * time.Minute
+	}
+	staleAfter = clampSosmedProviderSyncWorkerDuration(staleAfter, sosmedProviderSyncWorkerMinStaleAfter, sosmedProviderSyncWorkerMaxStaleAfter)
+
+	limit := input.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	limit = clampSosmedProviderSyncWorkerInt(limit, sosmedProviderSyncWorkerMinBatchLimit, sosmedProviderSyncWorkerMaxBatchLimit)
+
+	staleBefore := time.Now().Add(-staleAfter)
+	orders, err := s.repo.FindStaleSyncableProviderOrders(providerCode, staleBefore, limit)
+	if err != nil {
+		return nil, errors.New("gagal memuat order auto-sync provider")
+	}
+
+	return s.syncSosmedProviderOrderBatch(ctx, orders, "system", nil), nil
+}
+
+func (s *SosmedOrderService) syncSosmedProviderOrderBatch(ctx context.Context, orders []model.SosmedOrder, actorType string, actorID *uuid.UUID) *AdminSyncSosmedProviderResult {
 	result := &AdminSyncSosmedProviderResult{
 		Requested: len(orders),
 		Items:     make([]AdminSyncSosmedProviderResultItem, 0, len(orders)),
@@ -2386,7 +2426,7 @@ func (s *SosmedOrderService) AdminSyncProcessingProviderOrders(ctx context.Conte
 			OrderStatus:     order.OrderStatus,
 		}
 
-		stored, changed, syncErr := s.syncJAPProviderOrder(ctx, &order, "admin", &actorID)
+		stored, changed, syncErr := s.syncJAPProviderOrder(ctx, &order, actorType, actorID)
 		if syncErr != nil {
 			row.Result = "failed"
 			row.Message = syncErr.Error()
@@ -2408,7 +2448,7 @@ func (s *SosmedOrderService) AdminSyncProcessingProviderOrders(ctx context.Conte
 		result.Items = append(result.Items, row)
 	}
 
-	return result, nil
+	return result
 }
 
 type AdminRetrySosmedProviderInput struct {

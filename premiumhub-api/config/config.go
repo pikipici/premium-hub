@@ -56,6 +56,9 @@ type Config struct {
 	ConvertProofR2UploadTimeout                                                 string
 	SosmedResellerFXMode, SosmedResellerFXFixedRate                             string
 	SosmedResellerFXLiveURL, SosmedResellerFXLiveTimeout                        string
+	SosmedProviderSyncWorkerEnabled                                             bool
+	SosmedProviderSyncWorkerInterval, SosmedProviderSyncWorkerBatchLimit        string
+	SosmedProviderSyncWorkerStaleAfter, SosmedProviderSyncWorkerTimeout         string
 }
 
 func Load() *Config {
@@ -175,6 +178,11 @@ func Load() *Config {
 		SosmedResellerFXFixedRate:            e("SOSMED_RESELLER_FX_FIXED_RATE", "17000"),
 		SosmedResellerFXLiveURL:              e("SOSMED_RESELLER_FX_LIVE_URL", "https://open.er-api.com/v6/latest/USD"),
 		SosmedResellerFXLiveTimeout:          e("SOSMED_RESELLER_FX_LIVE_TIMEOUT", "8s"),
+		SosmedProviderSyncWorkerEnabled:      eb("SOSMED_PROVIDER_SYNC_WORKER_ENABLED", true),
+		SosmedProviderSyncWorkerInterval:     e("SOSMED_PROVIDER_SYNC_WORKER_INTERVAL", "1m"),
+		SosmedProviderSyncWorkerBatchLimit:   e("SOSMED_PROVIDER_SYNC_WORKER_BATCH_LIMIT", "20"),
+		SosmedProviderSyncWorkerStaleAfter:   e("SOSMED_PROVIDER_SYNC_WORKER_STALE_AFTER", "30m"),
+		SosmedProviderSyncWorkerTimeout:      e("SOSMED_PROVIDER_SYNC_WORKER_TIMEOUT", "45s"),
 	}
 }
 
