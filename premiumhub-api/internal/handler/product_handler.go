@@ -70,6 +70,16 @@ func (h *ProductHandler) AdminList(c *gin.Context) {
 	})
 }
 
+func (h *ProductHandler) AdminLookup(c *gin.Context) {
+	_, limit := parsePageLimit(c, 50, 200)
+	products, err := h.productSvc.AdminLookup(c.Query("q"), limit)
+	if err != nil {
+		response.InternalError(c)
+		return
+	}
+	response.Success(c, "OK", products)
+}
+
 func (h *ProductHandler) Create(c *gin.Context) {
 	var input service.CreateProductInput
 	if err := c.ShouldBindJSON(&input); err != nil {

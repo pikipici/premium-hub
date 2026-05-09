@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"strings"
+
 	"premiumhub-api/internal/model"
 
 	"github.com/google/uuid"
@@ -92,6 +94,24 @@ func (r *ProductRepo) AdminList(page, limit int) ([]model.Product, int64, error)
 		Order("sort_priority DESC, created_at DESC").
 		Find(&products).Error
 	return products, total, err
+}
+
+func (r *ProductRepo) AdminLookup(search string, limit int) ([]model.Product, error) {
+	var products []model.Product
+	q := r.db.Model(&model.Product{})
+	if keyword := strings.TrimSpace(search); keyword != "" {
+		like := "%" + strings.ToLower(keyword) + "%"
+		q = q.Where("LOWER(name) LIKE ? OR LOWER(slug) LIKE ? OR LOWER(category) LIKE ?", like, like, like)
+	}
+	if limit < 1 {
+		limit = 50
+	}
+	err := q.Select("id, name, slug, category, icon, icon_image_url, is_active, sort_priority, created_at, updated_at").
+		Preload("Prices").
+		Order("sort_priority DESC, created_at DESC").
+		Limit(limit).
+		Find(&products).Error
+	return products, err
 }
 
 func (r *ProductRepo) FindPriceByID(id uuid.UUID) (*model.ProductPrice, error) {

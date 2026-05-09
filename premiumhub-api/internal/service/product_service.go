@@ -176,6 +176,16 @@ func (s *ProductService) GetBySlug(slug string) (*model.Product, error) {
 	return product, nil
 }
 
+func (s *ProductService) AdminLookup(search string, limit int) ([]model.Product, error) {
+	if limit < 1 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	return s.productRepo.AdminLookup(search, limit)
+}
+
 type CreateProductInput struct {
 	Name               string                    `json:"name" binding:"required"`
 	Slug               string                    `json:"slug"`

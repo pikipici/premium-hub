@@ -371,6 +371,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	)
 
 	admin.GET("/products", productHandler.AdminList)
+	admin.GET("/products/lookup", productHandler.AdminLookup)
 	admin.POST("/products", productHandler.Create)
 	admin.PUT("/products/:id", productHandler.Update)
 	admin.POST("/products/:id/assets", productHandler.UploadAsset)

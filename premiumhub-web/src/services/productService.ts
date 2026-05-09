@@ -70,6 +70,11 @@ export const productService = {
     return res.data
   },
 
+  adminLookup: async (params?: { q?: string; limit?: number }) => {
+    const res = await api.get<ApiResponse<Product[]>>('/admin/products/lookup', { params })
+    return res.data
+  },
+
   adminCreate: async (data: AdminProductPayload) => {
     const res = await api.post<ApiResponse<Product>>('/admin/products', data)
     return res.data

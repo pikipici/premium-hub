@@ -367,7 +367,7 @@ export default function StokPage() {
 
   const loadProducts = useCallback(async () => {
     try {
-      const res = await productService.adminList({ page: 1, limit: LOOKUP_PRELOAD_LIMIT })
+      const res = await productService.adminLookup({ limit: LOOKUP_PRELOAD_LIMIT })
       if (!res.success) return
 
       setProducts(res.data)
