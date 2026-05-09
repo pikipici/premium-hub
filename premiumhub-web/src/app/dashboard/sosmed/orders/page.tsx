@@ -557,6 +557,12 @@ export default function DashboardSosmedOrdersPage() {
 
                     <div className="mt-4 flex flex-wrap gap-2 lg:justify-end">
                       <Link
+                        href={`/dashboard/sosmed/orders/${order.id}`}
+                        className="rounded-xl border border-[#FFB29F] bg-white px-3 py-2 text-[11px] font-black text-[#FF5733] hover:bg-[#FFF3EF]"
+                      >
+                        Detail Timeline
+                      </Link>
+                      <Link
                         href="/product/sosmed"
                         className="rounded-xl border border-[#DDD] bg-white px-3 py-2 text-[11px] font-black text-[#141414] hover:bg-[#F7F7F5]"
                       >
