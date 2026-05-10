@@ -153,62 +153,80 @@ function PlatformBrandIcon({ platformIcon, className }: { platformIcon: SosmedPl
   }
 }
 
+function sortRecommendedFirst<T extends { isRecommended: boolean }>(items: T[]) {
+  return [...items].sort((a, b) => Number(b.isRecommended) - Number(a.isRecommended))
+}
 
 function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
   const checkoutHref = bundle.variantKey
     ? `/product/sosmed/checkout?bundle=${encodeURIComponent(bundle.bundleKey)}&variant=${encodeURIComponent(bundle.variantKey)}`
     : '/product/sosmed'
   const canCheckoutBundle = Boolean(bundle.variantKey)
+  const mobileTitleMatch = bundle.buyerTitle.match(/^(.*?)\s*\(([^)]+)\)$/)
+  const mobileTitle = mobileTitleMatch?.[1] ?? bundle.buyerTitle
+  const mobileLevel = mobileTitleMatch?.[2]
 
   return (
     <article
       data-anime="sosmed-card"
       className={`group relative flex h-full flex-col overflow-hidden rounded-3xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
         bundle.isRecommended
-          ? 'border-[#FF5733] bg-gradient-to-b from-[#FFF8F5] to-white ring-4 ring-[#FFD5C8]/30'
+          ? 'border-[#FF5733] bg-gradient-to-b from-[#FFF8F5] to-white ring-2 ring-[#FFD5C8]/25 sm:ring-4 sm:ring-[#FFD5C8]/30'
           : 'border-[#EAEAEA] bg-white hover:border-[#FF9B80]/50'
       }`}
     >
       {bundle.isRecommended && (
-        <div className="absolute top-0 z-10 w-full bg-gradient-to-r from-[#FF5733] to-[#FF8C33] py-1 text-center text-[10px] font-black uppercase tracking-widest text-white shadow-sm">
+        <div className="absolute top-0 z-10 hidden w-full bg-gradient-to-r from-[#FF5733] to-[#FF8C33] py-1 text-center text-[10px] font-black uppercase tracking-widest text-white shadow-sm sm:block">
           Paket Paling Direkomendasikan
         </div>
       )}
 
-      <div className={`flex flex-col flex-grow p-6 ${bundle.isRecommended ? 'pt-8' : ''}`}>
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${bundle.tone}`}>
-            <PlatformBrandIcon platformIcon={bundle.platformIcon} className="h-6 w-6 text-[#141414]" />
+      <div className={`flex flex-col flex-grow p-3 sm:p-6 ${bundle.isRecommended ? 'sm:pt-8' : ''}`}>
+        <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
+          <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${bundle.tone}`}>
+            <PlatformBrandIcon platformIcon={bundle.platformIcon} className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
           </div>
           <div className="flex flex-col items-end gap-1">
-            <span className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-wider ${
-              bundle.isRecommended ? 'bg-[#FF5733] text-white shadow-sm' : 'border border-[#EBEBEB] bg-gray-50 text-gray-500'
-            }`}>
-              {bundle.platform}
-            </span>
-            {!bundle.isRecommended && (
-              <span className="rounded-full bg-[#FFF3EF] px-2 py-0.5 text-[9px] font-bold text-[#FF5733]">
-                {bundle.badge}
+            {bundle.isRecommended ? (
+              <span className="rounded-full bg-[#FF5733] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white shadow-sm sm:px-3 sm:py-1 sm:text-[9px]">
+                Rekomendasi
               </span>
+            ) : (
+              <>
+                <span className="rounded-full border border-[#EBEBEB] bg-gray-50 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-gray-500 sm:px-3 sm:py-1 sm:text-[9px]">
+                  {bundle.platform}
+                </span>
+                <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[8px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[9px]">
+                  {bundle.badge}
+                </span>
+              </>
             )}
           </div>
         </div>
 
         <div>
-          <h2 className="text-[19px] font-extrabold leading-tight text-[#141414] group-hover:text-[#FF5733] transition-colors">{bundle.buyerTitle}</h2>
-          <p className="mt-2.5 text-[13px] leading-relaxed text-[#666] line-clamp-2">
+          <h2 className="line-clamp-2 text-[13px] font-extrabold leading-tight text-[#141414] transition-colors group-hover:text-[#FF5733] sm:text-[19px]">
+            <span className="sm:hidden">{mobileTitle}</span>
+            <span className="hidden sm:inline">{bundle.buyerTitle}</span>
+          </h2>
+          {mobileLevel && (
+            <span className="mt-1 inline-flex rounded-full bg-[#FFF3EF] px-2 py-0.5 text-[8px] font-bold text-[#FF5733] sm:hidden">
+              {mobileLevel}
+            </span>
+          )}
+          <p className="mt-1 line-clamp-1 text-[10px] leading-snug text-[#666] sm:mt-2.5 sm:line-clamp-2 sm:text-[13px] sm:leading-relaxed">
             {bundle.bestFor}
           </p>
         </div>
 
-        <div className="mt-6 mb-7">
+        <div className="mb-2 mt-2 sm:mb-7 sm:mt-6">
           <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-black text-[#141414] tracking-tight">{bundle.priceLabel}</span>
+            <span className="text-[17px] font-black tracking-tight text-[#141414] sm:text-3xl">{bundle.priceLabel}</span>
           </div>
-          <span className="text-[11px] font-semibold text-[#888]">{bundle.packageLabel}</span>
+          <span className="line-clamp-1 text-[9px] font-semibold text-[#888] sm:text-[11px]">{bundle.packageLabel}</span>
         </div>
 
-        <div className="space-y-3.5 flex-grow">
+        <div className="hidden flex-grow space-y-3.5 sm:block">
           {bundle.benefits.map((benefit) => (
             <div key={`${bundle.key}-${benefit}`} className="flex items-start gap-3">
               <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E8F8EC]">
@@ -219,11 +237,11 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
           ))}
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-1.5 pt-5 border-t border-dashed border-gray-200">
+        <div className="mt-3 hidden flex-wrap gap-1 border-t border-dashed border-gray-200 pt-3 sm:mt-6 sm:flex sm:gap-1.5 sm:pt-5">
           {bundle.trustBadges.map((item) => (
             <span
               key={`${bundle.key}-${item}`}
-              className="rounded-lg bg-[#F8F8F8] px-2.5 py-1 text-[10px] font-bold text-[#777]"
+              className="rounded-md bg-[#F8F8F8] px-1.5 py-0.5 text-[8px] font-bold text-[#777] sm:rounded-lg sm:px-2.5 sm:py-1 sm:text-[10px]"
             >
               {item}
             </span>
@@ -231,11 +249,11 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-0 border-t border-gray-100 bg-[#FAFAFA]">
+      <div className="border-t border-gray-100 bg-[#FAFAFA] sm:grid sm:grid-cols-2 sm:gap-0">
         <Link
           href={checkoutHref}
           aria-disabled={!canCheckoutBundle}
-          className={`inline-flex h-14 items-center justify-center text-[12px] font-bold transition ${
+          className={`hidden h-14 items-center justify-center px-1 text-center text-[12px] font-bold leading-tight transition sm:inline-flex ${
             canCheckoutBundle ? 'text-[#666] hover:bg-gray-100 hover:text-[#141414]' : 'pointer-events-none text-[#AAA]'
           }`}
         >
@@ -244,7 +262,7 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
         <Link
           href={checkoutHref}
           aria-disabled={!canCheckoutBundle}
-          className={`inline-flex h-14 items-center justify-center gap-1.5 text-[12px] font-extrabold transition ${
+          className={`inline-flex h-9 w-full items-center justify-center gap-1 px-1 text-center text-[10px] font-extrabold leading-tight transition sm:h-14 sm:gap-1.5 sm:text-[12px] ${
             !canCheckoutBundle
               ? 'pointer-events-none bg-gray-200 text-gray-500'
               : bundle.isRecommended
@@ -252,7 +270,7 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
                 : 'bg-[#141414] text-white hover:bg-[#333]'
           }`}
         >
-          {canCheckoutBundle ? 'Pilih Paket' : 'Checkout Segera Hadir'} <ArrowRight className="h-3.5 w-3.5" />
+          {canCheckoutBundle ? 'Pilih Paket' : 'Segera Hadir'} <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
         </Link>
       </div>
     </article>
@@ -304,8 +322,8 @@ export default function ProductSosmedLandingPage() {
     }
   }, [])
 
-  const cards = useMemo(() => buildSosmedServiceCards(services), [services])
-  const bundleCards = useMemo(() => buildSosmedBundleProductCards(bundlePackages), [bundlePackages])
+  const cards = useMemo(() => sortRecommendedFirst(buildSosmedServiceCards(services)), [services])
+  const bundleCards = useMemo(() => sortRecommendedFirst(buildSosmedBundleProductCards(bundlePackages)), [bundlePackages])
   const platforms = useMemo(() => {
     const unique = Array.from(new Set(cards.map(c => c.platform)))
     return ['Semua', ...unique.sort()]
@@ -363,19 +381,25 @@ export default function ProductSosmedLandingPage() {
               Pilih product sosmed yang tersedia
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-[#666] md:text-base">
-              Semua harga ditulis per paket ±1.000. Pilih jumlah paket di checkout, pastikan akun/link public, lalu sistem mulai proses tanpa minta password.
+              Naikkan performa akun sosmed kamu dengan paket aman, cepat diproses, dan tanpa perlu password.
             </p>
           </header>
 
-          <div className="mb-6 grid gap-2 rounded-2xl border border-[#FFE2CF] bg-white p-3 text-xs shadow-sm sm:grid-cols-3">
-            <span data-anime="sosmed-trust-badge" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F2FCEB] px-3 py-2 font-semibold text-[#2F6B1A]">
-              <ShieldCheck className="h-4 w-4" /> Tanpa perlu password
+          <div className="mb-5 flex flex-wrap justify-center gap-1.5 rounded-2xl border border-[#FFE2CF]/70 bg-white/70 p-2 text-[10px] shadow-sm sm:mb-6 sm:grid sm:grid-cols-3 sm:gap-2 sm:bg-white sm:p-3 sm:text-xs">
+            <span data-anime="sosmed-trust-badge" className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#F2FCEB] px-2.5 py-1.5 font-semibold text-[#2F6B1A] sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2">
+              <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="sm:hidden">Tanpa password</span>
+              <span className="hidden sm:inline">Tanpa perlu password</span>
             </span>
-            <span data-anime="sosmed-trust-badge" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#EDF4FF] px-3 py-2 font-semibold text-[#1E4F9B]">
-              <Clock3 className="h-4 w-4" /> Mulai diproses cepat
+            <span data-anime="sosmed-trust-badge" className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#EDF4FF] px-2.5 py-1.5 font-semibold text-[#1E4F9B] sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2">
+              <Clock3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="sm:hidden">Proses cepat</span>
+              <span className="hidden sm:inline">Mulai diproses cepat</span>
             </span>
-            <span data-anime="sosmed-trust-badge" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFF3EA] px-3 py-2 font-semibold text-[#9A4B16]">
-              <Sparkles className="h-4 w-4" /> Garansi jelas kalau tersedia
+            <span data-anime="sosmed-trust-badge" className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#FFF3EA] px-2.5 py-1.5 font-semibold text-[#9A4B16] sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2">
+              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="sm:hidden">Garansi tersedia</span>
+              <span className="hidden sm:inline">Garansi jelas kalau tersedia</span>
             </span>
           </div>
 
@@ -435,7 +459,7 @@ export default function ProductSosmedLandingPage() {
                   ))}
                 </div>
               </div>
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 md:gap-5 xl:grid-cols-3">
               {paginatedCards.map((service) => {
               const checkoutHref = `/product/sosmed/checkout?service=${encodeURIComponent(service.code)}`
               const ServiceIcon = iconForPlatform(service.platformIcon)
@@ -457,19 +481,19 @@ export default function ProductSosmedLandingPage() {
                     </div>
                   )}
 
-                  <div className={`flex flex-col flex-grow p-6 ${isRecommended ? 'pt-8' : ''}`}>
-                    <div className="mb-5 flex items-start justify-between gap-3">
-                      <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${service.tone}`}>
-                        <ServiceIcon className="h-6 w-6 text-[#141414]" />
+                  <div className={`flex flex-col flex-grow p-3 sm:p-6 ${isRecommended ? 'pt-7 sm:pt-8' : ''}`}>
+                    <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
+                      <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${service.tone}`}>
+                        <ServiceIcon className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-wider ${
+                        <span className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider sm:px-3 sm:py-1 sm:text-[9px] ${
                           isRecommended ? 'bg-[#FF5733] text-white shadow-sm' : 'border border-[#EBEBEB] bg-gray-50 text-gray-500'
                         }`}>
                           {service.platform}
                         </span>
                         {!isRecommended && (
-                          <span className="rounded-full bg-[#FFF3EF] px-2 py-0.5 text-[9px] font-bold text-[#FF5733]">
+                          <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[8px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[9px]">
                             {service.badge}
                           </span>
                         )}
@@ -477,20 +501,20 @@ export default function ProductSosmedLandingPage() {
                     </div>
 
                     <div>
-                      <h2 className="text-[19px] font-extrabold leading-tight text-[#141414] group-hover:text-[#FF5733] transition-colors">{service.buyerTitle}</h2>
-                      <p className="mt-2.5 text-[13px] leading-relaxed text-[#666] line-clamp-2">
+                      <h2 className="line-clamp-2 text-[13px] font-extrabold leading-tight text-[#141414] transition-colors group-hover:text-[#FF5733] sm:text-[19px]">{service.buyerTitle}</h2>
+                      <p className="mt-1 line-clamp-1 text-[10px] leading-snug text-[#666] sm:mt-2.5 sm:line-clamp-2 sm:text-[13px] sm:leading-relaxed">
                         {service.bestFor}
                       </p>
                     </div>
 
-                    <div className="mt-6 mb-7">
+                    <div className="mb-2 mt-2 sm:mb-7 sm:mt-6">
                       <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-black text-[#141414] tracking-tight">{service.priceLabel}</span>
+                        <span className="text-[17px] font-black tracking-tight text-[#141414] sm:text-3xl">{service.priceLabel}</span>
                       </div>
-                      <span className="text-[11px] font-semibold text-[#888]">{service.packageLabel}</span>
+                      <span className="line-clamp-1 text-[9px] font-semibold text-[#888] sm:text-[11px]">{service.packageLabel}</span>
                     </div>
 
-                    <div className="space-y-3.5 flex-grow">
+                    <div className="hidden flex-grow space-y-3.5 sm:block">
                       {service.benefits.map((benefit) => (
                         <div key={`${service.key}-${benefit}`} className="flex items-start gap-3">
                           <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E8F8EC]">
@@ -501,11 +525,11 @@ export default function ProductSosmedLandingPage() {
                       ))}
                     </div>
 
-                    <div className="mt-6 flex flex-wrap gap-1.5 pt-5 border-t border-dashed border-gray-200">
+                    <div className="mt-3 hidden flex-wrap gap-1 border-t border-dashed border-gray-200 pt-3 sm:mt-6 sm:flex sm:gap-1.5 sm:pt-5">
                       {service.trustBadges.map((item) => (
                         <span
                           key={`${service.key}-${item}`}
-                          className="rounded-lg bg-[#F8F8F8] px-2.5 py-1 text-[10px] font-bold text-[#777]"
+                          className="rounded-md bg-[#F8F8F8] px-1.5 py-0.5 text-[8px] font-bold text-[#777] sm:rounded-lg sm:px-2.5 sm:py-1 sm:text-[10px]"
                         >
                           {item}
                         </span>
@@ -516,19 +540,19 @@ export default function ProductSosmedLandingPage() {
                   <div className="grid grid-cols-2 gap-0 border-t border-gray-100 bg-[#FAFAFA]">
                     <Link
                       href={checkoutHref}
-                      className="inline-flex h-14 items-center justify-center text-[12px] font-bold text-[#666] transition hover:bg-gray-100 hover:text-[#141414]"
+                      className="inline-flex h-9 items-center justify-center px-1 text-center text-[10px] font-bold leading-tight text-[#666] transition hover:bg-gray-100 hover:text-[#141414] sm:h-14 sm:text-[12px]"
                     >
                       Detail Layanan
                     </Link>
                     <Link
                       href={checkoutHref}
-                      className={`inline-flex h-14 items-center justify-center gap-1.5 text-[12px] font-extrabold transition ${
+                      className={`inline-flex h-9 items-center justify-center gap-1 px-1 text-center text-[10px] font-extrabold leading-tight transition sm:h-14 sm:gap-1.5 sm:text-[12px] ${
                         isRecommended 
                           ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]' 
                           : 'bg-[#141414] text-white hover:bg-[#333]'
                       }`}
                     >
-                      Pilih Layanan <ArrowRight className="h-3.5 w-3.5" />
+                      Pilih <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
                     </Link>
                   </div>
                                 </article>
@@ -537,36 +561,60 @@ export default function ProductSosmedLandingPage() {
               </div>
 
               {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-4">
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-all ${
-                          currentPage === pageNum
-                            ? 'bg-[#FF5733] text-white shadow-md'
-                            : 'text-gray-500 hover:bg-gray-100'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    ))}
+                <div className="mt-4">
+                  <div className="flex items-center justify-center gap-2 sm:hidden">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      aria-label="Halaman sebelumnya"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <div className="inline-flex h-9 min-w-24 items-center justify-center rounded-full border border-[#FFD5C8] bg-[#FFF8F5] px-4 text-xs font-extrabold text-[#FF5733] shadow-sm">
+                      {currentPage} / {totalPages}
+                    </div>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      aria-label="Halaman berikutnya"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
+
+                  <div className="hidden items-center justify-center gap-2 sm:flex">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-all ${
+                            currentPage === pageNum
+                              ? 'bg-[#FF5733] text-white shadow-md'
+                              : 'text-gray-500 hover:bg-gray-100'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -589,7 +637,7 @@ export default function ProductSosmedLandingPage() {
                   Paket Spesial belum tersedia sekarang. Cek lagi nanti ya.
                 </div>
               )}
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 md:gap-5 xl:grid-cols-3">
                 {bundleCards.map((bundle) => (
                   <BundleCard key={bundle.key} bundle={bundle} />
                 ))}
