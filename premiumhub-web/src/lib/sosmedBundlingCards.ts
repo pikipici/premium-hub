@@ -1,4 +1,5 @@
 import type { SosmedBundlePackage } from '@/types/sosmedBundle'
+import type { SosmedPromotionPrice } from '@/types/sosmedService'
 
 export type SosmedBundleCard = {
   key: string
@@ -16,6 +17,8 @@ export type SosmedBundleCard = {
     key?: string
     name: string
     priceLabel: string
+    originalPriceLabel?: string
+    promotion?: SosmedPromotionPrice
     items: string[]
   }[]
 }
@@ -31,6 +34,8 @@ export type SosmedBundleProductCard = {
   badge: string
   tone: string
   priceLabel: string
+  originalPriceLabel?: string
+  promotion?: SosmedPromotionPrice
   packageLabel: string
   benefits: string[]
   trustBadges: string[]
@@ -259,6 +264,8 @@ export function buildSosmedBundleCards(bundles: SosmedBundlePackage[]): SosmedBu
           key: variant.key,
           name: variant.name,
           priceLabel: formatBundleRupiah(variant.total_price),
+          originalPriceLabel: variant.promotion ? formatBundleRupiah(variant.promotion.original_price) : undefined,
+          promotion: variant.promotion,
           items: packageItemsForBundleVariant(variant),
         })),
       }
@@ -304,6 +311,8 @@ export function buildSosmedBundleProductCards(bundles: SosmedBundlePackage[]): S
         badge: bundle.badge,
         tone: bundle.tone,
         priceLabel: variant.priceLabel,
+        originalPriceLabel: variant.originalPriceLabel,
+        promotion: variant.promotion,
         packageLabel: `paket bundling isi ${variant.items.length} layanan`,
         benefits,
         trustBadges: [bundle.badge, `${variant.items.length} Layanan`, 'Bundling Hemat'].filter(Boolean).slice(0, 3),

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -16,7 +17,8 @@ import (
 )
 
 type SosmedBundleHandler struct {
-	repo *repository.SosmedBundleRepo
+	repo         *repository.SosmedBundleRepo
+	promotionSvc *service.SosmedPromotionService
 }
 
 type publicSosmedBundlePackageResponse struct {
@@ -43,6 +45,7 @@ type publicSosmedBundleVariantResponse struct {
 	DiscountAmount int64                            `json:"discount_amount"`
 	TotalPrice     int64                            `json:"total_price"`
 	OriginalPrice  int64                            `json:"original_price"`
+	Promotion      *service.SosmedPromotionPrice    `json:"promotion,omitempty"`
 	Items          []publicSosmedBundleItemResponse `json:"items"`
 	SortOrder      int                              `json:"sort_order"`
 }
@@ -61,6 +64,11 @@ func NewSosmedBundleHandler(repo *repository.SosmedBundleRepo) *SosmedBundleHand
 	return &SosmedBundleHandler{repo: repo}
 }
 
+func (h *SosmedBundleHandler) SetPromotionService(promotionSvc *service.SosmedPromotionService) *SosmedBundleHandler {
+	h.promotionSvc = promotionSvc
+	return h
+}
+
 func (h *SosmedBundleHandler) PublicList(c *gin.Context) {
 	bundles, err := h.repo.ListActiveBundles(c.Request.Context())
 	if err != nil {
@@ -70,7 +78,14 @@ func (h *SosmedBundleHandler) PublicList(c *gin.Context) {
 
 	items := make([]publicSosmedBundlePackageResponse, 0, len(bundles))
 	for _, bundle := range bundles {
-		items = append(items, toPublicSosmedBundlePackageResponse(bundle))
+		publicBundle := toPublicSosmedBundlePackageResponse(bundle)
+		if h.promotionSvc != nil {
+			if err := h.attachVariantPromotions(c.Request.Context(), &publicBundle, time.Now()); err != nil {
+				response.InternalError(c)
+				return
+			}
+		}
+		items = append(items, publicBundle)
 	}
 	response.Success(c, "OK", items)
 }
@@ -92,7 +107,32 @@ func (h *SosmedBundleHandler) PublicDetail(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, "OK", toPublicSosmedBundlePackageResponse(*bundle))
+	publicBundle := toPublicSosmedBundlePackageResponse(*bundle)
+	if h.promotionSvc != nil {
+		if err := h.attachVariantPromotions(c.Request.Context(), &publicBundle, time.Now()); err != nil {
+			response.InternalError(c)
+			return
+		}
+	}
+	response.Success(c, "OK", publicBundle)
+}
+
+func (h *SosmedBundleHandler) attachVariantPromotions(ctx context.Context, bundle *publicSosmedBundlePackageResponse, at time.Time) error {
+	for i := range bundle.Variants {
+		variant := &bundle.Variants[i]
+		promo, err := h.promotionSvc.ActiveBundleVariantPrice(ctx, variant.ID, variant.TotalPrice, at)
+		if err != nil {
+			return err
+		}
+		if promo == nil {
+			continue
+		}
+		variant.Promotion = promo
+		variant.OriginalPrice = promo.OriginalPrice
+		variant.TotalPrice = promo.FinalPrice
+		variant.DiscountAmount = promo.DiscountAmount
+	}
+	return nil
 }
 
 func toPublicSosmedBundlePackageResponse(bundle model.SosmedBundlePackage) publicSosmedBundlePackageResponse {

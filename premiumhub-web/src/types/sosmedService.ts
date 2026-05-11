@@ -1,5 +1,17 @@
 export type SosmedServiceTheme = 'blue' | 'pink' | 'yellow' | 'purple' | 'mint' | 'orange' | 'gray'
 
+export interface SosmedPromotionPrice {
+  id: string
+  name: string
+  discount_type: 'percent' | 'amount' | string
+  discount_value: number
+  original_price: number
+  discount_amount: number
+  final_price: number
+  starts_at: string
+  ends_at: string
+}
+
 export interface SosmedService {
   id: string
   category_code: string
@@ -25,7 +37,8 @@ export interface SosmedService {
   eta?: string
   price_start?: string
   price_per_1k?: string
-  checkout_price?: number
+  checkout_price: number
+  promotion?: SosmedPromotionPrice
   trust_badges?: string[]
   sort_order?: number
   is_active: boolean

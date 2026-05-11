@@ -18,30 +18,32 @@ import (
 )
 
 type SosmedServiceHandler struct {
-	svc *service.SosmedServiceService
+	svc          *service.SosmedServiceService
+	promotionSvc *service.SosmedPromotionService
 }
 
 type publicSosmedServiceResponse struct {
-	ID            uuid.UUID `json:"id"`
-	CategoryCode  string    `json:"category_code"`
-	Code          string    `json:"code"`
-	Title         string    `json:"title"`
-	Summary       string    `json:"summary"`
-	PlatformLabel string    `json:"platform_label"`
-	BadgeText     string    `json:"badge_text"`
-	Theme         string    `json:"theme"`
-	MinOrder      string    `json:"min_order"`
-	StartTime     string    `json:"start_time"`
-	Refill        string    `json:"refill"`
-	ETA           string    `json:"eta"`
-	PriceStart    string    `json:"price_start"`
-	PricePer1K    string    `json:"price_per_1k"`
-	CheckoutPrice int64     `json:"checkout_price"`
-	TrustBadges   []string  `json:"trust_badges,omitempty"`
-	SortOrder     int       `json:"sort_order"`
-	IsActive      bool      `json:"is_active"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID            uuid.UUID                     `json:"id"`
+	CategoryCode  string                        `json:"category_code"`
+	Code          string                        `json:"code"`
+	Title         string                        `json:"title"`
+	Summary       string                        `json:"summary"`
+	PlatformLabel string                        `json:"platform_label"`
+	BadgeText     string                        `json:"badge_text"`
+	Theme         string                        `json:"theme"`
+	MinOrder      string                        `json:"min_order"`
+	StartTime     string                        `json:"start_time"`
+	Refill        string                        `json:"refill"`
+	ETA           string                        `json:"eta"`
+	PriceStart    string                        `json:"price_start"`
+	PricePer1K    string                        `json:"price_per_1k"`
+	CheckoutPrice int64                         `json:"checkout_price"`
+	Promotion     *service.SosmedPromotionPrice `json:"promotion,omitempty"`
+	TrustBadges   []string                      `json:"trust_badges,omitempty"`
+	SortOrder     int                           `json:"sort_order"`
+	IsActive      bool                          `json:"is_active"`
+	CreatedAt     time.Time                     `json:"created_at"`
+	UpdatedAt     time.Time                     `json:"updated_at"`
 }
 
 var (
@@ -53,6 +55,11 @@ var (
 
 func NewSosmedServiceHandler(svc *service.SosmedServiceService) *SosmedServiceHandler {
 	return &SosmedServiceHandler{svc: svc}
+}
+
+func (h *SosmedServiceHandler) SetPromotionService(promotionSvc *service.SosmedPromotionService) *SosmedServiceHandler {
+	h.promotionSvc = promotionSvc
+	return h
 }
 
 func toPublicSosmedServiceResponse(item model.SosmedService) publicSosmedServiceResponse {
@@ -146,7 +153,16 @@ func (h *SosmedServiceHandler) PublicList(c *gin.Context) {
 
 	publicItems := make([]publicSosmedServiceResponse, 0, len(items))
 	for _, item := range items {
-		publicItems = append(publicItems, toPublicSosmedServiceResponse(item))
+		publicItem := toPublicSosmedServiceResponse(item)
+		if h.promotionSvc != nil {
+			promo, err := h.promotionSvc.ActiveServicePrice(c.Request.Context(), item.ID, item.CheckoutPrice, time.Now())
+			if err != nil {
+				response.InternalError(c)
+				return
+			}
+			publicItem.Promotion = promo
+		}
+		publicItems = append(publicItems, publicItem)
 	}
 
 	response.Success(c, "OK", publicItems)

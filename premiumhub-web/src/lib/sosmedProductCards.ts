@@ -1,4 +1,4 @@
-import type { SosmedService } from '@/types/sosmedService'
+import type { SosmedPromotionPrice, SosmedService } from '@/types/sosmedService'
 
 export type SosmedPlatformIconKey =
   | 'instagram'
@@ -33,6 +33,8 @@ export type SosmedProductCard = {
   benefits: string[]
   trustBadges: string[]
   checkoutPrice: number
+  originalPrice?: number
+  promotion?: SosmedPromotionPrice
   isRecommended: boolean
 }
 
@@ -374,7 +376,9 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
     const fallback = FALLBACK_SERVICES[index % FALLBACK_SERVICES.length]
     const platform = normalizePlatform(cleanValue(item.platform_label, fallback.platform))
     const unit = unitFromService(item)
-    const checkoutPrice = item.checkout_price && item.checkout_price > 0 ? item.checkout_price : fallback.checkoutPrice
+    const baseCheckoutPrice = item.checkout_price && item.checkout_price > 0 ? item.checkout_price : fallback.checkoutPrice
+    const promo = item.promotion
+    const checkoutPrice = promo?.final_price && promo.final_price > 0 ? promo.final_price : baseCheckoutPrice
     const startTime = cleanValue(item.start_time, fallback.startTime)
     const refill = cleanValue(item.refill, fallback.refill)
     const eta = cleanValue(item.eta, fallback.eta)
@@ -404,6 +408,8 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
       benefits: buildBenefits(startTime, refill, eta),
       trustBadges,
       checkoutPrice,
+      originalPrice: promo ? baseCheckoutPrice : undefined,
+      promotion: promo,
       isRecommended: badge.toLowerCase().includes('rekomendasi'),
     }
   })

@@ -1,6 +1,6 @@
 import api from '@/lib/api'
 import type { ApiResponse } from '@/types/api'
-import type { SosmedService } from '@/types/sosmedService'
+import type { SosmedPromotionPrice, SosmedService } from '@/types/sosmedService'
 
 export interface AdminSosmedServicePayload {
   category_code: string
@@ -86,6 +86,52 @@ export interface AdminSosmedResellerRepriceResult {
   skipped: number
 }
 
+export type AdminSosmedPromotionTargetType = 'service' | 'bundle_variant'
+export type AdminSosmedPromotionDiscountType = 'percent' | 'amount'
+
+export interface AdminSosmedPromotion extends SosmedPromotionPrice {
+  target_type: AdminSosmedPromotionTargetType
+  target_id: string
+  service_id?: string
+  bundle_variant_id?: string
+  service_title?: string
+  bundle_title?: string
+  variant_name?: string
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface AdminSosmedPromotionPayload {
+  name: string
+  target_type: AdminSosmedPromotionTargetType
+  target_id: string
+  discount_type: AdminSosmedPromotionDiscountType
+  discount_value: number
+  starts_at: string
+  ends_at: string
+  is_active?: boolean
+}
+
+interface AdminSosmedPromotionApiPayload extends Omit<AdminSosmedPromotionPayload, 'target_id'> {
+  service_id?: string
+  bundle_variant_id?: string
+}
+
+function toAdminSosmedPromotionApiPayload(data: AdminSosmedPromotionPayload): AdminSosmedPromotionApiPayload {
+  const { target_id: targetId, ...payload } = data
+  return data.target_type === 'bundle_variant'
+    ? { ...payload, bundle_variant_id: targetId }
+    : { ...payload, service_id: targetId }
+}
+
+function normalizeAdminSosmedPromotion(item: AdminSosmedPromotion): AdminSosmedPromotion {
+  return {
+    ...item,
+    target_id: item.target_id || item.service_id || item.bundle_variant_id || '',
+  }
+}
+
 export interface AdminSosmedImportJAPPayload {
   service_ids: number[]
 }
@@ -164,6 +210,44 @@ export const sosmedService = {
   adminGetJAPBalance: async () => {
     const res = await api.get<ApiResponse<AdminJAPBalance>>('/admin/sosmed/provider/jap/balance')
     return res.data
+  },
+
+  adminListPromotions: async () => {
+    const res = await api.get<ApiResponse<AdminSosmedPromotion[]>>('/admin/sosmed/promotions')
+    return {
+      ...res.data,
+      data: (res.data.data || []).map(normalizeAdminSosmedPromotion),
+    }
+  },
+
+  adminCreatePromotion: async (data: AdminSosmedPromotionPayload) => {
+    const res = await api.post<ApiResponse<AdminSosmedPromotion>>(
+      '/admin/sosmed/promotions',
+      toAdminSosmedPromotionApiPayload(data)
+    )
+    return {
+      ...res.data,
+      data: res.data.data ? normalizeAdminSosmedPromotion(res.data.data) : res.data.data,
+    }
+  },
+
+  adminUpdatePromotion: async (id: string, data: AdminSosmedPromotionPayload) => {
+    const res = await api.put<ApiResponse<AdminSosmedPromotion>>(
+      `/admin/sosmed/promotions/${id}`,
+      toAdminSosmedPromotionApiPayload(data)
+    )
+    return {
+      ...res.data,
+      data: res.data.data ? normalizeAdminSosmedPromotion(res.data.data) : res.data.data,
+    }
+  },
+
+  adminSetPromotionStatus: async (id: string, is_active: boolean) => {
+    const res = await api.patch<ApiResponse<AdminSosmedPromotion>>(`/admin/sosmed/promotions/${id}/status`, { is_active })
+    return {
+      ...res.data,
+      data: res.data.data ? normalizeAdminSosmedPromotion(res.data.data) : res.data.data,
+    }
   },
 
   adminCreate: async (data: AdminSosmedServicePayload) => {

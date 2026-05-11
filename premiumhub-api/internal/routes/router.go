@@ -39,6 +39,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	productRepo := repository.NewProductRepo(db)
 	productCategoryRepo := repository.NewProductCategoryRepo(db)
 	sosmedServiceRepo := repository.NewSosmedServiceRepo(db)
+	sosmedPromotionRepo := repository.NewSosmedPromotionRepo(db)
 	sosmedBundleRepo := repository.NewSosmedBundleRepo(db)
 	sosmedBundleOrderRepo := repository.NewSosmedBundleOrderRepo(db)
 	sosmedOrderRepo := repository.NewSosmedOrderRepo(db)
@@ -70,6 +71,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	notifSvc := service.NewNotificationService(notifRepo)
 	accountTypeSvc := service.NewAccountTypeService(accountTypeRepo)
 	productCategorySvc := service.NewProductCategoryService(productCategoryRepo)
+	sosmedPromotionSvc := service.NewSosmedPromotionService(sosmedPromotionRepo)
 	sosmedServiceSvc := service.NewSosmedServiceService(sosmedServiceRepo, productCategoryRepo).
 		SetResellerFXConfig(service.NewSosmedResellerFXConfig(
 			cfg.SosmedResellerFXMode,
@@ -81,8 +83,10 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	sosmedServiceSvc.SetJAPCatalogProvider(japSvc)
 	sosmedOrderSvc := service.NewSosmedOrderService(sosmedOrderRepo, sosmedServiceRepo, notifRepo).
 		SetWalletRepo(walletRepo).
+		SetPromotionService(sosmedPromotionSvc).
 		SetJAPOrderProvider(japSvc)
 	sosmedBundleOrderSvc := service.NewSosmedBundleOrderService(sosmedBundleRepo, sosmedBundleOrderRepo, walletRepo).
+		SetPromotionService(sosmedPromotionSvc).
 		SetJAPOrderProvider(japSvc)
 	sosmedBundleAdminSvc := service.NewSosmedBundleAdminService(sosmedBundleRepo, sosmedServiceRepo)
 	sosmedPaymentSvc := service.NewSosmedPaymentServiceWithGateway(cfg, sosmedOrderRepo, sosmedOrderSvc, nil)
@@ -136,10 +140,13 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	stockHandler := handler.NewStockHandler(stockSvc)
 	accountTypeHandler := handler.NewAccountTypeHandler(accountTypeSvc)
 	productCategoryHandler := handler.NewProductCategoryHandler(productCategorySvc)
-	sosmedServiceHandler := handler.NewSosmedServiceHandler(sosmedServiceSvc)
-	sosmedBundleHandler := handler.NewSosmedBundleHandler(sosmedBundleRepo)
+	sosmedServiceHandler := handler.NewSosmedServiceHandler(sosmedServiceSvc).
+		SetPromotionService(sosmedPromotionSvc)
+	sosmedBundleHandler := handler.NewSosmedBundleHandler(sosmedBundleRepo).
+		SetPromotionService(sosmedPromotionSvc)
 	sosmedBundleOrderHandler := handler.NewSosmedBundleOrderHandler(sosmedBundleOrderSvc)
 	sosmedBundleAdminHandler := handler.NewSosmedBundleAdminHandler(sosmedBundleAdminSvc)
+	sosmedPromotionAdminHandler := handler.NewSosmedPromotionAdminHandler(sosmedPromotionSvc)
 	japHandler := handler.NewJAPHandler(japSvc)
 	sosmedOrderHandler := handler.NewSosmedOrderHandler(sosmedOrderSvc)
 	sosmedPaymentHandler := handler.NewSosmedPaymentHandler(sosmedPaymentSvc)
@@ -392,6 +399,10 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.DELETE("/product-categories/:id", productCategoryHandler.Delete)
 
 	admin.GET("/sosmed/services", sosmedServiceHandler.AdminList)
+	admin.GET("/sosmed/promotions", sosmedPromotionAdminHandler.List)
+	admin.POST("/sosmed/promotions", sosmedPromotionAdminHandler.Create)
+	admin.PUT("/sosmed/promotions/:id", sosmedPromotionAdminHandler.Update)
+	admin.PATCH("/sosmed/promotions/:id/status", sosmedPromotionAdminHandler.SetStatus)
 	admin.GET("/sosmed/bundles", sosmedBundleAdminHandler.AdminList)
 	admin.POST("/sosmed/bundles", sosmedBundleAdminHandler.AdminCreatePackage)
 	admin.PUT("/sosmed/bundles/:id", sosmedBundleAdminHandler.AdminUpdatePackage)

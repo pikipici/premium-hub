@@ -30,6 +30,7 @@ type SosmedBundleOrderService struct {
 	bundleRepo       *repository.SosmedBundleRepo
 	orderRepo        *repository.SosmedBundleOrderRepo
 	walletRepo       *repository.WalletRepo
+	promotionSvc     *SosmedPromotionService
 	japOrderProvider SosmedJAPOrderProvider
 }
 
@@ -54,6 +55,11 @@ func NewSosmedBundleOrderService(
 
 func (s *SosmedBundleOrderService) SetJAPOrderProvider(provider SosmedJAPOrderProvider) *SosmedBundleOrderService {
 	s.japOrderProvider = provider
+	return s
+}
+
+func (s *SosmedBundleOrderService) SetPromotionService(promotionSvc *SosmedPromotionService) *SosmedBundleOrderService {
+	s.promotionSvc = promotionSvc
 	return s
 }
 
@@ -110,11 +116,21 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now()
+	if s.promotionSvc != nil {
+		promo, err := s.promotionSvc.ActiveBundleVariantPrice(ctx, variant.ID, pricing.TotalPrice, now)
+		if err != nil {
+			return nil, errors.New("gagal menghitung promo bundle sosmed")
+		}
+		if promo != nil {
+			pricing.DiscountAmount += promo.DiscountAmount
+			pricing.TotalPrice = promo.FinalPrice
+		}
+	}
 	if pricing.TotalPrice <= 0 {
 		return nil, errors.New("total harga bundle tidak valid")
 	}
 
-	now := time.Now()
 	orderID := uuid.New()
 	order := &model.SosmedBundleOrder{
 		ID:                     orderID,

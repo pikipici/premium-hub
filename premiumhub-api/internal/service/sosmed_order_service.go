@@ -62,6 +62,7 @@ type SosmedOrderService struct {
 	serviceRepo      *repository.SosmedServiceRepo
 	notifRepo        *repository.NotificationRepo
 	walletRepo       *repository.WalletRepo
+	promotionSvc     *SosmedPromotionService
 	japOrderProvider SosmedJAPOrderProvider
 }
 
@@ -86,6 +87,11 @@ func NewSosmedOrderService(
 
 func (s *SosmedOrderService) SetWalletRepo(walletRepo *repository.WalletRepo) *SosmedOrderService {
 	s.walletRepo = walletRepo
+	return s
+}
+
+func (s *SosmedOrderService) SetPromotionService(promotionSvc *SosmedPromotionService) *SosmedOrderService {
+	s.promotionSvc = promotionSvc
 	return s
 }
 
@@ -508,17 +514,27 @@ func (s *SosmedOrderService) Create(ctx context.Context, userID uuid.UUID, input
 		return nil, errors.New("konfirmasi dulu kalau akun/link target sudah public, aktif, dan tidak akan diubah sampai order selesai")
 	}
 
-	totalPriceFloat := float64(sosmedService.CheckoutPrice) * float64(quantity)
+	unitPrice := sosmedService.CheckoutPrice
+	if s.promotionSvc != nil {
+		promoPrice, err := s.promotionSvc.ActiveServicePrice(ctx, sosmedService.ID, sosmedService.CheckoutPrice, time.Now())
+		if err != nil {
+			return nil, errors.New("gagal cek promo layanan sosmed")
+		}
+		if promoPrice != nil {
+			unitPrice = promoPrice.FinalPrice
+		}
+	}
+	totalPriceFloat := float64(unitPrice) * float64(quantity)
 	if totalPriceFloat > math.MaxInt64 {
 		return nil, errors.New("harga order melebihi batas sistem")
 	}
 	totalPrice := int64(totalPriceFloat)
 
 	if s.walletRepo != nil {
-		return s.createWalletPaidOrder(ctx, userID, sosmedService, targetLink, quantity, totalPrice, input)
+		return s.createWalletPaidOrder(ctx, userID, sosmedService, targetLink, quantity, unitPrice, totalPrice, input)
 	}
 
-	return s.createPendingPaymentOrder(userID, sosmedService, targetLink, quantity, totalPrice, input)
+	return s.createPendingPaymentOrder(userID, sosmedService, targetLink, quantity, unitPrice, totalPrice, input)
 }
 
 func (s *SosmedOrderService) createPendingPaymentOrder(
@@ -526,6 +542,7 @@ func (s *SosmedOrderService) createPendingPaymentOrder(
 	sosmedService *model.SosmedService,
 	targetLink string,
 	quantity int64,
+	unitPrice int64,
 	totalPrice int64,
 	input CreateSosmedOrderInput,
 ) (*SosmedOrderDetail, error) {
@@ -539,7 +556,7 @@ func (s *SosmedOrderService) createPendingPaymentOrder(
 		ServiceTitle:  strings.TrimSpace(sosmedService.Title),
 		TargetLink:    targetLink,
 		Quantity:      quantity,
-		UnitPrice:     sosmedService.CheckoutPrice,
+		UnitPrice:     unitPrice,
 		TotalPrice:    totalPrice,
 		PaymentStatus: "pending",
 		OrderStatus:   sosmedOrderStatusPendingPayment,
@@ -579,6 +596,7 @@ func (s *SosmedOrderService) createWalletPaidOrder(
 	sosmedService *model.SosmedService,
 	targetLink string,
 	quantity int64,
+	unitPrice int64,
 	totalPrice int64,
 	input CreateSosmedOrderInput,
 ) (*SosmedOrderDetail, error) {
@@ -608,7 +626,7 @@ func (s *SosmedOrderService) createWalletPaidOrder(
 		ServiceTitle:           strings.TrimSpace(sosmedService.Title),
 		TargetLink:             targetLink,
 		Quantity:               quantity,
-		UnitPrice:              sosmedService.CheckoutPrice,
+		UnitPrice:              unitPrice,
 		TotalPrice:             totalPrice,
 		PaymentMethod:          "wallet",
 		PaymentStatus:          "paid",

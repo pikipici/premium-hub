@@ -39,6 +39,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.SosmedBundleItem{},
 		&model.SosmedBundleOrder{},
 		&model.SosmedBundleOrderItem{},
+		&model.SosmedPromotion{},
 		&model.SosmedOrder{},
 		&model.SosmedOrderEvent{},
 		&model.SosmedOrderRefillAttempt{},

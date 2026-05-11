@@ -19,6 +19,7 @@ import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { buildSosmedBundleProductCards, type SosmedBundleProductCard } from '@/lib/sosmedBundlingCards'
 import { buildSosmedServiceCards, type SosmedPlatformIconKey } from '@/lib/sosmedProductCards'
+import type { SosmedPromotionPrice } from '@/types/sosmedService'
 import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
 import type { SosmedBundlePackage } from '@/types/sosmedBundle'
@@ -153,8 +154,54 @@ function PlatformBrandIcon({ platformIcon, className }: { platformIcon: SosmedPl
   }
 }
 
-function sortRecommendedFirst<T extends { isRecommended: boolean }>(items: T[]) {
-  return [...items].sort((a, b) => Number(b.isRecommended) - Number(a.isRecommended))
+function sortPromoAndRecommendedFirst<T extends { isRecommended: boolean; promotion?: SosmedPromotionPrice }>(items: T[]) {
+  const score = (item: T) => {
+    if (item.promotion && item.isRecommended) return 3
+    if (item.promotion) return 2
+    if (item.isRecommended) return 1
+    return 0
+  }
+
+  return [...items].sort((a, b) => score(b) - score(a))
+}
+
+function formatPromoRemaining(endsAt: string) {
+  const diff = new Date(endsAt).getTime() - Date.now()
+  if (!Number.isFinite(diff) || diff <= 0) return 'Promo berakhir'
+  const totalSeconds = Math.floor(diff / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (hours >= 24) return `${Math.floor(hours / 24)}h ${hours % 24}j lagi`
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+function PromoCountdown({ promotion }: { promotion?: SosmedPromotionPrice }) {
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    if (!promotion?.ends_at) return
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000)
+    return () => window.clearInterval(timer)
+  }, [promotion?.ends_at])
+
+  if (!promotion?.ends_at) return null
+
+  return (
+    <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-[#FFD5C8] bg-[#FFF3EF] px-2 py-1 text-[9px] font-black uppercase tracking-wide text-[#D83A1D] sm:text-[10px]">
+      <Clock3 className="h-3 w-3" />
+      {formatPromoRemaining(promotion.ends_at)}
+    </div>
+  )
+}
+
+function PromoPrice({ priceLabel, originalPriceLabel }: { priceLabel: string; originalPriceLabel?: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      {originalPriceLabel ? <span className="text-[10px] font-bold text-gray-400 line-through sm:text-sm">{originalPriceLabel}</span> : null}
+      <span className="text-[17px] font-black tracking-tight text-[#141414] sm:text-3xl">{priceLabel}</span>
+    </div>
+  )
 }
 
 function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
@@ -220,10 +267,10 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
         </div>
 
         <div className="mb-2 mt-2 sm:mb-7 sm:mt-6">
-          <div className="flex items-baseline gap-1">
-            <span className="text-[17px] font-black tracking-tight text-[#141414] sm:text-3xl">{bundle.priceLabel}</span>
-          </div>
+          {bundle.promotion ? <span className="mb-1 inline-flex rounded-full bg-[#FF5733] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-white">Promo</span> : null}
+          <PromoPrice priceLabel={bundle.priceLabel} originalPriceLabel={bundle.originalPriceLabel} />
           <span className="line-clamp-1 text-[9px] font-semibold text-[#888] sm:text-[11px]">{bundle.packageLabel}</span>
+          <PromoCountdown promotion={bundle.promotion} />
         </div>
 
         <div className="hidden flex-grow space-y-3.5 sm:block">
@@ -322,8 +369,8 @@ export default function ProductSosmedLandingPage() {
     }
   }, [])
 
-  const cards = useMemo(() => sortRecommendedFirst(buildSosmedServiceCards(services)), [services])
-  const bundleCards = useMemo(() => sortRecommendedFirst(buildSosmedBundleProductCards(bundlePackages)), [bundlePackages])
+  const cards = useMemo(() => sortPromoAndRecommendedFirst(buildSosmedServiceCards(services)), [services])
+  const bundleCards = useMemo(() => sortPromoAndRecommendedFirst(buildSosmedBundleProductCards(bundlePackages)), [bundlePackages])
   const platforms = useMemo(() => {
     const unique = Array.from(new Set(cards.map(c => c.platform)))
     return ['Semua', ...unique.sort()]
@@ -508,10 +555,10 @@ export default function ProductSosmedLandingPage() {
                     </div>
 
                     <div className="mb-2 mt-2 sm:mb-7 sm:mt-6">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-[17px] font-black tracking-tight text-[#141414] sm:text-3xl">{service.priceLabel}</span>
-                      </div>
+                      {service.promotion ? <span className="mb-1 inline-flex rounded-full bg-[#FF5733] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-white">Promo</span> : null}
+                      <PromoPrice priceLabel={service.priceLabel} originalPriceLabel={service.originalPrice ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(service.originalPrice) : undefined} />
                       <span className="line-clamp-1 text-[9px] font-semibold text-[#888] sm:text-[11px]">{service.packageLabel}</span>
+                      <PromoCountdown promotion={service.promotion} />
                     </div>
 
                     <div className="hidden flex-grow space-y-3.5 sm:block">

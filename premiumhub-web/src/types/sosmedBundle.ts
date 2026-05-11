@@ -1,3 +1,5 @@
+import type { SosmedPromotionPrice } from './sosmedService'
+
 export interface SosmedBundleItem {
   id?: string
   service_id?: string
@@ -17,6 +19,7 @@ export interface SosmedBundleVariant {
   discount_amount: number
   total_price: number
   original_price: number
+  promotion?: SosmedPromotionPrice
   items: SosmedBundleItem[]
   sort_order: number
 }
