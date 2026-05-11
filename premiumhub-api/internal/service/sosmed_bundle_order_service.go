@@ -35,14 +35,21 @@ type SosmedBundleOrderService struct {
 }
 
 type CreateSosmedBundleOrderInput struct {
-	BundleKey             string `json:"bundle_key" binding:"required"`
-	VariantKey            string `json:"variant_key" binding:"required"`
-	TargetLink            string `json:"target_link"`
-	TargetUsername        string `json:"target_username"`
-	Notes                 string `json:"notes"`
-	PaymentMethod         string `json:"payment_method"`
-	IdempotencyKey        string `json:"idempotency_key"`
-	TargetPublicConfirmed bool   `json:"target_public_confirmed"`
+	BundleKey             string                                   `json:"bundle_key" binding:"required"`
+	VariantKey            string                                   `json:"variant_key" binding:"required"`
+	TargetLink            string                                   `json:"target_link"`
+	ItemTargets           []CreateSosmedBundleOrderItemTargetInput `json:"item_targets"`
+	TargetUsername        string                                   `json:"target_username"`
+	Notes                 string                                   `json:"notes"`
+	PaymentMethod         string                                   `json:"payment_method"`
+	IdempotencyKey        string                                   `json:"idempotency_key"`
+	TargetPublicConfirmed bool                                     `json:"target_public_confirmed"`
+}
+
+type CreateSosmedBundleOrderItemTargetInput struct {
+	BundleItemID    string `json:"bundle_item_id"`
+	SosmedServiceID string `json:"sosmed_service_id"`
+	TargetLink      string `json:"target_link"`
 }
 
 func NewSosmedBundleOrderService(
@@ -77,10 +84,6 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 		return nil, errors.New("bundle dan variant wajib diisi")
 	}
 
-	targetLink := normalizeSosmedOrderTargetLink(input.TargetLink)
-	if targetLink == "" {
-		return nil, errors.New("target link/username wajib diisi")
-	}
 	if !input.TargetPublicConfirmed {
 		return nil, errors.New("konfirmasi dulu kalau akun/link target sudah public, aktif, dan tidak akan diubah sampai order selesai")
 	}
@@ -95,15 +98,6 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 	if err != nil {
 		return nil, err
 	}
-	idempotencyRequestHash := buildSosmedBundleOrderIdempotencyRequestHash(bundleKey, variantKey, targetLink, paymentMethod, input)
-	if existing, err := s.orderRepo.GetBundleOrderByIdempotencyKeyForUser(ctx, userID, idempotencyKey); err == nil {
-		if storedHash := strings.TrimSpace(existing.IdempotencyRequestHash); storedHash != "" && storedHash != idempotencyRequestHash {
-			return nil, errors.New("idempotency_key sudah dipakai untuk checkout bundle sosmed berbeda")
-		}
-		return existing, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errors.New("gagal cek order bundle sosmed")
-	}
 
 	variant, err := s.bundleRepo.GetVariantForCheckout(ctx, bundleKey, variantKey)
 	if err != nil {
@@ -115,6 +109,19 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 	pricing, err := CalculateSosmedBundlePricing(variant)
 	if err != nil {
 		return nil, err
+	}
+	targetsByBundleItemID, primaryTargetLink, err := normalizeSosmedBundleItemTargets(variant, pricing, input)
+	if err != nil {
+		return nil, err
+	}
+	idempotencyRequestHash := buildSosmedBundleOrderIdempotencyRequestHash(bundleKey, variantKey, primaryTargetLink, paymentMethod, input, targetsByBundleItemID)
+	if existing, err := s.orderRepo.GetBundleOrderByIdempotencyKeyForUser(ctx, userID, idempotencyKey); err == nil {
+		if storedHash := strings.TrimSpace(existing.IdempotencyRequestHash); storedHash != "" && storedHash != idempotencyRequestHash {
+			return nil, errors.New("idempotency_key sudah dipakai untuk checkout bundle sosmed berbeda")
+		}
+		return existing, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("gagal cek order bundle sosmed")
 	}
 	now := time.Now()
 	if s.promotionSvc != nil {
@@ -141,7 +148,7 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 		PackageKeySnapshot:     strings.TrimSpace(variant.Package.Key),
 		VariantKeySnapshot:     strings.TrimSpace(variant.Key),
 		TitleSnapshot:          buildSosmedBundleOrderTitleSnapshot(variant),
-		TargetLink:             targetLink,
+		TargetLink:             primaryTargetLink,
 		TargetUsername:         strings.TrimSpace(input.TargetUsername),
 		Notes:                  strings.TrimSpace(input.Notes),
 		SubtotalPrice:          pricing.SubtotalPrice,
@@ -155,7 +162,7 @@ func (s *SosmedBundleOrderService) Create(ctx context.Context, userID uuid.UUID,
 		IdempotencyRequestHash: idempotencyRequestHash,
 		PaidAt:                 &now,
 	}
-	items := buildSosmedBundleOrderItems(variant, pricing, targetLink)
+	items := buildSosmedBundleOrderItems(variant, pricing, targetsByBundleItemID, primaryTargetLink)
 	chargeRef := sosmedBundleOrderWalletChargeRef(orderID)
 	var replayOrder *model.SosmedBundleOrder
 
@@ -425,21 +432,72 @@ func normalizeSosmedBundleIdempotencyKey(value string) (string, error) {
 	return key, nil
 }
 
-func buildSosmedBundleOrderIdempotencyRequestHash(bundleKey, variantKey, targetLink, paymentMethod string, input CreateSosmedBundleOrderInput) string {
+func normalizeSosmedBundleItemTargets(variant *model.SosmedBundleVariant, pricing *SosmedBundlePricingResult, input CreateSosmedBundleOrderInput) (map[string]string, string, error) {
+	if variant == nil || pricing == nil {
+		return nil, "", errors.New("paket bundle sosmed tidak valid")
+	}
+	globalTarget := normalizeSosmedOrderTargetLink(input.TargetLink)
+	inputByBundleItemID := make(map[string]string)
+	inputByServiceID := make(map[string]string)
+	for _, itemTarget := range input.ItemTargets {
+		target := normalizeSosmedOrderTargetLink(itemTarget.TargetLink)
+		if target == "" {
+			continue
+		}
+		if id := strings.TrimSpace(itemTarget.BundleItemID); id != "" {
+			inputByBundleItemID[id] = target
+		}
+		if id := strings.TrimSpace(itemTarget.SosmedServiceID); id != "" {
+			inputByServiceID[id] = target
+		}
+	}
+
+	targets := make(map[string]string, len(pricing.Items))
+	primaryTarget := ""
+	for idx, line := range pricing.Items {
+		bundleItemID := strings.TrimSpace(line.BundleItemID)
+		if bundleItemID == "" && idx < len(variant.Items) {
+			bundleItemID = variant.Items[idx].ID.String()
+		}
+		if bundleItemID == "" {
+			return nil, "", errors.New("item bundle sosmed tidak valid")
+		}
+
+		target := inputByBundleItemID[bundleItemID]
+		if target == "" {
+			target = inputByServiceID[strings.TrimSpace(line.SosmedServiceID)]
+		}
+		if target == "" {
+			target = globalTarget
+		}
+		if target == "" {
+			return nil, "", fmt.Errorf("target link untuk item %s wajib diisi", line.ServiceTitleSnapshot)
+		}
+		targets[bundleItemID] = target
+		if primaryTarget == "" {
+			primaryTarget = target
+		}
+	}
+	return targets, primaryTarget, nil
+}
+
+func buildSosmedBundleOrderIdempotencyRequestHash(bundleKey, variantKey, targetLink, paymentMethod string, input CreateSosmedBundleOrderInput, itemTargets map[string]string) string {
 	payload := struct {
-		Flow                  string `json:"flow"`
-		BundleKey             string `json:"bundle_key"`
-		VariantKey            string `json:"variant_key"`
-		TargetLink            string `json:"target_link"`
-		TargetUsername        string `json:"target_username"`
-		Notes                 string `json:"notes"`
-		PaymentMethod         string `json:"payment_method"`
-		TargetPublicConfirmed bool   `json:"target_public_confirmed"`
+		Flow                  string            `json:"flow"`
+		BundleKey             string            `json:"bundle_key"`
+		VariantKey            string            `json:"variant_key"`
+		TargetLink            string            `json:"target_link"`
+		ItemTargets           map[string]string `json:"item_targets,omitempty"`
+		TargetUsername        string            `json:"target_username"`
+		Notes                 string            `json:"notes"`
+		PaymentMethod         string            `json:"payment_method"`
+		TargetPublicConfirmed bool              `json:"target_public_confirmed"`
 	}{
 		Flow:                  "sosmed_bundle_order",
 		BundleKey:             strings.TrimSpace(bundleKey),
 		VariantKey:            strings.TrimSpace(variantKey),
 		TargetLink:            normalizeSosmedOrderTargetLink(targetLink),
+		ItemTargets:           itemTargets,
 		TargetUsername:        strings.TrimSpace(input.TargetUsername),
 		Notes:                 strings.TrimSpace(input.Notes),
 		PaymentMethod:         strings.ToLower(strings.TrimSpace(paymentMethod)),
@@ -475,7 +533,7 @@ func buildSosmedBundleOrderTitleSnapshot(variant *model.SosmedBundleVariant) str
 	return fmt.Sprintf("%s - %s", packageTitle, variantName)
 }
 
-func buildSosmedBundleOrderItems(variant *model.SosmedBundleVariant, pricing *SosmedBundlePricingResult, targetLink string) []model.SosmedBundleOrderItem {
+func buildSosmedBundleOrderItems(variant *model.SosmedBundleVariant, pricing *SosmedBundlePricingResult, targetsByBundleItemID map[string]string, fallbackTargetLink string) []model.SosmedBundleOrderItem {
 	if variant == nil || pricing == nil {
 		return nil
 	}
@@ -487,6 +545,14 @@ func buildSosmedBundleOrderItems(variant *model.SosmedBundleVariant, pricing *So
 		}
 		if serviceID == uuid.Nil && idx < len(variant.Items) {
 			serviceID = variant.Items[idx].SosmedServiceID
+		}
+		bundleItemID := strings.TrimSpace(line.BundleItemID)
+		if bundleItemID == "" && idx < len(variant.Items) {
+			bundleItemID = variant.Items[idx].ID.String()
+		}
+		targetLink := strings.TrimSpace(targetsByBundleItemID[bundleItemID])
+		if targetLink == "" {
+			targetLink = fallbackTargetLink
 		}
 		items = append(items, model.SosmedBundleOrderItem{
 			SosmedServiceID:           serviceID,

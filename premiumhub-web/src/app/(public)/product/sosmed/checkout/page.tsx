@@ -72,6 +72,7 @@ function SosmedCheckoutContent() {
   const [bundlePackage, setBundlePackage] = useState<SosmedBundlePackage | null>(null)
   const [bundleVariant, setBundleVariant] = useState<SosmedBundleVariant | null>(null)
   const [targetLink, setTargetLink] = useState('')
+  const [bundleItemTargets, setBundleItemTargets] = useState<Record<string, string>>({})
   const [packageQuantity, setPackageQuantity] = useState(1)
   const [notes, setNotes] = useState('')
   const [targetPublicConfirmed, setTargetPublicConfirmed] = useState(false)
@@ -131,6 +132,9 @@ function SosmedCheckoutContent() {
           }
           setBundlePackage(res.data)
           setBundleVariant(matchedVariant)
+          setBundleItemTargets(
+            Object.fromEntries((matchedVariant.items || []).map((item, index) => [item.id || item.service_id || `${item.service_code}-${index}`, '']))
+          )
         })
         .catch(() => {
           if (!alive) return
@@ -155,6 +159,7 @@ function SosmedCheckoutContent() {
     setError('')
     setBundlePackage(null)
     setBundleVariant(null)
+    setBundleItemTargets({})
 
     sosmedServiceApi
       .list()
@@ -218,9 +223,22 @@ function SosmedCheckoutContent() {
 
     const normalizedTargetLink = targetLink.trim()
     const normalizedNotes = notes.trim()
+    const normalizedBundleItemTargets = (bundleVariant?.items || []).map((item, index) => {
+      const key = item.id || item.service_id || `${item.service_code}-${index}`
+      return {
+        bundle_item_id: item.id,
+        sosmed_service_id: item.service_id,
+        target_link: (bundleItemTargets[key] || '').trim(),
+      }
+    })
 
-    if (!normalizedTargetLink) {
+    if (!isBundleCheckout && !normalizedTargetLink) {
       setError('Target link/username wajib diisi')
+      return
+    }
+
+    if (isBundleCheckout && normalizedBundleItemTargets.some((item) => !item.target_link)) {
+      setError('Isi target link untuk semua item di paket spesial ini')
       return
     }
 
@@ -258,7 +276,7 @@ function SosmedCheckoutContent() {
           'bundle',
           bundlePackage.key,
           bundleVariant.key,
-          normalizedTargetLink,
+          normalizedBundleItemTargets.map((item) => `${item.bundle_item_id || item.sosmed_service_id || ''}:${item.target_link}`).join(','),
           normalizedNotes,
           'wallet',
           targetPublicConfirmed,
@@ -270,7 +288,8 @@ function SosmedCheckoutContent() {
         const orderRes = await sosmedBundleServiceApi.createOrder({
           bundle_key: bundlePackage.key,
           variant_key: bundleVariant.key,
-          target_link: normalizedTargetLink,
+          target_link: normalizedBundleItemTargets[0]?.target_link || '',
+          item_targets: normalizedBundleItemTargets,
           notes: normalizedNotes,
           payment_method: 'wallet',
           idempotency_key: checkoutIdempotencyKey,
@@ -439,16 +458,43 @@ function SosmedCheckoutContent() {
 
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6 space-y-4">
             <h3 className="text-sm font-bold">Data Pesanan</h3>
-            <div>
-              <label className="block text-xs font-semibold text-[#666] mb-1">{SOSMED_TARGET_INPUT_COPY.label}</label>
-              <input
-                value={targetLink}
-                onChange={(event) => setTargetLink(event.target.value)}
-                placeholder={SOSMED_TARGET_INPUT_COPY.placeholder}
-                className="w-full rounded-xl border border-[#E5E5E5] px-3 py-2.5 text-sm"
-              />
-              <p className="mt-1 text-xs text-[#888]">{SOSMED_TARGET_INPUT_COPY.helper}</p>
-            </div>
+            {isBundleCheckout ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#666] mb-1">Target per item paket</label>
+                  <p className="text-xs text-[#888]">Isi link/username sesuai platform masing-masing item. Cocok buat paket gabungan IG + TikTok + YouTube.</p>
+                </div>
+                {(bundleVariant?.items || []).map((item, index) => {
+                  const key = item.id || item.service_id || `${item.service_code}-${index}`
+                  return (
+                    <div key={key} className="rounded-xl border border-[#E5E5E5] bg-[#FAFAF8] p-3">
+                      <label className="mb-1 block text-xs font-bold text-[#444]">
+                        {sanitizeProviderServiceTitle(item.title)}
+                        <span className="ml-2 font-semibold text-[#888]">{item.quantity_units.toLocaleString('id-ID')} unit</span>
+                      </label>
+                      <input
+                        value={bundleItemTargets[key] || ''}
+                        onChange={(event) => setBundleItemTargets((prev) => ({ ...prev, [key]: event.target.value }))}
+                        placeholder="Masukkan link/username target untuk item ini"
+                        className="w-full rounded-xl border border-[#E5E5E5] bg-white px-3 py-2.5 text-sm"
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-[#666] mb-1">{SOSMED_TARGET_INPUT_COPY.label}</label>
+                <input
+                  value={targetLink}
+                  onChange={(event) => setTargetLink(event.target.value)}
+                  placeholder={SOSMED_TARGET_INPUT_COPY.placeholder}
+                  className="w-full rounded-xl border border-[#E5E5E5] px-3 py-2.5 text-sm"
+                />
+                <p className="mt-1 text-xs text-[#888]">{SOSMED_TARGET_INPUT_COPY.helper}</p>
+              </div>
+            )}
+
             {!isBundleCheckout && (
               <div>
                 <label className="block text-xs font-semibold text-[#666] mb-1">Jumlah Paket 1K</label>

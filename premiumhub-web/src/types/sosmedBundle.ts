@@ -28,6 +28,11 @@ export interface CreateSosmedBundleOrderPayload {
   bundle_key: string
   variant_key: string
   target_link?: string
+  item_targets?: Array<{
+    bundle_item_id?: string
+    sosmed_service_id?: string
+    target_link: string
+  }>
   target_username?: string
   notes?: string
   payment_method?: 'wallet' | string
