@@ -59,6 +59,8 @@ type Config struct {
 	SosmedProviderSyncWorkerEnabled                                             bool
 	SosmedProviderSyncWorkerInterval, SosmedProviderSyncWorkerBatchLimit        string
 	SosmedProviderSyncWorkerStaleAfter, SosmedProviderSyncWorkerTimeout         string
+	RedisAddr, RedisPassword, RedisDB                                           string
+	ChatRedisChannel                                                            string
 }
 
 func Load() *Config {
@@ -183,6 +185,10 @@ func Load() *Config {
 		SosmedProviderSyncWorkerBatchLimit:   e("SOSMED_PROVIDER_SYNC_WORKER_BATCH_LIMIT", "20"),
 		SosmedProviderSyncWorkerStaleAfter:   e("SOSMED_PROVIDER_SYNC_WORKER_STALE_AFTER", "30m"),
 		SosmedProviderSyncWorkerTimeout:      e("SOSMED_PROVIDER_SYNC_WORKER_TIMEOUT", "45s"),
+		RedisAddr:                            e("REDIS_ADDR", ""),
+		RedisPassword:                        e("REDIS_PASSWORD", ""),
+		RedisDB:                              e("REDIS_DB", "0"),
+		ChatRedisChannel:                     e("CHAT_REDIS_CHANNEL", "premiumhub:chat"),
 	}
 }
 

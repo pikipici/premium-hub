@@ -109,7 +109,12 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	userSidebarMenuSettingSvc := service.NewUserSidebarMenuSettingService(userSidebarMenuSettingRepo)
 	navbarMenuSettingSvc := service.NewNavbarMenuSettingService(navbarMenuSettingRepo)
 	activitySvc := service.NewActivityService(activityRepo)
-	chatHub := service.NewChatHub()
+	chatHub := service.NewChatHubWithRedis(
+		cfg.RedisAddr,
+		cfg.RedisPassword,
+		cfg.RedisDB,
+		cfg.ChatRedisChannel,
+	)
 	chatSvc := service.NewChatService(chatRepo, chatHub)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
