@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -17,6 +19,9 @@ import (
 )
 
 const sosmedJAPProviderCode = "jap"
+
+//go:embed data/jap_catalog_2026_04_25.json
+var embeddedJAPCatalog20260425 []byte
 
 var (
 	sosmedJAPRefillPattern    = regexp.MustCompile(`(?i)\[Refill:\s*([^\]]+)\]`)
@@ -84,11 +89,18 @@ type ImportSelectedJAPServicesResult struct {
 	Items      []model.SosmedService `json:"items"`
 }
 
-func (s *SosmedServiceService) ListJAPCatalogOptions(ctx context.Context) (*PreviewSelectedJAPServicesResult, error) {
-	if s.japCatalogProvider == nil {
-		return nil, errors.New("provider katalog JAP belum terhubung")
+func loadEmbeddedJAPCatalog() ([]JAPServiceItem, error) {
+	var items []JAPServiceItem
+	if err := json.Unmarshal(embeddedJAPCatalog20260425, &items); err != nil {
+		return nil, errors.New("katalog layanan JAP lokal tidak valid")
 	}
+	if len(items) == 0 {
+		return nil, errors.New("katalog layanan JAP lokal kosong")
+	}
+	return items, nil
+}
 
+func (s *SosmedServiceService) ListJAPCatalogOptions(ctx context.Context) (*PreviewSelectedJAPServicesResult, error) {
 	items, err := s.repo.List(true)
 	if err != nil {
 		return nil, errors.New("gagal memuat master layanan sosmed")
@@ -99,7 +111,7 @@ func (s *SosmedServiceService) ListJAPCatalogOptions(ctx context.Context) (*Prev
 		return nil, err
 	}
 
-	providerServices, err := s.japCatalogProvider.GetServices(ctx)
+	providerServices, err := loadEmbeddedJAPCatalog()
 	if err != nil {
 		return nil, err
 	}
