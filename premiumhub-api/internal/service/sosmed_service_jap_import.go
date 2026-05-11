@@ -741,14 +741,14 @@ func detectJAPLocalCategoryCode(item JAPServiceItem) string {
 		return "comments"
 	case strings.Contains(haystack, "follower"), strings.Contains(haystack, "member"), strings.Contains(haystack, "friend"), strings.Contains(haystack, "subscriber"):
 		return "followers"
-	case strings.Contains(haystack, "like"), strings.Contains(haystack, "reaction"), strings.Contains(haystack, "heart"):
+	case strings.Contains(haystack, "like"), strings.Contains(haystack, "reaction"), strings.Contains(haystack, "heart"), strings.Contains(haystack, "favorite"):
 		return "likes"
-	case strings.Contains(haystack, "share"), strings.Contains(haystack, "save"), strings.Contains(haystack, "bookmark"), strings.Contains(haystack, "retweet"), strings.Contains(haystack, "download"), strings.Contains(haystack, "repost"):
+	case strings.Contains(haystack, "share"), strings.Contains(haystack, "save"), strings.Contains(haystack, "bookmark"), strings.Contains(haystack, "watchlist"), strings.Contains(haystack, "retweet"), strings.Contains(haystack, "download"), strings.Contains(haystack, "repost"):
 		return "shares"
-	case strings.Contains(haystack, "view"), strings.Contains(haystack, "watchtime"), strings.Contains(haystack, "listener"), strings.Contains(haystack, "play"), strings.Contains(haystack, "reach"), strings.Contains(haystack, "impression"), strings.Contains(haystack, "visit"):
+	case strings.Contains(haystack, "view"), strings.Contains(haystack, "watchtime"), strings.Contains(haystack, "listener"), strings.Contains(haystack, "play"), strings.Contains(haystack, "reach"), strings.Contains(haystack, "impression"), strings.Contains(haystack, "visit"), strings.Contains(haystack, "traffic"), strings.Contains(haystack, "stream"):
 		return "views"
 	default:
-		return ""
+		return "views"
 	}
 }
 
