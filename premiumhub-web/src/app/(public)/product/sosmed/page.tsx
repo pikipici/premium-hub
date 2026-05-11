@@ -200,11 +200,11 @@ function PromoRibbon({ promotion }: { promotion?: SosmedPromotionPrice }) {
   const promoValue = formatPromoValue(promotion)
 
   return (
-    <div className="absolute left-0 top-0 z-20 w-full bg-[linear-gradient(110deg,#B4161B_0%,#FF3F1F_48%,#FF9B31_100%)] px-3 py-1.5 text-white shadow-[0_10px_26px_rgba(216,58,29,0.28)] sm:px-5 sm:py-2">
-      <div className="flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-[0.16em] sm:text-[10px]">
+    <div className="absolute left-0 top-0 z-20 w-full bg-[linear-gradient(110deg,#B4161B_0%,#FF3F1F_48%,#FF9B31_100%)] px-2.5 py-1 text-white shadow-[0_10px_26px_rgba(216,58,29,0.28)] sm:px-5 sm:py-2">
+      <div className="flex items-center justify-between gap-1.5 text-[8px] font-black uppercase tracking-[0.08em] sm:gap-2 sm:text-[10px] sm:tracking-[0.16em]">
         <span>{promoValue || 'Promo Aktif'}</span>
-        <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 tracking-wide backdrop-blur">
-          <Clock3 className="h-3 w-3" />
+        <span className="inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 tracking-normal backdrop-blur sm:gap-1 sm:px-2 sm:tracking-wide">
+          <Clock3 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
           {formatPromoRemaining(promotion.ends_at)}
         </span>
       </div>
@@ -224,7 +224,7 @@ function PromoUrgencyBar({ promotion }: { promotion?: SosmedPromotionPrice }) {
   if (!promotion?.ends_at) return null
 
   return (
-    <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-[#FFC7B7] bg-[#FFF0EA] px-2.5 py-2 text-[9px] font-black uppercase tracking-wide text-[#B4161B] shadow-inner sm:px-3 sm:text-[10px]">
+    <div className="mt-2 hidden items-center justify-between gap-2 rounded-2xl border border-[#FFC7B7] bg-[#FFF0EA] px-2.5 py-2 text-[9px] font-black uppercase tracking-wide text-[#B4161B] shadow-inner sm:flex sm:px-3 sm:text-[10px]">
       <span className="inline-flex items-center gap-1">
         <Clock3 className="h-3.5 w-3.5" />
         Promo berakhir
@@ -242,11 +242,11 @@ function PromoPrice({ priceLabel, originalPriceLabel, promotion }: { priceLabel:
       {promotion ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="rounded-full bg-[#141414] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-white sm:text-[9px]">Promo</span>
-          {promoValue ? <span className="rounded-full bg-[#FFE0D5] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-[#B4161B] sm:text-[9px]">{promoValue}</span> : null}
+          {promoValue ? <span className="hidden rounded-full bg-[#FFE0D5] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-[#B4161B] sm:inline-flex sm:text-[9px]">{promoValue}</span> : null}
         </div>
       ) : null}
-      {originalPriceLabel ? <span className="text-[10px] font-bold text-gray-400 line-through sm:text-sm">{originalPriceLabel}</span> : null}
-      <span className={`text-[17px] font-black tracking-tight sm:text-3xl ${promotion ? 'text-[#B4161B]' : 'text-[#141414]'}`}>{priceLabel}</span>
+      {originalPriceLabel ? <span className="text-[9px] font-bold text-gray-400 line-through sm:text-sm">{originalPriceLabel}</span> : null}
+      <span className={`text-[16px] font-black tracking-tight sm:text-3xl ${promotion ? 'text-[#B4161B]' : 'text-[#141414]'}`}>{priceLabel}</span>
     </div>
   )
 }
@@ -280,7 +280,7 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
         </div>
       )}
 
-      <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-10 sm:pt-14' : bundle.isRecommended ? 'sm:pt-8' : ''}`}>
+      <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : bundle.isRecommended ? 'sm:pt-8' : ''}`}>
         <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
           <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${bundle.tone}`}>
             <PlatformBrandIcon platformIcon={bundle.platformIcon} className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
@@ -370,7 +370,9 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
                   : 'bg-[#141414] text-white hover:bg-[#333]'
           }`}
         >
-          {canCheckoutBundle ? (hasPromo ? 'Ambil Promo' : 'Pilih Paket') : 'Segera Hadir'} <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
+          {canCheckoutBundle ? (
+            hasPromo ? <><span className="sm:hidden">Ambil</span><span className="hidden sm:inline">Ambil Promo</span></> : 'Pilih Paket'
+          ) : 'Segera Hadir'} <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
         </Link>
       </div>
     </article>
@@ -586,7 +588,7 @@ export default function ProductSosmedLandingPage() {
                     </div>
                   )}
 
-                  <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-10 sm:pt-14' : isRecommended ? 'pt-7 sm:pt-8' : ''}`}>
+                  <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : isRecommended ? 'pt-7 sm:pt-8' : ''}`}>
                     <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
                       <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${service.tone}`}>
                         <ServiceIcon className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
@@ -658,7 +660,7 @@ export default function ProductSosmedLandingPage() {
                             : 'bg-[#141414] text-white hover:bg-[#333]'
                       }`}
                     >
-                      {hasPromo ? 'Ambil Promo' : 'Pilih'} <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
+                      {hasPromo ? <><span className="sm:hidden">Ambil</span><span className="hidden sm:inline">Ambil Promo</span></> : 'Pilih'} <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
                     </Link>
                   </div>
                                 </article>
