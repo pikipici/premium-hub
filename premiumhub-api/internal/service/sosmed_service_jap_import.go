@@ -84,6 +84,71 @@ type ImportSelectedJAPServicesResult struct {
 	Items      []model.SosmedService `json:"items"`
 }
 
+func (s *SosmedServiceService) ListJAPCatalogOptions(ctx context.Context) (*PreviewSelectedJAPServicesResult, error) {
+	if s.japCatalogProvider == nil {
+		return nil, errors.New("provider katalog JAP belum terhubung")
+	}
+
+	items, err := s.repo.List(true)
+	if err != nil {
+		return nil, errors.New("gagal memuat master layanan sosmed")
+	}
+
+	modeUsed, rateUsed, rateSource, warning, err := s.resolveResellerFXRate(ctx, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	providerServices, err := s.japCatalogProvider.GetServices(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	existingByProviderID := make(map[string]model.SosmedService, len(items))
+	for _, item := range items {
+		if strings.EqualFold(strings.TrimSpace(item.ProviderCode), sosmedJAPProviderCode) && strings.TrimSpace(item.ProviderServiceID) != "" {
+			existingByProviderID[strings.TrimSpace(item.ProviderServiceID)] = item
+		}
+	}
+
+	result := &PreviewSelectedJAPServicesResult{
+		Mode:       modeUsed,
+		RateSource: rateSource,
+		RateUsed:   rateUsed,
+		Warning:    warning,
+		Requested:  len(providerServices),
+		Items:      []PreviewSelectedJAPServiceRow{},
+		NotFound:   []string{},
+	}
+
+	nextSort := nextSosmedServiceSortOrder(items)
+	for _, providerItem := range providerServices {
+		serviceID := strings.TrimSpace(string(providerItem.Service))
+		if serviceID == "" {
+			continue
+		}
+
+		row, err := s.buildJAPPreviewRow(providerItem, nextSort, rateUsed)
+		if err != nil {
+			return nil, err
+		}
+		if existing, ok := existingByProviderID[serviceID]; ok && existing.ID != uuid.Nil {
+			row.ExistingID = existing.ID.String()
+			row.ExistingCode = existing.Code
+			row.ExistingActive = existing.IsActive
+		}
+		result.Matched++
+		result.Items = append(result.Items, row)
+		nextSort += 10
+	}
+
+	sort.Slice(result.Items, func(left, right int) bool {
+		return result.Items[left].ServiceID < result.Items[right].ServiceID
+	})
+
+	return result, nil
+}
+
 func (s *SosmedServiceService) PreviewSelectedFromJAP(ctx context.Context, input ImportSelectedJAPServicesInput) (*PreviewSelectedJAPServicesResult, error) {
 	if s.japCatalogProvider == nil {
 		return nil, errors.New("provider katalog JAP belum terhubung")

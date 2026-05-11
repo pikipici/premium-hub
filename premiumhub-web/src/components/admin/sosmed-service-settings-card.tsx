@@ -66,7 +66,6 @@ import { sosmedBundleService } from '@/services/sosmedBundleService'
 import {
   sosmedService,
   type AdminJAPBalance,
-  type AdminJAPProviderService,
   type AdminSosmedImportJAPPreviewItem,
   type AdminSosmedImportJAPPreviewResult,
   type AdminSosmedResellerRepricePayload,
@@ -344,7 +343,7 @@ export default function SosmedServiceSettingsCard() {
   const [formMode, setFormMode] = useState<FormMode>('create')
   const [editingItem, setEditingItem] = useState<SosmedService | null>(null)
   const [form, setForm] = useState<SosmedServiceFormState>(() => createEmptyForm(''))
-  const [japServices, setJAPServices] = useState<AdminJAPProviderService[]>([])
+  const [japServices, setJAPServices] = useState<AdminSosmedImportJAPPreviewItem[]>([])
   const [japServicesLoading, setJAPServicesLoading] = useState(false)
   const [japServicesError, setJAPServicesError] = useState('')
   const [selectedJAPPreview, setSelectedJAPPreview] = useState<AdminSosmedImportJAPPreviewItem | null>(null)
@@ -582,10 +581,10 @@ export default function SosmedServiceSettingsCard() {
         .map((item) => String(item.provider_service_id))
     )
     return [...japServices].sort((left, right) => {
-      const leftExisting = existingProviderIDs.has(String(left.service)) ? 1 : 0
-      const rightExisting = existingProviderIDs.has(String(right.service)) ? 1 : 0
+      const leftExisting = existingProviderIDs.has(left.service_id) ? 1 : 0
+      const rightExisting = existingProviderIDs.has(right.service_id) ? 1 : 0
       if (leftExisting !== rightExisting) return leftExisting - rightExisting
-      return String(left.service).localeCompare(String(right.service), undefined, { numeric: true })
+      return left.service_id.localeCompare(right.service_id, undefined, { numeric: true })
     })
   }, [items, japServices])
 
@@ -594,12 +593,12 @@ export default function SosmedServiceSettingsCard() {
     setJAPServicesLoading(true)
     setJAPServicesError('')
     try {
-      const res = await sosmedService.adminGetJAPServices()
+      const res = await sosmedService.adminListJAPCatalogOptions()
       if (!res.success) {
         setJAPServicesError(res.message || 'Gagal memuat layanan JAP')
         return
       }
-      setJAPServices(res.data || [])
+      setJAPServices(res.data?.items || [])
     } catch (err) {
       setJAPServicesError(mapErrorMessage(err, 'Gagal memuat layanan JAP'))
     } finally {
@@ -1302,37 +1301,23 @@ export default function SosmedServiceSettingsCard() {
     setImportJAPPreview(null)
   }
 
-  const selectJAPServiceForForm = async (service: AdminJAPProviderService) => {
-    const serviceID = Number(service.service)
-    if (!Number.isFinite(serviceID) || serviceID <= 0) return
-
+  const selectJAPServiceForForm = (preview: AdminSosmedImportJAPPreviewItem) => {
     setError('')
-    try {
-      const res = await sosmedService.adminPreviewJAPSelected({ service_ids: [serviceID] })
-      const preview = res.data?.items?.[0]
-      if (!res.success || !preview) {
-        setError(res.message || 'Gagal mengambil detail layanan JAP')
-        return
-      }
-
-      setSelectedJAPPreview(preview)
-      setForm((current) => ({
-        ...current,
-        category_code: preview.local_category_code || current.category_code,
-        code: preview.local_code || current.code,
-        title: preview.local_title || current.title,
-        platform_label: preview.platform_label || current.platform_label,
-        min_order: preview.min || current.min_order,
-        start_time: preview.start_time || current.start_time,
-        refill: preview.refill || current.refill,
-        eta: preview.eta || current.eta,
-        price_start: preview.price_start || current.price_start,
-        price_per_1k: preview.price_per_1k || current.price_per_1k,
-        checkout_price: preview.price_per_1k || current.checkout_price,
-      }))
-    } catch (err) {
-      setError(mapErrorMessage(err, 'Gagal mengambil detail layanan JAP'))
-    }
+    setSelectedJAPPreview(preview)
+    setForm((current) => ({
+      ...current,
+      category_code: preview.local_category_code || current.category_code,
+      code: preview.local_code || current.code,
+      title: preview.local_title || current.title,
+      platform_label: preview.platform_label || current.platform_label,
+      min_order: preview.min || current.min_order,
+      start_time: preview.start_time || current.start_time,
+      refill: preview.refill || current.refill,
+      eta: preview.eta || current.eta,
+      price_start: preview.price_start || current.price_start,
+      price_per_1k: preview.price_per_1k || current.price_per_1k,
+      checkout_price: preview.price_per_1k || current.checkout_price,
+    }))
   }
 
   const submitForm = async () => {
@@ -3514,15 +3499,15 @@ export default function SosmedServiceSettingsCard() {
                         value={selectedJAPPreview?.service_id || ''}
                         onFocus={() => void loadJAPServices()}
                         onChange={(event) => {
-                          const service = sortedJAPServices.find((item) => String(item.service) === event.target.value)
-                          if (service) void selectJAPServiceForForm(service)
+                          const service = sortedJAPServices.find((item) => item.service_id === event.target.value)
+                          if (service) selectJAPServiceForForm(service)
                         }}
                         disabled={japServicesLoading}
                       >
                         <option value="">{japServicesLoading ? 'Memuat layanan JAP...' : 'Pilih layanan JAP'}</option>
                         {sortedJAPServices.map((service) => (
-                          <option key={String(service.service)} value={String(service.service)}>
-                            #{service.service} - {service.name} | {service.category} | rate {service.rate} | min {service.min} max {service.max}
+                          <option key={service.service_id} value={service.service_id}>
+                            #{service.service_id} - {service.provider_name} | {service.provider_category} | rate {service.provider_rate} | min {service.min} max {service.max}
                           </option>
                         ))}
                       </select>

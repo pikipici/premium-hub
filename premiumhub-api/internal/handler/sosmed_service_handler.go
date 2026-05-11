@@ -240,6 +240,16 @@ func (h *SosmedServiceHandler) RepriceReseller(c *gin.Context) {
 	response.Success(c, "Sinkronisasi harga reseller selesai", res)
 }
 
+func (h *SosmedServiceHandler) ListJAPCatalogOptions(c *gin.Context) {
+	res, err := h.svc.ListJAPCatalogOptions(c.Request.Context())
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Katalog layanan JAP siap dipilih", res)
+}
+
 func (h *SosmedServiceHandler) PreviewSelectedFromJAP(c *gin.Context) {
 	var input service.ImportSelectedJAPServicesInput
 	if err := c.ShouldBindJSON(&input); err != nil {

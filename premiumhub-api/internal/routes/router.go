@@ -439,6 +439,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		japHandler.GetServices,
 	)
 	admin.POST("/sosmed/services", sosmedServiceHandler.Create)
+	admin.GET("/sosmed/services/jap-catalog-options", sosmedServiceHandler.ListJAPCatalogOptions)
 	admin.POST("/sosmed/services/preview-jap-selected", sosmedServiceHandler.PreviewSelectedFromJAP)
 	admin.POST("/sosmed/services/import-jap-selected", sosmedServiceHandler.ImportSelectedFromJAP)
 	admin.POST("/sosmed/provider/jap/sync-metadata", sosmedServiceHandler.SyncJAPMetadata)
