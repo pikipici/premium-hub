@@ -42,6 +42,21 @@ function formatRupiah(value: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value || 0)
 }
 
+function isPromoExpired(promo: Pick<AdminSosmedPromotion, 'ends_at'>, nowMs: number) {
+  const endsAtMs = new Date(promo.ends_at).getTime()
+  return Number.isFinite(endsAtMs) && endsAtMs <= nowMs
+}
+
+function promoStatusMeta(promo: AdminSosmedPromotion, nowMs: number) {
+  if (isPromoExpired(promo, nowMs)) {
+    return { label: 'Kadaluarsa', className: 'bg-amber-50 text-amber-700' }
+  }
+  if (promo.is_active) {
+    return { label: 'Aktif', className: 'bg-green-50 text-green-700' }
+  }
+  return { label: 'Nonaktif', className: 'bg-gray-100 text-gray-500' }
+}
+
 export default function SosmedPromotionCard() {
   const [promotions, setPromotions] = useState<AdminSosmedPromotion[]>([])
   const [services, setServices] = useState<SosmedService[]>([])
@@ -50,6 +65,12 @@ export default function SosmedPromotionCard() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -225,19 +246,23 @@ export default function SosmedPromotionCard() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {promotions.map((promo) => (
-              <tr key={promo.id}>
-                <td className="py-3 font-bold">{promo.name}</td>
-                <td>{promo.target_type === 'service' ? 'Layanan' : 'Paket'}<br /><span className="text-xs text-gray-400">{promo.target_id}</span></td>
-                <td>{promo.discount_type === 'percent' ? `${promo.discount_value}%` : formatRupiah(promo.discount_value)}</td>
-                <td className="text-xs text-gray-500">{new Date(promo.starts_at).toLocaleString('id-ID')}<br />{new Date(promo.ends_at).toLocaleString('id-ID')}</td>
-                <td><span className={`rounded-full px-2 py-1 text-xs font-black ${promo.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{promo.is_active ? 'Aktif' : 'Nonaktif'}</span></td>
-                <td className="space-x-2">
-                  <button type="button" onClick={() => editPromo(promo)} className="font-bold text-[#FF5733]">Edit</button>
-                  <button type="button" onClick={() => void toggleStatus(promo)} className="font-bold text-gray-600">{promo.is_active ? 'Disable' : 'Enable'}</button>
-                </td>
-              </tr>
-            ))}
+            {promotions.map((promo) => {
+              const status = promoStatusMeta(promo, nowMs)
+
+              return (
+                <tr key={promo.id}>
+                  <td className="py-3 font-bold">{promo.name}</td>
+                  <td>{promo.target_type === 'service' ? 'Layanan' : 'Paket'}<br /><span className="text-xs text-gray-400">{promo.target_id}</span></td>
+                  <td>{promo.discount_type === 'percent' ? `${promo.discount_value}%` : formatRupiah(promo.discount_value)}</td>
+                  <td className="text-xs text-gray-500">{new Date(promo.starts_at).toLocaleString('id-ID')}<br />{new Date(promo.ends_at).toLocaleString('id-ID')}</td>
+                  <td><span className={`rounded-full px-2 py-1 text-xs font-black ${status.className}`}>{status.label}</span></td>
+                  <td className="space-x-2">
+                    <button type="button" onClick={() => editPromo(promo)} className="font-bold text-[#FF5733]">Edit</button>
+                    <button type="button" onClick={() => void toggleStatus(promo)} className="font-bold text-gray-600">{promo.is_active ? 'Disable' : 'Enable'}</button>
+                  </td>
+                </tr>
+              )
+            })}
             {!promotions.length ? <tr><td colSpan={6} className="py-6 text-center text-gray-400">Belum ada promo</td></tr> : null}
           </tbody>
         </table>
