@@ -347,8 +347,6 @@ export default function SosmedServiceSettingsCard() {
   const [japServices, setJAPServices] = useState<AdminJAPProviderService[]>([])
   const [japServicesLoading, setJAPServicesLoading] = useState(false)
   const [japServicesError, setJAPServicesError] = useState('')
-  const [japServiceQuery, setJAPServiceQuery] = useState('')
-  const [japPickerOpen, setJAPPickerOpen] = useState(false)
   const [selectedJAPPreview, setSelectedJAPPreview] = useState<AdminSosmedImportJAPPreviewItem | null>(null)
 
   const [packageFormOpen, setPackageFormOpen] = useState(false)
@@ -577,31 +575,19 @@ export default function SosmedServiceSettingsCard() {
     (importJAPPreview.not_found || []).length === 0 &&
     unsupportedJAPPreviewItems.length === 0
 
-  const selectedJAPLabel = selectedJAPPreview
-    ? `#${selectedJAPPreview.service_id} - ${selectedJAPPreview.provider_name}`
-    : ''
-
-  const filteredJAPServices = useMemo(() => {
-    const query = japServiceQuery.toLowerCase().trim()
+  const sortedJAPServices = useMemo(() => {
     const existingProviderIDs = new Set(
       items
         .filter((item) => (item.provider_code || '').toLowerCase() === 'jap' && item.provider_service_id)
         .map((item) => String(item.provider_service_id))
     )
-    return japServices
-      .filter((item) => {
-        if (!query) return true
-        const haystack = `${item.service} ${item.name} ${item.category} ${item.type}`.toLowerCase()
-        return haystack.includes(query)
-      })
-      .sort((left, right) => {
-        const leftExisting = existingProviderIDs.has(String(left.service)) ? 1 : 0
-        const rightExisting = existingProviderIDs.has(String(right.service)) ? 1 : 0
-        if (leftExisting !== rightExisting) return leftExisting - rightExisting
-        return String(left.service).localeCompare(String(right.service), undefined, { numeric: true })
-      })
-      .slice(0, 80)
-  }, [items, japServiceQuery, japServices])
+    return [...japServices].sort((left, right) => {
+      const leftExisting = existingProviderIDs.has(String(left.service)) ? 1 : 0
+      const rightExisting = existingProviderIDs.has(String(right.service)) ? 1 : 0
+      if (leftExisting !== rightExisting) return leftExisting - rightExisting
+      return String(left.service).localeCompare(String(right.service), undefined, { numeric: true })
+    })
+  }, [items, japServices])
 
   const loadJAPServices = useCallback(async () => {
     if (japServices.length > 0 || japServicesLoading) return
@@ -719,8 +705,6 @@ export default function SosmedServiceSettingsCard() {
     setEditingItem(null)
     setForm(createEmptyForm(defaultCategoryCode))
     setSelectedJAPPreview(null)
-    setJAPPickerOpen(false)
-    setJAPServiceQuery('')
     setError('')
     setFormOpen(true)
     void loadJAPServices()
@@ -730,8 +714,6 @@ export default function SosmedServiceSettingsCard() {
     setFormMode('edit')
     setEditingItem(item)
     setSelectedJAPPreview(null)
-    setJAPPickerOpen(false)
-    setJAPServiceQuery(item.provider_service_id ? `${item.provider_service_id} - ${item.provider_title || item.title}` : '')
     setForm({
       category_code: item.category_code || defaultCategoryCode,
       code: item.code || '',
@@ -760,8 +742,6 @@ export default function SosmedServiceSettingsCard() {
     setFormOpen(false)
     setEditingItem(null)
     setSelectedJAPPreview(null)
-    setJAPPickerOpen(false)
-    setJAPServiceQuery('')
     setForm(createEmptyForm(defaultCategoryCode))
   }
 
@@ -1336,8 +1316,6 @@ export default function SosmedServiceSettingsCard() {
       }
 
       setSelectedJAPPreview(preview)
-      setJAPPickerOpen(false)
-      setJAPServiceQuery('')
       setForm((current) => ({
         ...current,
         category_code: preview.local_category_code || current.category_code,
@@ -3527,107 +3505,47 @@ export default function SosmedServiceSettingsCard() {
                   </select>
                 </div>
 
-                <div style={{ position: 'relative' }}>
+                <div>
                   <label className="form-label">Kode / Layanan JAP</label>
                   {formMode === 'create' ? (
                     <>
-                      <button
-                        type="button"
-                        className="form-input"
-                        onClick={() => {
-                          setJAPPickerOpen((open) => !open)
-                          void loadJAPServices()
+                      <select
+                        className="form-select"
+                        value={selectedJAPPreview?.service_id || ''}
+                        onFocus={() => void loadJAPServices()}
+                        onChange={(event) => {
+                          const service = sortedJAPServices.find((item) => String(item.service) === event.target.value)
+                          if (service) void selectJAPServiceForForm(service)
                         }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 8,
-                          minHeight: 44,
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          background: '#fff',
-                        }}
+                        disabled={japServicesLoading}
                       >
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {selectedJAPLabel || 'Pilih layanan JAP'}
-                        </span>
-                        <span style={{ color: '#FF5733', fontWeight: 800 }}>{japPickerOpen ? '^' : 'v' }</span>
-                      </button>
-
-                      {japPickerOpen && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            zIndex: 40,
-                            top: 'calc(100% + 6px)',
-                            left: 0,
-                            right: 0,
-                            border: '1px solid #FED7CC',
-                            borderRadius: 14,
-                            background: '#fff',
-                            boxShadow: '0 18px 45px rgba(40, 18, 13, 0.16)',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <div style={{ padding: 10, borderBottom: '1px solid #FED7CC', background: '#FFF7F3' }}>
-                            <input
-                              className="form-input"
-                              value={japServiceQuery}
-                              autoFocus
-                              onChange={(event) => setJAPServiceQuery(event.target.value)}
-                              placeholder="Cari ID/nama/kategori layanan..."
-                            />
-                          </div>
-                          <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                            {japServicesLoading && <div style={{ ...FIELD_HELP_STYLE, padding: 12 }}>Memuat layanan JAP...</div>}
-                            {japServicesError && (
-                              <div style={{ padding: 12 }}>
-                                <div style={{ ...FIELD_HELP_STYLE, color: '#B42318', marginBottom: 8 }}>{japServicesError}</div>
-                                <button
-                                  type="button"
-                                  className="btn-secondary"
-                                  onClick={() => {
-                                    setJAPServices([])
-                                    void loadJAPServices()
-                                  }}
-                                >
-                                  Coba Lagi
-                                </button>
-                              </div>
-                            )}
-                            {!japServicesLoading && !japServicesError && filteredJAPServices.length === 0 && (
-                              <div style={{ ...FIELD_HELP_STYLE, padding: 12 }}>Tidak ada layanan cocok.</div>
-                            )}
-                            {!japServicesLoading && !japServicesError && filteredJAPServices.map((service) => (
-                              <button
-                                key={String(service.service)}
-                                type="button"
-                                onClick={() => void selectJAPServiceForForm(service)}
-                                style={{
-                                  display: 'block',
-                                  width: '100%',
-                                  padding: '10px 12px',
-                                  border: 0,
-                                  borderBottom: '1px solid #FBE6DF',
-                                  background: String(service.service) === selectedJAPPreview?.service_id ? '#FFE4DC' : '#fff',
-                                  color: '#28120D',
-                                  textAlign: 'left',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <strong>#{service.service}</strong> {service.name}
-                                <span style={{ display: 'block', fontSize: 11, color: '#8A4A3B', marginTop: 2 }}>
-                                  {service.category} / {service.type} / rate {service.rate} / min {service.min} max {service.max}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
+                        <option value="">{japServicesLoading ? 'Memuat layanan JAP...' : 'Pilih layanan JAP'}</option>
+                        {sortedJAPServices.map((service) => (
+                          <option key={String(service.service)} value={String(service.service)}>
+                            #{service.service} - {service.name} | {service.category} | rate {service.rate} | min {service.min} max {service.max}
+                          </option>
+                        ))}
+                      </select>
+                      {japServicesError && (
+                        <div style={{ ...FIELD_HELP_STYLE, color: '#B42318', marginTop: 6 }}>
+                          {japServicesError}{' '}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setJAPServices([])
+                              void loadJAPServices()
+                            }}
+                            style={{ border: 0, background: 'transparent', color: '#FF5733', cursor: 'pointer', fontWeight: 800, padding: 0 }}
+                          >
+                            Coba lagi
+                          </button>
                         </div>
                       )}
-
+                      {!japServicesLoading && !japServicesError && sortedJAPServices.length === 0 && (
+                        <div style={FIELD_HELP_STYLE}>Belum ada layanan JAP yang bisa dipilih.</div>
+                      )}
                       <div style={FIELD_HELP_STYLE}>
-                        Kode lokal: <strong>{form.code || '-'}</strong>. Pilih dari dropdown JAP untuk auto-fill metadata dan harga.
+                        Kode lokal: <strong>{form.code || '-'}</strong>. Admin tinggal pilih layanan JAP dari dropdown untuk auto-fill metadata dan harga.
                       </div>
                     </>
                   ) : (
