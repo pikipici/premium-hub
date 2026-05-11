@@ -83,6 +83,8 @@ func (r *ChatRepo) ListAdminInbox(status, search string, page, limit int) ([]Adm
 	st := strings.ToLower(strings.TrimSpace(status))
 	if st == "open" || st == "closed" {
 		q = q.Where("c.status = ?", st)
+	} else if st == "unread" {
+		q = q.Where("c.unread_for_admin > 0")
 	}
 
 	if s := strings.TrimSpace(search); s != "" {

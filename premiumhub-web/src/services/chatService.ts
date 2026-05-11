@@ -15,7 +15,7 @@ export interface ChatListQuery {
 export interface AdminInboxQuery {
   page?: number
   limit?: number
-  status?: ChatStatus | 'all'
+  status?: ChatStatus | 'unread' | 'all'
   q?: string
 }
 

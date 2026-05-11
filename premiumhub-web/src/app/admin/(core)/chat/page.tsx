@@ -23,7 +23,7 @@ import type {
 } from '@/types/chat'
 
 type ConnState = 'connecting' | 'open' | 'closed'
-type InboxFilter = 'open' | 'closed' | 'all'
+type InboxFilter = 'unread' | 'open' | 'closed' | 'all'
 
 function formatTime(value: string | null | undefined) {
   if (!value) return ''
@@ -365,20 +365,38 @@ export default function AdminChatPage() {
           </p>
 
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {(['open', 'closed', 'all'] as InboxFilter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                  filter === f
-                    ? 'border-[#141414] bg-[#141414] text-white'
-                    : 'border-[#E5E5E3] bg-white text-[#666] hover:bg-[#F7F7F5]'
-                }`}
-              >
-                {f === 'open' ? 'Open' : f === 'closed' ? 'Closed' : 'Semua'}
-              </button>
-            ))}
+            {(['unread', 'open', 'closed', 'all'] as InboxFilter[]).map((f) => {
+              const count = f === 'unread' ? unreadTotal : 0
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    filter === f
+                      ? 'border-[#141414] bg-[#141414] text-white'
+                      : 'border-[#E5E5E3] bg-white text-[#666] hover:bg-[#F7F7F5]'
+                  }`}
+                >
+                  {f === 'unread'
+                    ? 'Unread'
+                    : f === 'open'
+                      ? 'Open'
+                      : f === 'closed'
+                        ? 'Closed'
+                        : 'Semua'}
+                  {f === 'unread' && count > 0 ? (
+                    <span
+                      className={`rounded-full px-1.5 text-[10px] font-bold ${
+                        filter === f ? 'bg-white text-[#141414]' : 'bg-[#E0592A] text-white'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
           </div>
 
           <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-[#E2E2E2] bg-white px-2">
@@ -542,8 +560,12 @@ export default function AdminChatPage() {
                           }`}
                         >
                           {formatTime(m.created_at)}
-                          {mine && m.read_by_user ? (
-                            <CheckCheck className="h-3 w-3" />
+                          {mine ? (
+                            <CheckCheck
+                              className={`h-3 w-3 ${
+                                m.read_by_user ? 'text-[#4FC3F7]' : 'text-white/50'
+                              }`}
+                            />
                           ) : null}
                         </p>
                       </div>

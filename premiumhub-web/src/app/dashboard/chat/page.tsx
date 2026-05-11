@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2, RefreshCcw, Send, WifiOff } from 'lucide-react'
+import { CheckCheck, Loader2, RefreshCcw, Send, WifiOff } from 'lucide-react'
 
 import { ChatSocket } from '@/lib/chatSocket'
 import { chatService } from '@/services/chatService'
@@ -264,8 +264,19 @@ export default function DashboardChatPage() {
                     }`}
                   >
                     <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                    <p className={`mt-1 text-[10px] ${mine ? 'text-white/70' : 'text-[#999]'}`}>
-                      {formatTime(m.created_at)} {mine ? (m.read_by_admin ? '• dibaca' : '• terkirim') : ''}
+                    <p
+                      className={`mt-1 flex items-center gap-1 text-[10px] ${
+                        mine ? 'text-white/70' : 'text-[#999]'
+                      }`}
+                    >
+                      {formatTime(m.created_at)}
+                      {mine ? (
+                        <CheckCheck
+                          className={`h-3 w-3 ${
+                            m.read_by_admin ? 'text-[#4FC3F7]' : 'text-white/50'
+                          }`}
+                        />
+                      ) : null}
                     </p>
                   </div>
                 </div>
