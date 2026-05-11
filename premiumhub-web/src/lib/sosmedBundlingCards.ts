@@ -209,7 +209,7 @@ function toneForBundle(bundle: Pick<SosmedBundlePackage, 'platform' | 'key'>) {
   return PLATFORM_TONES.find(([pattern]) => pattern.test(haystack))?.[1] || 'from-[#F4F4F2] to-[#ECECEA]'
 }
 
-function sanitizeProviderServiceTitle(title: string) {
+export function sanitizeProviderServiceTitle(title: string) {
   return title
     .replace(/\[[^\]]*\]/g, ' ')
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ')

@@ -11,6 +11,7 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { SOSMED_TARGET_INPUT_COPY } from '@/lib/sosmedCheckoutCopy'
 import { buildSosmedCheckoutServiceDisplay } from '@/lib/sosmedCheckoutDisplay'
+import { sanitizeProviderServiceTitle } from '@/lib/sosmedBundlingCards'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
@@ -402,7 +403,7 @@ function SosmedCheckoutContent() {
                     <div className="space-y-2">
                       {(bundleVariant?.items || []).map((item) => (
                         <div key={`${item.service_code}-${item.quantity_units}`} className="flex justify-between gap-3 text-xs">
-                          <span className="font-semibold text-[#444]">{item.title}</span>
+                          <span className="font-semibold text-[#444]">{sanitizeProviderServiceTitle(item.title)}</span>
                           <span className="text-right font-bold text-[#141414]">{item.quantity_units.toLocaleString('id-ID')} unit</span>
                         </div>
                       ))}
