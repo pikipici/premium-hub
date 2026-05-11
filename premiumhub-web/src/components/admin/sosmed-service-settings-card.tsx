@@ -66,6 +66,8 @@ import { sosmedBundleService } from '@/services/sosmedBundleService'
 import {
   sosmedService,
   type AdminJAPBalance,
+  type AdminJAPProviderService,
+  type AdminSosmedImportJAPPreviewItem,
   type AdminSosmedImportJAPPreviewResult,
   type AdminSosmedResellerRepricePayload,
   type AdminSosmedServicePayload,
@@ -342,6 +344,11 @@ export default function SosmedServiceSettingsCard() {
   const [formMode, setFormMode] = useState<FormMode>('create')
   const [editingItem, setEditingItem] = useState<SosmedService | null>(null)
   const [form, setForm] = useState<SosmedServiceFormState>(() => createEmptyForm(''))
+  const [japServices, setJAPServices] = useState<AdminJAPProviderService[]>([])
+  const [japServicesLoading, setJAPServicesLoading] = useState(false)
+  const [japServicesError, setJAPServicesError] = useState('')
+  const [japServiceQuery, setJAPServiceQuery] = useState('')
+  const [selectedJAPPreview, setSelectedJAPPreview] = useState<AdminSosmedImportJAPPreviewItem | null>(null)
 
   const [packageFormOpen, setPackageFormOpen] = useState(false)
   const [packageFormMode, setPackageFormMode] = useState<AdminSosmedBundlePackageFormMode>('create')
@@ -569,6 +576,46 @@ export default function SosmedServiceSettingsCard() {
     (importJAPPreview.not_found || []).length === 0 &&
     unsupportedJAPPreviewItems.length === 0
 
+  const filteredJAPServices = useMemo(() => {
+    const query = japServiceQuery.toLowerCase().trim()
+    const existingProviderIDs = new Set(
+      items
+        .filter((item) => (item.provider_code || '').toLowerCase() === 'jap' && item.provider_service_id)
+        .map((item) => String(item.provider_service_id))
+    )
+    return japServices
+      .filter((item) => {
+        if (!query) return true
+        const haystack = `${item.service} ${item.name} ${item.category} ${item.type}`.toLowerCase()
+        return haystack.includes(query)
+      })
+      .sort((left, right) => {
+        const leftExisting = existingProviderIDs.has(String(left.service)) ? 1 : 0
+        const rightExisting = existingProviderIDs.has(String(right.service)) ? 1 : 0
+        if (leftExisting !== rightExisting) return leftExisting - rightExisting
+        return String(left.service).localeCompare(String(right.service), undefined, { numeric: true })
+      })
+      .slice(0, 80)
+  }, [items, japServiceQuery, japServices])
+
+  const loadJAPServices = useCallback(async () => {
+    if (japServices.length > 0 || japServicesLoading) return
+    setJAPServicesLoading(true)
+    setJAPServicesError('')
+    try {
+      const res = await sosmedService.adminGetJAPServices()
+      if (!res.success) {
+        setJAPServicesError(res.message || 'Gagal memuat layanan JAP')
+        return
+      }
+      setJAPServices(res.data || [])
+    } catch (err) {
+      setJAPServicesError(mapErrorMessage(err, 'Gagal memuat layanan JAP'))
+    } finally {
+      setJAPServicesLoading(false)
+    }
+  }, [japServices.length, japServicesLoading])
+
   const loadJAPBalance = useCallback(async () => {
     setJAPBalanceLoading(true)
     setJAPBalanceError('')
@@ -666,13 +713,18 @@ export default function SosmedServiceSettingsCard() {
     setFormMode('create')
     setEditingItem(null)
     setForm(createEmptyForm(defaultCategoryCode))
+    setSelectedJAPPreview(null)
+    setJAPServiceQuery('')
     setError('')
     setFormOpen(true)
+    void loadJAPServices()
   }
 
   const openEditForm = (item: SosmedService) => {
     setFormMode('edit')
     setEditingItem(item)
+    setSelectedJAPPreview(null)
+    setJAPServiceQuery(item.provider_service_id ? `${item.provider_service_id} - ${item.provider_title || item.title}` : '')
     setForm({
       category_code: item.category_code || defaultCategoryCode,
       code: item.code || '',
@@ -700,6 +752,8 @@ export default function SosmedServiceSettingsCard() {
     if (saving) return
     setFormOpen(false)
     setEditingItem(null)
+    setSelectedJAPPreview(null)
+    setJAPServiceQuery('')
     setForm(createEmptyForm(defaultCategoryCode))
   }
 
@@ -1260,6 +1314,40 @@ export default function SosmedServiceSettingsCard() {
     setImportJAPPreview(null)
   }
 
+  const selectJAPServiceForForm = async (service: AdminJAPProviderService) => {
+    const serviceID = Number(service.service)
+    if (!Number.isFinite(serviceID) || serviceID <= 0) return
+
+    setError('')
+    try {
+      const res = await sosmedService.adminPreviewJAPSelected({ service_ids: [serviceID] })
+      const preview = res.data?.items?.[0]
+      if (!res.success || !preview) {
+        setError(res.message || 'Gagal mengambil detail layanan JAP')
+        return
+      }
+
+      setSelectedJAPPreview(preview)
+      setJAPServiceQuery(`${preview.service_id} - ${preview.provider_name}`)
+      setForm((current) => ({
+        ...current,
+        category_code: preview.local_category_code || current.category_code,
+        code: preview.local_code || current.code,
+        title: preview.local_title || current.title,
+        platform_label: preview.platform_label || current.platform_label,
+        min_order: preview.min || current.min_order,
+        start_time: preview.start_time || current.start_time,
+        refill: preview.refill || current.refill,
+        eta: preview.eta || current.eta,
+        price_start: preview.price_start || current.price_start,
+        price_per_1k: preview.price_per_1k || current.price_per_1k,
+        checkout_price: preview.price_per_1k || current.checkout_price,
+      }))
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal mengambil detail layanan JAP'))
+    }
+  }
+
   const submitForm = async () => {
     const normalizedCode = normalizeCode(form.code)
     if (!form.category_code) {
@@ -1268,6 +1356,10 @@ export default function SosmedServiceSettingsCard() {
     }
     if (!normalizedCode) {
       setError('Kode layanan wajib diisi')
+      return
+    }
+    if (formMode === 'create' && !selectedJAPPreview) {
+      setError('Pilih layanan JAP dari dropdown terlebih dahulu')
       return
     }
     if (!form.title.trim()) {
@@ -1301,6 +1393,20 @@ export default function SosmedServiceSettingsCard() {
       trust_badges: trustBadges,
       sort_order: sortOrder,
       is_active: form.is_active,
+      ...(selectedJAPPreview
+        ? {
+          provider_code: 'jap',
+          provider_service_id: selectedJAPPreview.service_id,
+          provider_title: selectedJAPPreview.provider_name,
+          provider_category: selectedJAPPreview.provider_category,
+          provider_type: selectedJAPPreview.provider_type,
+          provider_rate: selectedJAPPreview.provider_rate,
+          provider_currency: selectedJAPPreview.provider_currency,
+          provider_refill_supported: selectedJAPPreview.refill_supported,
+          provider_cancel_supported: selectedJAPPreview.cancel_supported,
+          provider_dripfeed_supported: selectedJAPPreview.dripfeed_supported,
+        }
+        : {}),
     }
 
     setSaving(true)
@@ -1334,6 +1440,16 @@ export default function SosmedServiceSettingsCard() {
           trust_badges: payloadBase.trust_badges,
           sort_order: payloadBase.sort_order,
           is_active: payloadBase.is_active,
+          provider_code: payloadBase.provider_code,
+          provider_service_id: payloadBase.provider_service_id,
+          provider_title: payloadBase.provider_title,
+          provider_category: payloadBase.provider_category,
+          provider_type: payloadBase.provider_type,
+          provider_rate: payloadBase.provider_rate,
+          provider_currency: payloadBase.provider_currency,
+          provider_refill_supported: payloadBase.provider_refill_supported,
+          provider_cancel_supported: payloadBase.provider_cancel_supported,
+          provider_dripfeed_supported: payloadBase.provider_dripfeed_supported,
         }
 
         const res = await sosmedService.adminUpdate(editingItem.id, payload)
@@ -3403,19 +3519,68 @@ export default function SosmedServiceSettingsCard() {
                 </div>
 
                 <div>
-                  <label className="form-label">Kode</label>
-                  <input
-                    className="form-input"
-                    value={form.code}
-                    onChange={(event) => setForm((prev) => ({ ...prev, code: normalizeCode(event.target.value) }))}
-                    disabled={formMode === 'edit'}
-                    placeholder="contoh: ig-followers-id"
-                  />
-                  <div style={FIELD_HELP_STYLE}>
-                    {formMode === 'create'
-                      ? 'Auto slug lowercase; kode ini permanen setelah layanan dibuat.'
-                      : 'Kode permanen dan tidak bisa diubah setelah layanan dibuat.'}
-                  </div>
+                  <label className="form-label">Kode / Layanan JAP</label>
+                  {formMode === 'create' ? (
+                    <>
+                      <input
+                        className="form-input"
+                        value={japServiceQuery}
+                        onFocus={() => void loadJAPServices()}
+                        onChange={(event) => {
+                          setJAPServiceQuery(event.target.value)
+                          setSelectedJAPPreview(null)
+                        }}
+                        placeholder="Cari ID/nama layanan JAP..."
+                      />
+                      <div
+                        style={{
+                          marginTop: 6,
+                          maxHeight: 180,
+                          overflowY: 'auto',
+                          border: '1px solid #FED7CC',
+                          borderRadius: 12,
+                          background: '#FFF7F3',
+                        }}
+                      >
+                        {japServicesLoading && <div style={{ ...FIELD_HELP_STYLE, padding: 10 }}>Memuat layanan JAP...</div>}
+                        {japServicesError && <div style={{ ...FIELD_HELP_STYLE, padding: 10, color: '#B42318' }}>{japServicesError}</div>}
+                        {!japServicesLoading && !japServicesError && filteredJAPServices.length === 0 && (
+                          <div style={{ ...FIELD_HELP_STYLE, padding: 10 }}>Tidak ada layanan cocok.</div>
+                        )}
+                        {!japServicesLoading && filteredJAPServices.map((service) => (
+                          <button
+                            key={String(service.service)}
+                            type="button"
+                            onClick={() => void selectJAPServiceForForm(service)}
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              padding: '9px 10px',
+                              border: 0,
+                              borderBottom: '1px solid #FED7CC',
+                              background: String(service.service) === selectedJAPPreview?.service_id ? '#FFE4DC' : 'transparent',
+                              color: '#28120D',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <strong>#{service.service}</strong> {service.name}
+                            <span style={{ display: 'block', fontSize: 11, color: '#8A4A3B', marginTop: 2 }}>
+                              {service.category} / {service.type} / rate {service.rate} / min {service.min} max {service.max}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <div style={FIELD_HELP_STYLE}>
+                        Kode lokal: <strong>{form.code || '-'}</strong>. Pilih layanan JAP untuk auto-fill metadata dan harga.
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <input className="form-input" value={form.code} disabled />
+                      <div style={FIELD_HELP_STYLE}>Kode permanen dan tidak bisa diubah setelah layanan dibuat.</div>
+                    </>
+                  )}
                 </div>
 
                 <div>
