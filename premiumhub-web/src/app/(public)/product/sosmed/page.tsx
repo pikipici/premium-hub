@@ -287,21 +287,21 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
 
       <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : ''}`}>
         <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
-          <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${bundle.tone}`}>
-            <PlatformBrandIcon platformIcon={bundle.platformIcon} className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <span className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider sm:px-3 sm:py-1 sm:text-[9px] ${
+          <div className="flex min-w-0 items-start gap-2 sm:gap-3">
+            <div className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${bundle.tone}`}>
+              <PlatformBrandIcon platformIcon={bundle.platformIcon} className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
+            </div>
+            <span className={`mt-0.5 max-w-[88px] truncate rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider sm:mt-1 sm:max-w-[130px] sm:px-3 sm:py-1 sm:text-[9px] ${
               bundle.isRecommended ? 'bg-[#FF5733] text-white shadow-sm' : 'border border-[#EBEBEB] bg-gray-50 text-gray-500'
             }`}>
               {bundle.platform}
             </span>
-            {!bundle.isRecommended && (
-              <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[8px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[9px]">
-                {bundle.badge}
-              </span>
-            )}
           </div>
+          {!bundle.isRecommended && (
+            <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[8px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[9px]">
+              {bundle.badge}
+            </span>
+          )}
         </div>
 
         <div>
@@ -587,21 +587,21 @@ export default function ProductSosmedLandingPage() {
 
                   <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : ''}`}>
                     <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
-                      <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${service.tone}`}>
-                        <ServiceIcon className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider sm:px-3 sm:py-1 sm:text-[9px] ${
+                      <div className="flex min-w-0 items-start gap-2 sm:gap-3">
+                        <div className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${service.tone}`}>
+                          <ServiceIcon className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
+                        </div>
+                        <span className={`mt-0.5 max-w-[88px] truncate rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider sm:mt-1 sm:max-w-[130px] sm:px-3 sm:py-1 sm:text-[9px] ${
                           isRecommended ? 'bg-[#FF5733] text-white shadow-sm' : 'border border-[#EBEBEB] bg-gray-50 text-gray-500'
                         }`}>
                           {service.platform}
                         </span>
-                        {!isRecommended && (
-                          <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[8px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[9px]">
-                            {service.badge}
-                          </span>
-                        )}
                       </div>
+                      {!isRecommended && (
+                        <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[8px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[9px]">
+                          {service.badge}
+                        </span>
+                      )}
                     </div>
 
                     <div>
