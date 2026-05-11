@@ -212,6 +212,15 @@ function PromoRibbon({ promotion }: { promotion?: SosmedPromotionPrice }) {
   )
 }
 
+function RecommendedSash() {
+  return (
+    <div className="pointer-events-none absolute -right-9 top-4 z-20 w-32 rotate-45 bg-[linear-gradient(110deg,#F59E0B,#FACC15)] py-1 text-center text-[8px] font-black uppercase tracking-[0.12em] text-[#3A2500] shadow-[0_8px_18px_rgba(245,158,11,0.28)] sm:-right-10 sm:top-5 sm:w-36 sm:text-[9px]">
+      <span className="sm:hidden">Best</span>
+      <span className="hidden sm:inline">Best Pick</span>
+    </div>
+  )
+}
+
 function PromoUrgencyBar({ promotion }: { promotion?: SosmedPromotionPrice }) {
   const [, setTick] = useState(0)
 
@@ -268,37 +277,29 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
         hasPromo
           ? 'border-[#D83A1D] bg-[radial-gradient(circle_at_top_left,#FFE0D5_0%,#FFF7F1_34%,#FFFFFF_72%)] shadow-[0_18px_44px_rgba(216,58,29,0.18)] ring-2 ring-[#FFB199]/45 sm:ring-4 sm:ring-[#FFB199]/35'
           : bundle.isRecommended
-            ? 'border-[#FF5733] bg-gradient-to-b from-[#FFF8F5] to-white ring-2 ring-[#FFD5C8]/25 sm:ring-4 sm:ring-[#FFD5C8]/30'
+            ? 'border-[#F2B233] bg-[radial-gradient(circle_at_top_right,#FFF4C7_0%,#FFFDF5_42%,#FFFFFF_78%)] ring-2 ring-[#FACC15]/20 sm:ring-4 sm:ring-[#FACC15]/25'
             : 'border-[#EAEAEA] bg-white hover:border-[#FF9B80]/50'
       }`}
     >
       <PromoRibbon promotion={bundle.promotion} />
 
-      {!hasPromo && bundle.isRecommended && (
-        <div className="absolute top-0 z-10 hidden w-full bg-gradient-to-r from-[#FF5733] to-[#FF8C33] py-1 text-center text-[10px] font-black uppercase tracking-widest text-white shadow-sm sm:block">
-          Paket Paling Direkomendasikan
-        </div>
-      )}
+      {!hasPromo && bundle.isRecommended ? <RecommendedSash /> : null}
 
-      <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : bundle.isRecommended ? 'sm:pt-8' : ''}`}>
+      <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : ''}`}>
         <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
           <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${bundle.tone}`}>
             <PlatformBrandIcon platformIcon={bundle.platformIcon} className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
           </div>
           <div className="flex flex-col items-end gap-1">
-            {bundle.isRecommended ? (
-              <span className="rounded-full bg-[#FF5733] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white shadow-sm sm:px-3 sm:py-1 sm:text-[9px]">
-                Rekomendasi
+            <span className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider sm:px-3 sm:py-1 sm:text-[9px] ${
+              bundle.isRecommended ? 'bg-[#FFF4C7] text-[#8A5700] shadow-sm ring-1 ring-[#FACC15]/50' : 'border border-[#EBEBEB] bg-gray-50 text-gray-500'
+            }`}>
+              {bundle.platform}
+            </span>
+            {!bundle.isRecommended && (
+              <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[8px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[9px]">
+                {bundle.badge}
               </span>
-            ) : (
-              <>
-                <span className="rounded-full border border-[#EBEBEB] bg-gray-50 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-gray-500 sm:px-3 sm:py-1 sm:text-[9px]">
-                  {bundle.platform}
-                </span>
-                <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[8px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[9px]">
-                  {bundle.badge}
-                </span>
-              </>
             )}
           </div>
         </div>
@@ -366,7 +367,7 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
               : hasPromo
                 ? 'bg-[linear-gradient(110deg,#B4161B,#FF5733_58%,#FF9B31)] text-white hover:brightness-105'
                 : bundle.isRecommended
-                  ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]'
+                  ? 'bg-[#F59E0B] text-[#2F1B00] hover:bg-[#D97706] hover:text-white'
                   : 'bg-[#141414] text-white hover:bg-[#333]'
           }`}
         >
@@ -576,26 +577,22 @@ export default function ProductSosmedLandingPage() {
                     hasPromo
                       ? 'border-[#D83A1D] bg-[radial-gradient(circle_at_top_left,#FFE0D5_0%,#FFF7F1_34%,#FFFFFF_72%)] shadow-[0_18px_44px_rgba(216,58,29,0.18)] ring-4 ring-[#FFB199]/35'
                       : isRecommended
-                        ? 'border-[#FF5733] bg-gradient-to-b from-[#FFF8F5] to-white ring-4 ring-[#FFD5C8]/30'
+                        ? 'border-[#F2B233] bg-[radial-gradient(circle_at_top_right,#FFF4C7_0%,#FFFDF5_42%,#FFFFFF_78%)] ring-4 ring-[#FACC15]/25'
                         : 'border-[#EAEAEA] bg-white hover:border-[#FF9B80]/50'
                   }`}
                 >
                   <PromoRibbon promotion={service.promotion} />
 
-                  {!hasPromo && isRecommended && (
-                    <div className="absolute top-0 z-10 w-full bg-gradient-to-r from-[#FF5733] to-[#FF8C33] py-1 text-center text-[10px] font-black uppercase tracking-widest text-white shadow-sm">
-                      Paling Direkomendasikan
-                    </div>
-                  )}
+                  {!hasPromo && isRecommended ? <RecommendedSash /> : null}
 
-                  <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : isRecommended ? 'pt-7 sm:pt-8' : ''}`}>
+                  <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : ''}`}>
                     <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
                       <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${service.tone}`}>
                         <ServiceIcon className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <span className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider sm:px-3 sm:py-1 sm:text-[9px] ${
-                          isRecommended ? 'bg-[#FF5733] text-white shadow-sm' : 'border border-[#EBEBEB] bg-gray-50 text-gray-500'
+                          isRecommended ? 'bg-[#FFF4C7] text-[#8A5700] shadow-sm ring-1 ring-[#FACC15]/50' : 'border border-[#EBEBEB] bg-gray-50 text-gray-500'
                         }`}>
                           {service.platform}
                         </span>
@@ -656,7 +653,7 @@ export default function ProductSosmedLandingPage() {
                         hasPromo
                           ? 'bg-[linear-gradient(110deg,#B4161B,#FF5733_58%,#FF9B31)] text-white hover:brightness-105'
                           : isRecommended
-                            ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]'
+                            ? 'bg-[#F59E0B] text-[#2F1B00] hover:bg-[#D97706] hover:text-white'
                             : 'bg-[#141414] text-white hover:bg-[#333]'
                       }`}
                     >
