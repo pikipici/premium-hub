@@ -35,6 +35,12 @@ const DRAWER_SECTIONS: DrawerSection[] = [
     ],
   },
   {
+    label: 'Support',
+    items: [
+      { href: '/admin/chat', label: 'Chat Support', icon: '◴' },
+    ],
+  },
+  {
     label: 'Katalog',
     items: [
       { href: '/admin/produk', label: 'Produk', icon: '◈' },
