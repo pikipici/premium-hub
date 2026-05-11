@@ -176,7 +176,43 @@ function formatPromoRemaining(endsAt: string) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-function PromoCountdown({ promotion }: { promotion?: SosmedPromotionPrice }) {
+function formatPromoValue(promotion?: SosmedPromotionPrice) {
+  if (!promotion) return null
+  if (promotion.discount_type === 'percent') return `${promotion.discount_value}% OFF`
+  return `Hemat ${formatCurrency(promotion.discount_amount || promotion.discount_value)}`
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
+}
+
+function PromoRibbon({ promotion }: { promotion?: SosmedPromotionPrice }) {
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    if (!promotion?.ends_at) return
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000)
+    return () => window.clearInterval(timer)
+  }, [promotion?.ends_at])
+
+  if (!promotion?.ends_at) return null
+
+  const promoValue = formatPromoValue(promotion)
+
+  return (
+    <div className="absolute left-0 top-0 z-20 w-full bg-[linear-gradient(110deg,#B4161B_0%,#FF3F1F_48%,#FF9B31_100%)] px-3 py-1.5 text-white shadow-[0_10px_26px_rgba(216,58,29,0.28)] sm:px-5 sm:py-2">
+      <div className="flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-[0.16em] sm:text-[10px]">
+        <span>{promoValue || 'Promo Aktif'}</span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 tracking-wide backdrop-blur">
+          <Clock3 className="h-3 w-3" />
+          {formatPromoRemaining(promotion.ends_at)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function PromoUrgencyBar({ promotion }: { promotion?: SosmedPromotionPrice }) {
   const [, setTick] = useState(0)
 
   useEffect(() => {
@@ -188,18 +224,29 @@ function PromoCountdown({ promotion }: { promotion?: SosmedPromotionPrice }) {
   if (!promotion?.ends_at) return null
 
   return (
-    <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-[#FFD5C8] bg-[#FFF3EF] px-2 py-1 text-[9px] font-black uppercase tracking-wide text-[#D83A1D] sm:text-[10px]">
-      <Clock3 className="h-3 w-3" />
-      {formatPromoRemaining(promotion.ends_at)}
+    <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-[#FFC7B7] bg-[#FFF0EA] px-2.5 py-2 text-[9px] font-black uppercase tracking-wide text-[#B4161B] shadow-inner sm:px-3 sm:text-[10px]">
+      <span className="inline-flex items-center gap-1">
+        <Clock3 className="h-3.5 w-3.5" />
+        Promo berakhir
+      </span>
+      <span className="rounded-full bg-white px-2 py-0.5 text-[#D83A1D] shadow-sm">{formatPromoRemaining(promotion.ends_at)}</span>
     </div>
   )
 }
 
-function PromoPrice({ priceLabel, originalPriceLabel }: { priceLabel: string; originalPriceLabel?: string }) {
+function PromoPrice({ priceLabel, originalPriceLabel, promotion }: { priceLabel: string; originalPriceLabel?: string; promotion?: SosmedPromotionPrice }) {
+  const promoValue = formatPromoValue(promotion)
+
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-1">
+      {promotion ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full bg-[#141414] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-white sm:text-[9px]">Promo</span>
+          {promoValue ? <span className="rounded-full bg-[#FFE0D5] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-[#B4161B] sm:text-[9px]">{promoValue}</span> : null}
+        </div>
+      ) : null}
       {originalPriceLabel ? <span className="text-[10px] font-bold text-gray-400 line-through sm:text-sm">{originalPriceLabel}</span> : null}
-      <span className="text-[17px] font-black tracking-tight text-[#141414] sm:text-3xl">{priceLabel}</span>
+      <span className={`text-[17px] font-black tracking-tight sm:text-3xl ${promotion ? 'text-[#B4161B]' : 'text-[#141414]'}`}>{priceLabel}</span>
     </div>
   )
 }
@@ -212,23 +259,28 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
   const mobileTitleMatch = bundle.buyerTitle.match(/^(.*?)\s*\(([^)]+)\)$/)
   const mobileTitle = mobileTitleMatch?.[1] ?? bundle.buyerTitle
   const mobileLevel = mobileTitleMatch?.[2]
+  const hasPromo = Boolean(bundle.promotion)
 
   return (
     <article
       data-anime="sosmed-card"
       className={`group relative flex h-full flex-col overflow-hidden rounded-3xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-        bundle.isRecommended
-          ? 'border-[#FF5733] bg-gradient-to-b from-[#FFF8F5] to-white ring-2 ring-[#FFD5C8]/25 sm:ring-4 sm:ring-[#FFD5C8]/30'
-          : 'border-[#EAEAEA] bg-white hover:border-[#FF9B80]/50'
+        hasPromo
+          ? 'border-[#D83A1D] bg-[radial-gradient(circle_at_top_left,#FFE0D5_0%,#FFF7F1_34%,#FFFFFF_72%)] shadow-[0_18px_44px_rgba(216,58,29,0.18)] ring-2 ring-[#FFB199]/45 sm:ring-4 sm:ring-[#FFB199]/35'
+          : bundle.isRecommended
+            ? 'border-[#FF5733] bg-gradient-to-b from-[#FFF8F5] to-white ring-2 ring-[#FFD5C8]/25 sm:ring-4 sm:ring-[#FFD5C8]/30'
+            : 'border-[#EAEAEA] bg-white hover:border-[#FF9B80]/50'
       }`}
     >
-      {bundle.isRecommended && (
+      <PromoRibbon promotion={bundle.promotion} />
+
+      {!hasPromo && bundle.isRecommended && (
         <div className="absolute top-0 z-10 hidden w-full bg-gradient-to-r from-[#FF5733] to-[#FF8C33] py-1 text-center text-[10px] font-black uppercase tracking-widest text-white shadow-sm sm:block">
           Paket Paling Direkomendasikan
         </div>
       )}
 
-      <div className={`flex flex-col flex-grow p-3 sm:p-6 ${bundle.isRecommended ? 'sm:pt-8' : ''}`}>
+      <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-10 sm:pt-14' : bundle.isRecommended ? 'sm:pt-8' : ''}`}>
         <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
           <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${bundle.tone}`}>
             <PlatformBrandIcon platformIcon={bundle.platformIcon} className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
@@ -267,10 +319,9 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
         </div>
 
         <div className="mb-2 mt-2 sm:mb-7 sm:mt-6">
-          {bundle.promotion ? <span className="mb-1 inline-flex rounded-full bg-[#FF5733] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-white">Promo</span> : null}
-          <PromoPrice priceLabel={bundle.priceLabel} originalPriceLabel={bundle.originalPriceLabel} />
+          <PromoPrice priceLabel={bundle.priceLabel} originalPriceLabel={bundle.originalPriceLabel} promotion={bundle.promotion} />
           <span className="line-clamp-1 text-[9px] font-semibold text-[#888] sm:text-[11px]">{bundle.packageLabel}</span>
-          <PromoCountdown promotion={bundle.promotion} />
+          <PromoUrgencyBar promotion={bundle.promotion} />
         </div>
 
         <div className="hidden flex-grow space-y-3.5 sm:block">
@@ -312,12 +363,14 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
           className={`inline-flex h-9 w-full items-center justify-center gap-1 px-1 text-center text-[10px] font-extrabold leading-tight transition sm:h-14 sm:gap-1.5 sm:text-[12px] ${
             !canCheckoutBundle
               ? 'pointer-events-none bg-gray-200 text-gray-500'
-              : bundle.isRecommended
-                ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]'
-                : 'bg-[#141414] text-white hover:bg-[#333]'
+              : hasPromo
+                ? 'bg-[linear-gradient(110deg,#B4161B,#FF5733_58%,#FF9B31)] text-white hover:brightness-105'
+                : bundle.isRecommended
+                  ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]'
+                  : 'bg-[#141414] text-white hover:bg-[#333]'
           }`}
         >
-          {canCheckoutBundle ? 'Pilih Paket' : 'Segera Hadir'} <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
+          {canCheckoutBundle ? (hasPromo ? 'Ambil Promo' : 'Pilih Paket') : 'Segera Hadir'} <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
         </Link>
       </div>
     </article>
@@ -511,24 +564,29 @@ export default function ProductSosmedLandingPage() {
               const checkoutHref = `/product/sosmed/checkout?service=${encodeURIComponent(service.code)}`
               const ServiceIcon = iconForPlatform(service.platformIcon)
               const isRecommended = service.isRecommended
+              const hasPromo = Boolean(service.promotion)
 
               return (
                 <article
                   key={service.key}
                   data-anime="sosmed-card"
                   className={`group relative flex h-full flex-col overflow-hidden rounded-3xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                    isRecommended 
-                      ? 'border-[#FF5733] bg-gradient-to-b from-[#FFF8F5] to-white ring-4 ring-[#FFD5C8]/30' 
-                      : 'border-[#EAEAEA] bg-white hover:border-[#FF9B80]/50'
+                    hasPromo
+                      ? 'border-[#D83A1D] bg-[radial-gradient(circle_at_top_left,#FFE0D5_0%,#FFF7F1_34%,#FFFFFF_72%)] shadow-[0_18px_44px_rgba(216,58,29,0.18)] ring-4 ring-[#FFB199]/35'
+                      : isRecommended
+                        ? 'border-[#FF5733] bg-gradient-to-b from-[#FFF8F5] to-white ring-4 ring-[#FFD5C8]/30'
+                        : 'border-[#EAEAEA] bg-white hover:border-[#FF9B80]/50'
                   }`}
                 >
-                  {isRecommended && (
+                  <PromoRibbon promotion={service.promotion} />
+
+                  {!hasPromo && isRecommended && (
                     <div className="absolute top-0 z-10 w-full bg-gradient-to-r from-[#FF5733] to-[#FF8C33] py-1 text-center text-[10px] font-black uppercase tracking-widest text-white shadow-sm">
                       Paling Direkomendasikan
                     </div>
                   )}
 
-                  <div className={`flex flex-col flex-grow p-3 sm:p-6 ${isRecommended ? 'pt-7 sm:pt-8' : ''}`}>
+                  <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-10 sm:pt-14' : isRecommended ? 'pt-7 sm:pt-8' : ''}`}>
                     <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
                       <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${service.tone}`}>
                         <ServiceIcon className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
@@ -555,10 +613,9 @@ export default function ProductSosmedLandingPage() {
                     </div>
 
                     <div className="mb-2 mt-2 sm:mb-7 sm:mt-6">
-                      {service.promotion ? <span className="mb-1 inline-flex rounded-full bg-[#FF5733] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-white">Promo</span> : null}
-                      <PromoPrice priceLabel={service.priceLabel} originalPriceLabel={service.originalPrice ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(service.originalPrice) : undefined} />
+                      <PromoPrice priceLabel={service.priceLabel} originalPriceLabel={service.originalPrice ? formatCurrency(service.originalPrice) : undefined} promotion={service.promotion} />
                       <span className="line-clamp-1 text-[9px] font-semibold text-[#888] sm:text-[11px]">{service.packageLabel}</span>
-                      <PromoCountdown promotion={service.promotion} />
+                      <PromoUrgencyBar promotion={service.promotion} />
                     </div>
 
                     <div className="hidden flex-grow space-y-3.5 sm:block">
@@ -594,12 +651,14 @@ export default function ProductSosmedLandingPage() {
                     <Link
                       href={checkoutHref}
                       className={`inline-flex h-9 items-center justify-center gap-1 px-1 text-center text-[10px] font-extrabold leading-tight transition sm:h-14 sm:gap-1.5 sm:text-[12px] ${
-                        isRecommended 
-                          ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]' 
-                          : 'bg-[#141414] text-white hover:bg-[#333]'
+                        hasPromo
+                          ? 'bg-[linear-gradient(110deg,#B4161B,#FF5733_58%,#FF9B31)] text-white hover:brightness-105'
+                          : isRecommended
+                            ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]'
+                            : 'bg-[#141414] text-white hover:bg-[#333]'
                       }`}
                     >
-                      Pilih <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
+                      {hasPromo ? 'Ambil Promo' : 'Pilih'} <ArrowRight className="hidden h-3.5 w-3.5 sm:block" />
                     </Link>
                   </div>
                                 </article>
