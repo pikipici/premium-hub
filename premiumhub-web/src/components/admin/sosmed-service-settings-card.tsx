@@ -3,6 +3,8 @@
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { ListPagination } from '@/components/shared/list-pagination'
+import { ADMIN_DENSE_PAGE_LIMIT } from '@/config/pagination'
 import {
   buildAdminSosmedCatalogTabs,
   type AdminSosmedCatalogTabKey,
@@ -359,6 +361,8 @@ export default function SosmedServiceSettingsCard() {
 
   const [searchQuery, setSearchQuery] = useState('')
   const [activePlatformFilter, setActivePlatformFilter] = useState('All')
+  const [servicePage, setServicePage] = useState(1)
+  const [bundlePage, setBundlePage] = useState(1)
 
   const categoryOptions = useMemo(
     () => categories.sort((left, right) => (left.sort_order || 100) - (right.sort_order || 100)),
@@ -418,7 +422,43 @@ export default function SosmedServiceSettingsCard() {
     [marginRisks]
   )
 
+  const serviceTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(sortedItems.length / ADMIN_DENSE_PAGE_LIMIT)),
+    [sortedItems.length]
+  )
+
+  const paginatedServices = useMemo(
+    () => sortedItems.slice((servicePage - 1) * ADMIN_DENSE_PAGE_LIMIT, servicePage * ADMIN_DENSE_PAGE_LIMIT),
+    [servicePage, sortedItems]
+  )
+
   const bundleRows = useMemo(() => buildAdminSosmedBundleRows(bundlePackages), [bundlePackages])
+
+  const bundleTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(bundleRows.length / ADMIN_DENSE_PAGE_LIMIT)),
+    [bundleRows.length]
+  )
+
+  const paginatedBundleRows = useMemo(
+    () => bundleRows.slice((bundlePage - 1) * ADMIN_DENSE_PAGE_LIMIT, bundlePage * ADMIN_DENSE_PAGE_LIMIT),
+    [bundlePage, bundleRows]
+  )
+
+  useEffect(() => {
+    setServicePage(1)
+  }, [activePlatformFilter, searchQuery])
+
+  useEffect(() => {
+    if (servicePage > serviceTotalPages) {
+      setServicePage(serviceTotalPages)
+    }
+  }, [servicePage, serviceTotalPages])
+
+  useEffect(() => {
+    if (bundlePage > bundleTotalPages) {
+      setBundlePage(bundleTotalPages)
+    }
+  }, [bundlePage, bundleTotalPages])
 
   const bundleSummary = useMemo(() => getAdminSosmedBundleSummary(bundlePackages), [bundlePackages])
 
@@ -1786,8 +1826,9 @@ export default function SosmedServiceSettingsCard() {
           ) : sortedItems.length === 0 ? (
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>Tidak ada layanan sosmed yang sesuai pencarian.</div>
           ) : (
-            <div className="table-wrap" style={{ overflowX: 'auto' }}>
-              <table>
+            <>
+              <div className="table-wrap" style={{ overflowX: 'auto' }}>
+                <table>
                 <thead>
                   <tr>
                     <th>Kode</th>
@@ -1800,7 +1841,7 @@ export default function SosmedServiceSettingsCard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedItems.map((item) => {
+                  {paginatedServices.map((item) => {
                     const status = statusLabel(item)
 
                     return (
@@ -1850,8 +1891,18 @@ export default function SosmedServiceSettingsCard() {
                     )
                   })}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+              <ListPagination
+                page={servicePage}
+                totalPages={serviceTotalPages}
+                total={sortedItems.length}
+                itemLabel="layanan"
+                loading={loading}
+                onPageChange={setServicePage}
+                tone="admin"
+              />
+            </>
           )}
         </div>
           </div>
@@ -1889,8 +1940,9 @@ export default function SosmedServiceSettingsCard() {
           ) : bundleRows.length === 0 ? (
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada paket spesial di admin catalog.</div>
           ) : (
-            <div className="table-wrap" style={{ overflowX: 'auto' }}>
-              <table>
+            <>
+              <div className="table-wrap" style={{ overflowX: 'auto' }}>
+                <table>
                 <thead>
                   <tr>
                     <th>Paket</th>
@@ -1903,7 +1955,7 @@ export default function SosmedServiceSettingsCard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bundleRows.map((bundle) => {
+                  {paginatedBundleRows.map((bundle) => {
                     const targetPackage = bundlePackageByKey.get(bundle.packageKey)
                     const packageToggle = targetPackage ? getPackageStatusToggle(targetPackage) : null
 
@@ -1975,8 +2027,18 @@ export default function SosmedServiceSettingsCard() {
                     )
                   })}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+              <ListPagination
+                page={bundlePage}
+                totalPages={bundleTotalPages}
+                total={bundleRows.length}
+                itemLabel="variant"
+                loading={loading}
+                onPageChange={setBundlePage}
+                tone="admin"
+              />
+            </>
           )}
         </div>
           </div>
