@@ -58,6 +58,8 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.ConvertProof{},
 		&model.ConvertPricingRule{},
 		&model.ConvertLimitRule{},
+		&model.ChatConversation{},
+		&model.ChatMessage{},
 		&model.ConvertTrackingToken{},
 	); err != nil {
 		log.Fatal("DB migrate:", err)

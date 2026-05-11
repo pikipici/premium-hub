@@ -54,6 +54,10 @@ function resolveCorePageMeta(pathname: string): PageMeta {
     return { title: 'Pengaturan', sub: 'Konfigurasi sistem' }
   }
 
+  if (pathname.startsWith('/admin/chat')) {
+    return { title: 'Chat Support', sub: 'Balas pesan user secara realtime' }
+  }
+
   return { title: 'Admin', sub: 'Panel administrasi' }
 }
 

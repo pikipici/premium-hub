@@ -40,6 +40,12 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Support',
+    items: [
+      { href: '/admin/chat', label: 'Chat Support', icon: '◴' },
+    ],
+  },
+  {
     label: 'Akun',
     items: [
       { href: '/admin/pengguna', label: 'Pengguna', icon: '◎' },

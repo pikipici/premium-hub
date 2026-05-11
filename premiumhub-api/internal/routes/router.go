@@ -55,6 +55,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	userSidebarMenuSettingRepo := repository.NewUserSidebarMenuSettingRepo(db)
 	navbarMenuSettingRepo := repository.NewNavbarMenuSettingRepo(db)
 	activityRepo := repository.NewActivityRepo(db)
+	chatRepo := repository.NewChatRepo(db)
 
 	stockCredentialKey := strings.TrimSpace(cfg.StockCredentialKey)
 	if stockCredentialKey == "" {
@@ -108,6 +109,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	userSidebarMenuSettingSvc := service.NewUserSidebarMenuSettingService(userSidebarMenuSettingRepo)
 	navbarMenuSettingSvc := service.NewNavbarMenuSettingService(navbarMenuSettingRepo)
 	activitySvc := service.NewActivityService(activityRepo)
+	chatHub := service.NewChatHub()
+	chatSvc := service.NewChatService(chatRepo, chatHub)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
 	service.StartWalletTopupReconcileWorker(cfg, walletSvc)
@@ -154,6 +157,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	userSidebarMenuSettingHandler := handler.NewUserSidebarMenuSettingHandler(userSidebarMenuSettingSvc)
 	navbarMenuSettingHandler := handler.NewNavbarMenuSettingHandler(navbarMenuSettingSvc)
 	activityHandler := handler.NewActivityHandler(activitySvc)
+	chatHandler := handler.NewChatHandler(chatSvc, cfg.FrontendURL)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, stockRepo, notifSvc)
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
 
@@ -244,6 +248,12 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	protected.GET("/activities/history", activityHandler.List)
 	protected.GET("/me/sidebar-menu", userSidebarMenuSettingHandler.List)
+
+	// Live chat user <-> admin
+	protected.GET("/chat/conversation", chatHandler.GetUserConversation)
+	protected.POST("/chat/messages", chatHandler.UserSendMessage)
+	protected.POST("/chat/read", chatHandler.UserMarkRead)
+	protected.GET("/chat/ws", chatHandler.UserWS)
 
 	protected.GET(
 		"/payment/methods",
@@ -520,6 +530,14 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.PUT("/convert/pricing", convertHandler.AdminUpdatePricingRules)
 	admin.GET("/convert/limits", convertHandler.AdminGetLimitRules)
 	admin.PUT("/convert/limits", convertHandler.AdminUpdateLimitRules)
+
+	// Live chat admin side
+	admin.GET("/chat/conversations", chatHandler.AdminListInbox)
+	admin.GET("/chat/conversations/:id/messages", chatHandler.AdminGetMessages)
+	admin.POST("/chat/conversations/:id/messages", chatHandler.AdminSendMessage)
+	admin.POST("/chat/conversations/:id/read", chatHandler.AdminMarkRead)
+	admin.PATCH("/chat/conversations/:id/status", chatHandler.AdminSetStatus)
+	admin.GET("/chat/ws", chatHandler.AdminWS)
 
 	return r
 }

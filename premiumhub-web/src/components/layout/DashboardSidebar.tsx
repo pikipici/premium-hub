@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LogOut,
   Megaphone,
+  MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
   RefreshCw,
@@ -39,6 +40,7 @@ const MENU = [
   { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Akun Aktif', settingKey: 'active_accounts' },
   { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order', settingKey: 'order_history' },
   { href: '/dashboard/klaim-garansi', icon: ShieldCheck, label: 'Klaim Garansi', settingKey: 'warranty_claim' },
+  { href: '/dashboard/chat', icon: MessageCircle, label: 'Chat Support' },
   { href: '/dashboard/notifikasi', icon: Bell, label: 'Notifikasi' },
 ] satisfies Array<{
   href: string
