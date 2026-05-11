@@ -4,6 +4,7 @@ export const CUSTOMER_LOOKUP_SCAN_LIMIT = 50
 
 export const ADMIN_PAGE_LIMIT = 20
 export const ADMIN_DENSE_PAGE_LIMIT = 30
+export const ADMIN_SOSMED_CATALOG_PAGE_LIMIT = 5
 export const LOOKUP_PRELOAD_LIMIT = 100
 export const LOOKUP_SCAN_PAGE_LIMIT = 100
 export const AUDIT_REPORT_LIMIT = 200

@@ -4,7 +4,7 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ListPagination } from '@/components/shared/list-pagination'
-import { ADMIN_DENSE_PAGE_LIMIT } from '@/config/pagination'
+import { ADMIN_SOSMED_CATALOG_PAGE_LIMIT } from '@/config/pagination'
 import {
   buildAdminSosmedCatalogTabs,
   type AdminSosmedCatalogTabKey,
@@ -423,24 +423,24 @@ export default function SosmedServiceSettingsCard() {
   )
 
   const serviceTotalPages = useMemo(
-    () => Math.max(1, Math.ceil(sortedItems.length / ADMIN_DENSE_PAGE_LIMIT)),
+    () => Math.max(1, Math.ceil(sortedItems.length / ADMIN_SOSMED_CATALOG_PAGE_LIMIT)),
     [sortedItems.length]
   )
 
   const paginatedServices = useMemo(
-    () => sortedItems.slice((servicePage - 1) * ADMIN_DENSE_PAGE_LIMIT, servicePage * ADMIN_DENSE_PAGE_LIMIT),
+    () => sortedItems.slice((servicePage - 1) * ADMIN_SOSMED_CATALOG_PAGE_LIMIT, servicePage * ADMIN_SOSMED_CATALOG_PAGE_LIMIT),
     [servicePage, sortedItems]
   )
 
   const bundleRows = useMemo(() => buildAdminSosmedBundleRows(bundlePackages), [bundlePackages])
 
   const bundleTotalPages = useMemo(
-    () => Math.max(1, Math.ceil(bundleRows.length / ADMIN_DENSE_PAGE_LIMIT)),
+    () => Math.max(1, Math.ceil(bundleRows.length / ADMIN_SOSMED_CATALOG_PAGE_LIMIT)),
     [bundleRows.length]
   )
 
   const paginatedBundleRows = useMemo(
-    () => bundleRows.slice((bundlePage - 1) * ADMIN_DENSE_PAGE_LIMIT, bundlePage * ADMIN_DENSE_PAGE_LIMIT),
+    () => bundleRows.slice((bundlePage - 1) * ADMIN_SOSMED_CATALOG_PAGE_LIMIT, bundlePage * ADMIN_SOSMED_CATALOG_PAGE_LIMIT),
     [bundlePage, bundleRows]
   )
 
