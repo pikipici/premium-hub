@@ -209,12 +209,22 @@ function toneForBundle(bundle: Pick<SosmedBundlePackage, 'platform' | 'key'>) {
   return PLATFORM_TONES.find(([pattern]) => pattern.test(haystack))?.[1] || 'from-[#F4F4F2] to-[#ECECEA]'
 }
 
+function sanitizeProviderServiceTitle(title: string) {
+  return title
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ')
+    .replace(/\b(PRANK|READ\s+DESCRIPTION|NO\s+REFILL|NON\s+DROP|HQ|LQ)\b/gi, ' ')
+    .replace(/\bRefill\s*:\s*\w+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function packageItemsForBundleVariant(variant: SosmedBundlePackage['variants'][number]) {
-  return variant.items.map((item) => `${formatQuantity(item.quantity_units)} ${item.title}`)
+  return variant.items.map((item) => `${formatQuantity(item.quantity_units)} ${sanitizeProviderServiceTitle(item.title)}`.trim())
 }
 
 function featuresForBundle(bundle: SosmedBundlePackage) {
-  const titles = bundle.variants.flatMap((variant) => variant.items.map((item) => item.title.trim()).filter(Boolean))
+  const titles = bundle.variants.flatMap((variant) => variant.items.map((item) => sanitizeProviderServiceTitle(item.title)).filter(Boolean))
   return Array.from(new Set(titles)).slice(0, 4)
 }
 
