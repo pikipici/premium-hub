@@ -124,7 +124,7 @@ const THEME_OPTIONS = [
   { value: 'gray', label: 'Gray' },
 ]
 
-const JAP_PICKER_RESULT_LIMIT = 120
+const JAP_PICKER_RESULT_LIMIT = 220
 
 function cleanJAPServiceName(value: string) {
   return value
@@ -360,6 +360,9 @@ export default function SosmedServiceSettingsCard() {
   const [selectedJAPPreview, setSelectedJAPPreview] = useState<AdminSosmedImportJAPPreviewItem | null>(null)
   const [japPickerOpen, setJAPPickerOpen] = useState(false)
   const [japPickerQuery, setJAPPickerQuery] = useState('')
+  const [japPickerPlatform, setJAPPickerPlatform] = useState('all')
+  const [japPickerCategory, setJAPPickerCategory] = useState('all')
+  const [japPickerUsage, setJAPPickerUsage] = useState<'all' | 'new' | 'used'>('new')
 
   const [packageFormOpen, setPackageFormOpen] = useState(false)
   const [packageFormMode, setPackageFormMode] = useState<AdminSosmedBundlePackageFormMode>('create')
@@ -604,23 +607,37 @@ export default function SosmedServiceSettingsCard() {
     })
   }, [existingJAPProviderIDs, japServices])
 
+  const japPickerPlatformOptions = useMemo(() => {
+    const values = new Set<string>()
+    japServices.forEach((service) => {
+      if (service.platform_label) values.add(service.platform_label)
+    })
+    return Array.from(values).sort((left, right) => left.localeCompare(right))
+  }, [japServices])
+
   const filteredJAPServices = useMemo(() => {
-    const query = japPickerQuery.trim().toLowerCase()
-    const matched = query
-      ? sortedJAPServices.filter((service) => {
-          const haystack = [
-            service.service_id,
-            service.provider_name,
-            service.provider_category,
-            service.platform_label,
-            categoryLabelMap[service.local_category_code] || service.local_category_code,
-            service.local_code,
-          ].join(' ').toLowerCase()
-          return haystack.includes(query)
-        })
-      : sortedJAPServices
+    const queryTokens = japPickerQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const matched = sortedJAPServices.filter((service) => {
+      const alreadyUsed = existingJAPProviderIDs.has(service.service_id)
+      if (japPickerUsage === 'new' && alreadyUsed) return false
+      if (japPickerUsage === 'used' && !alreadyUsed) return false
+      if (japPickerPlatform !== 'all' && service.platform_label !== japPickerPlatform) return false
+      if (japPickerCategory !== 'all' && service.local_category_code !== japPickerCategory) return false
+      if (queryTokens.length === 0) return true
+
+      const haystack = [
+        service.service_id,
+        service.provider_name,
+        cleanJAPServiceName(service.provider_name),
+        service.provider_category,
+        service.platform_label,
+        categoryLabelMap[service.local_category_code] || service.local_category_code,
+        service.local_code,
+      ].join(' ').toLowerCase()
+      return queryTokens.every((token) => haystack.includes(token))
+    })
     return matched.slice(0, JAP_PICKER_RESULT_LIMIT)
-  }, [categoryLabelMap, japPickerQuery, sortedJAPServices])
+  }, [categoryLabelMap, existingJAPProviderIDs, japPickerCategory, japPickerPlatform, japPickerQuery, japPickerUsage, sortedJAPServices])
 
   const loadJAPServices = useCallback(async () => {
     if (japServices.length > 0 || japServicesLoading) return
@@ -740,6 +757,9 @@ export default function SosmedServiceSettingsCard() {
     setSelectedJAPPreview(null)
     setJAPPickerOpen(false)
     setJAPPickerQuery('')
+    setJAPPickerPlatform('all')
+    setJAPPickerCategory('all')
+    setJAPPickerUsage('new')
     setError('')
     setFormOpen(true)
     void loadJAPServices()
@@ -779,6 +799,9 @@ export default function SosmedServiceSettingsCard() {
     setSelectedJAPPreview(null)
     setJAPPickerOpen(false)
     setJAPPickerQuery('')
+    setJAPPickerPlatform('all')
+    setJAPPickerCategory('all')
+    setJAPPickerUsage('new')
     setForm(createEmptyForm(defaultCategoryCode))
   }
 
@@ -1344,6 +1367,9 @@ export default function SosmedServiceSettingsCard() {
     setSelectedJAPPreview(preview)
     setJAPPickerOpen(false)
     setJAPPickerQuery('')
+    setJAPPickerPlatform('all')
+    setJAPPickerCategory('all')
+    setJAPPickerUsage('new')
     setForm((current) => ({
       ...current,
       category_code: preview.local_category_code || current.category_code,
@@ -2545,6 +2571,143 @@ export default function SosmedServiceSettingsCard() {
         </div>
       )}
 
+      {formOpen && formMode === 'create' && japPickerOpen && (
+        <div className="modal-overlay" style={{ ...MODAL_OVERLAY_STYLE, zIndex: 10020 }} onClick={() => setJAPPickerOpen(false)}>
+          <div
+            className="modal-card"
+            style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(1040px, 96vw)', overflow: 'hidden' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head" style={MODAL_HEAD_STYLE}>
+              <div>
+                <h3>Pilih Layanan JAP</h3>
+                <div className="modal-sub" style={MODAL_SUB_STYLE}>
+                  Katalog lokal {sortedJAPServices.length.toLocaleString('id-ID')} layanan. Pilih satu untuk auto-fill form layanan sosmed.
+                </div>
+              </div>
+              <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={() => setJAPPickerOpen(false)}>×</button>
+            </div>
+
+            <div className="modal-body" style={{ ...MODAL_BODY_STYLE, maxHeight: 'min(72vh, 720px)', overflow: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1.4fr) repeat(3, minmax(130px, 0.7fr))', gap: 10, alignItems: 'end' }}>
+                <div>
+                  <label className="form-label">Search layanan</label>
+                  <input
+                    className="form-input"
+                    value={japPickerQuery}
+                    onChange={(event) => setJAPPickerQuery(event.target.value)}
+                    placeholder="Contoh: 25, instagram followers refill, tiktok views"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Platform</label>
+                  <select className="form-select" value={japPickerPlatform} onChange={(event) => setJAPPickerPlatform(event.target.value)}>
+                    <option value="all">Semua</option>
+                    {japPickerPlatformOptions.map((platform) => (
+                      <option key={platform} value={platform}>{platform}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Kategori</label>
+                  <select className="form-select" value={japPickerCategory} onChange={(event) => setJAPPickerCategory(event.target.value)}>
+                    <option value="all">Semua</option>
+                    {categoryOptions.map((category) => (
+                      <option key={category.code} value={category.code}>{category.label || category.code}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Status</label>
+                  <select className="form-select" value={japPickerUsage} onChange={(event) => setJAPPickerUsage(event.target.value as 'all' | 'new' | 'used')}>
+                    <option value="new">Belum dipakai</option>
+                    <option value="all">Semua</option>
+                    <option value="used">Sudah ada</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  Menampilkan <strong>{filteredJAPServices.length}</strong> hasil teratas. Search pakai beberapa kata akan dicocokkan semuanya.
+                </div>
+                {(japPickerQuery || japPickerPlatform !== 'all' || japPickerCategory !== 'all' || japPickerUsage !== 'new') && (
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => {
+                      setJAPPickerQuery('')
+                      setJAPPickerPlatform('all')
+                      setJAPPickerCategory('all')
+                      setJAPPickerUsage('new')
+                    }}
+                  >
+                    Reset filter
+                  </button>
+                )}
+              </div>
+
+              <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+                {japServicesLoading && sortedJAPServices.length === 0 && (
+                  <div className="card" style={{ padding: 14, borderColor: '#E5E7EB', color: 'var(--muted)' }}>Memuat katalog JAP lokal...</div>
+                )}
+                {!japServicesLoading && filteredJAPServices.length === 0 && (
+                  <div className="card" style={{ padding: 14, borderColor: '#E5E7EB', color: 'var(--muted)' }}>
+                    Tidak ada layanan cocok. Coba longgarkan filter atau keyword.
+                  </div>
+                )}
+                {filteredJAPServices.map((service) => {
+                  const cleanName = cleanJAPServiceName(service.provider_name) || service.provider_name
+                  const alreadyUsed = existingJAPProviderIDs.has(service.service_id)
+                  const selected = selectedJAPPreview?.service_id === service.service_id
+                  return (
+                    <button
+                      key={service.service_id}
+                      type="button"
+                      onClick={() => selectJAPServiceForForm(service)}
+                      style={{
+                        border: `1px solid ${selected ? '#FF5733' : 'var(--line, #E5E7EB)'}`,
+                        background: selected ? '#FFF1ED' : '#fff',
+                        borderRadius: 14,
+                        padding: 12,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(0, 1.5fr) minmax(180px, 0.75fr) auto',
+                        gap: 12,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div style={{ minWidth: 0, display: 'grid', gap: 5 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0, flexWrap: 'wrap' }}>
+                          <strong style={{ color: '#FF5733' }}>#{service.service_id}</strong>
+                          <span style={{ fontWeight: 900 }}>{service.platform_label || 'Social'}</span>
+                          <span className="status s-sukses">{categoryLabelMap[service.local_category_code] || service.local_category_code || '-'}</span>
+                          {alreadyUsed && <span className="status s-proses">Sudah ada</span>}
+                        </div>
+                        <div style={{ fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cleanName}</div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          Raw: {service.provider_name}
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gap: 5, fontSize: 12, color: '#475467' }}>
+                        <span>{service.provider_category || '-'}</span>
+                        <strong>Rate {service.provider_rate || '-'} USD</strong>
+                        <span>Min {service.min || '-'} • Max {service.max || '-'}</span>
+                      </div>
+                      <span style={{ borderRadius: 999, background: '#FF5733', color: '#fff', padding: '9px 14px', fontSize: 12, fontWeight: 900 }}>
+                        Pilih
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {packageFormOpen && (
         <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={closePackageForm}>
           <div
@@ -3534,113 +3697,46 @@ export default function SosmedServiceSettingsCard() {
                   <label className="form-label">Kode / Layanan JAP</label>
                   {formMode === 'create' ? (
                     <>
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          type="button"
-                          className="form-select"
-                          onClick={() => {
-                            setJAPPickerOpen((value) => !value)
-                            void loadJAPServices()
-                          }}
-                          disabled={japServicesLoading && sortedJAPServices.length === 0}
-                          style={{
-                            width: '100%',
-                            minHeight: 42,
-                            textAlign: 'left',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 10,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {selectedJAPPreview
-                              ? `#${selectedJAPPreview.service_id} - ${cleanJAPServiceName(selectedJAPPreview.provider_name) || selectedJAPPreview.provider_name}`
-                              : japServicesLoading
-                                ? 'Memuat layanan JAP...'
-                                : 'Pilih layanan JAP'}
-                          </span>
-                          <span style={{ color: 'var(--muted)', flexShrink: 0 }}>▾</span>
-                        </button>
-
-                        {japPickerOpen && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              zIndex: 30,
-                              top: 'calc(100% + 6px)',
-                              left: 0,
-                              width: 'min(640px, calc(96vw - 36px))',
-                              maxWidth: 'calc(100vw - 48px)',
-                              background: '#fff',
-                              border: '1px solid var(--line, #E5E7EB)',
-                              borderRadius: 14,
-                              boxShadow: '0 18px 45px rgba(15, 23, 42, 0.20)',
-                              padding: 10,
-                            }}
-                          >
-                            <input
-                              className="form-input"
-                              value={japPickerQuery}
-                              onChange={(event) => setJAPPickerQuery(event.target.value)}
-                              placeholder="Cari ID, platform, kategori, atau nama layanan..."
-                              autoFocus
-                            />
-                            <div style={{ marginTop: 8, maxHeight: 330, overflow: 'auto', display: 'grid', gap: 6 }}>
-                              {japServicesLoading && sortedJAPServices.length === 0 && (
-                                <div style={{ padding: 12, fontSize: 13, color: 'var(--muted)' }}>Memuat katalog JAP...</div>
-                              )}
-                              {!japServicesLoading && filteredJAPServices.length === 0 && (
-                                <div style={{ padding: 12, fontSize: 13, color: 'var(--muted)' }}>
-                                  Tidak ada layanan cocok. Coba kata kunci lain.
-                                </div>
-                              )}
-                              {filteredJAPServices.map((service) => {
-                                const cleanName = cleanJAPServiceName(service.provider_name) || service.provider_name
-                                const alreadyUsed = existingJAPProviderIDs.has(service.service_id)
-                                const selected = selectedJAPPreview?.service_id === service.service_id
-                                return (
-                                  <button
-                                    key={service.service_id}
-                                    type="button"
-                                    onClick={() => selectJAPServiceForForm(service)}
-                                    style={{
-                                      border: `1px solid ${selected ? '#FF5733' : 'var(--line, #E5E7EB)'}`,
-                                      background: selected ? '#FFF1ED' : alreadyUsed ? '#F9FAFB' : '#fff',
-                                      borderRadius: 12,
-                                      padding: '10px 12px',
-                                      textAlign: 'left',
-                                      cursor: 'pointer',
-                                      display: 'grid',
-                                      gap: 5,
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
-                                      <strong style={{ color: '#FF5733', flexShrink: 0 }}>#{service.service_id}</strong>
-                                      <span style={{ fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {cleanName}
-                                      </span>
-                                      {alreadyUsed && <span className="status s-proses">Sudah ada</span>}
-                                    </div>
-                                    <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.45 }}>
-                                      {service.provider_category || '-'} • {service.platform_label || 'Social'} • {categoryLabelMap[service.local_category_code] || service.local_category_code || '-'}
-                                    </div>
-                                    <div style={{ fontSize: 12, color: '#475467' }}>
-                                      Rate {service.provider_rate || '-'} USD • min {service.min || '-'} • max {service.max || '-'}
-                                    </div>
-                                  </button>
-                                )
-                              })}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setJAPPickerOpen(true)
+                          void loadJAPServices()
+                        }}
+                        disabled={japServicesLoading && sortedJAPServices.length === 0}
+                        style={{
+                          width: '100%',
+                          minHeight: 58,
+                          border: '1px solid var(--line, #E5E7EB)',
+                          borderRadius: 12,
+                          background: selectedJAPPreview ? '#FFF7F4' : '#fff',
+                          padding: '10px 12px',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'grid',
+                          gap: 4,
+                        }}
+                      >
+                        {selectedJAPPreview ? (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                              <strong style={{ color: '#FF5733' }}>JAP #{selectedJAPPreview.service_id}</strong>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: '#FF5733' }}>Ganti</span>
                             </div>
-                            {sortedJAPServices.length > JAP_PICKER_RESULT_LIMIT && (
-                              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)' }}>
-                                Menampilkan {filteredJAPServices.length} dari {sortedJAPServices.length} layanan. Pakai search biar lebih cepat.
-                              </div>
-                            )}
-                          </div>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 800 }}>
+                              {cleanJAPServiceName(selectedJAPPreview.provider_name) || selectedJAPPreview.provider_name}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                              {selectedJAPPreview.provider_category || '-'} • Rate {selectedJAPPreview.provider_rate || '-'} USD
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <strong>{japServicesLoading ? 'Memuat layanan JAP...' : 'Pilih layanan JAP'}</strong>
+                            <span style={{ fontSize: 12, color: 'var(--muted)' }}>Buka picker besar untuk cari dan pilih layanan supplier.</span>
+                          </>
                         )}
-                      </div>
+                      </button>
                       {japServicesError && (
                         <div style={{ ...FIELD_HELP_STYLE, color: '#B42318', marginTop: 6 }}>
                           {japServicesError}{' '}
