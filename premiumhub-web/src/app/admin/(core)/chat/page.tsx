@@ -563,7 +563,7 @@ export default function AdminChatPage() {
                           {mine ? (
                             <CheckCheck
                               className={`h-3 w-3 ${
-                                m.read_by_user ? 'text-[#4FC3F7]' : 'text-white/50'
+                                m.read_by_user ? 'text-[#E0592A]' : 'text-white/50'
                               }`}
                             />
                           ) : null}
