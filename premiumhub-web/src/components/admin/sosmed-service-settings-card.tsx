@@ -176,11 +176,24 @@ const MODAL_BODY_STYLE = {
 }
 
 const MODAL_ACTIONS_STYLE = {
+  position: 'sticky' as const,
+  bottom: 0,
+  zIndex: 2,
   display: 'flex',
   justifyContent: 'flex-end',
   gap: 8,
   padding: '12px 18px 16px',
   borderTop: '1px solid var(--line, #E5E7EB)',
+  background: 'rgba(255, 255, 255, 0.96)',
+  backdropFilter: 'blur(8px)',
+  boxShadow: '0 -10px 24px rgba(15, 23, 42, 0.06)',
+}
+
+const FIELD_HELP_STYLE = {
+  marginTop: 5,
+  fontSize: 11,
+  lineHeight: 1.35,
+  color: 'var(--muted)',
 }
 
 function mapErrorMessage(err: unknown, fallback: string) {
@@ -3398,6 +3411,11 @@ export default function SosmedServiceSettingsCard() {
                     disabled={formMode === 'edit'}
                     placeholder="contoh: ig-followers-id"
                   />
+                  <div style={FIELD_HELP_STYLE}>
+                    {formMode === 'create'
+                      ? 'Auto slug lowercase; kode ini permanen setelah layanan dibuat.'
+                      : 'Kode permanen dan tidak bisa diubah setelah layanan dibuat.'}
+                  </div>
                 </div>
 
                 <div>
@@ -3517,6 +3535,7 @@ export default function SosmedServiceSettingsCard() {
                     onChange={(event) => setForm((prev) => ({ ...prev, price_start: event.target.value }))}
                     placeholder="Rp 28.000"
                   />
+                  <div style={FIELD_HELP_STYLE}>Teks display card, bukan harga transaksi.</div>
                 </div>
                 <div>
                   <label className="form-label">Harga per 1K</label>
@@ -3526,6 +3545,7 @@ export default function SosmedServiceSettingsCard() {
                     onChange={(event) => setForm((prev) => ({ ...prev, price_per_1k: event.target.value }))}
                     placeholder="≈ Rp 28 / 1K"
                   />
+                  <div style={FIELD_HELP_STYLE}>Teks display satuan di bawah harga.</div>
                 </div>
                 <div>
                   <label className="form-label">Checkout Price (IDR)</label>
@@ -3537,6 +3557,7 @@ export default function SosmedServiceSettingsCard() {
                     onChange={(event) => setForm((prev) => ({ ...prev, checkout_price: event.target.value }))}
                     placeholder="28000"
                   />
+                  <div style={FIELD_HELP_STYLE}>Harga transaksi checkout; isi angka IDR tanpa titik.</div>
                 </div>
               </div>
 
@@ -3548,6 +3569,18 @@ export default function SosmedServiceSettingsCard() {
                   onChange={(event) => setForm((prev) => ({ ...prev, trust_badges_text: event.target.value }))}
                   placeholder="No Password, Gradual Delivery, Refill 30 Hari"
                 />
+                <div style={{ ...FIELD_HELP_STYLE, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {(form.trust_badges_text || 'No Password, Gradual Delivery, Refill 30 Hari')
+                    .split(',')
+                    .map((badge) => badge.trim())
+                    .filter(Boolean)
+                    .slice(0, 5)
+                    .map((badge) => (
+                      <span key={badge} style={{ border: '1px solid #FFD5C8', borderRadius: 999, background: '#FFF8F5', color: '#FF5733', padding: '3px 8px', fontWeight: 700 }}>
+                        {badge}
+                      </span>
+                    ))}
+                </div>
               </div>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -3555,6 +3588,7 @@ export default function SosmedServiceSettingsCard() {
                   type="checkbox"
                   checked={form.is_active}
                   onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                  style={{ accentColor: '#FF5733' }}
                 />
                 Aktif untuk tampil di /product/sosmed
               </label>
