@@ -53,17 +53,39 @@ func (id *JAPServiceID) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type JAPServiceQuantity string
+
+func (q *JAPServiceQuantity) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		*q = ""
+		return nil
+	}
+
+	if trimmed[0] == '"' {
+		var value string
+		if err := json.Unmarshal(trimmed, &value); err != nil {
+			return err
+		}
+		*q = JAPServiceQuantity(strings.TrimSpace(value))
+		return nil
+	}
+
+	*q = JAPServiceQuantity(string(trimmed))
+	return nil
+}
+
 type JAPServiceItem struct {
-	Service  JAPServiceID `json:"service"`
-	Name     string       `json:"name"`
-	Type     string       `json:"type"`
-	Category string       `json:"category"`
-	Rate     string       `json:"rate"`
-	Min      string       `json:"min"`
-	Max      string       `json:"max"`
-	Dripfeed bool         `json:"dripfeed"`
-	Refill   bool         `json:"refill"`
-	Cancel   bool         `json:"cancel"`
+	Service  JAPServiceID       `json:"service"`
+	Name     string             `json:"name"`
+	Type     string             `json:"type"`
+	Category string             `json:"category"`
+	Rate     string             `json:"rate"`
+	Min      JAPServiceQuantity `json:"min"`
+	Max      JAPServiceQuantity `json:"max"`
+	Dripfeed bool               `json:"dripfeed"`
+	Refill   bool               `json:"refill"`
+	Cancel   bool               `json:"cancel"`
 }
 
 type JAPAddOrderInput struct {
