@@ -23,8 +23,16 @@ import type { SosmedService } from '@/types/sosmedService'
 
 function defaultCheckoutPrice(service: SosmedService | null) {
   if (!service) return 0
+  const promoPrice = service.promotion?.final_price || 0
+  if (promoPrice > 0) return promoPrice
   if (service.checkout_price && service.checkout_price > 0) return service.checkout_price
   return 0
+}
+
+function originalCheckoutPrice(service: SosmedService | null) {
+  if (!service?.promotion) return 0
+  const originalPrice = service.promotion.original_price || service.checkout_price || 0
+  return originalPrice > defaultCheckoutPrice(service) ? originalPrice : 0
 }
 
 const MAX_SOSMED_PACKAGE_QUANTITY = 1000
@@ -84,6 +92,7 @@ function SosmedCheckoutContent() {
   const [error, setError] = useState('')
 
   const checkoutPrice = useMemo(() => defaultCheckoutPrice(service), [service])
+  const checkoutOriginalPrice = useMemo(() => originalCheckoutPrice(service), [service])
   const bundleTotalPrice = bundleVariant?.total_price || 0
   const totalPrice = useMemo(
     () => (isBundleCheckout ? bundleTotalPrice : checkoutPrice * packageQuantity),
@@ -441,7 +450,12 @@ function SosmedCheckoutContent() {
                   </div>
                   <div className="flex justify-between text-sm gap-4">
                     <span className="text-[#888]">Harga per paket</span>
-                    <span className="font-semibold text-right">{formatRupiah(checkoutPrice)} / 1K</span>
+                    <span className="text-right">
+                      {checkoutOriginalPrice > 0 ? (
+                        <span className="mr-2 text-xs font-semibold text-[#999] line-through">{formatRupiah(checkoutOriginalPrice)}</span>
+                      ) : null}
+                      <span className="font-semibold">{formatRupiah(checkoutPrice)} / 1K</span>
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm gap-4">
                     <span className="text-[#888]">Jumlah paket</span>
