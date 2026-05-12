@@ -12,6 +12,7 @@ import { canSubmitAuth, isTurnstileEnabled, turnstileSiteKey } from '@/lib/turns
 import { useAuthStore } from '@/store/authStore'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
+import { DigiLoading } from '@/components/shared/DigiLoading'
 
 function LoginPageContent() {
   const router = useRouter()
@@ -148,7 +149,7 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<DigiLoading message="Menyiapkan halaman login..." />}>
       <LoginPageContent />
     </Suspense>
   )

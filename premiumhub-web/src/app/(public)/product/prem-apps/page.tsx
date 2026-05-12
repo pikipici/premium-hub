@@ -2,11 +2,13 @@
 
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import { DigiLoading, DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
 import ProductCard from '@/components/shared/ProductCard'
 import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { productService } from '@/services/productService'
 import { productCategoryService } from '@/services/productCategoryService'
+import { pageLoadingCopy } from '@/lib/loadingUi'
 import type { Product } from '@/types/product'
 import { Search, SlidersHorizontal } from 'lucide-react'
 
@@ -52,7 +54,7 @@ function toPremAppsCategoryOptions(items: Array<{ code: string; label: string }>
 
 export default function PremAppsPage() {
   return (
-    <Suspense fallback={<><Navbar /><div className="py-32 text-center animate-pulse text-[#888]">Loading...</div><Footer /></>}>
+    <Suspense fallback={<><Navbar /><DigiLoading message={pageLoadingCopy.premiumApps} /><Footer /></>}>
       <PremAppsContent />
     </Suspense>
   )
@@ -202,11 +204,7 @@ function PremAppsContent() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-44 sm:h-52 bg-white/50 rounded-2xl animate-pulse" />
-              ))}
-            </div>
+            <DigiLoadingCardGrid count={6} />
           ) : products.length === 0 ? (
             <div className="text-center py-20">
               <Search className="w-12 h-12 text-[#EBEBEB] mx-auto mb-4" />

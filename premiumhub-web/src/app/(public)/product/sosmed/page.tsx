@@ -17,6 +17,7 @@ import {
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
+import { DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
 import { buildSosmedBundleProductCards, type SosmedBundleProductCard } from '@/lib/sosmedBundlingCards'
 import { buildSosmedServiceCards, type SosmedPlatformIconKey } from '@/lib/sosmedProductCards'
 import type { SosmedPromotionPrice } from '@/types/sosmedService'
@@ -383,6 +384,7 @@ function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
 export default function ProductSosmedLandingPage() {
   const animationRootRef = useRef<HTMLElement | null>(null)
   const [services, setServices] = useState<SosmedService[]>([])
+  const [servicesLoading, setServicesLoading] = useState(true)
   const [bundlePackages, setBundlePackages] = useState<SosmedBundlePackage[]>([])
   const [bundleCatalogState, setBundleCatalogState] = useState<'loading' | 'ready' | 'fallback'>('loading')
   const [activeTab, setActiveTab] = useState<'satuan' | 'bundling'>('satuan')
@@ -402,6 +404,9 @@ export default function ProductSosmedLandingPage() {
       })
       .catch(() => {
         // fail-open: fallback cards still shown
+      })
+      .finally(() => {
+        if (alive) setServicesLoading(false)
       })
 
     sosmedBundleServiceApi
@@ -562,6 +567,9 @@ export default function ProductSosmedLandingPage() {
                   ))}
                 </div>
               </div>
+              {servicesLoading ? (
+                <DigiLoadingCardGrid count={6} />
+              ) : (
               <div className="grid grid-cols-2 gap-3 md:gap-5 xl:grid-cols-3">
               {paginatedCards.map((service) => {
               const checkoutHref = `/product/sosmed/checkout?service=${encodeURIComponent(service.code)}`
@@ -664,8 +672,9 @@ export default function ProductSosmedLandingPage() {
               )
             })}
               </div>
+              )}
 
-              {totalPages > 1 && (
+              {totalPages > 1 && !servicesLoading && (
                 <div className="mt-4">
                   <div className="flex items-center justify-center gap-2 sm:hidden">
                     <button

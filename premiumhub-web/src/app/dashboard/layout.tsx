@@ -7,6 +7,7 @@ import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import { useAuthStore } from '@/store/authStore'
 import Navbar from '@/components/layout/Navbar'
 import DashboardSidebar from '@/components/layout/DashboardSidebar'
+import { DigiLoading } from '@/components/shared/DigiLoading'
 
 function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const { isAuthenticated, hasHydrated, isBootstrapped } = useAuthStore()
@@ -61,7 +62,7 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<DigiLoading message="Memuat dashboard kamu..." />}>
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )

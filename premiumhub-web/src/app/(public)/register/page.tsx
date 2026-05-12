@@ -12,6 +12,7 @@ import { canSubmitAuth, isTurnstileEnabled, turnstileSiteKey } from '@/lib/turns
 import { useAuthStore } from '@/store/authStore'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { Eye, EyeOff, UserPlus } from 'lucide-react'
+import { DigiLoading } from '@/components/shared/DigiLoading'
 
 function RegisterPageContent() {
   const router = useRouter()
@@ -156,7 +157,7 @@ function RegisterPageContent() {
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<DigiLoading message="Menyiapkan halaman daftar..." />}>
       <RegisterPageContent />
     </Suspense>
   )

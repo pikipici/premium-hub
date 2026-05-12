@@ -4,6 +4,7 @@ import { Suspense, type ReactNode } from 'react'
 import { useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
+import { DigiLoading } from '@/components/shared/DigiLoading'
 import AdminStyles from '@/components/admin/admin-styles'
 import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import { useAuthStore } from '@/store/authStore'
@@ -40,7 +41,7 @@ function AdminRootLayoutContent({ children }: { children: ReactNode }) {
 
 export default function AdminRootLayout({ children }: { children: ReactNode }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<DigiLoading message="Memuat area admin..." />}>
       <AdminRootLayoutContent>{children}</AdminRootLayoutContent>
     </Suspense>
   )

@@ -9,8 +9,10 @@ import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import { clearCheckoutIdempotencyKey, getOrCreateCheckoutIdempotencyKey } from '@/lib/checkoutIdempotency'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import { DigiLoading } from '@/components/shared/DigiLoading'
 import { SOSMED_TARGET_INPUT_COPY } from '@/lib/sosmedCheckoutCopy'
 import { buildSosmedCheckoutServiceDisplay } from '@/lib/sosmedCheckoutDisplay'
+import { pageLoadingCopy } from '@/lib/loadingUi'
 import { sanitizeProviderServiceTitle } from '@/lib/sosmedBundlingCards'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
@@ -54,7 +56,7 @@ export default function SosmedCheckoutPage() {
       fallback={
         <>
           <Navbar />
-          <div className="py-32 text-center text-sm text-[#888]">Memuat checkout sosmed...</div>
+          <DigiLoading message={pageLoadingCopy.sosmedCheckout} />
           <Footer />
         </>
       }
@@ -366,7 +368,7 @@ function SosmedCheckoutContent() {
     return (
       <>
         <Navbar />
-        <div className="py-32 text-center text-sm text-[#888]">Memuat checkout sosmed...</div>
+        <DigiLoading message={pageLoadingCopy.sosmedCheckout} />
         <Footer />
       </>
     )

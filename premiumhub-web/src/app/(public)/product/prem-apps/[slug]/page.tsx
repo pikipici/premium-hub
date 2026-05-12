@@ -6,6 +6,7 @@ import { useParams, usePathname, useRouter } from 'next/navigation'
 import { Check, Clock, ShieldCheck, Zap } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
+import { DigiLoading } from '@/components/shared/DigiLoading'
 import Navbar from '@/components/layout/Navbar'
 import { buildLoginHref } from '@/lib/auth'
 import { formatRupiah } from '@/lib/utils'
@@ -341,9 +342,7 @@ export default function PremAppsProductDetailPage() {
     return (
       <>
         <Navbar />
-        <div className="max-w-4xl mx-auto px-4 py-16">
-          <div className="h-96 bg-white/50 rounded-2xl animate-pulse" />
-        </div>
+        <DigiLoading message="Memuat detail produk..." skeletonCount={2} />
         <Footer />
       </>
     )
