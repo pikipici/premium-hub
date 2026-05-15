@@ -93,6 +93,15 @@ func (r *DigiConnectRepo) ListEntitlementsByUser(userID uuid.UUID) ([]model.Digi
 	return rows, err
 }
 
+func (r *DigiConnectRepo) CountActiveEntitlementsByPlan(planCode string, now time.Time) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.DigiConnectEntitlement{}).
+		Where("plan_code = ? AND status = ?", strings.TrimSpace(planCode), "active").
+		Where("expires_at IS NULL OR expires_at > ?", now).
+		Count(&count).Error
+	return count, err
+}
+
 func (r *DigiConnectRepo) AdminListEntitlements(userID uuid.UUID, page, limit int) ([]model.DigiConnectEntitlement, int64, error) {
 	var rows []model.DigiConnectEntitlement
 	var total int64

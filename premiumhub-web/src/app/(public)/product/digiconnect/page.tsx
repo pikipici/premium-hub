@@ -45,6 +45,10 @@ export default function DigiConnectProductPage() {
   }, [])
 
   const checkout = async (plan: DigiConnectPlan) => {
+    if (plan.available === false) {
+      setMessage('Paket ini sedang tidak tersedia. Pilih paket lain dulu.')
+      return
+    }
     if (!hasHydrated) return
     if (!isAuthenticated) {
       router.push(`/login?redirect=${encodeURIComponent('/product/digiconnect')}`)
@@ -131,7 +135,7 @@ export default function DigiConnectProductPage() {
                 <article key={plan.code} className={`rounded-[2rem] border bg-white p-6 shadow-sm ${index === 1 ? 'border-slate-900 ring-4 ring-amber-200' : 'border-slate-200'}`}>
                   <div className="mb-5 flex items-center justify-between">
                     <div className="rounded-2xl bg-slate-950 p-3 text-amber-300"><Code2 className="h-6 w-6" /></div>
-                    {index === 1 && <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-black text-slate-950">REKOMENDASI</span>}
+                    {plan.available === false ? <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-black text-rose-700">STOK HABIS</span> : index === 1 ? <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-black text-slate-950">REKOMENDASI</span> : null}
                   </div>
                   <h3 className="text-2xl font-black">{plan.name}</h3>
                   <p className="mt-2 min-h-12 text-sm text-slate-600">{plan.description}</p>
@@ -143,6 +147,11 @@ export default function DigiConnectProductPage() {
                     <p className="flex items-center"><ShieldCheck className="mr-2 h-4 w-4 text-emerald-600" /> {plan.billing_model === 'pay_per_request' ? 'Charge per request billable berhasil' : 'Fair-use aktif selama paket berjalan'}</p>
                     <p className="flex items-center"><Wallet className="mr-2 h-4 w-4 text-emerald-600" /> Pakai saldo DigiMarket</p>
                   </div>
+                  {plan.stock_managed ? (
+                    <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+                      Stok tersisa {plan.stock_remaining ?? 0} dari {plan.stock_total ?? 0} slot
+                    </p>
+                  ) : null}
                   {plan.model_labels?.length ? (
                     <div className="mt-5 flex flex-wrap gap-2">
                       {plan.model_labels.slice(0, 6).map((label) => (
@@ -151,9 +160,9 @@ export default function DigiConnectProductPage() {
                       {plan.model_labels.length > 6 && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">+{plan.model_labels.length - 6} model</span>}
                     </div>
                   ) : null}
-                  <button onClick={() => checkout(plan)} disabled={checkingOut === plan.code} className="mt-7 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 font-bold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
+                  <button onClick={() => checkout(plan)} disabled={checkingOut === plan.code || plan.available === false} className="mt-7 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 font-bold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
                     {checkingOut === plan.code ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Checkout pakai wallet
+                    {plan.available === false ? 'Stok habis' : 'Checkout pakai wallet'}
                   </button>
                 </article>
               ))}

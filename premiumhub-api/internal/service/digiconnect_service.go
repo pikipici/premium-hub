@@ -100,6 +100,12 @@ type DigiConnectPlanResponse struct {
 	DailyFairUseLimit    int      `json:"daily_fair_use_limit"`
 	PayPerRequestEnabled bool     `json:"pay_per_request_enabled"`
 	ModelLabels          []string `json:"model_labels,omitempty"`
+	StockManaged         bool     `json:"stock_managed"`
+	StockTotal           int      `json:"stock_total,omitempty"`
+	StockUsed            int      `json:"stock_used,omitempty"`
+	StockRemaining       int      `json:"stock_remaining,omitempty"`
+	Available            bool     `json:"available"`
+	UnavailableReason    string   `json:"unavailable_reason,omitempty"`
 }
 
 type DigiConnectCheckoutInput struct {
@@ -127,7 +133,23 @@ func (s *DigiConnectService) SetWalletRepo(walletRepo *repository.WalletRepo) *D
 	return s
 }
 
+const digiConnectTwoDayStockTotal = 10
+
+var digiConnectCXModelLabels = []string{"GPT 5.5", "GPT 5.4", "GPT 5.3 Codex", "GPT 5.3 Codex XHigh", "GPT 5.3 Codex High", "GPT 5.3 Codex Low", "GPT 5.3 Codex None", "GPT 5.3 Codex Spark", "GPT 5.2 Codex", "GPT 5.2", "GPT 5.1 Codex Max", "GPT 5.1 Codex"}
+
 func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
+	now := time.Now()
+	twoDayStockUsed := int64(0)
+	if s.repo != nil {
+		if count, err := s.repo.CountActiveEntitlementsByPlan("digiconnect_2d", now); err == nil {
+			twoDayStockUsed = count
+		}
+	}
+	twoDayRemaining := digiConnectTwoDayStockTotal - int(twoDayStockUsed)
+	if twoDayRemaining < 0 {
+		twoDayRemaining = 0
+	}
+	twoDayAvailable := twoDayRemaining > 0
 	return []DigiConnectPlanResponse{
 		{
 			Code:                 "digiconnect_ppr_hemat",
@@ -137,7 +159,8 @@ func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
 			PriceLabel:           "Rp150/request",
 			BillingModel:         "pay_per_request",
 			PayPerRequestEnabled: true,
-			ModelLabels:          []string{"GPT 5.5", "GPT 5.4", "GPT 5.3 Codex", "GPT 5.3 Codex XHigh", "GPT 5.3 Codex High", "GPT 5.3 Codex Low", "GPT 5.3 Codex None", "GPT 5.3 Codex Spark", "GPT 5.2 Codex", "GPT 5.2", "GPT 5.1 Codex Max", "GPT 5.1 Codex"},
+			ModelLabels:          digiConnectCXModelLabels,
+			Available:            true,
 		},
 		{
 			Code:                 "digiconnect_ppr_premium",
@@ -148,6 +171,7 @@ func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
 			BillingModel:         "pay_per_request",
 			PayPerRequestEnabled: true,
 			ModelLabels:          []string{"Claude Opus 4.6", "Claude Opus 4.7", "Auto", "Claude Opus 4.5", "Claude Sonnet 4.6", "Claude Sonnet 4.5", "Claude Haiku 4.5", "DeepSeek 3.2", "Qwen3 Coder Next", "GLM 5", "MiniMax M2.5"},
+			Available:            true,
 		},
 		{
 			Code:                 "digiconnect_2d",
@@ -159,7 +183,13 @@ func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
 			DurationDays:         2,
 			DailyFairUseLimit:    1000,
 			PayPerRequestEnabled: false,
-			ModelLabels:          []string{"Fair-use included", "Overage wallet tersedia"},
+			ModelLabels:          digiConnectCXModelLabels,
+			StockManaged:         true,
+			StockTotal:           digiConnectTwoDayStockTotal,
+			StockUsed:            int(twoDayStockUsed),
+			StockRemaining:       twoDayRemaining,
+			Available:            twoDayAvailable,
+			UnavailableReason:    map[bool]string{true: "", false: "stok_habis"}[twoDayAvailable],
 		},
 	}
 }
@@ -243,6 +273,9 @@ func (s *DigiConnectService) CheckoutWithWallet(userID uuid.UUID, input DigiConn
 		if selected.DurationDays > 0 {
 			expiry := now.AddDate(0, 0, selected.DurationDays)
 			expiresAt = &expiry
+		}
+		if selected.StockManaged && selected.StockRemaining <= 0 {
+			return errors.New("stok paket DigiConnect sedang habis")
 		}
 		if selected.BillingModel != "pay_per_request" {
 			if user.WalletBalance < selected.Price {

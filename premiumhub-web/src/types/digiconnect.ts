@@ -9,6 +9,12 @@ export interface DigiConnectPlan {
   daily_fair_use_limit: number
   pay_per_request_enabled: boolean
   model_labels?: string[]
+  stock_managed: boolean
+  stock_total?: number
+  stock_used?: number
+  stock_remaining?: number
+  available: boolean
+  unavailable_reason?: string
 }
 
 export interface DigiConnectCheckoutPayload {
