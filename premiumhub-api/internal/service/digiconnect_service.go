@@ -748,8 +748,14 @@ func (s *DigiConnectService) callRouter(ctx context.Context, input DigiConnectAP
 	if baseURL == "" {
 		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: errors.New("digiconnect router base URL is empty")}
 	}
+	modelID := "digiconnect-smart"
+	if input.Options != nil {
+		if selected, ok := input.Options["model"].(string); ok && strings.TrimSpace(selected) != "" {
+			modelID = strings.TrimSpace(selected)
+		}
+	}
 	body := map[string]interface{}{
-		"model": "digiconnect-smart",
+		"model": modelID,
 		"input": input.Input,
 	}
 	if len(input.Options) > 0 {
