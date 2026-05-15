@@ -82,7 +82,7 @@ func (r *DigiConnectRepo) FindActiveEntitlementByUser(userID uuid.UUID, now time
 	var entitlement model.DigiConnectEntitlement
 	err := r.db.Where("user_id = ? AND status = ?", userID, "active").
 		Where("expires_at IS NULL OR expires_at > ?", now).
-		Order("expires_at DESC NULLS FIRST, created_at DESC").
+		Order("(expires_at IS NULL) ASC, expires_at DESC, created_at DESC").
 		First(&entitlement).Error
 	return &entitlement, err
 }

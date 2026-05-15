@@ -94,7 +94,7 @@ func CheckDigiConnectIdempotency(existingPayloadHash, incomingPayloadHash string
 
 func DecideDigiConnectBilling(now time.Time, entitlement *DigiConnectEntitlementState, walletBalance int64, payPerRequestPrice int64, fairUseExceeded bool) DigiConnectBillingDecision {
 	if payPerRequestPrice <= 0 {
-		payPerRequestPrice = 100
+		payPerRequestPrice = 150
 	}
 	if entitlement != nil && strings.EqualFold(strings.TrimSpace(entitlement.Status), "active") {
 		if entitlement.ExpiresAt == nil || entitlement.ExpiresAt.After(now) {

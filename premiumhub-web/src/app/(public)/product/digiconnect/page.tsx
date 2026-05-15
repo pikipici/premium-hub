@@ -14,8 +14,8 @@ import type { DigiConnectPlan } from '@/types/digiconnect'
 const formatRupiah = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 
 const highlights = [
-  'OpenAI-compatible request shape lewat gateway DigiMarket',
-  'Billing aman: wallet dipotong saat paket aktif atau request upstream berhasil',
+  'Pilih harga per request Rp150/Rp200 atau aktifkan paket durasi 2 hari',
+  'Billing aman: wallet dipotong hanya untuk request billable yang berhasil',
   'Dashboard API key, entitlement, dan usage request buat tim kamu',
 ]
 
@@ -135,12 +135,22 @@ export default function DigiConnectProductPage() {
                   </div>
                   <h3 className="text-2xl font-black">{plan.name}</h3>
                   <p className="mt-2 min-h-12 text-sm text-slate-600">{plan.description}</p>
-                  <div className="mt-6 text-4xl font-black">{formatRupiah(plan.price)}</div>
-                  <p className="mt-1 text-sm text-slate-500">Aktif {plan.duration_days} hari</p>
+                  <div className="mt-6 text-4xl font-black">{plan.price_label || formatRupiah(plan.price)}</div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {plan.billing_model === 'pay_per_request' ? 'Tanpa biaya langganan' : `Aktif ${plan.duration_days} hari`}
+                  </p>
                   <div className="mt-6 space-y-3 text-sm text-slate-700">
-                    <p className="flex items-center"><ShieldCheck className="mr-2 h-4 w-4 text-emerald-600" /> Fair-use {plan.daily_fair_use_limit} request/hari</p>
-                    <p className="flex items-center"><Wallet className="mr-2 h-4 w-4 text-emerald-600" /> Overage via wallet tersedia</p>
+                    <p className="flex items-center"><ShieldCheck className="mr-2 h-4 w-4 text-emerald-600" /> {plan.billing_model === 'pay_per_request' ? 'Charge per request billable berhasil' : 'Fair-use aktif selama paket berjalan'}</p>
+                    <p className="flex items-center"><Wallet className="mr-2 h-4 w-4 text-emerald-600" /> Pakai saldo DigiMarket</p>
                   </div>
+                  {plan.model_labels?.length ? (
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {plan.model_labels.slice(0, 6).map((label) => (
+                        <span key={label} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{label}</span>
+                      ))}
+                      {plan.model_labels.length > 6 && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">+{plan.model_labels.length - 6} model</span>}
+                    </div>
+                  ) : null}
                   <button onClick={() => checkout(plan)} disabled={checkingOut === plan.code} className="mt-7 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 font-bold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
                     {checkingOut === plan.code ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Checkout pakai wallet

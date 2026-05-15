@@ -3,9 +3,12 @@ export interface DigiConnectPlan {
   name: string
   description: string
   price: number
+  price_label: string
+  billing_model: string
   duration_days: number
   daily_fair_use_limit: number
   pay_per_request_enabled: boolean
+  model_labels?: string[]
 }
 
 export interface DigiConnectCheckoutPayload {

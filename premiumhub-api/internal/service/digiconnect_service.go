@@ -90,13 +90,16 @@ type DigiConnectAPIRequestInput struct {
 }
 
 type DigiConnectPlanResponse struct {
-	Code                 string `json:"code"`
-	Name                 string `json:"name"`
-	Description          string `json:"description"`
-	Price                int64  `json:"price"`
-	DurationDays         int    `json:"duration_days"`
-	DailyFairUseLimit    int    `json:"daily_fair_use_limit"`
-	PayPerRequestEnabled bool   `json:"pay_per_request_enabled"`
+	Code                 string   `json:"code"`
+	Name                 string   `json:"name"`
+	Description          string   `json:"description"`
+	Price                int64    `json:"price"`
+	PriceLabel           string   `json:"price_label"`
+	BillingModel         string   `json:"billing_model"`
+	DurationDays         int      `json:"duration_days"`
+	DailyFairUseLimit    int      `json:"daily_fair_use_limit"`
+	PayPerRequestEnabled bool     `json:"pay_per_request_enabled"`
+	ModelLabels          []string `json:"model_labels,omitempty"`
 }
 
 type DigiConnectCheckoutInput struct {
@@ -126,9 +129,38 @@ func (s *DigiConnectService) SetWalletRepo(walletRepo *repository.WalletRepo) *D
 
 func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
 	return []DigiConnectPlanResponse{
-		{Code: "digiconnect_starter", Name: "Starter API", Description: "Cocok buat testing dan integrasi awal.", Price: 49000, DurationDays: 30, DailyFairUseLimit: 100, PayPerRequestEnabled: true},
-		{Code: "digiconnect_growth", Name: "Growth API", Description: "Untuk workflow aktif dengan fair-use lebih besar.", Price: 149000, DurationDays: 30, DailyFairUseLimit: 500, PayPerRequestEnabled: true},
-		{Code: "digiconnect_pro", Name: "Pro API", Description: "Untuk pemakaian intensif dan overage wallet.", Price: 299000, DurationDays: 30, DailyFairUseLimit: 1500, PayPerRequestEnabled: true},
+		{
+			Code:                 "digiconnect_ppr_hemat",
+			Name:                 "Bayar per Request Hemat",
+			Description:          "Akses model GPT pilihan dengan biaya lebih ringan, bayar hanya request billable yang berhasil.",
+			Price:                150,
+			PriceLabel:           "Rp150/request",
+			BillingModel:         "pay_per_request",
+			PayPerRequestEnabled: true,
+			ModelLabels:          []string{"GPT 5.5", "GPT 5.4", "GPT 5.3 Codex", "GPT 5.3 Codex XHigh", "GPT 5.3 Codex High", "GPT 5.3 Codex Low", "GPT 5.3 Codex None", "GPT 5.3 Codex Spark", "GPT 5.2 Codex", "GPT 5.2", "GPT 5.1 Codex Max", "GPT 5.1 Codex"},
+		},
+		{
+			Code:                 "digiconnect_ppr_premium",
+			Name:                 "Bayar per Request Premium",
+			Description:          "Akses model AI premium tanpa paket durasi, cocok buat workflow yang butuh pilihan model lebih kuat.",
+			Price:                200,
+			PriceLabel:           "Rp200/request",
+			BillingModel:         "pay_per_request",
+			PayPerRequestEnabled: true,
+			ModelLabels:          []string{"Claude Opus 4.6", "Claude Opus 4.7", "Auto", "Claude Opus 4.5", "Claude Sonnet 4.6", "Claude Sonnet 4.5", "Claude Haiku 4.5", "DeepSeek 3.2", "Qwen3 Coder Next", "GLM 5", "MiniMax M2.5"},
+		},
+		{
+			Code:                 "digiconnect_2d",
+			Name:                 "Paket 2 Hari",
+			Description:          "Aktif 2 hari untuk request fair-use. Cocok buat sprint pendek, testing intensif, atau demo client.",
+			Price:                15000,
+			PriceLabel:           "Rp15.000 / 2 hari",
+			BillingModel:         "duration_package",
+			DurationDays:         2,
+			DailyFairUseLimit:    1000,
+			PayPerRequestEnabled: false,
+			ModelLabels:          []string{"Fair-use included", "Overage wallet tersedia"},
+		},
 	}
 }
 
@@ -206,21 +238,29 @@ func (s *DigiConnectService) CheckoutWithWallet(userID uuid.UUID, input DigiConn
 		if err != nil {
 			return err
 		}
-		if user.WalletBalance < selected.Price {
-			return errors.New("saldo wallet tidak cukup")
-		}
-		before := user.WalletBalance
-		after := before - selected.Price
-		user.WalletBalance = after
-		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
-			return err
-		}
-		if err := s.walletRepo.CreateLedgerTx(tx, &model.WalletLedger{UserID: userID, Type: "debit", Category: "digiconnect_plan", Amount: selected.Price, BalanceBefore: before, BalanceAfter: after, Reference: reference, Description: "Pembelian paket " + selected.Name}); err != nil {
-			return err
-		}
 		now := time.Now()
-		expiresAt := now.AddDate(0, 0, selected.DurationDays)
-		entitlement = &model.DigiConnectEntitlement{UserID: userID, PlanCode: selected.Code, BillingModel: "wallet_plan", Status: "active", Price: selected.Price, StartsAt: now, ExpiresAt: &expiresAt, PayPerRequestEnabled: selected.PayPerRequestEnabled, OveragePayPerRequestEnabled: true, DailyFairUseLimit: selected.DailyFairUseLimit}
+		var expiresAt *time.Time
+		if selected.DurationDays > 0 {
+			expiry := now.AddDate(0, 0, selected.DurationDays)
+			expiresAt = &expiry
+		}
+		if selected.BillingModel != "pay_per_request" {
+			if user.WalletBalance < selected.Price {
+				return errors.New("saldo wallet tidak cukup")
+			}
+			before := user.WalletBalance
+			after := before - selected.Price
+			user.WalletBalance = after
+			if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+				return err
+			}
+			if err := s.walletRepo.CreateLedgerTx(tx, &model.WalletLedger{UserID: userID, Type: "debit", Category: "digiconnect_plan", Amount: selected.Price, BalanceBefore: before, BalanceAfter: after, Reference: reference, Description: "Pembelian paket " + selected.Name}); err != nil {
+				return err
+			}
+		} else if user.WalletBalance < selected.Price {
+			return errors.New("saldo wallet minimal harus cukup untuk 1 request")
+		}
+		entitlement = &model.DigiConnectEntitlement{UserID: userID, PlanCode: selected.Code, BillingModel: selected.BillingModel, Status: "active", Price: selected.Price, StartsAt: now, ExpiresAt: expiresAt, PayPerRequestEnabled: selected.PayPerRequestEnabled, OveragePayPerRequestEnabled: true, DailyFairUseLimit: selected.DailyFairUseLimit}
 		return tx.Create(entitlement).Error
 	})
 	if err != nil {
@@ -353,7 +393,11 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 			walletBalance = user.WalletBalance
 		}
 	}
-	billing := DecideDigiConnectBilling(now, entitlementState, walletBalance, 100, false)
+	payPerRequestPrice := int64(0)
+	if entitlement != nil {
+		payPerRequestPrice = entitlement.Price
+	}
+	billing := DecideDigiConnectBilling(now, entitlementState, walletBalance, payPerRequestPrice, false)
 	if !billing.Allowed {
 		return nil, billingPublicError(billing.Reason)
 	}
