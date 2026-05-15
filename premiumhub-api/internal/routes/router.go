@@ -169,6 +169,10 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, stockRepo, notifSvc)
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
 
+	openAICompat := r.Group("/v1")
+	openAICompat.GET("/models", digiConnectHandler.OpenAICompatibleModels)
+	openAICompat.POST("/responses", digiConnectHandler.OpenAICompatibleResponses)
+
 	api := r.Group("/api/v1")
 	api.Use(
 		middleware.MaxRequestBodyBytes(cfg.MaxRequestBodyBytes),
@@ -204,6 +208,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.GET("/public/sosmed/services", sosmedServiceHandler.PublicList)
 	api.GET("/public/sosmed/bundles", sosmedBundleHandler.PublicList)
 	api.GET("/public/digiconnect/plans", digiConnectHandler.PublicPlans)
+	api.GET("/models", digiConnectHandler.OpenAICompatibleModels)
+	api.POST("/responses", digiConnectHandler.OpenAICompatibleResponses)
 	api.GET("/public/sosmed/bundles/:key", sosmedBundleHandler.PublicDetail)
 	api.GET(
 		"/convert/track/:token",

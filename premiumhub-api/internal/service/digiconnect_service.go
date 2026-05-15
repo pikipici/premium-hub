@@ -137,6 +137,10 @@ const digiConnectTwoDayStockTotal = 10
 
 var digiConnectCXModelLabels = []string{"GPT 5.5", "GPT 5.4", "GPT 5.3 Codex", "GPT 5.3 Codex XHigh", "GPT 5.3 Codex High", "GPT 5.3 Codex Low", "GPT 5.3 Codex None", "GPT 5.3 Codex Spark", "GPT 5.2 Codex", "GPT 5.2", "GPT 5.1 Codex Max", "GPT 5.1 Codex"}
 
+var digiConnectCXModelIDs = []string{"cx/gpt-5.5", "cx/gpt-5.4", "cx/gpt-5.3-codex", "cx/gpt-5.3-codex-xhigh", "cx/gpt-5.3-codex-high", "cx/gpt-5.3-codex-low", "cx/gpt-5.3-codex-none", "cx/gpt-5.3-codex-spark", "cx/gpt-5.2-codex", "cx/gpt-5.2", "cx/gpt-5.1-codex-max", "cx/gpt-5.1-codex"}
+
+var digiConnectPremiumModelIDs = []string{"kr/claude-opus-4.6", "kr/claude-opus-4.7", "kr/auto", "kr/claude-opus-4.5", "kr/claude-sonnet-4.6", "kr/claude-sonnet-4.5", "kr/claude-haiku-4.5", "kr/deepseek-3.2", "kr/qwen3-coder-next", "kr/glm-5", "kr/MiniMax-M2.5"}
+
 func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
 	now := time.Now()
 	twoDayStockUsed := int64(0)
@@ -375,6 +379,138 @@ func (s *DigiConnectService) RouterHealth() map[string]interface{} {
 		base = strings.TrimRight(s.cfg.DigiConnectRouterBaseURL, "/")
 	}
 	return map[string]interface{}{"status": "not_checked", "router_configured": base != "", "checked_at": time.Now()}
+}
+
+type OpenAICompatibleResponseInput struct {
+	Model           string                 `json:"model"`
+	Input           interface{}            `json:"input"`
+	Instructions    string                 `json:"instructions"`
+	Temperature     *float64               `json:"temperature"`
+	MaxOutputTokens *int                   `json:"max_output_tokens"`
+	Metadata        map[string]interface{} `json:"metadata"`
+}
+
+func (s *DigiConnectService) OpenAICompatibleModels(apiKey string) ([]string, DigiConnectPublicError) {
+	key, entitlement, publicErr := s.validateOpenAICompatibleAccess(apiKey)
+	_ = key
+	if publicErr.Code != "" {
+		return nil, publicErr
+	}
+	return modelIDsForDigiConnectEntitlement(entitlement), DigiConnectPublicError{}
+}
+
+func (s *DigiConnectService) CreateOpenAICompatibleResponse(ctx context.Context, apiKey string, input OpenAICompatibleResponseInput, idempotencyKey string) (map[string]interface{}, DigiConnectPublicError) {
+	_, entitlement, publicErr := s.validateOpenAICompatibleAccess(apiKey)
+	if publicErr.Code != "" {
+		return nil, publicErr
+	}
+	modelID := strings.TrimSpace(input.Model)
+	if modelID == "" || !containsDigiConnectModel(modelIDsForDigiConnectEntitlement(entitlement), modelID) {
+		return nil, MapDigiConnectPublicError("UNSUPPORTED_TYPE")
+	}
+	textInput := normalizeOpenAICompatibleInput(input.Input)
+	if strings.TrimSpace(input.Instructions) != "" {
+		textInput = strings.TrimSpace(input.Instructions) + "\n\n" + textInput
+	}
+	options := map[string]interface{}{"model": modelID}
+	if input.Temperature != nil {
+		options["temperature"] = *input.Temperature
+	}
+	if input.MaxOutputTokens != nil {
+		options["max_output_tokens"] = *input.MaxOutputTokens
+	}
+	metadata := input.Metadata
+	if metadata == nil {
+		metadata = map[string]interface{}{}
+	}
+	metadata["compat"] = "openai_responses"
+	res, err := s.CreateAPIRequest(ctx, apiKey, DigiConnectAPIRequestInput{Service: "digiconnect-smart", Type: "text", Input: textInput, Options: options, Metadata: metadata}, idempotencyKey)
+	if err.Code != "" {
+		return nil, err
+	}
+	requestID, _ := res["request_id"].(string)
+	if requestID == "" {
+		requestID = "resp_" + uuid.NewString()
+	}
+	return map[string]interface{}{
+		"id":          requestID,
+		"object":      "response",
+		"created_at":  time.Now().Unix(),
+		"model":       modelID,
+		"status":      "completed",
+		"output":      []map[string]interface{}{{"type": "message", "role": "assistant", "content": []map[string]interface{}{{"type": "output_text", "text": extractDigiConnectText(res)}}}},
+		"digiconnect": res,
+	}, DigiConnectPublicError{}
+}
+
+func (s *DigiConnectService) validateOpenAICompatibleAccess(apiKey string) (*model.DigiConnectAPIKey, *model.DigiConnectEntitlement, DigiConnectPublicError) {
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, nil, MapDigiConnectPublicError("MISSING_API_KEY")
+	}
+	key, err := s.repo.FindAPIKeyByHash(HashDigiConnectSecret(apiKey))
+	if err != nil || key.Status != "active" {
+		return nil, nil, MapDigiConnectPublicError("INVALID_API_KEY")
+	}
+	entitlement, err := s.repo.FindActiveEntitlementByUser(key.UserID, time.Now())
+	if err != nil || entitlement == nil || entitlement.ID == uuid.Nil {
+		return nil, nil, MapDigiConnectPublicError("NO_ACTIVE_ENTITLEMENT")
+	}
+	return key, entitlement, DigiConnectPublicError{}
+}
+
+func modelIDsForDigiConnectEntitlement(entitlement *model.DigiConnectEntitlement) []string {
+	if entitlement == nil {
+		return nil
+	}
+	if entitlement.PlanCode == "digiconnect_ppr_premium" {
+		return digiConnectPremiumModelIDs
+	}
+	return digiConnectCXModelIDs
+}
+
+func containsDigiConnectModel(models []string, modelID string) bool {
+	for _, item := range models {
+		if item == modelID {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeOpenAICompatibleInput(value interface{}) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case []interface{}:
+		parts := make([]string, 0, len(typed))
+		for _, item := range typed {
+			parts = append(parts, normalizeOpenAICompatibleInput(item))
+		}
+		return strings.TrimSpace(strings.Join(parts, "\n"))
+	case map[string]interface{}:
+		if text, ok := typed["text"].(string); ok {
+			return text
+		}
+		if content, ok := typed["content"]; ok {
+			return normalizeOpenAICompatibleInput(content)
+		}
+	}
+	encoded, _ := json.Marshal(value)
+	return string(encoded)
+}
+
+func extractDigiConnectText(res map[string]interface{}) string {
+	if router, ok := res["router_response"].(map[string]interface{}); ok {
+		for _, key := range []string{"output_text", "text", "content", "message"} {
+			if value, ok := router[key].(string); ok && strings.TrimSpace(value) != "" {
+				return value
+			}
+		}
+		encoded, _ := json.Marshal(router)
+		return string(encoded)
+	}
+	encoded, _ := json.Marshal(res)
+	return string(encoded)
 }
 
 func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string, input DigiConnectAPIRequestInput, idempotencyKey string) (map[string]interface{}, DigiConnectPublicError) {

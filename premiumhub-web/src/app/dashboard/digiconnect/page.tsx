@@ -40,8 +40,8 @@ function planPricing(entitlement?: DigiConnectEntitlement) {
 }
 
 function apiRequestUrl() {
-  if (typeof window === 'undefined') return '/api/v1/digiconnect/requests'
-  return `${window.location.origin}/api/v1/digiconnect/requests`
+  if (typeof window === 'undefined') return '/v1'
+  return `${window.location.origin}/v1`
 }
 
 export default function DigiConnectDashboardPage() {
@@ -130,14 +130,18 @@ export default function DigiConnectDashboardPage() {
         ) : (
           <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
             <section className="space-y-6">
-              <Card title="Base URL" icon={<Globe2 className="h-5 w-5" />}>
+              <Card title="OpenAI-compatible Base URL" icon={<Globe2 className="h-5 w-5" />}>
                 <div className="rounded-2xl bg-[#FFF7F1] p-4">
-                  <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#A15A40]">Endpoint request</div>
+                  <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#A15A40]">Base URL untuk 9router</div>
                   <button type="button" onClick={() => void navigator.clipboard?.writeText(baseUrl)} className="mt-2 flex w-full items-center justify-between gap-3 rounded-xl border border-[#F0D8C8] bg-white px-3 py-3 text-left font-mono text-xs font-bold text-[#171411] transition hover:border-[#FF5733]">
                     <span className="break-all">{baseUrl}</span>
                     <Copy className="h-4 w-4 shrink-0 text-[#FF5733]" />
                   </button>
-                  <p className="mt-3 text-sm font-semibold text-[#7B7067]">Gunakan API key dengan header Authorization saat hit endpoint ini.</p>
+                  <div className="mt-3 grid gap-2 text-xs font-bold text-[#7B7067] sm:grid-cols-2">
+                    <code className="rounded-xl bg-white px-3 py-2 ring-1 ring-[#F0D8C8]">GET /models</code>
+                    <code className="rounded-xl bg-white px-3 py-2 ring-1 ring-[#F0D8C8]">POST /responses</code>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-[#7B7067]">Paste base URL ini ke 9router OpenAI Compatible Responses dan pakai API key DigiConnect sebagai bearer token.</p>
                 </div>
               </Card>
 

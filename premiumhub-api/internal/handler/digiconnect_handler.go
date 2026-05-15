@@ -4,6 +4,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"time"
 
 	"premiumhub-api/internal/repository"
 	"premiumhub-api/internal/service"
@@ -74,6 +75,36 @@ func (h *DigiConnectHandler) CreateAPIRequest(c *gin.Context) {
 		return
 	}
 	response.Success(c, "OK", res)
+}
+
+func (h *DigiConnectHandler) OpenAICompatibleModels(c *gin.Context) {
+	apiKey := bearerToken(c.GetHeader("Authorization"))
+	models, publicErr := h.svc.OpenAICompatibleModels(apiKey)
+	if publicErr.Code != "" {
+		writeDigiConnectError(c, publicErr)
+		return
+	}
+	data := make([]map[string]interface{}, 0, len(models))
+	now := time.Now().Unix()
+	for _, modelID := range models {
+		data = append(data, map[string]interface{}{"id": modelID, "object": "model", "created": now, "owned_by": "digiconnect"})
+	}
+	c.JSON(http.StatusOK, gin.H{"object": "list", "data": data})
+}
+
+func (h *DigiConnectHandler) OpenAICompatibleResponses(c *gin.Context) {
+	apiKey := bearerToken(c.GetHeader("Authorization"))
+	var input service.OpenAICompatibleResponseInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		writeDigiConnectError(c, service.MapDigiConnectPublicError("INVALID_PAYLOAD"))
+		return
+	}
+	res, publicErr := h.svc.CreateOpenAICompatibleResponse(c.Request.Context(), apiKey, input, c.GetHeader("Idempotency-Key"))
+	if publicErr.Code != "" {
+		writeDigiConnectError(c, publicErr)
+		return
+	}
+	c.JSON(http.StatusOK, res)
 }
 
 func (h *DigiConnectHandler) ListRequests(c *gin.Context) {
