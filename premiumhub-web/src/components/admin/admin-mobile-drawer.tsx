@@ -28,7 +28,7 @@ const DRAWER_SECTIONS: DrawerSection[] = [
     label: 'Transaksi',
     items: [
       { href: '/admin/order', label: 'Order', icon: '◉' },
-      { href: '/admin/sosmed/orders', label: 'Order Sosmed', icon: '◎' },
+      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: '◎' },
       { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: '◬' },
       { href: '/admin/convert', label: 'Control Convert', icon: '⇄' },
       { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌' },
@@ -44,7 +44,7 @@ const DRAWER_SECTIONS: DrawerSection[] = [
     label: 'Katalog',
     items: [
       { href: '/admin/produk', label: 'Produk', icon: '◈' },
-      { href: '/admin/sosmed', label: 'Layanan Sosmed', icon: '◍' },
+      { href: '/admin/sosmed', label: 'DigiSosmed', icon: '◍' },
       { href: '/admin/stok', label: 'Stok Akun', icon: '◧' },
     ],
   },

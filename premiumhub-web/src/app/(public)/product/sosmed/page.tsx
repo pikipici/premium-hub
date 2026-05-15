@@ -484,12 +484,12 @@ export default function ProductSosmedLandingPage() {
       <main ref={animationRootRef} className="bg-[#F7F7F5]">
         <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <header data-anime="sosmed-hero" className="mx-auto mb-6 max-w-3xl text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FF5733]">Sosmed</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FF5733]">DigiSosmed</p>
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#141414] md:text-4xl">
-              Pilih product sosmed yang tersedia
+              Growth sosial praktis lewat DigiSosmed
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-[#666] md:text-base">
-              Naikkan performa akun sosmed kamu dengan paket aman, cepat diproses, dan tanpa perlu password.
+              Pilih layanan SMM untuk followers, views, dan engagement dengan proses aman, cepat, dan tanpa perlu password.
             </p>
           </header>
 

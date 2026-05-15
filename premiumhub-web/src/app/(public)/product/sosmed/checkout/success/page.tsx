@@ -214,7 +214,7 @@ function SosmedCheckoutSuccessContent() {
               href="/dashboard/sosmed/orders"
               className="inline-flex items-center justify-center rounded-full bg-[#141414] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#000]"
             >
-              Lihat Order Sosmed
+              Lihat Order DigiSosmed
             </Link>
             <Link
               href="/product/sosmed"

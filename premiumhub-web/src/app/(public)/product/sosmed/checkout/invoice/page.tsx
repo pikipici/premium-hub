@@ -103,7 +103,7 @@ function SosmedInvoiceContent() {
       <Navbar />
       <section className="py-12 md:py-16">
         <div className="max-w-xl mx-auto px-4">
-          <h1 className="text-2xl font-extrabold mb-2 text-center">Invoice Sosmed</h1>
+          <h1 className="text-2xl font-extrabold mb-2 text-center">Invoice DigiSosmed</h1>
           <p className="text-center text-sm text-[#888] mb-8">Selesaikan pembayaran biar order langsung masuk ke antrean proses.</p>
 
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-5 mb-4">

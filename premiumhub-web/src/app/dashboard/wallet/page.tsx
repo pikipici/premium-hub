@@ -527,7 +527,7 @@ export default function WalletPage() {
                 href="/product/sosmed"
                 className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#141414] hover:opacity-90"
               >
-                Buka SMM
+                Buka DigiSosmed
               </Link>
             </div>
           </section>

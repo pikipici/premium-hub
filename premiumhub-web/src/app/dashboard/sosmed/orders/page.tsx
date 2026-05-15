@@ -290,8 +290,8 @@ export default function DashboardSosmedOrdersPage() {
     <div ref={animationRootRef} className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Order Sosmed</h1>
-          <p className="mt-1 text-sm text-[#888]">Pantau status pembayaran dan progres layanan sosmed lu.</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">Order DigiSosmed</h1>
+          <p className="mt-1 text-sm text-[#888]">Pantau status pembayaran dan progres layanan SMM DigiSosmed lu.</p>
         </div>
 
         <div className="flex items-center gap-2">

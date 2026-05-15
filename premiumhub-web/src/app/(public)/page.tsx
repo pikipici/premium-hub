@@ -120,13 +120,13 @@ export default function HomePage() {
           <header className="mx-auto mb-6 max-w-3xl text-center lg:mb-10">
             <p className="inline-flex items-center gap-2 rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-4 py-1.5 text-xs font-bold text-[#FF5733]">
               <Rocket className="h-3.5 w-3.5" />
-              DigiConnect + SMM dalam satu wallet
+              DigiConnect + DigiSosmed dalam satu wallet
             </p>
             <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] text-[#141414] sm:text-5xl">
 Gateway AI dan growth sosial, satu tempat.
             </h1>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[#6B7280] sm:text-base">
-              Aktifkan DigiConnect untuk akses API berbasis wallet, sambil tetap order SMM untuk kebutuhan follower, viewer, dan engagement.
+              Aktifkan DigiConnect untuk akses API berbasis wallet, sambil tetap pakai DigiSosmed untuk kebutuhan followers, views, dan engagement.
             </p>
             <div className="mt-5 grid grid-cols-3 gap-2 text-[11px] font-bold text-[#3A3A3A] sm:mx-auto sm:max-w-xl sm:text-xs">
               <span className="inline-flex items-center justify-center gap-1 rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 shadow-[0_8px_18px_rgba(20,20,20,0.04)]">
@@ -191,7 +191,7 @@ Gateway AI dan growth sosial, satu tempat.
               <article className={productCardClass}>
                 <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#EEF4FF]" />
                 <p className="relative inline-flex rounded-full border border-[#DCE9FF] bg-[#EEF4FF] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#2853A6]">
-                  Jasa SMM
+                  DigiSosmed
                 </p>
                 <h2 className="relative mt-3 text-2xl font-extrabold tracking-tight text-[#141414]">
                   Naikin Follower, Viewer, dan Engagement
@@ -223,7 +223,7 @@ Gateway AI dan growth sosial, satu tempat.
                   href="/product/sosmed"
                   className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-[#2853A6] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#204486]"
                 >
-                  Lihat Paket SMM
+                  Lihat DigiSosmed
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </article>

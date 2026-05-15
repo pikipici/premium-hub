@@ -62,7 +62,7 @@ function unitFromServiceLike(service: Pick<SosmedService, 'category_code' | 'tit
 
 function serviceForOrderDisplay(order: SosmedOrder): SosmedService {
   const service = order.service
-  const snapshotTitle = clean(order.service_title) || 'Layanan Sosmed'
+  const snapshotTitle = clean(order.service_title) || 'Layanan DigiSosmed'
   const title = clean(service?.title) || snapshotTitle
   const categoryCode = clean(service?.category_code) || inferCategoryCode(title, snapshotTitle, order.service_code)
   const platformLabel = clean(service?.platform_label) || inferPlatformLabel(title, snapshotTitle, order.service_code)

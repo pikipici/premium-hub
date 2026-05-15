@@ -31,11 +31,11 @@ function resolveCorePageMeta(pathname: string): PageMeta {
   }
 
   if (pathname.startsWith('/admin/sosmed/orders')) {
-    return { title: 'Order Sosmed', sub: 'Pantau dan update status order layanan sosmed' }
+    return { title: 'Order DigiSosmed', sub: 'Pantau dan update status order layanan SMM DigiSosmed' }
   }
 
   if (pathname.startsWith('/admin/sosmed')) {
-    return { title: 'Layanan Sosmed', sub: 'Kelola card katalog /product/sosmed' }
+    return { title: 'DigiSosmed', sub: 'Kelola card katalog /product/sosmed' }
   }
 
   if (pathname.startsWith('/admin/order')) {

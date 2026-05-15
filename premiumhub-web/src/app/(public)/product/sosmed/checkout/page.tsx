@@ -409,7 +409,7 @@ function SosmedCheckoutContent() {
       <Navbar />
       <section className="py-12 md:py-16">
         <div className="max-w-2xl mx-auto px-4">
-          <h1 className="text-2xl font-extrabold mb-8 text-center">{isBundleCheckout ? 'Checkout Paket Spesial' : 'Checkout Sosmed'}</h1>
+          <h1 className="text-2xl font-extrabold mb-8 text-center">{isBundleCheckout ? 'Checkout Paket Spesial' : 'Checkout DigiSosmed'}</h1>
 
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6">
             <h3 className="text-sm font-bold mb-4">{isBundleCheckout ? 'Ringkasan Paket' : 'Ringkasan Layanan'}</h3>

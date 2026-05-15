@@ -1916,7 +1916,7 @@ export default function SosmedServiceSettingsCard() {
           <div className="card" style={{ marginBottom: 12 }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
               <div>
-                <h2>Master Layanan Sosmed</h2>
+                <h2>Master DigiSosmed</h2>
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                   Konten card di /product/sosmed diambil langsung dari master layanan ini.
                 </div>
@@ -3669,7 +3669,7 @@ export default function SosmedServiceSettingsCard() {
           >
             <div className="modal-head" style={MODAL_HEAD_STYLE}>
               <div>
-                <h3>{formMode === 'create' ? 'Tambah Layanan Sosmed' : 'Edit Layanan Sosmed'}</h3>
+                <h3>{formMode === 'create' ? 'Tambah Layanan DigiSosmed' : 'Edit Layanan DigiSosmed'}</h3>
                 <div className="modal-sub" style={MODAL_SUB_STYLE}>Kode layanan permanen setelah dibuat.</div>
               </div>
               <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={closeForm}>×</button>
@@ -3974,7 +3974,7 @@ export default function SosmedServiceSettingsCard() {
             >
               <div className="modal-head" style={MODAL_HEAD_STYLE}>
                 <div>
-                  <h3>Detail Layanan Sosmed</h3>
+                  <h3>Detail Layanan DigiSosmed</h3>
                   <div className="modal-sub" style={MODAL_SUB_STYLE}>{detailTarget.code}</div>
                 </div>
                 <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={() => setDetailTarget(null)}>×</button>

@@ -7,22 +7,22 @@ import { normalizeNavbarMenuItems } from './navbarMenuCache'
 import { DEFAULT_PUBLIC_NAV_ITEMS } from './publicNavItems'
 
 describe('sosmed landing copy', () => {
-  it('shows the buyer-facing navbar label requested for sosmed products', () => {
-    expect(DEFAULT_PUBLIC_NAV_ITEMS).toContainEqual({ href: '/product/sosmed', label: 'Paket Sosmed' })
-    expect(DEFAULT_PUBLIC_NAV_ITEMS).not.toContainEqual({ href: '/product/sosmed', label: 'Sosmed' })
+  it('shows the DigiSosmed navbar brand for sosmed products', () => {
+    expect(DEFAULT_PUBLIC_NAV_ITEMS).toContainEqual({ href: '/product/sosmed', label: 'DigiSosmed' })
+    expect(DEFAULT_PUBLIC_NAV_ITEMS).not.toContainEqual({ href: '/product/sosmed', label: 'Paket Sosmed' })
   })
 
-  it('normalizes stale sosmed navbar labels from cache or API into the new buyer-facing label', () => {
+  it('normalizes stale sosmed navbar labels from cache or API into the DigiSosmed brand', () => {
     expect(normalizeNavbarMenuItems([{ href: '/product/sosmed', label: 'Sosmed' }])).toEqual([
       { href: '/product/digiconnect', label: 'DigiConnect' },
-      { href: '/product/sosmed', label: 'Paket Sosmed' },
+      { href: '/product/sosmed', label: 'DigiSosmed' },
     ])
   })
 
-  it('uses the requested product availability headline on the sosmed landing page', () => {
+  it('uses the DigiSosmed product headline on the sosmed landing page', () => {
     const source = readFileSync(join(process.cwd(), 'src/app/(public)/product/sosmed/page.tsx'), 'utf8')
 
-    expect(source).toContain('Pilih product sosmed yang tersedia')
-    expect(source).not.toContain('Pilih paket yang paling gampang dipahami')
+    expect(source).toContain('Growth sosial praktis lewat DigiSosmed')
+    expect(source).not.toContain('Pilih product sosmed yang tersedia')
   })
 })

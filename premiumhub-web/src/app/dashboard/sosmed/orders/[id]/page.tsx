@@ -92,7 +92,7 @@ export default function SosmedOrderDetailPage() {
                 </span>
               ) : null}
             </div>
-            <h1 className="mt-3 text-2xl font-black leading-tight sm:text-3xl">Detail Order Sosmed</h1>
+            <h1 className="mt-3 text-2xl font-black leading-tight sm:text-3xl">Detail Order DigiSosmed</h1>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#666]">
               Timeline ini pakai bahasa ringkas biar lu bisa cek posisi order tanpa istilah teknis supplier.
             </p>

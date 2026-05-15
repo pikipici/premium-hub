@@ -36,7 +36,7 @@ const SCOPE_OPTIONS: Array<{ value: ProductCategoryScope; label: string; desc: s
   },
   {
     value: 'sosmed',
-    label: 'Sosmed SMM',
+    label: 'DigiSosmed (SMM)',
     desc: 'Kategori untuk katalog /product/sosmed',
   },
 ]

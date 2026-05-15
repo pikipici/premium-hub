@@ -35,7 +35,7 @@ const MENU = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/wallet', icon: Wallet, label: 'Wallet' },
   { href: '/dashboard/convert/orders', icon: RefreshCw, label: 'Riwayat Convert', settingKey: 'convert_history' },
-  { href: '/dashboard/sosmed/orders', icon: Megaphone, label: 'Order Sosmed' },
+  { href: '/dashboard/sosmed/orders', icon: Megaphone, label: 'Order DigiSosmed' },
   { href: '/dashboard/digiconnect', icon: Network, label: 'DigiConnect' },
   { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Akun Aktif', settingKey: 'active_accounts' },
   { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order', settingKey: 'order_history' },

@@ -11,10 +11,10 @@ type MobileItem = {
 const MOBILE_ITEMS: MobileItem[] = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/produk', label: 'Produk' },
-  { href: '/admin/sosmed', label: 'Sosmed' },
+  { href: '/admin/sosmed', label: 'DigiSosmed' },
   { href: '/admin/stok', label: 'Stok' },
   { href: '/admin/order', label: 'Order' },
-  { href: '/admin/sosmed/orders', label: 'Order SSM' },
+  { href: '/admin/sosmed/orders', label: 'Order DigiSosmed' },
   { href: '/admin/garansi', label: 'Garansi' },
   { href: '/admin/pengguna', label: 'Pengguna' },
   { href: '/admin/pengaturan', label: 'Pengaturan' },

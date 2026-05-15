@@ -9,14 +9,14 @@ type NavbarMenuSourceItem = {
   is_visible?: boolean
 }
 
-const NAVBAR_MENU_CACHE_KEY = 'digimarket:public-navbar-menu:v2'
+const NAVBAR_MENU_CACHE_KEY = 'digimarket:public-navbar-menu:v3'
 
 export const NAVBAR_MENU_CACHE_EVENT = 'digimarket:public-navbar-menu-updated'
 
 let memoryCache: CachedNavbarMenuItem[] | null = null
 
 function normalizeNavbarMenuLabel(href: string, label: string) {
-  if (href === '/product/sosmed' && label === 'Sosmed') return 'Paket Sosmed'
+  if (href === '/product/sosmed') return 'DigiSosmed'
   return label
 }
 

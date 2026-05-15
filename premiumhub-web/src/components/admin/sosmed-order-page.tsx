@@ -330,7 +330,7 @@ export default function SosmedOrderPage() {
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div>
-            <h2>Order Sosmed</h2>
+            <h2>Order DigiSosmed</h2>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
               Kelola status order layanan sosmed dari pending sampai selesai.
             </div>
@@ -609,7 +609,7 @@ export default function SosmedOrderPage() {
           >
             <div style={{ padding: 18, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
               <div>
-                <h3 style={{ margin: 0 }}>Detail Order Sosmed</h3>
+                <h3 style={{ margin: 0 }}>Detail Order DigiSosmed</h3>
                 <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>{detail.order.id}</div>
               </div>
               <button className="action-btn" type="button" onClick={() => setDetail(null)}>Tutup</button>

@@ -5,5 +5,5 @@ export type PublicNavItem = {
 
 export const DEFAULT_PUBLIC_NAV_ITEMS: PublicNavItem[] = [
   { href: '/product/digiconnect', label: 'DigiConnect' },
-  { href: '/product/sosmed', label: 'Paket Sosmed' },
+  { href: '/product/sosmed', label: 'DigiSosmed' },
 ]
