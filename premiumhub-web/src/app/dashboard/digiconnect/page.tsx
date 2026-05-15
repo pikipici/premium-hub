@@ -2,7 +2,7 @@
 
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Copy, KeyRound, Loader2, Plus, RadioTower, WalletCards } from 'lucide-react'
+import { Activity, Copy, Globe2, KeyRound, Loader2, Plus, RadioTower, WalletCards } from 'lucide-react'
 
 import { digiconnectService } from '@/services/digiconnectService'
 import type { DigiConnectApiKey, DigiConnectEntitlement, DigiConnectRequest, DigiConnectSummary } from '@/types/digiconnect'
@@ -21,6 +21,29 @@ function statusClass(status: string) {
   return 'bg-rose-50 text-rose-700 ring-rose-200'
 }
 
+const planLabels: Record<string, string> = {
+  digiconnect_ppr_hemat: 'Bayar per Request Hemat',
+  digiconnect_ppr_premium: 'Bayar per Request Premium',
+  digiconnect_2d: 'Paket 2 Hari',
+}
+
+function planLabel(code?: string | null) {
+  if (!code) return '-'
+  return planLabels[code] || code
+}
+
+function planPricing(entitlement?: DigiConnectEntitlement) {
+  if (!entitlement) return '-'
+  if (entitlement.billing_model === 'pay_per_request') return `${currency.format(entitlement.price)}/request`
+  if (entitlement.expires_at) return 'Paket aktif'
+  return currency.format(entitlement.price)
+}
+
+function apiRequestUrl() {
+  if (typeof window === 'undefined') return '/api/v1/digiconnect/requests'
+  return `${window.location.origin}/api/v1/digiconnect/requests`
+}
+
 export default function DigiConnectDashboardPage() {
   const [summary, setSummary] = useState<DigiConnectSummary | null>(null)
   const [keys, setKeys] = useState<DigiConnectApiKey[]>([])
@@ -31,6 +54,7 @@ export default function DigiConnectDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [baseUrl, setBaseUrl] = useState('/api/v1/digiconnect/requests')
 
   const activeEntitlement = useMemo(() => entitlements.find((item) => item.status === 'active'), [entitlements])
 
@@ -55,6 +79,7 @@ export default function DigiConnectDashboardPage() {
   }
 
   useEffect(() => {
+    setBaseUrl(apiRequestUrl())
     void load()
   }, [])
 
@@ -90,8 +115,8 @@ export default function DigiConnectDashboardPage() {
             <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
               <Stat label="Status" value={summary?.status || 'inactive'} />
               <Stat label="API key" value={String(summary?.api_keys_count ?? keys.length)} />
-              <Stat label="Plan" value={summary?.active_plan_code || '-'} />
-              <Stat label="Pay/request" value={summary?.pay_per_request_enabled ? 'Aktif' : 'Nonaktif'} />
+              <Stat label="Plan" value={planLabel(summary?.active_plan_code || activeEntitlement?.plan_code)} />
+              <Stat label="Harga" value={planPricing(activeEntitlement)} />
             </div>
           </div>
         </div>
@@ -105,6 +130,17 @@ export default function DigiConnectDashboardPage() {
         ) : (
           <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
             <section className="space-y-6">
+              <Card title="Base URL" icon={<Globe2 className="h-5 w-5" />}>
+                <div className="rounded-2xl bg-[#FFF7F1] p-4">
+                  <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#A15A40]">Endpoint request</div>
+                  <button type="button" onClick={() => void navigator.clipboard?.writeText(baseUrl)} className="mt-2 flex w-full items-center justify-between gap-3 rounded-xl border border-[#F0D8C8] bg-white px-3 py-3 text-left font-mono text-xs font-bold text-[#171411] transition hover:border-[#FF5733]">
+                    <span className="break-all">{baseUrl}</span>
+                    <Copy className="h-4 w-4 shrink-0 text-[#FF5733]" />
+                  </button>
+                  <p className="mt-3 text-sm font-semibold text-[#7B7067]">Gunakan API key dengan header Authorization saat hit endpoint ini.</p>
+                </div>
+              </Card>
+
               <Card title="API key" icon={<KeyRound className="h-5 w-5" />}>
                 <div className="flex flex-col gap-3 rounded-2xl bg-[#FFF7F1] p-3 sm:flex-row">
                   <input
@@ -148,10 +184,10 @@ export default function DigiConnectDashboardPage() {
               <Card title="Entitlement aktif" icon={<WalletCards className="h-5 w-5" />}>
                 {activeEntitlement ? (
                   <div className="rounded-2xl bg-[#171411] p-5 text-white">
-                    <div className="text-sm text-orange-100/80">{activeEntitlement.billing_model}</div>
-                    <div className="mt-1 text-2xl font-black">{activeEntitlement.plan_code}</div>
+                    <div className="text-sm text-orange-100/80">{activeEntitlement.billing_model === 'pay_per_request' ? 'Pay per request' : 'Paket durasi'}</div>
+                    <div className="mt-1 text-2xl font-black">{planLabel(activeEntitlement.plan_code)}</div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <Mini label="Harga" value={currency.format(activeEntitlement.price)} />
+                      <Mini label="Harga" value={planPricing(activeEntitlement)} />
                       <Mini label="Fair use" value={activeEntitlement.daily_fair_use_limit ? `${activeEntitlement.daily_fair_use_limit}/hari` : 'Unlimited'} />
                       <Mini label="Expired" value={formatDate(activeEntitlement.expires_at)} />
                     </div>
