@@ -1,0 +1,589 @@
+package service
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"premiumhub-api/config"
+	"premiumhub-api/internal/model"
+	"premiumhub-api/internal/repository"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+type DigiConnectService struct {
+	cfg        *config.Config
+	repo       *repository.DigiConnectRepo
+	walletRepo *repository.WalletRepo
+	httpClient *http.Client
+}
+
+type DigiConnectSummaryResponse struct {
+	Enabled              bool       `json:"enabled"`
+	Status               string     `json:"status"`
+	ActivePlanCode       string     `json:"active_plan_code,omitempty"`
+	ExpiresAt            *time.Time `json:"expires_at,omitempty"`
+	PayPerRequestEnabled bool       `json:"pay_per_request_enabled"`
+	APIKeysCount         int        `json:"api_keys_count"`
+}
+
+type DigiConnectAPIKeyResponse struct {
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	KeyPrefix  string     `json:"key_prefix"`
+	MaskedKey  string     `json:"masked_key"`
+	PlainKey   string     `json:"plain_key,omitempty"`
+	Status     string     `json:"status"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+type DigiConnectRequestListResponse struct {
+	ID              string     `json:"id"`
+	RequestID       string     `json:"request_id"`
+	ServiceAlias    string     `json:"service_alias"`
+	RequestType     string     `json:"request_type"`
+	Status          string     `json:"status"`
+	InputPreview    string     `json:"input_preview"`
+	BillingDecision string     `json:"billing_decision"`
+	BillingStatus   string     `json:"billing_status"`
+	BillingSource   string     `json:"billing_source"`
+	Amount          int64      `json:"amount"`
+	Currency        string     `json:"currency"`
+	PublicErrorCode string     `json:"public_error_code,omitempty"`
+	RouterStatus    int        `json:"router_status"`
+	RouterLatencyMS int64      `json:"router_latency_ms"`
+	StartedAt       *time.Time `json:"started_at"`
+	CompletedAt     *time.Time `json:"completed_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+
+type DigiConnectAdminOverviewResponse struct {
+	Router        map[string]interface{} `json:"router"`
+	StatusCounts  map[string]int64       `json:"status_counts"`
+	TodayCounts   map[string]int64       `json:"today_counts"`
+	ChargedCount  int64                  `json:"charged_count"`
+	ChargedAmount int64                  `json:"charged_amount"`
+	GeneratedAt   time.Time              `json:"generated_at"`
+}
+
+type DigiConnectCreateAPIKeyInput struct {
+	Name string `json:"name"`
+}
+
+type DigiConnectAPIRequestInput struct {
+	Service  string                 `json:"service"`
+	Type     string                 `json:"type"`
+	Input    string                 `json:"input"`
+	Options  map[string]interface{} `json:"options"`
+	Metadata map[string]interface{} `json:"metadata"`
+}
+
+type DigiConnectPlanResponse struct {
+	Code                 string `json:"code"`
+	Name                 string `json:"name"`
+	Description          string `json:"description"`
+	Price                int64  `json:"price"`
+	DurationDays         int    `json:"duration_days"`
+	DailyFairUseLimit    int    `json:"daily_fair_use_limit"`
+	PayPerRequestEnabled bool   `json:"pay_per_request_enabled"`
+}
+
+type DigiConnectCheckoutInput struct {
+	PlanCode string `json:"plan_code" binding:"required"`
+}
+
+type DigiConnectProvisionEntitlementInput struct {
+	UserID                      string `json:"user_id" binding:"required"`
+	PlanCode                    string `json:"plan_code"`
+	BillingModel                string `json:"billing_model"`
+	Price                       int64  `json:"price"`
+	DurationDays                int    `json:"duration_days"`
+	PayPerRequestEnabled        bool   `json:"pay_per_request_enabled"`
+	OveragePayPerRequestEnabled bool   `json:"overage_pay_per_request_enabled"`
+	DailyFairUseLimit           int    `json:"daily_fair_use_limit"`
+	CustomRateLimitProfile      string `json:"custom_rate_limit_profile"`
+}
+
+func NewDigiConnectService(cfg *config.Config, repo *repository.DigiConnectRepo) *DigiConnectService {
+	return &DigiConnectService{cfg: cfg, repo: repo, httpClient: &http.Client{Timeout: parseDigiConnectTimeout(cfg)}}
+}
+
+func (s *DigiConnectService) SetWalletRepo(walletRepo *repository.WalletRepo) *DigiConnectService {
+	s.walletRepo = walletRepo
+	return s
+}
+
+func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
+	return []DigiConnectPlanResponse{
+		{Code: "digiconnect_starter", Name: "Starter API", Description: "Cocok buat testing dan integrasi awal.", Price: 49000, DurationDays: 30, DailyFairUseLimit: 100, PayPerRequestEnabled: true},
+		{Code: "digiconnect_growth", Name: "Growth API", Description: "Untuk workflow aktif dengan fair-use lebih besar.", Price: 149000, DurationDays: 30, DailyFairUseLimit: 500, PayPerRequestEnabled: true},
+		{Code: "digiconnect_pro", Name: "Pro API", Description: "Untuk pemakaian intensif dan overage wallet.", Price: 299000, DurationDays: 30, DailyFairUseLimit: 1500, PayPerRequestEnabled: true},
+	}
+}
+
+func (s *DigiConnectService) Summary(userID uuid.UUID) (*DigiConnectSummaryResponse, error) {
+	keys, err := s.repo.ListAPIKeysByUser(userID)
+	if err != nil {
+		return nil, err
+	}
+	res := &DigiConnectSummaryResponse{Enabled: s.cfg != nil && s.cfg.DigiConnectEnabled, Status: "inactive", APIKeysCount: len(keys)}
+	entitlement, err := s.repo.FindActiveEntitlementByUser(userID, time.Now())
+	if err == nil {
+		res.Status = entitlement.Status
+		res.ActivePlanCode = entitlement.PlanCode
+		res.ExpiresAt = entitlement.ExpiresAt
+		res.PayPerRequestEnabled = entitlement.PayPerRequestEnabled
+		return res, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return res, nil
+	}
+	return nil, err
+}
+
+func (s *DigiConnectService) ListAPIKeys(userID uuid.UUID) ([]DigiConnectAPIKeyResponse, error) {
+	rows, err := s.repo.ListAPIKeysByUser(userID)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]DigiConnectAPIKeyResponse, 0, len(rows))
+	for _, row := range rows {
+		res = append(res, mapDigiConnectAPIKey(row, ""))
+	}
+	return res, nil
+}
+
+func (s *DigiConnectService) ListEntitlements(userID uuid.UUID) ([]model.DigiConnectEntitlement, error) {
+	return s.repo.ListEntitlementsByUser(userID)
+}
+
+func (s *DigiConnectService) ListRequests(userID uuid.UUID, page, limit int) ([]DigiConnectRequestListResponse, int64, error) {
+	rows, total, err := s.repo.ListRequestsByUser(userID, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	return mapDigiConnectRequests(rows), total, nil
+}
+
+func (s *DigiConnectService) AdminListRequests(filter repository.DigiConnectAdminRequestFilter) ([]model.DigiConnectRequest, int64, error) {
+	return s.repo.AdminListRequests(filter)
+}
+
+func (s *DigiConnectService) AdminListEntitlements(userID uuid.UUID, page, limit int) ([]model.DigiConnectEntitlement, int64, error) {
+	return s.repo.AdminListEntitlements(userID, page, limit)
+}
+
+func (s *DigiConnectService) CheckoutWithWallet(userID uuid.UUID, input DigiConnectCheckoutInput) (*model.DigiConnectEntitlement, error) {
+	if s.walletRepo == nil {
+		return nil, errors.New("wallet belum dikonfigurasi")
+	}
+	var selected *DigiConnectPlanResponse
+	for _, plan := range s.PublicPlans() {
+		if plan.Code == strings.TrimSpace(input.PlanCode) {
+			p := plan
+			selected = &p
+			break
+		}
+	}
+	if selected == nil {
+		return nil, errors.New("plan DigiConnect tidak valid")
+	}
+	var entitlement *model.DigiConnectEntitlement
+	reference := "digiconnect:plan:" + userID.String() + ":" + selected.Code + ":" + time.Now().Format("20060102150405")
+	err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		user, err := s.walletRepo.LockUserByIDTx(tx, userID)
+		if err != nil {
+			return err
+		}
+		if user.WalletBalance < selected.Price {
+			return errors.New("saldo wallet tidak cukup")
+		}
+		before := user.WalletBalance
+		after := before - selected.Price
+		user.WalletBalance = after
+		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+			return err
+		}
+		if err := s.walletRepo.CreateLedgerTx(tx, &model.WalletLedger{UserID: userID, Type: "debit", Category: "digiconnect_plan", Amount: selected.Price, BalanceBefore: before, BalanceAfter: after, Reference: reference, Description: "Pembelian paket " + selected.Name}); err != nil {
+			return err
+		}
+		now := time.Now()
+		expiresAt := now.AddDate(0, 0, selected.DurationDays)
+		entitlement = &model.DigiConnectEntitlement{UserID: userID, PlanCode: selected.Code, BillingModel: "wallet_plan", Status: "active", Price: selected.Price, StartsAt: now, ExpiresAt: &expiresAt, PayPerRequestEnabled: selected.PayPerRequestEnabled, OveragePayPerRequestEnabled: true, DailyFairUseLimit: selected.DailyFairUseLimit}
+		return tx.Create(entitlement).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return entitlement, nil
+}
+
+func (s *DigiConnectService) AdminProvisionEntitlement(input DigiConnectProvisionEntitlementInput) (*model.DigiConnectEntitlement, error) {
+	userID, err := uuid.Parse(strings.TrimSpace(input.UserID))
+	if err != nil {
+		return nil, errors.New("user_id tidak valid")
+	}
+	planCode := strings.TrimSpace(input.PlanCode)
+	if planCode == "" {
+		planCode = "digiconnect_starter"
+	}
+	billingModel := strings.TrimSpace(input.BillingModel)
+	if billingModel == "" {
+		billingModel = "manual_admin"
+	}
+	durationDays := input.DurationDays
+	if durationDays <= 0 {
+		durationDays = 30
+	}
+	if input.Price < 0 {
+		return nil, errors.New("harga tidak valid")
+	}
+	if input.DailyFairUseLimit < 0 {
+		return nil, errors.New("daily fair use tidak valid")
+	}
+	now := time.Now()
+	expiresAt := now.AddDate(0, 0, durationDays)
+	entitlement := &model.DigiConnectEntitlement{UserID: userID, PlanCode: planCode, BillingModel: billingModel, Status: "active", Price: input.Price, StartsAt: now, ExpiresAt: &expiresAt, PayPerRequestEnabled: input.PayPerRequestEnabled, OveragePayPerRequestEnabled: input.OveragePayPerRequestEnabled, DailyFairUseLimit: input.DailyFairUseLimit, CustomRateLimitProfile: strings.TrimSpace(input.CustomRateLimitProfile)}
+	if err := s.repo.CreateEntitlement(entitlement); err != nil {
+		return nil, err
+	}
+	return entitlement, nil
+}
+
+func (s *DigiConnectService) AdminOverview() (*DigiConnectAdminOverviewResponse, error) {
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	statusCounts, err := s.repo.RequestStatusCounts(time.Time{})
+	if err != nil {
+		return nil, err
+	}
+	todayCounts, err := s.repo.RequestStatusCounts(startOfDay)
+	if err != nil {
+		return nil, err
+	}
+	chargedCount, chargedAmount, err := s.repo.RequestBillingSum(startOfDay)
+	if err != nil {
+		return nil, err
+	}
+	return &DigiConnectAdminOverviewResponse{Router: s.RouterHealth(), StatusCounts: statusCounts, TodayCounts: todayCounts, ChargedCount: chargedCount, ChargedAmount: chargedAmount, GeneratedAt: now}, nil
+}
+
+func (s *DigiConnectService) CreateAPIKey(userID uuid.UUID, input DigiConnectCreateAPIKeyInput) (*DigiConnectAPIKeyResponse, error) {
+	material, err := GenerateDigiConnectAPIKey()
+	if err != nil {
+		return nil, err
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		name = "Default key"
+	}
+	key := &model.DigiConnectAPIKey{UserID: userID, Name: name, KeyPrefix: material.Prefix, KeyHash: material.Hash, Status: "active"}
+	if err := s.repo.CreateAPIKey(key); err != nil {
+		return nil, err
+	}
+	res := mapDigiConnectAPIKey(*key, material.Plain)
+	return &res, nil
+}
+
+func (s *DigiConnectService) RouterHealth() map[string]interface{} {
+	base := ""
+	if s.cfg != nil {
+		base = strings.TrimRight(s.cfg.DigiConnectRouterBaseURL, "/")
+	}
+	return map[string]interface{}{"status": "not_checked", "router_configured": base != "", "checked_at": time.Now()}
+}
+
+func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string, input DigiConnectAPIRequestInput, idempotencyKey string) (map[string]interface{}, DigiConnectPublicError) {
+	if s.cfg == nil || !s.cfg.DigiConnectEnabled {
+		return nil, DigiConnectPublicError{Code: "SERVICE_BUSY", HTTPStatus: http.StatusServiceUnavailable, Message: "Jaringan sedang ramai, coba lagi sebentar lagi."}
+	}
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, MapDigiConnectPublicError("MISSING_API_KEY")
+	}
+	key, err := s.repo.FindAPIKeyByHash(HashDigiConnectSecret(apiKey))
+	if err != nil || key.Status != "active" {
+		return nil, MapDigiConnectPublicError("INVALID_API_KEY")
+	}
+	if strings.TrimSpace(input.Input) == "" || strings.TrimSpace(input.Service) == "" || strings.TrimSpace(input.Type) == "" {
+		return nil, MapDigiConnectPublicError("MISSING_INPUT")
+	}
+	if strings.TrimSpace(input.Service) != "digiconnect-smart" || strings.TrimSpace(input.Type) != "text" {
+		return nil, MapDigiConnectPublicError("UNSUPPORTED_TYPE")
+	}
+
+	payloadHash := hashDigiConnectPayload(input)
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if idempotencyKey != "" {
+		existing, err := s.repo.FindRequestByUserAndIdempotencyKey(key.UserID, idempotencyKey)
+		if err == nil {
+			if checkErr := CheckDigiConnectIdempotency(existing.IdempotencyRequestHash, payloadHash); checkErr != nil {
+				return nil, MapDigiConnectPublicError("IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD")
+			}
+			return mapDigiConnectRequestResponse(existing, true), DigiConnectPublicError{}
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, MapDigiConnectPublicError("DATABASE_ERROR")
+		}
+	}
+
+	now := time.Now()
+	entitlement, err := s.repo.FindActiveEntitlementByUser(key.UserID, now)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, MapDigiConnectPublicError("DATABASE_ERROR")
+	}
+	var entitlementState *DigiConnectEntitlementState
+	if entitlement != nil && entitlement.ID != uuid.Nil {
+		entitlementState = &DigiConnectEntitlementState{Status: entitlement.Status, ExpiresAt: entitlement.ExpiresAt, PayPerRequestEnabled: entitlement.PayPerRequestEnabled, OveragePayPerRequestEnabled: entitlement.OveragePayPerRequestEnabled}
+	}
+	walletBalance := int64(0)
+	if s.walletRepo != nil {
+		user, userErr := s.walletRepo.LockUserByIDTx(s.walletRepo.DB(), key.UserID)
+		if userErr == nil {
+			walletBalance = user.WalletBalance
+		}
+	}
+	billing := DecideDigiConnectBilling(now, entitlementState, walletBalance, 100, false)
+	if !billing.Allowed {
+		return nil, billingPublicError(billing.Reason)
+	}
+
+	requestID := "dc_req_" + uuid.NewString()
+	request := &model.DigiConnectRequest{RequestID: requestID, UserID: key.UserID, APIKeyID: &key.ID, ServiceAlias: input.Service, RequestType: input.Type, Status: "processing", InputHash: HashDigiConnectSecret(input.Input), InputPreview: previewDigiConnectInput(input.Input), PayloadHash: payloadHash, IdempotencyRequestHash: payloadHash, BillingDecision: billing.Decision, BillingStatus: "reserved", BillingSource: billing.Source, Amount: billing.Amount, Currency: "IDR", StartedAt: &now}
+	if idempotencyKey != "" {
+		request.IdempotencyKey = &idempotencyKey
+	}
+	if optionsJSON, err := json.Marshal(input.Options); err == nil {
+		request.OptionsJSON = string(optionsJSON)
+	}
+	if metadataJSON, err := json.Marshal(input.Metadata); err == nil {
+		request.MetadataJSON = string(metadataJSON)
+	}
+	if externalID, ok := input.Metadata["external_id"].(string); ok {
+		request.ExternalID = strings.TrimSpace(externalID)
+	}
+	if err := s.repo.CreateRequest(request); err != nil {
+		return nil, MapDigiConnectPublicError("DATABASE_ERROR")
+	}
+
+	routerStarted := time.Now()
+	routerRes, routerErr := s.callRouter(ctx, input)
+	latency := time.Since(routerStarted).Milliseconds()
+	completedAt := time.Now()
+	request.RouterLatencyMS = latency
+	request.CompletedAt = &completedAt
+	if routerErr != nil {
+		request.Status = "pending_verification"
+		request.BillingDecision = "pending_verification"
+		request.BillingStatus = "pending_verification"
+		request.PublicErrorCode = "REQUEST_PENDING_VERIFICATION"
+		request.PublicErrorMessage = "Request sedang diverifikasi. Cek status beberapa saat lagi."
+		request.InternalErrorCode = routerErr.InternalCode
+		request.InternalErrorMessage = routerErr.Err.Error()
+		_ = s.repo.SaveRequest(request)
+		return mapDigiConnectRequestResponse(request, false), MapDigiConnectPublicError(routerErr.InternalCode)
+	}
+	request.RouterStatus = routerRes.StatusCode
+	if routerRes.StatusCode < 200 || routerRes.StatusCode >= 300 {
+		request.Status = "failed"
+		request.BillingDecision = "rejected"
+		request.BillingStatus = "failed"
+		request.PublicErrorCode = "UPSTREAM_ERROR"
+		request.InternalErrorCode = fmt.Sprintf("NINEROUTER_%d", routerRes.StatusCode)
+		_ = s.repo.SaveRequest(request)
+		return nil, DigiConnectPublicError{Code: "UPSTREAM_ERROR", HTTPStatus: http.StatusBadGateway, Message: "Layanan sedang mengalami gangguan. Coba lagi nanti."}
+	}
+	if billing.Source == DigiConnectBillingSourceWallet {
+		if err := s.chargeWalletAfterRouterSuccess(ctx, key.UserID, request.ID, billing.Amount); err != nil {
+			request.Status = "pending_verification"
+			request.BillingDecision = "pending_verification"
+			request.BillingStatus = "pending_verification"
+			request.InternalErrorCode = "WALLET_CHARGE_FAILED"
+			request.InternalErrorMessage = err.Error()
+			_ = s.repo.SaveRequest(request)
+			return mapDigiConnectRequestResponse(request, false), MapDigiConnectPublicError("NINEROUTER_TIMEOUT")
+		}
+		request.BillingStatus = DigiConnectBillingStatusCharged
+	} else {
+		request.BillingStatus = DigiConnectBillingStatusIncluded
+	}
+	request.Status = "completed"
+	if err := s.repo.SaveRequest(request); err != nil {
+		return nil, MapDigiConnectPublicError("DATABASE_ERROR")
+	}
+	res := mapDigiConnectRequestResponse(request, false)
+	res["router_response"] = routerRes.Body
+	return res, DigiConnectPublicError{}
+}
+
+func mapDigiConnectAPIKey(key model.DigiConnectAPIKey, plain string) DigiConnectAPIKeyResponse {
+	masked := key.KeyPrefix + "........"
+	if plain != "" {
+		masked = MaskDigiConnectAPIKey(plain)
+	}
+	return DigiConnectAPIKeyResponse{ID: key.ID.String(), Name: key.Name, KeyPrefix: key.KeyPrefix, MaskedKey: masked, PlainKey: plain, Status: key.Status, LastUsedAt: key.LastUsedAt, CreatedAt: key.CreatedAt}
+}
+
+func mapDigiConnectRequests(rows []model.DigiConnectRequest) []DigiConnectRequestListResponse {
+	res := make([]DigiConnectRequestListResponse, 0, len(rows))
+	for _, row := range rows {
+		res = append(res, DigiConnectRequestListResponse{ID: row.ID.String(), RequestID: row.RequestID, ServiceAlias: row.ServiceAlias, RequestType: row.RequestType, Status: row.Status, InputPreview: row.InputPreview, BillingDecision: row.BillingDecision, BillingStatus: row.BillingStatus, BillingSource: row.BillingSource, Amount: row.Amount, Currency: row.Currency, PublicErrorCode: row.PublicErrorCode, RouterStatus: row.RouterStatus, RouterLatencyMS: row.RouterLatencyMS, StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, CreatedAt: row.CreatedAt})
+	}
+	return res
+}
+
+type digiConnectRouterResponse struct {
+	StatusCode int
+	Body       map[string]interface{}
+}
+
+type digiConnectRouterError struct {
+	InternalCode string
+	Err          error
+}
+
+func (s *DigiConnectService) callRouter(ctx context.Context, input DigiConnectAPIRequestInput) (*digiConnectRouterResponse, *digiConnectRouterError) {
+	baseURL := strings.TrimRight(s.cfg.DigiConnectRouterBaseURL, "/")
+	if baseURL == "" {
+		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: errors.New("digiconnect router base URL is empty")}
+	}
+	body := map[string]interface{}{
+		"model": "digiconnect-smart",
+		"input": input.Input,
+	}
+	if len(input.Options) > 0 {
+		body["options"] = input.Options
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return nil, &digiConnectRouterError{InternalCode: "INVALID_PAYLOAD", Err: err}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+s.cfg.DigiConnectRouterResponsesPath, bytes.NewReader(encoded))
+	if err != nil {
+		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: err}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token := strings.TrimSpace(s.cfg.DigiConnectRouterInternalAPIKey); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	res, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_TIMEOUT", Err: err}
+	}
+	defer res.Body.Close()
+	raw, readErr := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if readErr != nil {
+		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: readErr}
+	}
+	decoded := map[string]interface{}{}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &decoded); err != nil {
+			decoded = map[string]interface{}{"raw_preview": previewDigiConnectInput(string(raw))}
+		}
+	}
+	return &digiConnectRouterResponse{StatusCode: res.StatusCode, Body: decoded}, nil
+}
+
+func (s *DigiConnectService) chargeWalletAfterRouterSuccess(ctx context.Context, userID uuid.UUID, requestID uuid.UUID, amount int64) error {
+	if s.walletRepo == nil {
+		return errors.New("wallet repo belum dikonfigurasi")
+	}
+	if amount <= 0 {
+		return nil
+	}
+	reference := fmt.Sprintf("digiconnect:%s:charge", requestID.String())
+	return s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+		}
+		if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, reference); err == nil {
+			return nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		user, err := s.walletRepo.LockUserByIDTx(tx, userID)
+		if err != nil {
+			return err
+		}
+		if user.WalletBalance < amount {
+			return errors.New("saldo wallet tidak cukup")
+		}
+		before := user.WalletBalance
+		after := before - amount
+		user.WalletBalance = after
+		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+			return err
+		}
+		return s.walletRepo.CreateLedgerTx(tx, &model.WalletLedger{UserID: userID, Type: "debit", Category: "digiconnect_request", Amount: amount, BalanceBefore: before, BalanceAfter: after, Reference: reference, Description: "DigiConnect API request"})
+	})
+}
+
+func hashDigiConnectPayload(input DigiConnectAPIRequestInput) string {
+	encoded, _ := json.Marshal(input)
+	sum := sha256.Sum256(encoded)
+	return hex.EncodeToString(sum[:])
+}
+
+func previewDigiConnectInput(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= 200 {
+		return value
+	}
+	return value[:200]
+}
+
+func billingPublicError(reason string) DigiConnectPublicError {
+	switch reason {
+	case "insufficient_balance":
+		return MapDigiConnectPublicError("WALLET_BALANCE_INSUFFICIENT")
+	case "fair_use_limit_reached":
+		return MapDigiConnectPublicError("DAILY_FAIR_USE_EXCEEDED")
+	default:
+		return MapDigiConnectPublicError("NO_ACTIVE_ENTITLEMENT")
+	}
+}
+
+func mapDigiConnectRequestResponse(request *model.DigiConnectRequest, replay bool) map[string]interface{} {
+	return map[string]interface{}{
+		"request_id":        request.RequestID,
+		"status":            request.Status,
+		"idempotent_replay": replay,
+		"billing": map[string]interface{}{
+			"source":   request.BillingSource,
+			"decision": request.BillingDecision,
+			"status":   request.BillingStatus,
+			"amount":   request.Amount,
+			"currency": request.Currency,
+		},
+		"error": map[string]interface{}{
+			"code":    request.PublicErrorCode,
+			"message": request.PublicErrorMessage,
+		},
+		"created_at": request.CreatedAt,
+	}
+}
+
+func parseDigiConnectTimeout(cfg *config.Config) time.Duration {
+	if cfg == nil {
+		return 60 * time.Second
+	}
+	d, err := time.ParseDuration(strings.TrimSpace(cfg.DigiConnectRouterTimeoutMS) + "ms")
+	if err != nil || d <= 0 {
+		return 60 * time.Second
+	}
+	return d
+}

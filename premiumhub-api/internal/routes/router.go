@@ -56,6 +56,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	navbarMenuSettingRepo := repository.NewNavbarMenuSettingRepo(db)
 	activityRepo := repository.NewActivityRepo(db)
 	chatRepo := repository.NewChatRepo(db)
+	digiConnectRepo := repository.NewDigiConnectRepo(db)
 
 	stockCredentialKey := strings.TrimSpace(cfg.StockCredentialKey)
 	if stockCredentialKey == "" {
@@ -116,6 +117,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		cfg.ChatRedisChannel,
 	)
 	chatSvc := service.NewChatService(chatRepo, chatHub)
+	digiConnectSvc := service.NewDigiConnectService(cfg, digiConnectRepo).SetWalletRepo(walletRepo)
 	service.StartConvertExpiryWorker(cfg, convertSvc)
 	service.StartFiveSimReconcileWorker(cfg, fiveSimSvc)
 	service.StartWalletTopupReconcileWorker(cfg, walletSvc)
@@ -163,6 +165,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	navbarMenuSettingHandler := handler.NewNavbarMenuSettingHandler(navbarMenuSettingSvc)
 	activityHandler := handler.NewActivityHandler(activitySvc)
 	chatHandler := handler.NewChatHandler(chatSvc, cfg.FrontendURL)
+	digiConnectHandler := handler.NewDigiConnectHandler(digiConnectSvc)
 	adminHandler := handler.NewAdminHandler(orderRepo, claimRepo, userRepo, stockRepo, notifSvc)
 	userHandler := handler.NewUserHandler(authSvc, notifSvc)
 
@@ -200,6 +203,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.GET("/public/navbar-menu", navbarMenuSettingHandler.PublicList)
 	api.GET("/public/sosmed/services", sosmedServiceHandler.PublicList)
 	api.GET("/public/sosmed/bundles", sosmedBundleHandler.PublicList)
+	api.GET("/public/digiconnect/plans", digiConnectHandler.PublicPlans)
 	api.GET("/public/sosmed/bundles/:key", sosmedBundleHandler.PublicDetail)
 	api.GET(
 		"/convert/track/:token",
@@ -220,6 +224,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		"/convert/track/:token/proofs",
 		middleware.NewIPRateLimiter(cfg.ConvertProofRateLimitMax, cfg.ConvertProofRateLimitWindow, "Terlalu banyak upload bukti convert. Coba lagi sebentar."),
 		convertHandler.UploadProofByToken,
+	)
+	api.POST(
+		"/digiconnect/requests",
+		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),
+		digiConnectHandler.CreateAPIRequest,
 	)
 
 	// Protected routes
@@ -295,6 +304,14 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	)
 	protected.GET("/wallet/topups", walletHandler.ListTopups)
 	protected.GET("/wallet/topups/:id", walletHandler.GetTopup)
+
+	protected.GET("/digiconnect/summary", digiConnectHandler.Summary)
+	protected.GET("/digiconnect/api-keys", digiConnectHandler.ListAPIKeys)
+	protected.POST("/digiconnect/api-keys", digiConnectHandler.CreateAPIKey)
+	protected.GET("/digiconnect/entitlements", digiConnectHandler.ListEntitlements)
+	protected.POST("/digiconnect/checkout", digiConnectHandler.CheckoutWithWallet)
+	protected.GET("/digiconnect/requests", digiConnectHandler.ListRequests)
+
 	protected.POST(
 		"/wallet/topups/:id/check",
 		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak cek topup. Coba lagi sebentar."),
@@ -381,6 +398,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.Use(middleware.Auth(cfg.JWTSecret), middleware.AdminOnly())
 
 	admin.GET("/dashboard", adminHandler.Dashboard)
+	admin.GET("/digiconnect/overview", digiConnectHandler.AdminOverview)
+	admin.GET("/digiconnect/requests", digiConnectHandler.AdminListRequests)
+	admin.GET("/digiconnect/entitlements", digiConnectHandler.AdminListEntitlements)
+	admin.POST("/digiconnect/entitlements", digiConnectHandler.AdminProvisionEntitlement)
+	admin.GET("/digiconnect/router/health", digiConnectHandler.RouterHealth)
 	admin.GET(
 		"/5sim/profile",
 		middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak request provider. Coba lagi sebentar."),

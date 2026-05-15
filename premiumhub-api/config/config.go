@@ -61,6 +61,10 @@ type Config struct {
 	SosmedProviderSyncWorkerStaleAfter, SosmedProviderSyncWorkerTimeout         string
 	RedisAddr, RedisPassword, RedisDB                                           string
 	ChatRedisChannel                                                            string
+	DigiConnectRouterBaseURL, DigiConnectRouterHealthPath                       string
+	DigiConnectRouterResponsesPath, DigiConnectRouterTimeoutMS                  string
+	DigiConnectRouterInternalAPIKey                                             string
+	DigiConnectEnabled                                                          bool
 }
 
 func Load() *Config {
@@ -189,6 +193,12 @@ func Load() *Config {
 		RedisPassword:                        e("REDIS_PASSWORD", ""),
 		RedisDB:                              e("REDIS_DB", "0"),
 		ChatRedisChannel:                     e("CHAT_REDIS_CHANNEL", "premiumhub:chat"),
+		DigiConnectRouterBaseURL:             e("DIGICONNECT_ROUTER_BASE_URL", "http://127.0.0.1:20128"),
+		DigiConnectRouterHealthPath:          e("DIGICONNECT_ROUTER_HEALTH_PATH", "/api/health"),
+		DigiConnectRouterResponsesPath:       e("DIGICONNECT_ROUTER_RESPONSES_PATH", "/v1/responses"),
+		DigiConnectRouterTimeoutMS:           e("DIGICONNECT_ROUTER_TIMEOUT_MS", "60000"),
+		DigiConnectRouterInternalAPIKey:      e("DIGICONNECT_ROUTER_INTERNAL_API_KEY", ""),
+		DigiConnectEnabled:                   eb("DIGICONNECT_ENABLED", false),
 	}
 }
 
