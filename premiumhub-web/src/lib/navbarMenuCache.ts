@@ -9,7 +9,7 @@ type NavbarMenuSourceItem = {
   is_visible?: boolean
 }
 
-const NAVBAR_MENU_CACHE_KEY = 'digimarket:public-navbar-menu:v1'
+const NAVBAR_MENU_CACHE_KEY = 'digimarket:public-navbar-menu:v2'
 
 export const NAVBAR_MENU_CACHE_EVENT = 'digimarket:public-navbar-menu-updated'
 
@@ -30,10 +30,11 @@ export function normalizeNavbarMenuItems(
     const href = String(item.href || '').trim()
     const label = String(item.label || '').trim()
     if (!href || !label || href === '/product/nokos') return acc
+    if (acc.some((entry) => entry.href === href)) return acc
 
     acc.push({ href, label: normalizeNavbarMenuLabel(href, label) })
     return acc
-  }, [])
+  }, [{ href: '/product/digiconnect', label: 'DigiConnect' }])
 }
 
 export function getNavbarMenuMemoryCache() {

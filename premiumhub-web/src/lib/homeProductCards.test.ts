@@ -11,19 +11,21 @@ describe('home product cards visibility', () => {
     expect(
       selectVisibleHomeProductCards([
         { href: '/product/prem-apps' },
+        { href: '/product/digiconnect' },
         { href: '/product/sosmed' },
         { href: '/product/convert' },
       ])
-    ).toEqual(['/product/sosmed'])
+    ).toEqual(['/product/digiconnect', '/product/sosmed'])
   })
 
   it('keeps card order stable and de-duplicates', () => {
     expect(
       selectVisibleHomeProductCards([
         { href: '/product/sosmed' },
+        { href: '/product/digiconnect' },
         { href: '/product/sosmed' },
       ])
-    ).toEqual(['/product/sosmed'])
+    ).toEqual(['/product/digiconnect', '/product/sosmed'])
   })
 
   it('falls back to default home cards when default menu has no supported routes', () => {

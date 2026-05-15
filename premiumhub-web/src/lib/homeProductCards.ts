@@ -1,6 +1,6 @@
 import { DEFAULT_PUBLIC_NAV_ITEMS } from './publicNavItems'
 
-const HOME_PRODUCT_CARD_HREFS = ['/product/sosmed'] as const
+const HOME_PRODUCT_CARD_HREFS = ['/product/digiconnect', '/product/sosmed'] as const
 
 export type HomeProductCardHref = (typeof HOME_PRODUCT_CARD_HREFS)[number]
 

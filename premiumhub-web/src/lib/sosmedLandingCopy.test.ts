@@ -14,6 +14,7 @@ describe('sosmed landing copy', () => {
 
   it('normalizes stale sosmed navbar labels from cache or API into the new buyer-facing label', () => {
     expect(normalizeNavbarMenuItems([{ href: '/product/sosmed', label: 'Sosmed' }])).toEqual([
+      { href: '/product/digiconnect', label: 'DigiConnect' },
       { href: '/product/sosmed', label: 'Paket Sosmed' },
     ])
   })
