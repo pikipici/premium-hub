@@ -579,6 +579,9 @@ func normalizeOpenAICompatibleInput(value interface{}) string {
 
 func extractDigiConnectText(res map[string]interface{}) string {
 	if router, ok := res["router_response"].(map[string]interface{}); ok {
+		if text := extractOpenAIResponseText(router); text != "" {
+			return text
+		}
 		for _, key := range []string{"output_text", "text", "content", "message"} {
 			if value, ok := router[key].(string); ok && strings.TrimSpace(value) != "" {
 				return value
@@ -589,6 +592,34 @@ func extractDigiConnectText(res map[string]interface{}) string {
 	}
 	encoded, _ := json.Marshal(res)
 	return string(encoded)
+}
+
+func extractOpenAIResponseText(router map[string]interface{}) string {
+	output, ok := router["output"].([]interface{})
+	if !ok {
+		return ""
+	}
+	parts := []string{}
+	for _, item := range output {
+		message, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		content, ok := message["content"].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, contentItem := range content {
+			entry, ok := contentItem.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if text, ok := entry["text"].(string); ok && strings.TrimSpace(text) != "" {
+				parts = append(parts, strings.TrimSpace(text))
+			}
+		}
+	}
+	return strings.TrimSpace(strings.Join(parts, "\n"))
 }
 
 func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string, input DigiConnectAPIRequestInput, idempotencyKey string) (map[string]interface{}, DigiConnectPublicError) {
