@@ -759,7 +759,12 @@ func (s *DigiConnectService) callRouter(ctx context.Context, input DigiConnectAP
 		"input": input.Input,
 	}
 	if len(input.Options) > 0 {
-		body["options"] = input.Options
+		for key, value := range input.Options {
+			if key == "model" {
+				continue
+			}
+			body[key] = value
+		}
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
