@@ -40,8 +40,8 @@ function planPricing(entitlement?: DigiConnectEntitlement) {
 }
 
 function apiRequestUrl() {
-  if (typeof window === 'undefined') return '/v1'
-  return `${window.location.origin}/v1`
+  if (typeof window === 'undefined') return '/api/v1'
+  return `${window.location.origin}/api/v1`
 }
 
 export default function DigiConnectDashboardPage() {
