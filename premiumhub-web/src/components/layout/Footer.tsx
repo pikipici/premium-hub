@@ -16,7 +16,6 @@ import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
 
 const FOOTER_PRODUCT_LABEL_BY_HREF: Record<string, string> = {
   '/product/prem-apps': 'Apps Premium',
-  '/product/nokos': 'Nomor Virtual OTP',
   '/product/sosmed': 'Sosmed SMM',
   '/product/convert': 'Convert Aset',
 }
@@ -89,7 +88,7 @@ export default function Footer() {
               <span className="text-xl font-extrabold">Digi<span className="text-[#FF5733]">Market</span></span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
-              Platform nomor virtual OTP dan jasa untuk bantu naikin follower, viewer, dan engagement akun media sosial Termurah dan Terpercaya No. 1 di Indonesia.
+              Platform layanan digital untuk bantu workflow, pemasaran, dan kebutuhan akun kamu dengan proses cepat dan pembayaran aman.
             </p>
           </div>
 

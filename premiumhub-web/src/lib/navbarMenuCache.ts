@@ -29,7 +29,7 @@ export function normalizeNavbarMenuItems(
 
     const href = String(item.href || '').trim()
     const label = String(item.label || '').trim()
-    if (!href || !label) return acc
+    if (!href || !label || href === '/product/nokos') return acc
 
     acc.push({ href, label: normalizeNavbarMenuLabel(href, label) })
     return acc

@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Shield,
   ShoppingBag,
-  Smartphone,
   UserCircle,
   Wallet,
   X,
@@ -561,18 +560,6 @@ export default function Navbar() {
                           >
                             <RefreshCw className="h-4 w-4" /> Riwayat Convert
                           </Link>
-
-                          <Link
-                            href="/dashboard/nokos"
-                            className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
-                              isActivePath(pathname, '/dashboard/nokos')
-                                ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
-                                : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
-                            }`}
-                            onClick={() => setOpen(false)}
-                          >
-                            <Smartphone className="h-4 w-4" /> Nomor Virtual
-                          </Link>
                         </div>
                       ) : null}
                     </section>
@@ -619,18 +606,6 @@ export default function Navbar() {
                           onClick={() => setOpen(false)}
                         >
                           <RefreshCw className="h-4 w-4" /> Riwayat Convert
-                        </Link>
-
-                        <Link
-                          href="/dashboard/nokos"
-                          className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
-                            isActivePath(pathname, '/dashboard/nokos')
-                              ? 'border-[#FFD5C8] bg-[#FFF3EF] text-[#FF5733]'
-                              : 'border-[#EBEBEB] text-[#141414] hover:bg-[#F7F7F5]'
-                          }`}
-                          onClick={() => setOpen(false)}
-                        >
-                          <Smartphone className="h-4 w-4" /> Nomor Virtual
                         </Link>
                       </div>
                     </section>

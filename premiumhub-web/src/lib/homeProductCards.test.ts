@@ -11,21 +11,19 @@ describe('home product cards visibility', () => {
     expect(
       selectVisibleHomeProductCards([
         { href: '/product/prem-apps' },
-        { href: '/product/nokos' },
         { href: '/product/sosmed' },
         { href: '/product/convert' },
       ])
-    ).toEqual(['/product/nokos', '/product/sosmed'])
+    ).toEqual(['/product/sosmed'])
   })
 
   it('keeps card order stable and de-duplicates', () => {
     expect(
       selectVisibleHomeProductCards([
         { href: '/product/sosmed' },
-        { href: '/product/nokos' },
         { href: '/product/sosmed' },
       ])
-    ).toEqual(['/product/nokos', '/product/sosmed'])
+    ).toEqual(['/product/sosmed'])
   })
 
   it('falls back to default home cards when default menu has no supported routes', () => {

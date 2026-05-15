@@ -18,7 +18,6 @@ import {
   RefreshCw,
   ShieldCheck,
   ShoppingBag,
-  Smartphone,
   Wallet,
 } from 'lucide-react'
 
@@ -37,7 +36,6 @@ const MENU = [
   { href: '/dashboard/wallet', icon: Wallet, label: 'Wallet' },
   { href: '/dashboard/convert/orders', icon: RefreshCw, label: 'Riwayat Convert', settingKey: 'convert_history' },
   { href: '/dashboard/sosmed/orders', icon: Megaphone, label: 'Order Sosmed' },
-  { href: '/dashboard/nokos', icon: Smartphone, label: 'Nomor Virtual' },
   { href: '/dashboard/digiconnect', icon: Network, label: 'DigiConnect' },
   { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Akun Aktif', settingKey: 'active_accounts' },
   { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order', settingKey: 'order_history' },
