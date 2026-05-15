@@ -15,7 +15,7 @@ type ChatConversation struct {
 	Subject         string     `gorm:"size:160" json:"subject"`
 	Status          string     `gorm:"size:20;not null;default:open;index" json:"status"` // open | closed
 	LastMessageAt   *time.Time `gorm:"index" json:"last_message_at"`
-	LastMessagePrev string     `gorm:"size:240" json:"last_message_preview"`
+	LastMessagePrev string     `gorm:"column:last_message_preview;size:240" json:"last_message_preview"`
 	UnreadForUser   int        `gorm:"not null;default:0" json:"unread_for_user"`
 	UnreadForAdmin  int        `gorm:"not null;default:0" json:"unread_for_admin"`
 	CreatedAt       time.Time  `json:"created_at"`
