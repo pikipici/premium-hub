@@ -390,6 +390,20 @@ type OpenAICompatibleResponseInput struct {
 	Metadata        map[string]interface{} `json:"metadata"`
 }
 
+type OpenAICompatibleChatMessage struct {
+	Role    string      `json:"role"`
+	Content interface{} `json:"content"`
+}
+
+type OpenAICompatibleChatInput struct {
+	Model       string                        `json:"model"`
+	Messages    []OpenAICompatibleChatMessage `json:"messages"`
+	Temperature *float64                      `json:"temperature"`
+	MaxTokens   *int                          `json:"max_tokens"`
+	Stream      bool                          `json:"stream"`
+	Metadata    map[string]interface{}        `json:"metadata"`
+}
+
 func (s *DigiConnectService) OpenAICompatibleModels(apiKey string) ([]string, DigiConnectPublicError) {
 	key, entitlement, publicErr := s.validateOpenAICompatibleAccess(apiKey)
 	_ = key
@@ -443,6 +457,54 @@ func (s *DigiConnectService) CreateOpenAICompatibleResponse(ctx context.Context,
 	}, DigiConnectPublicError{}
 }
 
+func (s *DigiConnectService) CreateOpenAICompatibleChatCompletion(ctx context.Context, apiKey string, input OpenAICompatibleChatInput, idempotencyKey string) (map[string]interface{}, DigiConnectPublicError) {
+	_, entitlement, publicErr := s.validateOpenAICompatibleAccess(apiKey)
+	if publicErr.Code != "" {
+		return nil, publicErr
+	}
+	modelID := strings.TrimSpace(input.Model)
+	if modelID == "" || !containsDigiConnectModel(modelIDsForDigiConnectEntitlement(entitlement), modelID) {
+		return nil, MapDigiConnectPublicError("UNSUPPORTED_TYPE")
+	}
+	if len(input.Messages) == 0 {
+		return nil, MapDigiConnectPublicError("MISSING_INPUT")
+	}
+	textInput := normalizeOpenAICompatibleMessages(input.Messages)
+	options := map[string]interface{}{"model": modelID}
+	if input.Temperature != nil {
+		options["temperature"] = *input.Temperature
+	}
+	if input.MaxTokens != nil {
+		options["max_tokens"] = *input.MaxTokens
+	}
+	metadata := input.Metadata
+	if metadata == nil {
+		metadata = map[string]interface{}{}
+	}
+	metadata["compat"] = "openai_chat_completions"
+	res, err := s.CreateAPIRequest(ctx, apiKey, DigiConnectAPIRequestInput{Service: "digiconnect-smart", Type: "text", Input: textInput, Options: options, Metadata: metadata}, idempotencyKey)
+	if err.Code != "" {
+		return nil, err
+	}
+	requestID, _ := res["request_id"].(string)
+	if requestID == "" {
+		requestID = "chatcmpl_" + uuid.NewString()
+	}
+	return map[string]interface{}{
+		"id":      requestID,
+		"object":  "chat.completion",
+		"created": time.Now().Unix(),
+		"model":   modelID,
+		"choices": []map[string]interface{}{{
+			"index":         0,
+			"message":       map[string]interface{}{"role": "assistant", "content": extractDigiConnectText(res)},
+			"finish_reason": "stop",
+		}},
+		"usage":       map[string]int{"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+		"digiconnect": res,
+	}, DigiConnectPublicError{}
+}
+
 func (s *DigiConnectService) validateOpenAICompatibleAccess(apiKey string) (*model.DigiConnectAPIKey, *model.DigiConnectEntitlement, DigiConnectPublicError) {
 	if strings.TrimSpace(apiKey) == "" {
 		return nil, nil, MapDigiConnectPublicError("MISSING_API_KEY")
@@ -475,6 +537,22 @@ func containsDigiConnectModel(models []string, modelID string) bool {
 		}
 	}
 	return false
+}
+
+func normalizeOpenAICompatibleMessages(messages []OpenAICompatibleChatMessage) string {
+	parts := make([]string, 0, len(messages))
+	for _, message := range messages {
+		role := strings.TrimSpace(message.Role)
+		if role == "" {
+			role = "message"
+		}
+		content := normalizeOpenAICompatibleInput(message.Content)
+		if strings.TrimSpace(content) == "" {
+			continue
+		}
+		parts = append(parts, role+": "+content)
+	}
+	return strings.TrimSpace(strings.Join(parts, "\n"))
 }
 
 func normalizeOpenAICompatibleInput(value interface{}) string {

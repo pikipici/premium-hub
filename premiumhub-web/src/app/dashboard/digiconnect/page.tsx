@@ -137,11 +137,12 @@ export default function DigiConnectDashboardPage() {
                     <span className="break-all">{baseUrl}</span>
                     <Copy className="h-4 w-4 shrink-0 text-[#FF5733]" />
                   </button>
-                  <div className="mt-3 grid gap-2 text-xs font-bold text-[#7B7067] sm:grid-cols-2">
+                  <div className="mt-3 grid gap-2 text-xs font-bold text-[#7B7067] sm:grid-cols-3">
                     <code className="rounded-xl bg-white px-3 py-2 ring-1 ring-[#F0D8C8]">GET /models</code>
+                    <code className="rounded-xl bg-white px-3 py-2 ring-1 ring-[#F0D8C8]">POST /chat/completions</code>
                     <code className="rounded-xl bg-white px-3 py-2 ring-1 ring-[#F0D8C8]">POST /responses</code>
                   </div>
-                  <p className="mt-3 text-sm font-semibold text-[#7B7067]">Paste base URL ini ke 9router OpenAI Compatible Responses dan pakai API key DigiConnect sebagai bearer token.</p>
+                  <p className="mt-3 text-sm font-semibold text-[#7B7067]">Paste base URL ini ke 9router OpenAI Compatible Chat atau Responses dan pakai API key DigiConnect sebagai bearer token.</p>
                 </div>
               </Card>
 

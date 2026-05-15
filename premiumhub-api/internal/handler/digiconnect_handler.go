@@ -107,6 +107,21 @@ func (h *DigiConnectHandler) OpenAICompatibleResponses(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+func (h *DigiConnectHandler) OpenAICompatibleChatCompletions(c *gin.Context) {
+	apiKey := bearerToken(c.GetHeader("Authorization"))
+	var input service.OpenAICompatibleChatInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		writeDigiConnectError(c, service.MapDigiConnectPublicError("INVALID_PAYLOAD"))
+		return
+	}
+	res, publicErr := h.svc.CreateOpenAICompatibleChatCompletion(c.Request.Context(), apiKey, input, c.GetHeader("Idempotency-Key"))
+	if publicErr.Code != "" {
+		writeDigiConnectError(c, publicErr)
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
 func (h *DigiConnectHandler) ListRequests(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	page, limit := parsePageLimit(c, DefaultAdminPageLimit, MaxPageLimit)
