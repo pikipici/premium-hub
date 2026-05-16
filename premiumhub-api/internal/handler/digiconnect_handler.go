@@ -23,7 +23,7 @@ func NewDigiConnectHandler(svc *service.DigiConnectService) *DigiConnectHandler 
 }
 
 func (h *DigiConnectHandler) PublicPlans(c *gin.Context) {
-	response.Success(c, "OK", h.svc.PublicPlans())
+	response.Success(c, "OK", h.svc.PublicPlansView())
 }
 
 func (h *DigiConnectHandler) Summary(c *gin.Context) {

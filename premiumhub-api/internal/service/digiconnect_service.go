@@ -89,9 +89,20 @@ type DigiConnectAPIRequestInput struct {
 	Metadata map[string]interface{} `json:"metadata"`
 }
 
+type DigiConnectPlanTabResponse struct {
+	Key       string `json:"key"`
+	Label     string `json:"label"`
+	PlanCode  string `json:"plan_code"`
+	Badge     string `json:"badge,omitempty"`
+	SortOrder int    `json:"sort_order"`
+}
+
 type DigiConnectPlanResponse struct {
 	Code                 string   `json:"code"`
+	TabKey               string   `json:"tab_key"`
+	TabLabel             string   `json:"tab_label"`
 	Name                 string   `json:"name"`
+	ShortName            string   `json:"short_name"`
 	Description          string   `json:"description"`
 	Price                int64    `json:"price"`
 	PriceLabel           string   `json:"price_label"`
@@ -100,12 +111,21 @@ type DigiConnectPlanResponse struct {
 	DailyFairUseLimit    int      `json:"daily_fair_use_limit"`
 	PayPerRequestEnabled bool     `json:"pay_per_request_enabled"`
 	ModelLabels          []string `json:"model_labels,omitempty"`
+	ModelIDs             []string `json:"model_ids,omitempty"`
+	Features             []string `json:"features,omitempty"`
+	CTA                  string   `json:"cta"`
 	StockManaged         bool     `json:"stock_managed"`
 	StockTotal           int      `json:"stock_total,omitempty"`
 	StockUsed            int      `json:"stock_used,omitempty"`
 	StockRemaining       int      `json:"stock_remaining,omitempty"`
 	Available            bool     `json:"available"`
 	UnavailableReason    string   `json:"unavailable_reason,omitempty"`
+}
+
+type DigiConnectPlansResponse struct {
+	DefaultTab string                       `json:"default_tab"`
+	Tabs       []DigiConnectPlanTabResponse `json:"tabs"`
+	Plans      []DigiConnectPlanResponse    `json:"plans"`
 }
 
 type DigiConnectCheckoutInput struct {
@@ -142,6 +162,10 @@ var digiConnectCXModelIDs = []string{"cx/gpt-5.5", "cx/gpt-5.4", "cx/gpt-5.3-cod
 var digiConnectPremiumModelIDs = []string{"kr/claude-opus-4.6", "kr/claude-opus-4.7", "kr/auto", "kr/claude-opus-4.5", "kr/claude-sonnet-4.6", "kr/claude-sonnet-4.5", "kr/claude-haiku-4.5", "kr/deepseek-3.2", "kr/qwen3-coder-next", "kr/glm-5", "kr/MiniMax-M2.5"}
 
 func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
+	return s.PublicPlansView().Plans
+}
+
+func (s *DigiConnectService) PublicPlansView() DigiConnectPlansResponse {
 	now := time.Now()
 	twoDayStockUsed := int64(0)
 	if s.repo != nil {
@@ -154,32 +178,47 @@ func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
 		twoDayRemaining = 0
 	}
 	twoDayAvailable := twoDayRemaining > 0
-	return []DigiConnectPlanResponse{
+	plans := []DigiConnectPlanResponse{
 		{
 			Code:                 "digiconnect_ppr_hemat",
+			TabKey:               "ppr_hemat",
+			TabLabel:             "Rp150/request",
 			Name:                 "Bayar per Request Hemat",
+			ShortName:            "Hemat",
 			Description:          "Akses model GPT pilihan dengan biaya lebih ringan, bayar hanya request billable yang berhasil.",
 			Price:                150,
 			PriceLabel:           "Rp150/request",
 			BillingModel:         "pay_per_request",
 			PayPerRequestEnabled: true,
 			ModelLabels:          digiConnectCXModelLabels,
+			ModelIDs:             digiConnectCXModelIDs,
+			Features:             []string{"Bayar hanya request sukses", "Cocok untuk workflow hemat", "OpenAI-compatible Models, Chat, dan Responses"},
+			CTA:                  "Aktifkan Rp150/request",
 			Available:            true,
 		},
 		{
 			Code:                 "digiconnect_ppr_premium",
+			TabKey:               "ppr_premium",
+			TabLabel:             "Rp200/request",
 			Name:                 "Bayar per Request Premium",
+			ShortName:            "Premium",
 			Description:          "Akses model AI premium tanpa paket durasi, cocok buat workflow yang butuh pilihan model lebih kuat.",
 			Price:                200,
 			PriceLabel:           "Rp200/request",
 			BillingModel:         "pay_per_request",
 			PayPerRequestEnabled: true,
 			ModelLabels:          []string{"Claude Opus 4.6", "Claude Opus 4.7", "Auto", "Claude Opus 4.5", "Claude Sonnet 4.6", "Claude Sonnet 4.5", "Claude Haiku 4.5", "DeepSeek 3.2", "Qwen3 Coder Next", "GLM 5", "MiniMax M2.5"},
+			ModelIDs:             digiConnectPremiumModelIDs,
+			Features:             []string{"Model premium dan auto-router", "Bayar hanya request sukses", "OpenAI-compatible Models, Chat, dan Responses"},
+			CTA:                  "Aktifkan Rp200/request",
 			Available:            true,
 		},
 		{
 			Code:                 "digiconnect_2d",
+			TabKey:               "package_2d",
+			TabLabel:             "Paket 2 hari",
 			Name:                 "Paket 2 Hari",
+			ShortName:            "2 Hari",
 			Description:          "Aktif 2 hari untuk request fair-use. Cocok buat sprint pendek, testing intensif, atau demo client.",
 			Price:                15000,
 			PriceLabel:           "Rp15.000 / 2 hari",
@@ -188,6 +227,9 @@ func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
 			DailyFairUseLimit:    1000,
 			PayPerRequestEnabled: false,
 			ModelLabels:          digiConnectCXModelLabels,
+			ModelIDs:             digiConnectCXModelIDs,
+			Features:             []string{"Aktif 2 hari sejak checkout", "Fair-use 1000 request per hari", "Stok terbatas untuk menjaga kapasitas"},
+			CTA:                  "Beli paket Rp15.000",
 			StockManaged:         true,
 			StockTotal:           digiConnectTwoDayStockTotal,
 			StockUsed:            int(twoDayStockUsed),
@@ -196,6 +238,19 @@ func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
 			UnavailableReason:    map[bool]string{true: "", false: "stok_habis"}[twoDayAvailable],
 		},
 	}
+	return DigiConnectPlansResponse{
+		DefaultTab: plans[0].TabKey,
+		Tabs:       tabsForDigiConnectPlans(plans),
+		Plans:      plans,
+	}
+}
+
+func tabsForDigiConnectPlans(plans []DigiConnectPlanResponse) []DigiConnectPlanTabResponse {
+	tabs := make([]DigiConnectPlanTabResponse, 0, len(plans))
+	for i, plan := range plans {
+		tabs = append(tabs, DigiConnectPlanTabResponse{Key: plan.TabKey, Label: plan.TabLabel, PlanCode: plan.Code, Badge: plan.ShortName, SortOrder: i + 1})
+	}
+	return tabs
 }
 
 func (s *DigiConnectService) Summary(userID uuid.UUID) (*DigiConnectSummaryResponse, error) {
