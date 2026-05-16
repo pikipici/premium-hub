@@ -225,11 +225,6 @@ export default function DigiConnectDashboardPage() {
                           <div className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</div>
                           <h2 className="mt-3 text-2xl font-black text-[#171411]">{activePlan.name}</h2>
                           <p className="mt-2 text-sm font-semibold leading-6 text-[#7B7067]">{activePlan.description}</p>
-                          <div className="mt-5 overflow-hidden rounded-2xl border border-[#F0D8C8] bg-white/80">
-                            <AccessSummaryRow label="Harga" value={activePlan.price_label || currency.format(activePlan.price)} />
-                            <AccessSummaryRow label="Billing" value={activePlan.billing_model === 'pay_per_request' ? 'Per request sukses' : `${activePlan.duration_days} hari`} />
-                            <AccessSummaryRow label="Status" value={activePlanEntitlement ? 'Aktif' : activePlan.available === false ? 'Stok habis' : 'Belum aktif'} />
-                          </div>
                         </div>
                         <button
                           type="button"
@@ -240,6 +235,13 @@ export default function DigiConnectDashboardPage() {
                           {checkingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                           {activePlanEntitlement ? 'Aktifkan lagi' : activePlan.available === false ? 'Stok habis' : activePlan.cta || 'Checkout paket'}
                         </button>
+                      </div>
+                      <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                        <div className="w-full overflow-hidden rounded-2xl border border-[#F0D8C8] bg-white/85">
+                          <AccessSummaryRow label="Harga" value={activePlan.price_label || currency.format(activePlan.price)} />
+                          <AccessSummaryRow label="Billing" value={activePlan.billing_model === 'pay_per_request' ? 'Per request sukses' : `${activePlan.duration_days} hari`} />
+                          <AccessSummaryRow label="Status" value={activePlanEntitlement ? 'Aktif' : activePlan.available === false ? 'Stok habis' : 'Belum aktif'} />
+                        </div>
                       </div>
                       <div className="grid gap-3 border-t border-[#F0D8C8] bg-white/70 p-5 lg:grid-cols-[1fr_0.9fr]">
                         <div className="space-y-2">
