@@ -44,6 +44,11 @@ function apiRequestUrl() {
   return `${window.location.origin}/api/v1`
 }
 
+function shortRequestId(value: string) {
+  const normalized = value.replace(/^dc_req_/, '')
+  return normalized.length > 8 ? normalized.slice(0, 8) : normalized
+}
+
 function normalizePlanTabs(plans: DigiConnectPlan[], tabs?: DigiConnectPlanTab[]) {
   if (tabs?.length) return [...tabs].sort((a, b) => a.sort_order - b.sort_order)
   return plans.map((plan, index) => ({
@@ -321,24 +326,30 @@ export default function DigiConnectDashboardPage() {
             </section>
 
             <Card title="Request terbaru" icon={<Activity className="h-5 w-5" />}>
-              <div className="space-y-3">
-                {activePlanRequests.map((request) => (
-                  <div key={request.id} className="rounded-2xl border border-[#EFE8DF] bg-white p-4 transition hover:border-[#F0D8C8] hover:shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-mono text-[11px] font-semibold text-[#8A8178]">{request.request_id}</div>
-                        <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-[#171411]">{request.input_preview || request.service_alias}</p>
+              <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1 [scrollbar-width:thin]">
+                {activePlanRequests.map((request) => {
+                  const modelLabel = [request.router_provider, request.router_model].filter(Boolean).join(' / ') || '-'
+                  return (
+                    <div key={request.id} className="rounded-2xl border border-[#EFE8DF] bg-white p-4 transition hover:border-[#F0D8C8] hover:shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-[#171411] px-2.5 py-1 font-mono text-[11px] font-black text-white" title={request.request_id}>#{shortRequestId(request.request_id)}</span>
+                            <span className="text-[11px] font-black uppercase tracking-[0.12em] text-[#A15A40]">Activity</span>
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-sm font-bold leading-5 text-[#171411]">{request.input_preview || request.service_alias}</p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${statusClass(request.status)}`}>{request.status}</span>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${statusClass(request.status)}`}>{request.status}</span>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-[#6F675F]">
+                        <RequestChip>{request.billing_source}</RequestChip>
+                        <RequestChip>{request.amount ? currency.format(request.amount) : '-'}</RequestChip>
+                        <RequestChip>{request.router_latency_ms} ms</RequestChip>
+                        <RequestChip mono>{modelLabel}</RequestChip>
+                      </div>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-[#6F675F] sm:grid-cols-4">
-                      <span className="truncate">{request.billing_source}</span>
-                      <span className="truncate">{request.amount ? currency.format(request.amount) : '-'}</span>
-                      <span className="truncate">{request.router_latency_ms} ms</span>
-                      <span className="truncate font-mono">{request.router_provider || '-'} / {request.router_model || '-'}</span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
                 {activePlanRequests.length === 0 ? <Empty text="Belum ada request untuk tab ini." /> : null}
               </div>
             </Card>
@@ -359,6 +370,10 @@ function Card({ title, icon, children }: { title: string; icon: React.ReactNode;
       {children}
     </section>
   )
+}
+
+function RequestChip({ children, mono = false }: { children: React.ReactNode; mono?: boolean }) {
+  return <span className={`max-w-full truncate rounded-full bg-[#FFF7F1] px-2.5 py-1 ring-1 ring-[#F0D8C8] ${mono ? 'font-mono' : ''}`}>{children}</span>
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
