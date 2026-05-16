@@ -36,6 +36,16 @@ func (h *DigiConnectHandler) Summary(c *gin.Context) {
 	response.Success(c, "OK", res)
 }
 
+func (h *DigiConnectHandler) Dashboard(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	res, err := h.svc.Dashboard(userID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "OK", res)
+}
+
 func (h *DigiConnectHandler) ListAPIKeys(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	res, err := h.svc.ListAPIKeys(userID)

@@ -53,6 +53,7 @@ type DigiConnectRequestListResponse struct {
 	RequestID       string     `json:"request_id"`
 	ServiceAlias    string     `json:"service_alias"`
 	RequestType     string     `json:"request_type"`
+	PlanCode        string     `json:"plan_code,omitempty"`
 	Status          string     `json:"status"`
 	InputPreview    string     `json:"input_preview"`
 	BillingDecision string     `json:"billing_decision"`
@@ -75,6 +76,28 @@ type DigiConnectAdminOverviewResponse struct {
 	ChargedCount  int64                  `json:"charged_count"`
 	ChargedAmount int64                  `json:"charged_amount"`
 	GeneratedAt   time.Time              `json:"generated_at"`
+}
+
+type DigiConnectDashboardResponse struct {
+	GeneratedAt time.Time                          `json:"generated_at"`
+	Plans       []DigiConnectPlanDashboardResponse `json:"plans"`
+}
+
+type DigiConnectPlanDashboardResponse struct {
+	Plan              DigiConnectPlanResponse          `json:"plan"`
+	Entitlement       *model.DigiConnectEntitlement    `json:"entitlement,omitempty"`
+	Stats             DigiConnectPlanStatsResponse     `json:"stats"`
+	RecentRequests    []DigiConnectRequestListResponse `json:"recent_requests"`
+	DashboardHeadline string                           `json:"dashboard_headline"`
+	DashboardSummary  string                           `json:"dashboard_summary"`
+}
+
+type DigiConnectPlanStatsResponse struct {
+	TotalRequests  int64      `json:"total_requests"`
+	CompletedCount int64      `json:"completed_count"`
+	ChargedAmount  int64      `json:"charged_amount"`
+	AvgLatencyMS   int64      `json:"avg_latency_ms"`
+	LastRequestAt  *time.Time `json:"last_request_at,omitempty"`
 }
 
 type DigiConnectCreateAPIKeyInput struct {
@@ -253,6 +276,32 @@ func tabsForDigiConnectPlans(plans []DigiConnectPlanResponse) []DigiConnectPlanT
 	return tabs
 }
 
+func dashboardHeadlineForDigiConnectPlan(plan DigiConnectPlanResponse) string {
+	switch plan.Code {
+	case "digiconnect_ppr_hemat":
+		return "Dashboard request hemat"
+	case "digiconnect_ppr_premium":
+		return "Dashboard model premium"
+	case "digiconnect_2d":
+		return "Dashboard paket 2 hari"
+	default:
+		return "Dashboard " + plan.Name
+	}
+}
+
+func dashboardSummaryForDigiConnectPlan(plan DigiConnectPlanResponse) string {
+	switch plan.Code {
+	case "digiconnect_ppr_hemat":
+		return "Pantau request hemat, saldo terpakai, dan model CX yang sering dipakai."
+	case "digiconnect_ppr_premium":
+		return "Pantau request premium, biaya wallet, dan akses model kelas atas."
+	case "digiconnect_2d":
+		return "Pantau masa aktif paket, fair-use harian, stok, dan request yang masuk ke kuota paket."
+	default:
+		return plan.Description
+	}
+}
+
 func (s *DigiConnectService) Summary(userID uuid.UUID) (*DigiConnectSummaryResponse, error) {
 	keys, err := s.repo.ListAPIKeysByUser(userID)
 	if err != nil {
@@ -295,6 +344,45 @@ func (s *DigiConnectService) ListRequests(userID uuid.UUID, page, limit int) ([]
 		return nil, 0, err
 	}
 	return mapDigiConnectRequests(rows), total, nil
+}
+
+func (s *DigiConnectService) Dashboard(userID uuid.UUID) (*DigiConnectDashboardResponse, error) {
+	now := time.Now()
+	plans := s.PublicPlans()
+	entitlements, err := s.repo.ListEntitlementsByUser(userID)
+	if err != nil {
+		return nil, err
+	}
+	entitlementByPlan := make(map[string]*model.DigiConnectEntitlement, len(entitlements))
+	for i := range entitlements {
+		item := &entitlements[i]
+		if item.Status == "active" && (item.ExpiresAt == nil || item.ExpiresAt.After(now)) {
+			if existing := entitlementByPlan[item.PlanCode]; existing == nil || item.CreatedAt.After(existing.CreatedAt) {
+				entitlementByPlan[item.PlanCode] = item
+			}
+		}
+	}
+	statsByPlan, err := s.repo.RequestPlanStatsByUser(userID, time.Time{})
+	if err != nil {
+		return nil, err
+	}
+	items := make([]DigiConnectPlanDashboardResponse, 0, len(plans))
+	for _, plan := range plans {
+		recentRows, err := s.repo.ListRequestsByUserAndPlan(userID, plan.Code, 5)
+		if err != nil {
+			return nil, err
+		}
+		stat := statsByPlan[plan.Code]
+		items = append(items, DigiConnectPlanDashboardResponse{
+			Plan:              plan,
+			Entitlement:       entitlementByPlan[plan.Code],
+			Stats:             DigiConnectPlanStatsResponse{TotalRequests: stat.TotalRequests, CompletedCount: stat.CompletedCount, ChargedAmount: stat.ChargedAmount, AvgLatencyMS: int64(stat.AvgLatencyMS + 0.5), LastRequestAt: stat.LastRequestAt},
+			RecentRequests:    mapDigiConnectRequests(recentRows),
+			DashboardHeadline: dashboardHeadlineForDigiConnectPlan(plan),
+			DashboardSummary:  dashboardSummaryForDigiConnectPlan(plan),
+		})
+	}
+	return &DigiConnectDashboardResponse{GeneratedAt: now, Plans: items}, nil
 }
 
 func (s *DigiConnectService) AdminListRequests(filter repository.DigiConnectAdminRequestFilter) ([]model.DigiConnectRequest, int64, error) {
@@ -736,7 +824,11 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 	}
 
 	requestID := "dc_req_" + uuid.NewString()
-	request := &model.DigiConnectRequest{RequestID: requestID, UserID: key.UserID, APIKeyID: &key.ID, ServiceAlias: input.Service, RequestType: input.Type, Status: "processing", InputHash: HashDigiConnectSecret(input.Input), InputPreview: previewDigiConnectInput(input.Input), PayloadHash: payloadHash, IdempotencyRequestHash: payloadHash, BillingDecision: billing.Decision, BillingStatus: "reserved", BillingSource: billing.Source, Amount: billing.Amount, Currency: "IDR", StartedAt: &now}
+	planCode := ""
+	if entitlement != nil {
+		planCode = entitlement.PlanCode
+	}
+	request := &model.DigiConnectRequest{RequestID: requestID, UserID: key.UserID, APIKeyID: &key.ID, ServiceAlias: input.Service, RequestType: input.Type, PlanCode: planCode, Status: "processing", InputHash: HashDigiConnectSecret(input.Input), InputPreview: previewDigiConnectInput(input.Input), PayloadHash: payloadHash, IdempotencyRequestHash: payloadHash, BillingDecision: billing.Decision, BillingStatus: "reserved", BillingSource: billing.Source, Amount: billing.Amount, Currency: "IDR", StartedAt: &now}
 	if idempotencyKey != "" {
 		request.IdempotencyKey = &idempotencyKey
 	}
@@ -814,7 +906,7 @@ func mapDigiConnectAPIKey(key model.DigiConnectAPIKey, plain string) DigiConnect
 func mapDigiConnectRequests(rows []model.DigiConnectRequest) []DigiConnectRequestListResponse {
 	res := make([]DigiConnectRequestListResponse, 0, len(rows))
 	for _, row := range rows {
-		res = append(res, DigiConnectRequestListResponse{ID: row.ID.String(), RequestID: row.RequestID, ServiceAlias: row.ServiceAlias, RequestType: row.RequestType, Status: row.Status, InputPreview: row.InputPreview, BillingDecision: row.BillingDecision, BillingStatus: row.BillingStatus, BillingSource: row.BillingSource, Amount: row.Amount, Currency: row.Currency, PublicErrorCode: row.PublicErrorCode, RouterStatus: row.RouterStatus, RouterLatencyMS: row.RouterLatencyMS, StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, CreatedAt: row.CreatedAt})
+		res = append(res, DigiConnectRequestListResponse{ID: row.ID.String(), RequestID: row.RequestID, ServiceAlias: row.ServiceAlias, RequestType: row.RequestType, PlanCode: row.PlanCode, Status: row.Status, InputPreview: row.InputPreview, BillingDecision: row.BillingDecision, BillingStatus: row.BillingStatus, BillingSource: row.BillingSource, Amount: row.Amount, Currency: row.Currency, PublicErrorCode: row.PublicErrorCode, RouterStatus: row.RouterStatus, RouterLatencyMS: row.RouterLatencyMS, StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, CreatedAt: row.CreatedAt})
 	}
 	return res
 }

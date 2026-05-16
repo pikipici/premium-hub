@@ -70,6 +70,7 @@ type DigiConnectRequest struct {
 
 	ServiceAlias string `gorm:"size:80;not null;index" json:"service_alias"`
 	RequestType  string `gorm:"size:40;not null;index" json:"request_type"`
+	PlanCode     string `gorm:"size:60;index" json:"plan_code,omitempty"`
 	Status       string `gorm:"size:40;not null;default:queued;index" json:"status"`
 
 	InputHash    string `gorm:"size:128;index" json:"-"`

@@ -145,6 +145,63 @@ func (r *DigiConnectRepo) ListRequestsByUser(userID uuid.UUID, page, limit int) 
 	return rows, total, err
 }
 
+func (r *DigiConnectRepo) ListRequestsByUserAndPlan(userID uuid.UUID, planCode string, limit int) ([]model.DigiConnectRequest, error) {
+	var rows []model.DigiConnectRequest
+	_, limit = normalizePageLimit(1, limit, 8)
+	err := r.db.Where("user_id = ? AND plan_code = ?", userID, strings.TrimSpace(planCode)).
+		Limit(limit).
+		Order("created_at DESC").
+		Find(&rows).Error
+	return rows, err
+}
+
+func (r *DigiConnectRepo) RequestPlanStatsByUser(userID uuid.UUID, since time.Time) (map[string]DigiConnectPlanStatsRow, error) {
+	type row struct {
+		PlanCode       string
+		TotalRequests  int64
+		CompletedCount int64
+		ChargedAmount  int64
+		AvgLatencyMS   float64
+		LastRequestAt  *time.Time
+	}
+	var rows []row
+	q := r.db.Model(&model.DigiConnectRequest{}).
+		Select(`plan_code,
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) AS completed_count,
+			COALESCE(SUM(CASE WHEN billing_status = 'charged' THEN amount ELSE 0 END), 0) AS charged_amount,
+			COALESCE(AVG(CASE WHEN router_latency_ms > 0 THEN router_latency_ms ELSE NULL END), 0) AS avg_latency_ms,
+			MAX(created_at) AS last_request_at`).
+		Where("user_id = ?", userID).
+		Where("plan_code <> ''").
+		Group("plan_code")
+	if !since.IsZero() {
+		q = q.Where("created_at >= ?", since)
+	}
+	if err := q.Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	stats := make(map[string]DigiConnectPlanStatsRow, len(rows))
+	for _, row := range rows {
+		stats[row.PlanCode] = DigiConnectPlanStatsRow{
+			TotalRequests:  row.TotalRequests,
+			CompletedCount: row.CompletedCount,
+			ChargedAmount:  row.ChargedAmount,
+			AvgLatencyMS:   row.AvgLatencyMS,
+			LastRequestAt:  row.LastRequestAt,
+		}
+	}
+	return stats, nil
+}
+
+type DigiConnectPlanStatsRow struct {
+	TotalRequests  int64
+	CompletedCount int64
+	ChargedAmount  int64
+	AvgLatencyMS   float64
+	LastRequestAt  *time.Time
+}
+
 func (r *DigiConnectRepo) AdminListRequests(filter DigiConnectAdminRequestFilter) ([]model.DigiConnectRequest, int64, error) {
 	var rows []model.DigiConnectRequest
 	var total int64

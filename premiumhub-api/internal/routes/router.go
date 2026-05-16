@@ -314,6 +314,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/wallet/topups/:id", walletHandler.GetTopup)
 
 	protected.GET("/digiconnect/summary", digiConnectHandler.Summary)
+	protected.GET("/digiconnect/dashboard", digiConnectHandler.Dashboard)
 	protected.GET("/digiconnect/api-keys", digiConnectHandler.ListAPIKeys)
 	protected.POST("/digiconnect/api-keys", digiConnectHandler.CreateAPIKey)
 	protected.GET("/digiconnect/entitlements", digiConnectHandler.ListEntitlements)
