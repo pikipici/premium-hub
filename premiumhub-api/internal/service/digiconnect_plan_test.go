@@ -61,3 +61,33 @@ func TestDigiConnectPublicPlansRemainsBackwardCompatible(t *testing.T) {
 		t.Fatalf("unexpected plan order: %#v", plans)
 	}
 }
+
+func TestDigiConnectRouterRouteFollowsPlanProvider(t *testing.T) {
+	tests := []struct {
+		name         string
+		planCode     string
+		requested    string
+		wantProvider string
+		wantModel    string
+	}{
+		{"hemat defaults to codex", "digiconnect_ppr_hemat", "", "codex", "cx/gpt-5.5"},
+		{"hemat keeps allowed codex model", "digiconnect_ppr_hemat", "cx/gpt-5.3-codex", "codex", "cx/gpt-5.3-codex"},
+		{"hemat blocks kiro model", "digiconnect_ppr_hemat", "kr/claude-sonnet-4.5", "codex", "cx/gpt-5.5"},
+		{"premium defaults to kiro", "digiconnect_ppr_premium", "", "kiro", "kr/claude-opus-4.6"},
+		{"premium blocks codex model", "digiconnect_ppr_premium", "cx/gpt-5.5", "kiro", "kr/claude-opus-4.6"},
+		{"package two day defaults to codex", "digiconnect_2d", "", "codex", "cx/gpt-5.5"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := DigiConnectAPIRequestInput{Options: map[string]interface{}{}}
+			if tt.requested != "" {
+				input.Options["model"] = tt.requested
+			}
+			got := routeDigiConnectRequest(tt.planCode, input)
+			if got.Provider != tt.wantProvider || got.ModelID != tt.wantModel {
+				t.Fatalf("unexpected route: got provider=%q model=%q", got.Provider, got.ModelID)
+			}
+		})
+	}
+}

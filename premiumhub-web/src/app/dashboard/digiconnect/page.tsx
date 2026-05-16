@@ -331,10 +331,11 @@ export default function DigiConnectDashboardPage() {
                       </div>
                       <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusClass(request.status)}`}>{request.status}</span>
                     </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[#6F675F]">
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#6F675F] sm:grid-cols-4">
                       <span>{request.billing_source}</span>
                       <span>{request.amount ? currency.format(request.amount) : '-'}</span>
                       <span>{request.router_latency_ms} ms</span>
+                      <span className="truncate font-mono">{request.router_provider || '-'} / {request.router_model || '-'}</span>
                     </div>
                   </div>
                 ))}

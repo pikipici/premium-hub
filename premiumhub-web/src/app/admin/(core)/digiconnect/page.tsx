@@ -152,7 +152,11 @@ export default function AdminDigiConnectPage() {
                       </td>
                       <td className="px-3 py-4"><span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusClass(request.status)}`}>{request.status}</span></td>
                       <td className="px-3 py-4 text-[#665D54]">{request.billing_source}<br />{request.amount ? currency.format(request.amount) : '-'}</td>
-                      <td className="px-3 py-4 text-[#665D54]">{request.router_status || '-'}<br />{request.router_latency_ms} ms</td>
+                      <td className="px-3 py-4 text-[#665D54]">
+                        <span className="font-bold text-[#171411]">{request.router_provider || '-'}</span><br />
+                        <span className="font-mono text-xs">{request.router_model || '-'}</span><br />
+                        {request.router_status || '-'} · {request.router_latency_ms} ms
+                      </td>
                       <td className="px-3 py-4 text-[#665D54]">{formatDate(request.created_at)}</td>
                     </tr>
                   ))}

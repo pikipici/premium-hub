@@ -54,6 +54,8 @@ type DigiConnectRequestListResponse struct {
 	ServiceAlias    string     `json:"service_alias"`
 	RequestType     string     `json:"request_type"`
 	PlanCode        string     `json:"plan_code,omitempty"`
+	RouterProvider  string     `json:"router_provider,omitempty"`
+	RouterModel     string     `json:"router_model,omitempty"`
 	Status          string     `json:"status"`
 	InputPreview    string     `json:"input_preview"`
 	BillingDecision string     `json:"billing_decision"`
@@ -183,6 +185,55 @@ var digiConnectCXModelLabels = []string{"GPT 5.5", "GPT 5.4", "GPT 5.3 Codex", "
 var digiConnectCXModelIDs = []string{"cx/gpt-5.5", "cx/gpt-5.4", "cx/gpt-5.3-codex", "cx/gpt-5.3-codex-xhigh", "cx/gpt-5.3-codex-high", "cx/gpt-5.3-codex-low", "cx/gpt-5.3-codex-none", "cx/gpt-5.3-codex-spark", "cx/gpt-5.2-codex", "cx/gpt-5.2", "cx/gpt-5.1-codex-max", "cx/gpt-5.1-codex"}
 
 var digiConnectPremiumModelIDs = []string{"kr/claude-opus-4.6", "kr/claude-opus-4.7", "kr/auto", "kr/claude-opus-4.5", "kr/claude-sonnet-4.6", "kr/claude-sonnet-4.5", "kr/claude-haiku-4.5", "kr/deepseek-3.2", "kr/qwen3-coder-next", "kr/glm-5", "kr/MiniMax-M2.5"}
+
+type digiConnectRouterPlanRoute struct {
+	Provider string
+	ModelIDs []string
+}
+
+type digiConnectResolvedRouterRoute struct {
+	Provider string
+	ModelID  string
+}
+
+var digiConnectRouterPlanRoutes = map[string]digiConnectRouterPlanRoute{
+	"digiconnect_ppr_hemat":   {Provider: "codex", ModelIDs: digiConnectCXModelIDs},
+	"digiconnect_ppr_premium": {Provider: "kiro", ModelIDs: digiConnectPremiumModelIDs},
+	"digiconnect_2d":          {Provider: "codex", ModelIDs: digiConnectCXModelIDs},
+}
+
+func routeDigiConnectRequest(planCode string, input DigiConnectAPIRequestInput) digiConnectResolvedRouterRoute {
+	planRoute, ok := digiConnectRouterPlanRoutes[strings.TrimSpace(planCode)]
+	if !ok || len(planRoute.ModelIDs) == 0 {
+		planRoute = digiConnectRouterPlanRoute{Provider: "codex", ModelIDs: digiConnectCXModelIDs}
+	}
+	selectedModel := strings.TrimSpace(optionString(input.Options, "model"))
+	if !containsString(planRoute.ModelIDs, selectedModel) {
+		selectedModel = planRoute.ModelIDs[0]
+	}
+	return digiConnectResolvedRouterRoute{Provider: planRoute.Provider, ModelID: selectedModel}
+}
+
+func optionString(options map[string]interface{}, key string) string {
+	if options == nil {
+		return ""
+	}
+	value, _ := options[key].(string)
+	return value
+}
+
+func containsString(values []string, needle string) bool {
+	needle = strings.TrimSpace(needle)
+	if needle == "" {
+		return false
+	}
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
+}
 
 func (s *DigiConnectService) PublicPlans() []DigiConnectPlanResponse {
 	return s.PublicPlansView().Plans
@@ -828,7 +879,8 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 	if entitlement != nil {
 		planCode = entitlement.PlanCode
 	}
-	request := &model.DigiConnectRequest{RequestID: requestID, UserID: key.UserID, APIKeyID: &key.ID, ServiceAlias: input.Service, RequestType: input.Type, PlanCode: planCode, Status: "processing", InputHash: HashDigiConnectSecret(input.Input), InputPreview: previewDigiConnectInput(input.Input), PayloadHash: payloadHash, IdempotencyRequestHash: payloadHash, BillingDecision: billing.Decision, BillingStatus: "reserved", BillingSource: billing.Source, Amount: billing.Amount, Currency: "IDR", StartedAt: &now}
+	routerRoute := routeDigiConnectRequest(planCode, input)
+	request := &model.DigiConnectRequest{RequestID: requestID, UserID: key.UserID, APIKeyID: &key.ID, ServiceAlias: input.Service, RequestType: input.Type, PlanCode: planCode, RouterProvider: routerRoute.Provider, RouterModel: routerRoute.ModelID, Status: "processing", InputHash: HashDigiConnectSecret(input.Input), InputPreview: previewDigiConnectInput(input.Input), PayloadHash: payloadHash, IdempotencyRequestHash: payloadHash, BillingDecision: billing.Decision, BillingStatus: "reserved", BillingSource: billing.Source, Amount: billing.Amount, Currency: "IDR", StartedAt: &now}
 	if idempotencyKey != "" {
 		request.IdempotencyKey = &idempotencyKey
 	}
@@ -846,7 +898,7 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 	}
 
 	routerStarted := time.Now()
-	routerRes, routerErr := s.callRouter(ctx, input)
+	routerRes, routerErr := s.callRouter(ctx, input, routerRoute)
 	latency := time.Since(routerStarted).Milliseconds()
 	completedAt := time.Now()
 	request.RouterLatencyMS = latency
@@ -906,7 +958,7 @@ func mapDigiConnectAPIKey(key model.DigiConnectAPIKey, plain string) DigiConnect
 func mapDigiConnectRequests(rows []model.DigiConnectRequest) []DigiConnectRequestListResponse {
 	res := make([]DigiConnectRequestListResponse, 0, len(rows))
 	for _, row := range rows {
-		res = append(res, DigiConnectRequestListResponse{ID: row.ID.String(), RequestID: row.RequestID, ServiceAlias: row.ServiceAlias, RequestType: row.RequestType, PlanCode: row.PlanCode, Status: row.Status, InputPreview: row.InputPreview, BillingDecision: row.BillingDecision, BillingStatus: row.BillingStatus, BillingSource: row.BillingSource, Amount: row.Amount, Currency: row.Currency, PublicErrorCode: row.PublicErrorCode, RouterStatus: row.RouterStatus, RouterLatencyMS: row.RouterLatencyMS, StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, CreatedAt: row.CreatedAt})
+		res = append(res, DigiConnectRequestListResponse{ID: row.ID.String(), RequestID: row.RequestID, ServiceAlias: row.ServiceAlias, RequestType: row.RequestType, PlanCode: row.PlanCode, RouterProvider: row.RouterProvider, RouterModel: row.RouterModel, Status: row.Status, InputPreview: row.InputPreview, BillingDecision: row.BillingDecision, BillingStatus: row.BillingStatus, BillingSource: row.BillingSource, Amount: row.Amount, Currency: row.Currency, PublicErrorCode: row.PublicErrorCode, RouterStatus: row.RouterStatus, RouterLatencyMS: row.RouterLatencyMS, StartedAt: row.StartedAt, CompletedAt: row.CompletedAt, CreatedAt: row.CreatedAt})
 	}
 	return res
 }
@@ -921,16 +973,14 @@ type digiConnectRouterError struct {
 	Err          error
 }
 
-func (s *DigiConnectService) callRouter(ctx context.Context, input DigiConnectAPIRequestInput) (*digiConnectRouterResponse, *digiConnectRouterError) {
+func (s *DigiConnectService) callRouter(ctx context.Context, input DigiConnectAPIRequestInput, route digiConnectResolvedRouterRoute) (*digiConnectRouterResponse, *digiConnectRouterError) {
 	baseURL := strings.TrimRight(s.cfg.DigiConnectRouterBaseURL, "/")
 	if baseURL == "" {
 		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: errors.New("digiconnect router base URL is empty")}
 	}
-	modelID := digiConnectCXModelIDs[0]
-	if input.Options != nil {
-		if selected, ok := input.Options["model"].(string); ok && strings.TrimSpace(selected) != "" {
-			modelID = strings.TrimSpace(selected)
-		}
+	modelID := strings.TrimSpace(route.ModelID)
+	if modelID == "" {
+		modelID = digiConnectCXModelIDs[0]
 	}
 	body := map[string]interface{}{
 		"model": modelID,
@@ -953,6 +1003,9 @@ func (s *DigiConnectService) callRouter(ctx context.Context, input DigiConnectAP
 		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: err}
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if provider := strings.TrimSpace(route.Provider); provider != "" {
+		req.Header.Set("X-DigiConnect-Router-Provider", provider)
+	}
 	if token := strings.TrimSpace(s.cfg.DigiConnectRouterInternalAPIKey); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}

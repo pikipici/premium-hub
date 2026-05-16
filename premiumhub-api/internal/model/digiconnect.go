@@ -68,10 +68,12 @@ type DigiConnectRequest struct {
 	APIKeyID *uuid.UUID         `gorm:"type:uuid;index" json:"api_key_id,omitempty"`
 	APIKey   *DigiConnectAPIKey `gorm:"foreignKey:APIKeyID" json:"api_key,omitempty"`
 
-	ServiceAlias string `gorm:"size:80;not null;index" json:"service_alias"`
-	RequestType  string `gorm:"size:40;not null;index" json:"request_type"`
-	PlanCode     string `gorm:"size:60;index" json:"plan_code,omitempty"`
-	Status       string `gorm:"size:40;not null;default:queued;index" json:"status"`
+	ServiceAlias   string `gorm:"size:80;not null;index" json:"service_alias"`
+	RequestType    string `gorm:"size:40;not null;index" json:"request_type"`
+	PlanCode       string `gorm:"size:60;index" json:"plan_code,omitempty"`
+	RouterProvider string `gorm:"size:40;index" json:"router_provider,omitempty"`
+	RouterModel    string `gorm:"size:120" json:"router_model,omitempty"`
+	Status         string `gorm:"size:40;not null;default:queued;index" json:"status"`
 
 	InputHash    string `gorm:"size:128;index" json:"-"`
 	InputPreview string `gorm:"size:240" json:"input_preview"`

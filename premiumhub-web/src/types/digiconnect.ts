@@ -84,6 +84,8 @@ export interface DigiConnectRequest {
   service_alias: string
   request_type: string
   plan_code?: string
+  router_provider?: string
+  router_model?: string
   status: string
   input_preview: string
   billing_decision: string
