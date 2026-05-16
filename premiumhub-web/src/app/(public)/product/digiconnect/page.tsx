@@ -78,7 +78,7 @@ export default function DigiConnectProductPage() {
                 <Network className="mr-2 h-4 w-4 text-amber-300" /> Managed Routing Layer untuk aplikasi kamu
               </div>
               <h1 className="max-w-3xl text-4xl font-black tracking-tight sm:text-6xl">
-                DigiConnect API, akses AI yang bisa langsung kamu tagihkan dari wallet.
+                DigiConnect, akses AI yang bisa langsung kamu tagihkan dari wallet.
               </h1>
               <p className="mt-6 max-w-2xl text-lg text-slate-100">
                 Beli paket, buat API key, lalu kirim request lewat gateway Premium Hub. Cocok buat bot, dashboard internal, dan workflow otomatis tanpa expose detail routing internal.

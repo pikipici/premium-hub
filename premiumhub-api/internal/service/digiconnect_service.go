@@ -1118,7 +1118,7 @@ func (s *DigiConnectService) chargeWalletAfterRouterSuccess(ctx context.Context,
 		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
 			return err
 		}
-		return s.walletRepo.CreateLedgerTx(tx, &model.WalletLedger{UserID: userID, Type: "debit", Category: "digiconnect_request", Amount: amount, BalanceBefore: before, BalanceAfter: after, Reference: reference, Description: "DigiConnect API request"})
+		return s.walletRepo.CreateLedgerTx(tx, &model.WalletLedger{UserID: userID, Type: "debit", Category: "digiconnect_request", Amount: amount, BalanceBefore: before, BalanceAfter: after, Reference: reference, Description: "DigiConnect request"})
 	})
 }
 

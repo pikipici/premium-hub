@@ -149,7 +149,7 @@ Gateway AI dan growth sosial, satu tempat.
               <article className={productCardClass}>
                 <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#FFF3CC]" />
                 <p className="relative inline-flex rounded-full border border-[#F7D45B] bg-[#FFF8DC] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#7A5200]">
-                  DigiConnect API
+                  DigiConnect
                 </p>
                 <h2 className="relative mt-3 text-2xl font-extrabold tracking-tight text-[#141414]">
                   Gateway AI Siap Dipakai dari Wallet

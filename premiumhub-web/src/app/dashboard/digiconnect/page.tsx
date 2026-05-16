@@ -173,7 +173,7 @@ export default function DigiConnectDashboardPage() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-2xl">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/14 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-orange-50 ring-1 ring-white/20">
-                <RadioTower className="h-4 w-4" /> DigiConnect API
+                <RadioTower className="h-4 w-4" /> DigiConnect
               </div>
               <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">{activePlanDashboard?.dashboard_headline || 'Pusat kontrol AI API kamu'}</h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-orange-50/88 sm:text-base">

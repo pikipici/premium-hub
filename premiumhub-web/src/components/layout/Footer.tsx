@@ -15,7 +15,7 @@ import {
 import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
 
 const FOOTER_PRODUCT_LABEL_BY_HREF: Record<string, string> = {
-  '/product/digiconnect': 'DigiConnect API',
+  '/product/digiconnect': 'DigiConnect',
   '/product/prem-apps': 'Apps Premium',
   '/product/sosmed': 'DigiSosmed',
   '/product/convert': 'Convert Aset',
@@ -89,7 +89,7 @@ export default function Footer() {
               <span className="text-xl font-extrabold">Digi<span className="text-[#FF5733]">Market</span></span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
-              Platform DigiConnect API dan DigiSosmed untuk bantu workflow, otomasi, dan pertumbuhan akun sosial dalam satu wallet.
+              Platform DigiConnect dan DigiSosmed untuk bantu workflow, otomasi, dan pertumbuhan akun sosial dalam satu wallet.
             </p>
           </div>
 
