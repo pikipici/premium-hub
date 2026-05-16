@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Activity, CheckCircle2, Copy, Globe2, KeyRound, Loader2, Plus, RadioTower, Sparkles, WalletCards } from 'lucide-react'
 
 import { digiconnectService } from '@/services/digiconnectService'
-import type { DigiConnectApiKey, DigiConnectEntitlement, DigiConnectPlan, DigiConnectPlanTab, DigiConnectRequest, DigiConnectSummary } from '@/types/digiconnect'
+import type { DigiConnectApiKey, DigiConnectEntitlement, DigiConnectPlan, DigiConnectPlanDashboard, DigiConnectPlanTab } from '@/types/digiconnect'
 
 const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
 
@@ -60,10 +60,8 @@ function planTabKey(plan: DigiConnectPlan) {
 }
 
 export default function DigiConnectDashboardPage() {
-  const [summary, setSummary] = useState<DigiConnectSummary | null>(null)
   const [keys, setKeys] = useState<DigiConnectApiKey[]>([])
-  const [requests, setRequests] = useState<DigiConnectRequest[]>([])
-  const [entitlements, setEntitlements] = useState<DigiConnectEntitlement[]>([])
+  const [planDashboards, setPlanDashboards] = useState<DigiConnectPlanDashboard[]>([])
   const [plans, setPlans] = useState<DigiConnectPlan[]>([])
   const [tabs, setTabs] = useState<DigiConnectPlanTab[]>([])
   const [activeTab, setActiveTab] = useState<string>('')
@@ -75,35 +73,33 @@ export default function DigiConnectDashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [baseUrl, setBaseUrl] = useState('/api/v1/digiconnect/requests')
 
-  const activeEntitlement = useMemo(() => entitlements.find((item) => item.status === 'active'), [entitlements])
   const activePlan = useMemo(() => plans.find((plan) => planTabKey(plan) === activeTab) || plans[0], [activeTab, plans])
-  const activePlanEntitlement = useMemo(() => entitlements.find((item) => item.status === 'active' && item.plan_code === activePlan?.code), [activePlan?.code, entitlements])
-  const activePlanRequests = useMemo(() => {
-    if (!activePlan) return requests
-    return requests.filter((request) => request.billing_source === 'wallet' ? activePlan.billing_model === 'pay_per_request' : activePlan.billing_model === 'duration_package')
-  }, [activePlan, requests])
+  const activePlanDashboard = useMemo(() => planDashboards.find((item) => item.plan.code === activePlan?.code), [activePlan?.code, planDashboards])
+  const activePlanEntitlement = activePlanDashboard?.entitlement
+  const activePlanRequests = activePlanDashboard?.recent_requests || []
+  const activeStats = activePlanDashboard?.stats
 
   const load = async () => {
     setError(null)
     try {
-      const [summaryRes, keyRes, requestRes, entitlementRes, planRes] = await Promise.all([
+      const [summaryRes, keyRes, dashboardRes, planRes] = await Promise.all([
         digiconnectService.getSummary(),
         digiconnectService.listApiKeys(),
-        digiconnectService.listRequests({ limit: 8 }),
-        digiconnectService.listEntitlements(),
+        digiconnectService.getDashboard(),
         digiconnectService.publicPlans(),
       ])
       const planData = planRes.data
-      const nextPlans = planData?.plans || []
-      const nextTabs = normalizePlanTabs(nextPlans, planData?.tabs)
-      const preferredPlan = nextPlans.find((plan) => plan.code === summaryRes.data?.active_plan_code)
-      setSummary(summaryRes.data)
+      const dashboardItems = dashboardRes.data?.plans || []
+      const nextPlans = dashboardItems.map((item) => item.plan)
+      const fallbackPlans = planData?.plans || []
+      const resolvedPlans = nextPlans.length ? nextPlans : fallbackPlans
+      const nextTabs = normalizePlanTabs(resolvedPlans, planData?.tabs)
+      const preferredPlan = resolvedPlans.find((plan) => plan.code === summaryRes.data?.active_plan_code) || resolvedPlans.find((plan) => dashboardItems.some((item) => item.plan.code === plan.code && item.entitlement?.status === 'active'))
       setKeys(keyRes.data || [])
-      setRequests(requestRes.data || [])
-      setEntitlements(entitlementRes.data || [])
-      setPlans(nextPlans)
+      setPlanDashboards(dashboardItems)
+      setPlans(resolvedPlans)
       setTabs(nextTabs)
-      setActiveTab(preferredPlan ? planTabKey(preferredPlan) : planData?.default_tab || nextTabs[0]?.key || '')
+      setActiveTab((current) => current || (preferredPlan ? planTabKey(preferredPlan) : planData?.default_tab || nextTabs[0]?.key || ''))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat DigiConnect')
     } finally {
@@ -137,8 +133,7 @@ export default function DigiConnectDashboardPage() {
     setError(null)
     try {
       const res = await digiconnectService.checkoutWithWallet({ plan_code: activePlan.code })
-      setEntitlements((prev) => [res.data, ...prev])
-      setSummary((prev) => prev ? { ...prev, status: res.data.status, active_plan_code: res.data.plan_code, expires_at: res.data.expires_at, pay_per_request_enabled: res.data.pay_per_request_enabled } : prev)
+      setPlanDashboards((prev) => prev.map((item) => item.plan.code === res.data.plan_code ? { ...item, entitlement: res.data } : item))
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } }
       setError(error.response?.data?.message || 'Checkout gagal. Pastikan saldo wallet cukup.')
@@ -174,16 +169,16 @@ export default function DigiConnectDashboardPage() {
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/14 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-orange-50 ring-1 ring-white/20">
                 <RadioTower className="h-4 w-4" /> DigiConnect API
               </div>
-              <h1 className="text-3xl font-black tracking-tight sm:text-5xl">Pusat kontrol AI API kamu</h1>
+              <h1 className="text-3xl font-black tracking-tight sm:text-5xl">{activePlanDashboard?.dashboard_headline || 'Pusat kontrol AI API kamu'}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-orange-50/88 sm:text-base">
-                Kelola API key, pantau entitlement, dan cek request terbaru sebelum integrasi ke app atau workflow eksternal.
+                {activePlanDashboard?.dashboard_summary || 'Kelola API key, pantau entitlement, dan cek request terbaru sebelum integrasi ke app atau workflow eksternal.'}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
-              <Stat label="Status" value={summary?.status || 'inactive'} />
-              <Stat label="API key" value={String(summary?.api_keys_count ?? keys.length)} />
-              <Stat label="Plan" value={planLabel(summary?.active_plan_code || activeEntitlement?.plan_code)} />
-              <Stat label="Harga" value={planPricing(activeEntitlement)} />
+              <Stat label="Status" value={activePlanEntitlement?.status || 'inactive'} />
+              <Stat label="Request" value={String(activeStats?.total_requests ?? 0)} />
+              <Stat label="Sukses" value={String(activeStats?.completed_count ?? 0)} />
+              <Stat label="Biaya" value={currency.format(activeStats?.charged_amount ?? 0)} />
             </div>
           </div>
         </div>
@@ -243,6 +238,15 @@ export default function DigiConnectDashboardPage() {
                 ) : <Empty text="Paket DigiConnect belum tersedia." />}
               </Card>
 
+              <Card title="Stat tab aktif" icon={<Activity className="h-5 w-5" />}>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MiniLight label="Total request" value={String(activeStats?.total_requests ?? 0)} />
+                  <MiniLight label="Request sukses" value={String(activeStats?.completed_count ?? 0)} />
+                  <MiniLight label="Rata-rata latency" value={activeStats?.avg_latency_ms ? `${activeStats.avg_latency_ms} ms` : '-'} />
+                  <MiniLight label="Request terakhir" value={formatDate(activeStats?.last_request_at)} />
+                </div>
+              </Card>
+
               <Card title="OpenAI-compatible Base URL" icon={<Globe2 className="h-5 w-5" />}>
                 <div className="rounded-2xl bg-[#FFF7F1] p-4">
                   <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#A15A40]">Base URL untuk 9router</div>
@@ -299,26 +303,26 @@ export default function DigiConnectDashboardPage() {
                 </div>
               </Card>
 
-              <Card title="Entitlement aktif" icon={<WalletCards className="h-5 w-5" />}>
-                {activeEntitlement ? (
+              <Card title="Entitlement tab ini" icon={<WalletCards className="h-5 w-5" />}>
+                {activePlanEntitlement ? (
                   <div className="rounded-2xl bg-[#171411] p-5 text-white">
-                    <div className="text-sm text-orange-100/80">{activeEntitlement.billing_model === 'pay_per_request' ? 'Pay per request' : 'Paket durasi'}</div>
-                    <div className="mt-1 text-2xl font-black">{planLabel(activeEntitlement.plan_code)}</div>
+                    <div className="text-sm text-orange-100/80">{activePlanEntitlement.billing_model === 'pay_per_request' ? 'Pay per request' : 'Paket durasi'}</div>
+                    <div className="mt-1 text-2xl font-black">{planLabel(activePlanEntitlement.plan_code)}</div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <Mini label="Harga" value={planPricing(activeEntitlement)} />
-                      <Mini label="Fair use" value={activeEntitlement.daily_fair_use_limit ? `${activeEntitlement.daily_fair_use_limit}/hari` : 'Unlimited'} />
-                      <Mini label="Expired" value={formatDate(activeEntitlement.expires_at)} />
+                      <Mini label="Harga" value={planPricing(activePlanEntitlement)} />
+                      <Mini label="Fair use" value={activePlanEntitlement.daily_fair_use_limit ? `${activePlanEntitlement.daily_fair_use_limit}/hari` : 'Unlimited'} />
+                      <Mini label="Expired" value={formatDate(activePlanEntitlement.expires_at)} />
                     </div>
                   </div>
                 ) : (
-                  <Empty text="Belum ada entitlement aktif. Pay-per-request mengikuti policy backend." />
+                  <Empty text="Belum ada entitlement aktif untuk tab ini." />
                 )}
               </Card>
             </section>
 
             <Card title="Request terbaru" icon={<Activity className="h-5 w-5" />}>
               <div className="space-y-3">
-                {(activePlanRequests.length ? activePlanRequests : requests).map((request) => (
+                {activePlanRequests.map((request) => (
                   <div key={request.id} className="rounded-2xl border border-[#EFE8DF] bg-white p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
@@ -334,7 +338,7 @@ export default function DigiConnectDashboardPage() {
                     </div>
                   </div>
                 ))}
-                {requests.length === 0 ? <Empty text="Belum ada request." /> : null}
+                {activePlanRequests.length === 0 ? <Empty text="Belum ada request untuk tab ini." /> : null}
               </div>
             </Card>
           </div>

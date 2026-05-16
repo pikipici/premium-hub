@@ -83,6 +83,7 @@ export interface DigiConnectRequest {
   request_id: string
   service_alias: string
   request_type: string
+  plan_code?: string
   status: string
   input_preview: string
   billing_decision: string
@@ -96,6 +97,28 @@ export interface DigiConnectRequest {
   started_at?: string | null
   completed_at?: string | null
   created_at: string
+}
+
+export interface DigiConnectPlanStats {
+  total_requests: number
+  completed_count: number
+  charged_amount: number
+  avg_latency_ms: number
+  last_request_at?: string | null
+}
+
+export interface DigiConnectPlanDashboard {
+  plan: DigiConnectPlan
+  entitlement?: DigiConnectEntitlement
+  stats: DigiConnectPlanStats
+  recent_requests: DigiConnectRequest[]
+  dashboard_headline: string
+  dashboard_summary: string
+}
+
+export interface DigiConnectDashboard {
+  generated_at: string
+  plans: DigiConnectPlanDashboard[]
 }
 
 export interface DigiConnectAdminOverview {

@@ -4,6 +4,7 @@ import type {
   DigiConnectAdminOverview,
   DigiConnectApiKey,
   DigiConnectCheckoutPayload,
+  DigiConnectDashboard,
   DigiConnectEntitlement,
   DigiConnectListParams,
   DigiConnectPlansView,
@@ -25,6 +26,11 @@ export const digiconnectService = {
 
   getSummary: async () => {
     const res = await api.get<ApiResponse<DigiConnectSummary>>('/digiconnect/summary')
+    return res.data
+  },
+
+  getDashboard: async () => {
+    const res = await api.get<ApiResponse<DigiConnectDashboard>>('/digiconnect/dashboard')
     return res.data
   },
 
