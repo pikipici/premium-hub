@@ -805,6 +805,9 @@ func extractDigiConnectText(res map[string]interface{}) string {
 		if text := extractOpenAIResponseText(router); text != "" {
 			return text
 		}
+		if text := extractOpenAIChatText(router); text != "" {
+			return text
+		}
 		for _, key := range []string{"output_text", "text", "content", "message"} {
 			if value, ok := router[key].(string); ok && strings.TrimSpace(value) != "" {
 				return value
@@ -815,6 +818,30 @@ func extractDigiConnectText(res map[string]interface{}) string {
 	}
 	encoded, _ := json.Marshal(res)
 	return string(encoded)
+}
+
+func extractOpenAIChatText(router map[string]interface{}) string {
+	choices, ok := router["choices"].([]interface{})
+	if !ok {
+		return ""
+	}
+	parts := []string{}
+	for _, item := range choices {
+		choice, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for _, key := range []string{"message", "delta"} {
+			message, ok := choice[key].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if content, ok := message["content"].(string); ok && strings.TrimSpace(content) != "" {
+				parts = append(parts, strings.TrimSpace(content))
+			}
+		}
+	}
+	return strings.TrimSpace(strings.Join(parts, "\n"))
 }
 
 func extractOpenAIResponseText(router map[string]interface{}) string {
