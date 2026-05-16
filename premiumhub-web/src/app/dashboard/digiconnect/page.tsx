@@ -32,6 +32,24 @@ function planLabel(code?: string | null) {
   return planLabels[code] || code
 }
 
+function compactPlanName(plan: DigiConnectPlan) {
+  if (plan.code === 'digiconnect_ppr_hemat') return 'Bayar per Request'
+  if (plan.code === 'digiconnect_ppr_premium') return 'Bayar per Request'
+  return plan.name
+}
+
+function compactPlanDescription(plan: DigiConnectPlan) {
+  if (plan.billing_model === 'pay_per_request') return 'Akses GPT pilihan dengan biaya ringan. Hanya request sukses yang ditagihkan.'
+  if (plan.duration_days) return `Akses DigiConnect aktif ${plan.duration_days} hari untuk workflow intensif.`
+  return plan.description
+}
+
+function accessStatus(plan: DigiConnectPlan, entitlement?: DigiConnectEntitlement) {
+  if (entitlement) return 'Aktif'
+  if (plan.available === false) return 'Stok habis'
+  return 'Belum aktif'
+}
+
 function planPricing(entitlement?: DigiConnectEntitlement) {
   if (!entitlement) return '-'
   if (entitlement.billing_model === 'pay_per_request') return `${currency.format(entitlement.price)}/request`
@@ -219,12 +237,12 @@ export default function DigiConnectDashboardPage() {
               {activePanel === 'akses' ? (
                 <div className="space-y-4">
                   {plans.length && activePlan ? (
-                    <div className="overflow-hidden rounded-3xl border border-[#F0D8C8] bg-[linear-gradient(135deg,#FFF8F2,#FFFFFF)]">
+                    <div className="overflow-hidden rounded-3xl border border-[#F0D8C8] bg-[linear-gradient(135deg,#FFFAF6,#FFFFFF)] shadow-sm shadow-orange-950/5">
                       <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-[1fr_auto] xl:items-start">
                         <div className="min-w-0">
-                          <div className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</div>
-                          <h2 className="mt-3 text-2xl font-black text-[#171411]">{activePlan.name}</h2>
-                          <p className="mt-2 text-sm font-semibold leading-6 text-[#7B7067]">{activePlan.description}</p>
+                          <div className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</div>
+                          <h2 className="mt-3 text-2xl font-black tracking-tight text-[#171411]">{compactPlanName(activePlan)}</h2>
+                          <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-[#7B7067]">{compactPlanDescription(activePlan)}</p>
                         </div>
                         <button
                           type="button"
@@ -237,23 +255,23 @@ export default function DigiConnectDashboardPage() {
                         </button>
                       </div>
                       <div className="px-4 pb-4 sm:px-5 sm:pb-5">
-                        <div className="w-full overflow-hidden rounded-2xl border border-[#F0D8C8] bg-white/85">
-                          <AccessSummaryRow label="Harga" value={activePlan.price_label || currency.format(activePlan.price)} />
-                          <AccessSummaryRow label="Billing" value={activePlan.billing_model === 'pay_per_request' ? 'Per request sukses' : `${activePlan.duration_days} hari`} />
-                          <AccessSummaryRow label="Status" value={activePlanEntitlement ? 'Aktif' : activePlan.available === false ? 'Stok habis' : 'Belum aktif'} />
+                        <div className="grid gap-2 rounded-2xl bg-white/80 p-2 ring-1 ring-[#F3E2D6] sm:grid-cols-3">
+                          <AccessSummaryItem label="Harga" value={activePlan.price_label || currency.format(activePlan.price)} />
+                          <AccessSummaryItem label="Billing" value={activePlan.billing_model === 'pay_per_request' ? 'Request sukses' : `${activePlan.duration_days} hari`} />
+                          <AccessSummaryItem label="Status" value={accessStatus(activePlan, activePlanEntitlement)} tone={activePlanEntitlement ? 'active' : activePlan.available === false ? 'danger' : 'muted'} />
                         </div>
                       </div>
-                      <div className="grid gap-3 border-t border-[#F0D8C8] bg-white/70 p-5 lg:grid-cols-[1fr_0.9fr]">
+                      <div className="grid gap-4 border-t border-[#F4E5DA] bg-white/55 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-start">
                         <div className="space-y-2">
-                          {(activePlan.features || []).map((feature) => (
-                            <div key={feature} className="flex items-center gap-2 text-sm font-bold text-[#4C463F]"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> {feature}</div>
+                          {(activePlan.features || []).slice(0, 3).map((feature) => (
+                            <div key={feature} className="flex items-center gap-2 text-sm font-bold text-[#4C463F]"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> {feature}</div>
                           ))}
                         </div>
-                        <div>
-                          {activePlan.stock_managed ? <div className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">Stok tersisa {activePlan.stock_remaining ?? 0}/{activePlan.stock_total ?? 0}</div> : null}
-                          <div className="flex flex-wrap gap-2">
-                            {(activePlan.model_labels || []).slice(0, 7).map((label) => <span key={label} className="rounded-full bg-[#FFF0EA] px-3 py-1 text-xs font-bold text-[#A15A40]">{label}</span>)}
-                            {(activePlan.model_labels?.length || 0) > 7 ? <span className="rounded-full bg-[#171411] px-3 py-1 text-xs font-bold text-white">+{(activePlan.model_labels?.length || 0) - 7} model</span> : null}
+                        <div className="min-w-0 lg:max-w-[230px]">
+                          {activePlan.stock_managed ? <div className="mb-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-900">Stok {activePlan.stock_remaining ?? 0}/{activePlan.stock_total ?? 0}</div> : null}
+                          <div className="flex flex-wrap gap-2 lg:justify-end">
+                            {(activePlan.model_labels || []).slice(0, 3).map((label) => <span key={label} className="rounded-full bg-[#FFF0EA] px-3 py-1 text-xs font-bold text-[#A15A40] ring-1 ring-[#F3D4C6]">{label}</span>)}
+                            {(activePlan.model_labels?.length || 0) > 3 ? <span className="rounded-full bg-[#171411] px-3 py-1 text-xs font-bold text-white">+{(activePlan.model_labels?.length || 0) - 3} model</span> : null}
                           </div>
                         </div>
                       </div>
@@ -395,11 +413,12 @@ function RequestChip({ children, mono = false }: { children: React.ReactNode; mo
   return <span className={`max-w-full truncate rounded-full bg-[#FFF7F1] px-2.5 py-1 ring-1 ring-[#F0D8C8] ${mono ? 'font-mono' : ''}`}>{children}</span>
 }
 
-function AccessSummaryRow({ label, value }: { label: string; value: string }) {
+function AccessSummaryItem({ label, value, tone = 'default' }: { label: string; value: string; tone?: 'default' | 'active' | 'danger' | 'muted' }) {
+  const toneClass = tone === 'active' ? 'text-emerald-700' : tone === 'danger' ? 'text-rose-700' : tone === 'muted' ? 'text-[#7B7067]' : 'text-[#171411]'
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#F0D8C8] px-4 py-3 last:border-b-0">
-      <div className="text-xs font-black uppercase tracking-[0.12em] text-[#A15A40]">{label}</div>
-      <div className="text-right text-sm font-black leading-5 text-[#171411]">{value}</div>
+    <div className="rounded-xl px-3 py-2.5">
+      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A15A40]/75">{label}</div>
+      <div className={`mt-1 truncate text-sm font-black leading-5 ${toneClass}`}>{value}</div>
     </div>
   )
 }
