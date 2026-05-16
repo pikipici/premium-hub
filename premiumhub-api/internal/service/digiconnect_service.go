@@ -641,12 +641,23 @@ func (s *DigiConnectService) CreateOpenAICompatibleResponse(ctx context.Context,
 		requestID = "resp_" + uuid.NewString()
 	}
 	return map[string]interface{}{
-		"id":          requestID,
-		"object":      "response",
-		"created_at":  time.Now().Unix(),
-		"model":       modelID,
-		"status":      "completed",
-		"output":      []map[string]interface{}{{"type": "message", "role": "assistant", "content": []map[string]interface{}{{"type": "output_text", "text": extractDigiConnectText(res)}}}},
+		"id":         requestID,
+		"object":     "response",
+		"created_at": time.Now().Unix(),
+		"model":      modelID,
+		"status":     "completed",
+		"output": []map[string]interface{}{{
+			"id":     "msg_" + uuid.NewString(),
+			"type":   "message",
+			"role":   "assistant",
+			"status": "completed",
+			"content": []map[string]interface{}{{
+				"type":        "output_text",
+				"text":        extractDigiConnectText(res),
+				"annotations": []interface{}{},
+			}},
+		}},
+		"usage":       openAICompatibleUsageFromResult(res),
 		"digiconnect": res,
 	}, DigiConnectPublicError{}
 }
@@ -769,6 +780,24 @@ func normalizeOpenAICompatibleInput(value interface{}) string {
 	}
 	encoded, _ := json.Marshal(value)
 	return string(encoded)
+}
+
+func openAICompatibleUsageFromResult(res map[string]interface{}) map[string]int {
+	usage := map[string]int{"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+	router, ok := res["router_response"].(map[string]interface{})
+	if !ok {
+		return usage
+	}
+	routerUsage, ok := router["usage"].(map[string]interface{})
+	if !ok {
+		return usage
+	}
+	for _, key := range []string{"input_tokens", "output_tokens", "total_tokens"} {
+		if value, ok := routerUsage[key].(float64); ok {
+			usage[key] = int(value)
+		}
+	}
+	return usage
 }
 
 func extractDigiConnectText(res map[string]interface{}) string {
