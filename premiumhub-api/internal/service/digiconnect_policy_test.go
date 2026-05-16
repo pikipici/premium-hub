@@ -54,8 +54,15 @@ func TestDecideDigiConnectBillingUsesOverageOnlyWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestDecideDigiConnectBillingPayPerRequestChargesWallet(t *testing.T) {
+	decision := DecideDigiConnectBilling(time.Now(), &DigiConnectEntitlementState{Status: "active", PayPerRequestEnabled: true}, 200, 100, false)
+	if !decision.Allowed || decision.Source != DigiConnectBillingSourceWallet || decision.Decision != DigiConnectBillingDecisionCharged || decision.Amount != 100 {
+		t.Fatalf("expected pay-per-request wallet charge, got %#v", decision)
+	}
+}
+
 func TestDecideDigiConnectBillingPayPerRequestInsufficientBalance(t *testing.T) {
-	decision := DecideDigiConnectBilling(time.Now(), &DigiConnectEntitlementState{PayPerRequestEnabled: true}, 50, 100, false)
+	decision := DecideDigiConnectBilling(time.Now(), &DigiConnectEntitlementState{Status: "active", PayPerRequestEnabled: true}, 50, 100, false)
 	if decision.Allowed || decision.Reason != "insufficient_balance" || decision.Source != DigiConnectBillingSourceWallet {
 		t.Fatalf("expected insufficient balance reject, got %#v", decision)
 	}

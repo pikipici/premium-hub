@@ -96,8 +96,8 @@ func DecideDigiConnectBilling(now time.Time, entitlement *DigiConnectEntitlement
 	if payPerRequestPrice <= 0 {
 		payPerRequestPrice = 150
 	}
-	if entitlement != nil && strings.EqualFold(strings.TrimSpace(entitlement.Status), "active") {
-		if entitlement.ExpiresAt == nil || entitlement.ExpiresAt.After(now) {
+	if entitlement != nil && strings.EqualFold(strings.TrimSpace(entitlement.Status), "active") && entitlement.ExpiresAt != nil {
+		if entitlement.ExpiresAt.After(now) {
 			if !fairUseExceeded {
 				return DigiConnectBillingDecision{Allowed: true, Source: DigiConnectBillingSourceDurationPackage, Decision: DigiConnectBillingDecisionIncludedInPackage, Status: DigiConnectBillingStatusIncluded}
 			}
