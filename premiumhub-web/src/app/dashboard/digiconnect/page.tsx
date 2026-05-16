@@ -50,6 +50,19 @@ function accessStatus(plan: DigiConnectPlan, entitlement?: DigiConnectEntitlemen
   return 'Belum aktif'
 }
 
+function compactFeatureLine(plan: DigiConnectPlan) {
+  const features = plan.features || []
+  if (features.length === 0) return 'Siap dipakai untuk workflow AI kamu'
+  return features.slice(0, 3).map((feature) => feature.replace(/^Bayar hanya /i, '').replace(/, Chat, dan Responses/i, '')).join(' • ')
+}
+
+function compactModelLine(plan: DigiConnectPlan) {
+  const models = plan.model_labels || []
+  if (models.length === 0) return 'Model mengikuti paket aktif'
+  const visible = models.slice(0, 2).join(', ')
+  return models.length > 2 ? `${visible} +${models.length - 2} model` : visible
+}
+
 function planPricing(entitlement?: DigiConnectEntitlement) {
   if (!entitlement) return '-'
   if (entitlement.billing_model === 'pay_per_request') return `${currency.format(entitlement.price)}/request`
@@ -237,42 +250,38 @@ export default function DigiConnectDashboardPage() {
               {activePanel === 'akses' ? (
                 <div className="space-y-4">
                   {plans.length && activePlan ? (
-                    <div className="overflow-hidden rounded-3xl border border-[#F0D8C8] bg-[linear-gradient(135deg,#FFFAF6,#FFFFFF)] shadow-sm shadow-orange-950/5">
-                      <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-[1fr_auto] xl:items-start">
+                    <div className="rounded-3xl border border-[#F0D8C8] bg-[linear-gradient(135deg,#FFFAF6,#FFFFFF)] p-4 shadow-sm shadow-orange-950/5 sm:p-5">
+                      <div className="grid gap-4 xl:grid-cols-[1fr_210px] xl:items-center">
                         <div className="min-w-0">
-                          <div className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</div>
-                          <h2 className="mt-3 text-2xl font-black tracking-tight text-[#171411]">{compactPlanName(activePlan)}</h2>
-                          <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-[#7B7067]">{compactPlanDescription(activePlan)}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={checkoutActivePlan}
-                          disabled={checkingOut || activePlan.available === false}
-                          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#FF5733] px-5 text-sm font-black text-white shadow-lg shadow-orange-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 xl:w-auto"
-                        >
-                          {checkingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                          {activePlanEntitlement ? 'Aktifkan lagi' : activePlan.available === false ? 'Stok habis' : activePlan.cta || 'Checkout paket'}
-                        </button>
-                      </div>
-                      <div className="px-4 pb-4 sm:px-5 sm:pb-5">
-                        <div className="grid gap-2 rounded-2xl bg-white/80 p-2 ring-1 ring-[#F3E2D6] sm:grid-cols-3">
-                          <AccessSummaryItem label="Harga" value={activePlan.price_label || currency.format(activePlan.price)} />
-                          <AccessSummaryItem label="Billing" value={activePlan.billing_model === 'pay_per_request' ? 'Request sukses' : `${activePlan.duration_days} hari`} />
-                          <AccessSummaryItem label="Status" value={accessStatus(activePlan, activePlanEntitlement)} tone={activePlanEntitlement ? 'active' : activePlan.available === false ? 'danger' : 'muted'} />
-                        </div>
-                      </div>
-                      <div className="grid gap-4 border-t border-[#F4E5DA] bg-white/55 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-start">
-                        <div className="space-y-2">
-                          {(activePlan.features || []).slice(0, 3).map((feature) => (
-                            <div key={feature} className="flex items-center gap-2 text-sm font-bold text-[#4C463F]"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> {feature}</div>
-                          ))}
-                        </div>
-                        <div className="min-w-0 lg:max-w-[230px]">
-                          {activePlan.stock_managed ? <div className="mb-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-900">Stok {activePlan.stock_remaining ?? 0}/{activePlan.stock_total ?? 0}</div> : null}
-                          <div className="flex flex-wrap gap-2 lg:justify-end">
-                            {(activePlan.model_labels || []).slice(0, 3).map((label) => <span key={label} className="rounded-full bg-[#FFF0EA] px-3 py-1 text-xs font-bold text-[#A15A40] ring-1 ring-[#F3D4C6]">{label}</span>)}
-                            {(activePlan.model_labels?.length || 0) > 3 ? <span className="rounded-full bg-[#171411] px-3 py-1 text-xs font-bold text-white">+{(activePlan.model_labels?.length || 0) - 3} model</span> : null}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</span>
+                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${activePlanEntitlement ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : activePlan.available === false ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-white text-[#7B7067] ring-[#F3E2D6]'}`}>{accessStatus(activePlan, activePlanEntitlement)}</span>
+                            {activePlan.stock_managed ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-black text-amber-900 ring-1 ring-amber-200">Stok {activePlan.stock_remaining ?? 0}/{activePlan.stock_total ?? 0}</span> : null}
                           </div>
+                          <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
+                            <h2 className="text-2xl font-black tracking-tight text-[#171411]">{compactPlanName(activePlan)}</h2>
+                            <span className="pb-1 text-sm font-black text-[#B73B20]">{activePlan.price_label || currency.format(activePlan.price)}</span>
+                          </div>
+                          <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#7B7067]">{compactPlanDescription(activePlan)}</p>
+                          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-black text-[#6F675F]">
+                            <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />{compactFeatureLine(activePlan)}</span>
+                            <span className="text-[#D6B9A7]">•</span>
+                            <span>{compactModelLine(activePlan)}</span>
+                          </div>
+                        </div>
+                        <div className="rounded-2xl bg-white/80 p-3 text-left ring-1 ring-[#F3E2D6] xl:text-right">
+                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A15A40]/75">Harga</div>
+                          <div className="mt-1 text-xl font-black leading-none text-[#171411]">{activePlan.price_label || currency.format(activePlan.price)}</div>
+                          <div className="mt-1 text-xs font-bold text-[#7B7067]">{activePlan.billing_model === 'pay_per_request' ? 'Per request sukses' : `${activePlan.duration_days} hari`}</div>
+                          <button
+                            type="button"
+                            onClick={checkoutActivePlan}
+                            disabled={checkingOut || activePlan.available === false}
+                            className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-[#FF5733] px-4 text-sm font-black text-white shadow-lg shadow-orange-500/15 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {checkingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {activePlanEntitlement ? 'Aktifkan lagi' : activePlan.available === false ? 'Stok habis' : activePlan.cta || 'Checkout paket'}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -411,16 +420,6 @@ function Card({ title, icon, children }: { title: string; icon: React.ReactNode;
 
 function RequestChip({ children, mono = false }: { children: React.ReactNode; mono?: boolean }) {
   return <span className={`max-w-full truncate rounded-full bg-[#FFF7F1] px-2.5 py-1 ring-1 ring-[#F0D8C8] ${mono ? 'font-mono' : ''}`}>{children}</span>
-}
-
-function AccessSummaryItem({ label, value, tone = 'default' }: { label: string; value: string; tone?: 'default' | 'active' | 'danger' | 'muted' }) {
-  const toneClass = tone === 'active' ? 'text-emerald-700' : tone === 'danger' ? 'text-rose-700' : tone === 'muted' ? 'text-[#7B7067]' : 'text-[#171411]'
-  return (
-    <div className="rounded-xl px-3 py-2.5">
-      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A15A40]/75">{label}</div>
-      <div className={`mt-1 truncate text-sm font-black leading-5 ${toneClass}`}>{value}</div>
-    </div>
-  )
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
