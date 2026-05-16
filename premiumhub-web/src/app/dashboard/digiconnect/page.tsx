@@ -150,6 +150,24 @@ export default function DigiConnectDashboardPage() {
   return (
     <main className="min-h-screen bg-[#F7F4EE] px-4 py-6 text-[#171411] sm:px-6 lg:px-8">
       <section className="mx-auto max-w-7xl space-y-6">
+        {tabs.length ? (
+          <div className="mx-auto max-w-3xl rounded-[28px] border border-[#F0D8C8] bg-white/90 p-2 shadow-lg shadow-orange-950/5 backdrop-blur">
+            <div className="grid gap-2 sm:grid-cols-3">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`rounded-2xl px-4 py-3 text-left transition ${activeTab === tab.key ? 'bg-[#171411] text-white shadow-xl shadow-orange-950/20' : 'bg-[#FFF7F1] text-[#7B7067] hover:bg-white hover:text-[#FF5733]'}`}
+                >
+                  <span className="block text-sm font-black">{tab.label}</span>
+                  {tab.badge ? <span className="mt-1 block text-xs font-bold opacity-70">{tab.badge}</span> : null}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="overflow-hidden rounded-[32px] border border-[#F0D8C8] bg-[linear-gradient(135deg,#24140D,#B73B20_58%,#FF7048)] p-6 text-white shadow-xl shadow-orange-950/10 sm:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
@@ -182,19 +200,6 @@ export default function DigiConnectDashboardPage() {
               <Card title="Pilih akses DigiConnect" icon={<Sparkles className="h-5 w-5" />}>
                 {plans.length ? (
                   <div className="space-y-4">
-                    <div className="grid gap-2 rounded-2xl bg-[#FFF7F1] p-2 sm:grid-cols-3">
-                      {tabs.map((tab) => (
-                        <button
-                          key={tab.key}
-                          type="button"
-                          onClick={() => setActiveTab(tab.key)}
-                          className={`rounded-xl px-3 py-3 text-left text-sm font-black transition ${activeTab === tab.key ? 'bg-[#171411] text-white shadow-lg shadow-orange-950/15' : 'bg-white text-[#7B7067] hover:text-[#FF5733]'}`}
-                        >
-                          <span className="block">{tab.label}</span>
-                          {tab.badge ? <span className="mt-1 block text-xs font-bold opacity-70">{tab.badge}</span> : null}
-                        </button>
-                      ))}
-                    </div>
                     {activePlan ? (
                       <div className="overflow-hidden rounded-3xl border border-[#F0D8C8] bg-[linear-gradient(135deg,#FFF8F2,#FFFFFF)]">
                         <div className="grid gap-4 p-5 lg:grid-cols-[1fr_auto] lg:items-start">
