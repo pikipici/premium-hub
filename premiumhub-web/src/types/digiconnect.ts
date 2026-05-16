@@ -1,6 +1,17 @@
+export interface DigiConnectPlanTab {
+  key: string
+  label: string
+  plan_code: string
+  badge?: string
+  sort_order: number
+}
+
 export interface DigiConnectPlan {
   code: string
+  tab_key?: string
+  tab_label?: string
   name: string
+  short_name?: string
   description: string
   price: number
   price_label: string
@@ -9,12 +20,21 @@ export interface DigiConnectPlan {
   daily_fair_use_limit: number
   pay_per_request_enabled: boolean
   model_labels?: string[]
+  model_ids?: string[]
+  features?: string[]
+  cta?: string
   stock_managed: boolean
   stock_total?: number
   stock_used?: number
   stock_remaining?: number
   available: boolean
   unavailable_reason?: string
+}
+
+export interface DigiConnectPlansView {
+  default_tab: string
+  tabs: DigiConnectPlanTab[]
+  plans: DigiConnectPlan[]
 }
 
 export interface DigiConnectCheckoutPayload {

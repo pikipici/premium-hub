@@ -31,7 +31,7 @@ export default function DigiConnectProductPage() {
     let alive = true
     digiconnectService.publicPlans()
       .then((res) => {
-        if (alive) setPlans(res.data || [])
+        if (alive) setPlans(res.data?.plans || [])
       })
       .catch(() => {
         if (alive) setMessage('Belum bisa ambil paket DigiConnect. Coba refresh sebentar lagi.')

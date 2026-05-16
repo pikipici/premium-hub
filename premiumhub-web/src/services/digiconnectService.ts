@@ -6,7 +6,7 @@ import type {
   DigiConnectCheckoutPayload,
   DigiConnectEntitlement,
   DigiConnectListParams,
-  DigiConnectPlan,
+  DigiConnectPlansView,
   DigiConnectProvisionEntitlementPayload,
   DigiConnectRequest,
   DigiConnectSummary,
@@ -14,7 +14,7 @@ import type {
 
 export const digiconnectService = {
   publicPlans: async () => {
-    const res = await api.get<ApiResponse<DigiConnectPlan[]>>('/public/digiconnect/plans')
+    const res = await api.get<ApiResponse<DigiConnectPlansView>>('/public/digiconnect/plans')
     return res.data
   },
 
