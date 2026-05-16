@@ -2,10 +2,33 @@
 
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, CheckCircle2, Copy, Loader2, Plus, RadioTower, Sparkles } from 'lucide-react'
+import {
+  Activity,
+  AlertCircle,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Copy,
+  Key,
+  Loader2,
+  Plug,
+  Plus,
+  RadioTower,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from 'lucide-react'
 
 import { digiconnectService } from '@/services/digiconnectService'
-import type { DigiConnectApiKey, DigiConnectEntitlement, DigiConnectPlan, DigiConnectPlanDashboard, DigiConnectPlanTab } from '@/types/digiconnect'
+import type {
+  DigiConnectApiKey,
+  DigiConnectEntitlement,
+  DigiConnectPlan,
+  DigiConnectPlanDashboard,
+  DigiConnectPlanStats,
+  DigiConnectPlanTab,
+  DigiConnectRequest,
+} from '@/types/digiconnect'
 
 const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
 
@@ -14,70 +37,110 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 
-function statusClass(status: string) {
-  const normalized = status.toLowerCase()
-  if (['completed', 'active', 'included', 'charged'].includes(normalized)) return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-  if (['processing', 'pending_verification'].includes(normalized)) return 'bg-amber-50 text-amber-700 ring-amber-200'
-  return 'bg-rose-50 text-rose-700 ring-rose-200'
+function formatDateOnly(value?: string | null) {
+  if (!value) return '-'
+  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(new Date(value))
 }
 
-const planLabels: Record<string, string> = {
-  digiconnect_ppr_hemat: 'Bayar per Request Hemat',
-  digiconnect_ppr_premium: 'Bayar per Request Premium',
-  digiconnect_2d: 'Paket 2 Hari',
+function relativeTime(value?: string | null) {
+  if (!value) return '-'
+  const target = new Date(value).getTime()
+  if (Number.isNaN(target)) return '-'
+  const diff = Date.now() - target
+  if (diff < 0) return formatDate(value)
+  const sec = Math.floor(diff / 1000)
+  if (sec < 60) return `${sec}d lalu`
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `${min}m lalu`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}j lalu`
+  const day = Math.floor(hr / 24)
+  if (day < 30) return `${day}h lalu`
+  return formatDateOnly(value)
 }
 
-function planLabel(code?: string | null) {
-  if (!code) return '-'
-  return planLabels[code] || code
+type Tone = 'success' | 'warn' | 'error' | 'neutral' | 'info'
+
+function statusTone(status: string): Tone {
+  const s = (status || '').toLowerCase()
+  if (['completed', 'active', 'included', 'charged', 'success'].includes(s)) return 'success'
+  if (['processing', 'pending', 'pending_verification'].includes(s)) return 'warn'
+  if (['failed', 'cancelled', 'revoked', 'expired'].includes(s)) return 'error'
+  if (['inactive', 'disabled'].includes(s)) return 'neutral'
+  return 'info'
 }
 
-function compactPlanName(plan: DigiConnectPlan) {
-  if (plan.code === 'digiconnect_ppr_hemat') return 'Bayar per Request'
-  if (plan.code === 'digiconnect_ppr_premium') return 'Bayar per Request'
-  return plan.name
+function toneClass(tone: Tone) {
+  switch (tone) {
+    case 'success': return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+    case 'warn': return 'bg-amber-50 text-amber-700 ring-amber-200'
+    case 'error': return 'bg-rose-50 text-rose-700 ring-rose-200'
+    case 'neutral': return 'bg-stone-100 text-stone-600 ring-stone-200'
+    case 'info': return 'bg-sky-50 text-sky-700 ring-sky-200'
+  }
 }
 
-function compactPlanDescription(plan: DigiConnectPlan) {
-  if (plan.billing_model === 'pay_per_request') return 'Akses GPT pilihan dengan biaya ringan. Hanya request sukses yang ditagihkan.'
-  if (plan.duration_days) return `Akses DigiConnect aktif ${plan.duration_days} hari untuk workflow intensif.`
-  return plan.description
+function statusLabel(status: string) {
+  const map: Record<string, string> = {
+    completed: 'Selesai',
+    active: 'Aktif',
+    inactive: 'Belum aktif',
+    processing: 'Diproses',
+    pending: 'Menunggu',
+    pending_verification: 'Verifikasi',
+    failed: 'Gagal',
+    cancelled: 'Dibatalkan',
+    revoked: 'Dicabut',
+    expired: 'Kadaluarsa',
+    charged: 'Tertagih',
+    included: 'Termasuk',
+  }
+  return map[(status || '').toLowerCase()] || status || '-'
 }
 
-function accessStatus(plan: DigiConnectPlan, entitlement?: DigiConnectEntitlement) {
-  if (entitlement) return 'Aktif'
-  if (plan.available === false) return 'Stok habis'
+function accessTone(plan?: DigiConnectPlan, entitlement?: DigiConnectEntitlement): Tone {
+  if (entitlement) {
+    if (entitlement.status === 'active') return 'success'
+    if (entitlement.status === 'expired') return 'error'
+    return 'info'
+  }
+  if (plan?.available === false) return 'error'
+  return 'neutral'
+}
+
+function accessLabel(plan?: DigiConnectPlan, entitlement?: DigiConnectEntitlement) {
+  if (entitlement) return entitlement.status === 'active' ? 'Aktif' : statusLabel(entitlement.status)
+  if (plan?.available === false) return 'Stok habis'
   return 'Belum aktif'
 }
 
-function compactFeatureLine(plan: DigiConnectPlan) {
-  const features = plan.features || []
-  if (features.length === 0) return 'Siap dipakai untuk workflow AI kamu'
-  return features.slice(0, 3).map((feature) => feature.replace(/^Bayar hanya /i, '').replace(/, Chat, dan Responses/i, '')).join(' • ')
+function billingDescriptor(plan: DigiConnectPlan) {
+  if (plan.billing_model === 'pay_per_request') return 'Per request sukses'
+  if (plan.duration_days) return `Aktif ${plan.duration_days} hari`
+  return '-'
 }
 
-function compactModelLine(plan: DigiConnectPlan) {
-  const models = plan.model_labels || []
-  if (models.length === 0) return 'Model mengikuti paket aktif'
-  const visible = models.slice(0, 2).join(', ')
-  return models.length > 2 ? `${visible} +${models.length - 2} model` : visible
+function compactPlanName(plan: DigiConnectPlan) {
+  if (plan.code === 'digiconnect_ppr_hemat') return 'Bayar per Request — Hemat'
+  if (plan.code === 'digiconnect_ppr_premium') return 'Bayar per Request — Premium'
+  return plan.name
 }
 
-function planPricing(entitlement?: DigiConnectEntitlement) {
-  if (!entitlement) return '-'
-  if (entitlement.billing_model === 'pay_per_request') return `${currency.format(entitlement.price)}/request`
-  if (entitlement.expires_at) return 'Paket aktif'
-  return currency.format(entitlement.price)
-}
-
-function apiRequestUrl() {
-  if (typeof window === 'undefined') return '/api/v1'
-  return `${window.location.origin}/api/v1`
+function planDescription(plan: DigiConnectPlan) {
+  if (plan.description) return plan.description
+  if (plan.billing_model === 'pay_per_request') return 'Akses model AI dengan biaya per request. Hanya request sukses yang ditagihkan.'
+  if (plan.duration_days) return `Akses DigiConnect aktif ${plan.duration_days} hari untuk workflow intensif.`
+  return 'Akses API DigiConnect.'
 }
 
 function shortRequestId(value: string) {
-  const normalized = value.replace(/^dc_req_/, '')
-  return normalized.length > 8 ? normalized.slice(0, 8) : normalized
+  const normalized = (value || '').replace(/^dc_req_/, '')
+  return normalized.length > 8 ? normalized.slice(0, 8) : normalized || '-'
+}
+
+function apiBaseUrl() {
+  if (typeof window === 'undefined') return '/api/v1'
+  return `${window.location.origin}/api/v1`
 }
 
 function normalizePlanTabs(plans: DigiConnectPlan[], tabs?: DigiConnectPlanTab[]) {
@@ -95,26 +158,39 @@ function planTabKey(plan: DigiConnectPlan) {
   return plan.tab_key || plan.code
 }
 
+type PanelKey = 'akses' | 'stat' | 'integrasi' | 'api-key'
+
+const PANELS: { key: PanelKey; label: string; icon: React.ReactNode }[] = [
+  { key: 'akses', label: 'Akses', icon: <ShieldCheck className="h-4 w-4" /> },
+  { key: 'stat', label: 'Statistik', icon: <Activity className="h-4 w-4" /> },
+  { key: 'integrasi', label: 'Integrasi', icon: <Plug className="h-4 w-4" /> },
+  { key: 'api-key', label: 'API Key', icon: <Key className="h-4 w-4" /> },
+]
+
 export default function DigiConnectDashboardPage() {
   const [keys, setKeys] = useState<DigiConnectApiKey[]>([])
   const [planDashboards, setPlanDashboards] = useState<DigiConnectPlanDashboard[]>([])
   const [plans, setPlans] = useState<DigiConnectPlan[]>([])
   const [tabs, setTabs] = useState<DigiConnectPlanTab[]>([])
   const [activeTab, setActiveTab] = useState<string>('')
-  const [activePanel, setActivePanel] = useState<'akses' | 'stat' | 'integrasi' | 'api-key'>('akses')
+  const [activePanel, setActivePanel] = useState<PanelKey>('akses')
   const [checkingOut, setCheckingOut] = useState(false)
   const [newKeyName, setNewKeyName] = useState('Production key')
   const [createdKey, setCreatedKey] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [baseUrl, setBaseUrl] = useState('/api/v1/digiconnect/requests')
+  const [baseUrl, setBaseUrl] = useState('/api/v1')
+  const [showAllRequests, setShowAllRequests] = useState(false)
+  const [activeRequest, setActiveRequest] = useState<DigiConnectRequest | null>(null)
+  const [copyKey, setCopyKey] = useState<string | null>(null)
 
   const activePlan = useMemo(() => plans.find((plan) => planTabKey(plan) === activeTab) || plans[0], [activeTab, plans])
   const activePlanDashboard = useMemo(() => planDashboards.find((item) => item.plan.code === activePlan?.code), [activePlan?.code, planDashboards])
   const activePlanEntitlement = activePlanDashboard?.entitlement
-  const activePlanRequests = activePlanDashboard?.recent_requests || []
+  const activePlanRequests = useMemo(() => activePlanDashboard?.recent_requests || [], [activePlanDashboard])
   const activeStats = activePlanDashboard?.stats
+  const visibleRequests = useMemo(() => showAllRequests ? activePlanRequests : activePlanRequests.slice(0, 5), [showAllRequests, activePlanRequests])
 
   const load = async () => {
     setError(null)
@@ -145,9 +221,11 @@ export default function DigiConnectDashboardPage() {
   }
 
   useEffect(() => {
-    setBaseUrl(apiRequestUrl())
+    setBaseUrl(apiBaseUrl())
     void load()
   }, [])
+
+  useEffect(() => { setShowAllRequests(false) }, [activeTab])
 
   const createKey = async () => {
     setCreating(true)
@@ -172,283 +250,545 @@ export default function DigiConnectDashboardPage() {
       const res = await digiconnectService.checkoutWithWallet({ plan_code: activePlan.code })
       setPlanDashboards((prev) => prev.map((item) => item.plan.code === res.data.plan_code ? { ...item, entitlement: res.data } : item))
     } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } }
-      setError(error.response?.data?.message || 'Checkout gagal. Pastikan saldo wallet cukup.')
+      const e = err as { response?: { data?: { message?: string } } }
+      setError(e.response?.data?.message || 'Checkout gagal. Pastikan saldo wallet cukup.')
     } finally {
       setCheckingOut(false)
     }
   }
 
+  const copyText = async (label: string, value: string) => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopyKey(label)
+      window.setTimeout(() => setCopyKey((current) => current === label ? null : current), 1500)
+    } catch {
+      // ignore
+    }
+  }
+
+  const sampleKey = keys.find((k) => k.status === 'active')?.masked_key || 'dc_live_xxxxxxxxxxxxxxxxxxxx'
+  const sampleModel = activePlan?.model_ids?.[0] || activePlan?.model_labels?.[0] || 'kr/claude-opus-4.6'
+  const curlSample = `curl ${baseUrl}/digiconnect/chat/completions \\\n  -H "Authorization: Bearer ${sampleKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"${sampleModel}","messages":[{"role":"user","content":"halo"}]}'`
+
+  const headline = activePlanDashboard?.dashboard_headline || 'Pusat kontrol DigiConnect'
+  const summary = activePlanDashboard?.dashboard_summary || 'Kelola API key, pantau request, dan integrasi DigiConnect dari satu tempat.'
+
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F7F4EE] px-3 py-5 text-[#171411] sm:px-5 lg:px-7">
-      <section className="mx-auto w-full max-w-6xl space-y-5">
+    <main className="min-h-screen bg-[#FBF8F4] px-3 py-5 text-[#171411] sm:px-5 lg:px-7">
+      <section className="mx-auto w-full max-w-6xl space-y-4">
+
         {tabs.length ? (
-          <div className="mx-auto max-w-2xl rounded-[24px] border border-[#F0D8C8] bg-white/90 p-1.5 shadow-lg shadow-orange-950/5 backdrop-blur">
-            <div className="grid grid-cols-3 gap-1.5">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`min-w-0 rounded-[18px] px-2.5 py-2.5 text-left transition sm:px-4 sm:py-3 ${activeTab === tab.key ? 'bg-[#171411] text-white shadow-xl shadow-orange-950/20' : 'bg-[#FFF7F1] text-[#7B7067] hover:bg-white hover:text-[#FF5733]'}`}
-                >
-                  <span className="block truncate text-xs font-black sm:text-sm">{tab.label}</span>
-                  {tab.badge ? <span className="mt-1 block truncate text-[11px] font-bold opacity-70 sm:text-xs">{tab.badge}</span> : null}
-                </button>
-              ))}
+          <nav className="rounded-2xl border border-[#EFE3D6] bg-white p-1 shadow-sm">
+            <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.key
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`flex shrink-0 flex-col items-start gap-0.5 rounded-xl px-4 py-2.5 text-left transition ${isActive ? 'bg-[#171411] text-white shadow-sm' : 'text-[#7B7067] hover:bg-[#FFF7F1] hover:text-[#171411]'}`}
+                  >
+                    <span className="text-[13px] font-bold leading-tight">{tab.label}</span>
+                    {tab.badge ? <span className={`text-[11px] font-semibold leading-tight ${isActive ? 'text-orange-100/80' : 'text-[#A89F94]'}`}>{tab.badge}</span> : null}
+                  </button>
+                )
+              })}
             </div>
+          </nav>
+        ) : null}
+
+        <header className="rounded-2xl border border-[#EFE3D6] bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="inline-flex items-center gap-2 rounded-full bg-[#FFF0EA] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[#B73B20]">
+                <RadioTower className="h-3.5 w-3.5" /> DigiConnect
+              </div>
+              <h1 className="mt-2 text-xl font-bold tracking-tight text-[#171411] sm:text-2xl">{headline}</h1>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#7B7067]">{summary}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:w-[420px] lg:shrink-0">
+              <HeadStat label="Status" value={activePlanEntitlement ? statusLabel(activePlanEntitlement.status) : 'Belum aktif'} tone={accessTone(activePlan, activePlanEntitlement)} />
+              <HeadStat label="Request" value={String(activeStats?.total_requests ?? 0)} hint={activeStats?.completed_count ? `${activeStats.completed_count} sukses` : undefined} />
+              <HeadStat label="Biaya" value={currency.format(activeStats?.charged_amount ?? 0)} hint={activeStats?.last_request_at ? relativeTime(activeStats.last_request_at) : undefined} />
+            </div>
+          </div>
+        </header>
+
+        {error ? (
+          <div className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
         ) : null}
 
-        <div className="overflow-hidden rounded-[28px] border border-[#F0D8C8] bg-[linear-gradient(135deg,#24140D,#B73B20_58%,#FF7048)] p-5 text-white shadow-xl shadow-orange-950/10 sm:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0 max-w-2xl">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/14 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-orange-50 ring-1 ring-white/20">
-                <RadioTower className="h-4 w-4" /> DigiConnect
-              </div>
-              <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">{activePlanDashboard?.dashboard_headline || 'Pusat kontrol AI API kamu'}</h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-orange-50/88 sm:text-base">
-                {activePlanDashboard?.dashboard_summary || 'Kelola API key, pantau entitlement, dan cek request terbaru sebelum integrasi ke app atau workflow eksternal.'}
-              </p>
-            </div>
-            <div className="grid w-full grid-cols-2 gap-3 lg:w-[340px] lg:shrink-0">
-              <Stat label="Status" value={activePlanEntitlement?.status || 'inactive'} />
-              <Stat label="Request" value={String(activeStats?.total_requests ?? 0)} />
-              <Stat label="Sukses" value={String(activeStats?.completed_count ?? 0)} />
-              <Stat label="Biaya" value={currency.format(activeStats?.charged_amount ?? 0)} />
-            </div>
-          </div>
-        </div>
-
-        {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div> : null}
-
         {loading ? (
-          <div className="flex items-center justify-center rounded-3xl bg-white py-16 text-[#FF5733]">
+          <div className="flex items-center justify-center rounded-2xl border border-[#EFE3D6] bg-white py-16 text-[#FF5733]">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         ) : (
-          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] xl:grid-cols-[0.85fr_1.15fr]">
-            <Card title="Kontrol DigiConnect" icon={<Sparkles className="h-5 w-5" />}>
-              <div className="mb-5 flex gap-2 overflow-x-auto rounded-2xl bg-[#FFF7F1] p-1 [scrollbar-width:none]">
-                {[
-                  { key: 'akses', label: 'Akses' },
-                  { key: 'stat', label: 'Stat' },
-                  { key: 'integrasi', label: 'Integrasi' },
-                  { key: 'api-key', label: 'API Key' },
-                ].map((panel) => (
-                  <button
-                    key={panel.key}
-                    type="button"
-                    onClick={() => setActivePanel(panel.key as typeof activePanel)}
-                    className={`shrink-0 rounded-xl px-4 py-2 text-xs font-black transition ${activePanel === panel.key ? 'bg-[#171411] text-white shadow-lg shadow-orange-950/10' : 'text-[#7B7067] hover:bg-white hover:text-[#FF5733]'}`}
-                  >
-                    {panel.label}
-                  </button>
-                ))}
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+            <section className="rounded-2xl border border-[#EFE3D6] bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl bg-[#FBF3EC] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {PANELS.map((panel) => {
+                  const isActive = activePanel === panel.key
+                  return (
+                    <button
+                      key={panel.key}
+                      type="button"
+                      onClick={() => setActivePanel(panel.key)}
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${isActive ? 'bg-white text-[#171411] shadow-sm ring-1 ring-[#EFE3D6]' : 'text-[#7B7067] hover:text-[#171411]'}`}
+                    >
+                      {panel.icon}
+                      {panel.label}
+                    </button>
+                  )
+                })}
               </div>
 
               {activePanel === 'akses' ? (
-                <div className="space-y-4">
-                  {plans.length && activePlan ? (
-                    <div className="rounded-3xl border border-[#F0D8C8] bg-[linear-gradient(135deg,#FFFAF6,#FFFFFF)] p-4 shadow-sm shadow-orange-950/5 sm:p-5">
-                      <div className="grid gap-4 xl:grid-cols-[1fr_210px] xl:items-center">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</span>
-                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${activePlanEntitlement ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : activePlan.available === false ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-white text-[#7B7067] ring-[#F3E2D6]'}`}>{accessStatus(activePlan, activePlanEntitlement)}</span>
-                            {activePlan.stock_managed ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-black text-amber-900 ring-1 ring-amber-200">Stok {activePlan.stock_remaining ?? 0}/{activePlan.stock_total ?? 0}</span> : null}
-                          </div>
-                          <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
-                            <h2 className="text-2xl font-black tracking-tight text-[#171411]">{compactPlanName(activePlan)}</h2>
-                            <span className="pb-1 text-sm font-black text-[#B73B20]">{activePlan.price_label || currency.format(activePlan.price)}</span>
-                          </div>
-                          <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#7B7067]">{compactPlanDescription(activePlan)}</p>
-                          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-black text-[#6F675F]">
-                            <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />{compactFeatureLine(activePlan)}</span>
-                            <span className="text-[#D6B9A7]">•</span>
-                            <span>{compactModelLine(activePlan)}</span>
-                          </div>
-                        </div>
-                        <div className="rounded-2xl bg-white/80 p-3 text-left ring-1 ring-[#F3E2D6] xl:text-right">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A15A40]/75">Harga</div>
-                          <div className="mt-1 text-xl font-black leading-none text-[#171411]">{activePlan.price_label || currency.format(activePlan.price)}</div>
-                          <div className="mt-1 text-xs font-bold text-[#7B7067]">{activePlan.billing_model === 'pay_per_request' ? 'Per request sukses' : `${activePlan.duration_days} hari`}</div>
-                          <button
-                            type="button"
-                            onClick={checkoutActivePlan}
-                            disabled={checkingOut || activePlan.available === false}
-                            className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-[#FF5733] px-4 text-sm font-black text-white shadow-lg shadow-orange-500/15 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {checkingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {activePlanEntitlement ? 'Aktifkan lagi' : activePlan.available === false ? 'Stok habis' : activePlan.cta || 'Checkout paket'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : <Empty text="Paket DigiConnect belum tersedia." />}
-
-                  {activePlanEntitlement ? (
-                    <div className="rounded-2xl bg-[#171411] p-5 text-white">
-                      <div className="text-sm text-orange-100/80">{activePlanEntitlement.billing_model === 'pay_per_request' ? 'Pay per request' : 'Paket durasi'}</div>
-                      <div className="mt-1 text-2xl font-black">{planLabel(activePlanEntitlement.plan_code)}</div>
-                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        <Mini label="Harga" value={planPricing(activePlanEntitlement)} />
-                        <Mini label="Fair use" value={activePlanEntitlement.daily_fair_use_limit ? `${activePlanEntitlement.daily_fair_use_limit}/hari` : 'Unlimited'} />
-                        <Mini label="Expired" value={formatDate(activePlanEntitlement.expires_at)} />
-                      </div>
-                    </div>
-                  ) : (
-                    <Empty text="Belum ada entitlement aktif untuk tab ini." />
-                  )}
-                </div>
+                <AccessPanel plan={activePlan} entitlement={activePlanEntitlement} checkingOut={checkingOut} onCheckout={checkoutActivePlan} />
               ) : null}
 
               {activePanel === 'stat' ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <MiniLight label="Total request" value={String(activeStats?.total_requests ?? 0)} />
-                  <MiniLight label="Request sukses" value={String(activeStats?.completed_count ?? 0)} />
-                  <MiniLight label="Rata-rata latency" value={activeStats?.avg_latency_ms ? `${activeStats.avg_latency_ms} ms` : '-'} />
-                  <MiniLight label="Request terakhir" value={formatDate(activeStats?.last_request_at)} />
-                </div>
+                <StatsPanel stats={activeStats} requests={activePlanRequests} />
               ) : null}
 
               {activePanel === 'integrasi' ? (
-                <div className="rounded-2xl bg-[#FFF7F1] p-4">
-                  <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#A15A40]">Base URL untuk 9router</div>
-                  <button type="button" onClick={() => void navigator.clipboard?.writeText(baseUrl)} className="mt-2 flex w-full items-center justify-between gap-3 rounded-xl border border-[#F0D8C8] bg-white px-3 py-3 text-left font-mono text-xs font-bold text-[#171411] transition hover:border-[#FF5733]">
-                    <span className="break-all">{baseUrl}</span>
-                    <Copy className="h-4 w-4 shrink-0 text-[#FF5733]" />
-                  </button>
-                  <div className="mt-3 grid gap-2 text-xs font-bold text-[#7B7067] sm:grid-cols-3">
-                    <code className="rounded-xl bg-white px-3 py-2 ring-1 ring-[#F0D8C8]">GET /models</code>
-                    <code className="rounded-xl bg-white px-3 py-2 ring-1 ring-[#F0D8C8]">POST /chat/completions</code>
-                    <code className="rounded-xl bg-white px-3 py-2 ring-1 ring-[#F0D8C8]">POST /responses</code>
-                  </div>
-                  <p className="mt-3 text-sm font-semibold text-[#7B7067]">Paste base URL ini ke 9router OpenAI Compatible Chat atau Responses dan pakai API key DigiConnect sebagai bearer token.</p>
-                </div>
+                <IntegrationPanel baseUrl={baseUrl} sampleKey={sampleKey} curlSample={curlSample} copyKey={copyKey} onCopy={copyText} />
               ) : null}
 
               {activePanel === 'api-key' ? (
-                <div>
-                  <div className="flex flex-col gap-3 rounded-2xl bg-[#FFF7F1] p-3 sm:flex-row">
-                    <input
-                      value={newKeyName}
-                      onChange={(event) => setNewKeyName(event.target.value)}
-                      className="min-h-11 flex-1 rounded-xl border border-[#F0D8C8] bg-white px-4 text-sm font-semibold outline-none focus:border-[#FF5733]"
-                      placeholder="Nama key"
-                    />
-                    <button
-                      type="button"
-                      onClick={createKey}
-                      disabled={creating}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#FF5733] px-4 text-sm font-bold text-white shadow-lg shadow-orange-500/20 disabled:opacity-60"
-                    >
-                      {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      Buat key
-                    </button>
-                  </div>
-                  {createdKey ? (
-                    <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                      <div className="font-bold">Simpan sekarang. Plain key cuma muncul sekali.</div>
-                      <button type="button" onClick={() => void navigator.clipboard?.writeText(createdKey)} className="mt-2 inline-flex items-center gap-2 break-all rounded-xl bg-white px-3 py-2 font-mono text-xs text-amber-900 ring-1 ring-amber-200">
-                        <Copy className="h-4 w-4" /> {createdKey}
-                      </button>
-                    </div>
-                  ) : null}
-                  <div className="mt-4 space-y-3">
-                    {keys.map((key) => (
-                      <div key={key.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#EFE8DF] bg-white p-4">
-                        <div className="min-w-0">
-                          <div className="font-bold text-[#171411]">{key.name}</div>
-                          <div className="truncate font-mono text-xs text-[#8A8178]">{key.masked_key}</div>
-                        </div>
-                        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusClass(key.status)}`}>{key.status}</span>
-                      </div>
-                    ))}
-                    {keys.length === 0 ? <Empty text="Belum ada API key." /> : null}
+                <ApiKeyPanel
+                  keys={keys}
+                  newKeyName={newKeyName}
+                  setNewKeyName={setNewKeyName}
+                  createdKey={createdKey}
+                  creating={creating}
+                  onCreate={createKey}
+                  onClearCreated={() => setCreatedKey(null)}
+                  copyKey={copyKey}
+                  onCopy={copyText}
+                />
+              ) : null}
+            </section>
+
+            <section className="rounded-2xl border border-[#EFE3D6] bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#FFF0EA] text-[#FF5733]"><Activity className="h-4 w-4" /></span>
+                  <div>
+                    <div className="text-sm font-bold text-[#171411]">Request terbaru</div>
+                    <div className="text-xs font-semibold text-[#A89F94]">{activePlanRequests.length} entri</div>
                   </div>
                 </div>
-              ) : null}
-            </Card>
-
-            <Card title="Request terbaru" icon={<Activity className="h-5 w-5" />}>
-              <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1 [scrollbar-width:thin]">
-                {activePlanRequests.map((request) => {
-                  const modelLabel = [request.router_provider, request.router_model].filter(Boolean).join(' / ') || '-'
-                  return (
-                    <div key={request.id} className="rounded-2xl border border-[#EFE8DF] bg-white p-4 transition hover:border-[#F0D8C8] hover:shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[#171411] px-2.5 py-1 font-mono text-[11px] font-black text-white" title={request.request_id}>#{shortRequestId(request.request_id)}</span>
-                            <span className="text-[11px] font-black uppercase tracking-[0.12em] text-[#A15A40]">Activity</span>
-                          </div>
-                          <p className="mt-2 line-clamp-2 text-sm font-bold leading-5 text-[#171411]">{request.input_preview || request.service_alias}</p>
-                        </div>
-                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${statusClass(request.status)}`}>{request.status}</span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-[#6F675F]">
-                        <RequestChip>{request.billing_source}</RequestChip>
-                        <RequestChip>{request.amount ? currency.format(request.amount) : '-'}</RequestChip>
-                        <RequestChip>{request.router_latency_ms} ms</RequestChip>
-                        <RequestChip mono>{modelLabel}</RequestChip>
-                      </div>
-                    </div>
-                  )
-                })}
-                {activePlanRequests.length === 0 ? <Empty text="Belum ada request untuk tab ini." /> : null}
+                {activePlanRequests.length > 5 ? (
+                  <button type="button" onClick={() => setShowAllRequests((v) => !v)} className="text-xs font-bold text-[#FF5733] hover:underline">
+                    {showAllRequests ? 'Sembunyikan' : `Lihat semua (${activePlanRequests.length})`}
+                  </button>
+                ) : null}
               </div>
-            </Card>
+
+              {visibleRequests.length === 0 ? (
+                <Empty icon={<Sparkles className="h-5 w-5" />} title="Belum ada request" hint="Kirim panggilan pertama lewat panel Integrasi untuk melihat aktivitas di sini." />
+              ) : (
+                <div className="space-y-2">
+                  {visibleRequests.map((request) => (
+                    <RequestRow key={request.id} request={request} onClick={() => setActiveRequest(request)} />
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
       </section>
+
+      {activeRequest ? <RequestDetail request={activeRequest} onClose={() => setActiveRequest(null)} /> : null}
     </main>
   )
 }
 
-function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function AccessPanel({ plan, entitlement, checkingOut, onCheckout }: { plan?: DigiConnectPlan; entitlement?: DigiConnectEntitlement; checkingOut: boolean; onCheckout: () => void }) {
+  if (!plan) return <Empty icon={<ShieldCheck className="h-5 w-5" />} title="Paket DigiConnect belum tersedia" hint="Coba refresh halaman atau hubungi support kalau masalah berlanjut." />
+
+  const tone = accessTone(plan, entitlement)
+  const isStockOut = plan.available === false
+  const ctaLabel = entitlement ? 'Aktifkan ulang' : isStockOut ? 'Stok habis' : (plan.cta || 'Aktifkan paket')
+
+  const items: { label: string; value: string }[] = [
+    { label: 'Billing', value: billingDescriptor(plan) },
+    { label: 'Fair use harian', value: plan.daily_fair_use_limit ? `${plan.daily_fair_use_limit} request` : 'Unlimited' },
+    { label: 'Berakhir', value: entitlement?.expires_at ? formatDateOnly(entitlement.expires_at) : (plan.duration_days ? '-' : 'Tanpa expired') },
+    { label: 'Stok', value: plan.stock_managed ? `${plan.stock_remaining ?? 0} / ${plan.stock_total ?? 0} tersisa` : 'Tidak terbatas' },
+  ]
+
+  const models = plan.model_labels || []
+  const features = plan.features || []
+
   return (
-    <section className="rounded-[26px] border border-[#EFE8DF] bg-white p-4 shadow-sm shadow-orange-950/5 sm:p-5">
-      <div className="mb-4 flex items-center gap-2 text-base font-black text-[#171411] sm:text-lg">
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFF0EA] text-[#FF5733]">{icon}</span>
-        {title}
+    <div className="space-y-4">
+      <div className="rounded-xl border border-[#EFE3D6] bg-[#FFFAF5] p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Pill tone={tone}>{accessLabel(plan, entitlement)}</Pill>
+              {plan.short_name ? <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#7B7067] ring-1 ring-[#EFE3D6]">{plan.short_name}</span> : null}
+            </div>
+            <h2 className="mt-2 text-lg font-bold tracking-tight text-[#171411] sm:text-xl">{compactPlanName(plan)}</h2>
+            <p className="mt-1 text-sm leading-relaxed text-[#7B7067]">{planDescription(plan)}</p>
+          </div>
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            <div className="text-right">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#A89F94]">Harga</div>
+              <div className="text-lg font-bold text-[#171411]">{plan.price_label || currency.format(plan.price)}</div>
+            </div>
+            <button
+              type="button"
+              onClick={onCheckout}
+              disabled={checkingOut || isStockOut}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#FF5733] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#E64A28] disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-[160px]"
+            >
+              {checkingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {ctaLabel}
+            </button>
+          </div>
+        </div>
+
+        <dl className="mt-4 grid gap-x-4 gap-y-2 border-t border-[#EFE3D6] pt-3 sm:grid-cols-2">
+          {items.map((item) => (
+            <div key={item.label} className="flex items-baseline justify-between gap-3 text-sm">
+              <dt className="font-semibold text-[#7B7067]">{item.label}</dt>
+              <dd className="text-right font-bold text-[#171411]">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
-      {children}
-    </section>
-  )
-}
 
-function RequestChip({ children, mono = false }: { children: React.ReactNode; mono?: boolean }) {
-  return <span className={`max-w-full truncate rounded-full bg-[#FFF7F1] px-2.5 py-1 ring-1 ring-[#F0D8C8] ${mono ? 'font-mono' : ''}`}>{children}</span>
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-white/14 p-4 ring-1 ring-white/18 backdrop-blur">
-      <div className="text-xs font-bold uppercase tracking-[0.14em] text-orange-50/70">{label}</div>
-      <div className="mt-1 truncate text-xl font-black">{value}</div>
+      {(features.length || models.length) ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {features.length ? (
+            <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Yang termasuk</div>
+              <ul className="space-y-1.5">
+                {features.slice(0, 5).map((feature, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-[#3F3A35]">
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {models.length ? (
+            <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Model tersedia</div>
+              <div className="flex flex-wrap gap-1.5">
+                {models.slice(0, 8).map((model) => (
+                  <span key={model} className="rounded-md bg-[#FFF0EA] px-2 py-1 font-mono text-[11px] font-semibold text-[#B73B20]">{model}</span>
+                ))}
+                {models.length > 8 ? <span className="rounded-md bg-stone-100 px-2 py-1 text-[11px] font-bold text-[#7B7067]">+{models.length - 8}</span> : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }
 
-function Mini({ label, value }: { label: string; value: string }) {
+function StatsPanel({ stats, requests }: { stats?: DigiConnectPlanStats; requests: DigiConnectRequest[] }) {
+  const lat = useMemo(() => requests.slice(0, 12).map((r) => r.router_latency_ms || 0).reverse(), [requests])
+  const max = Math.max(1, ...lat)
+  const totalReq = stats?.total_requests ?? 0
+  const successRate = totalReq ? Math.round(((stats?.completed_count ?? 0) / totalReq) * 100) : 0
+
   return (
-    <div className="rounded-2xl bg-white/10 p-3">
-      <div className="text-xs font-semibold text-orange-100/70">{label}</div>
-      <div className="mt-1 text-sm font-black">{value}</div>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <BigStat label="Total request" value={String(totalReq)} />
+        <BigStat label="Sukses" value={String(stats?.completed_count ?? 0)} hint={totalReq ? `${successRate}%` : undefined} />
+        <BigStat label="Avg latency" value={stats?.avg_latency_ms ? `${stats.avg_latency_ms} ms` : '-'} />
+        <BigStat label="Total biaya" value={currency.format(stats?.charged_amount ?? 0)} />
+      </div>
+
+      <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Latency request terakhir</div>
+            <div className="text-sm font-semibold text-[#7B7067]">{lat.length} request terbaru</div>
+          </div>
+          <Clock className="h-4 w-4 text-[#A89F94]" />
+        </div>
+        {lat.length === 0 ? (
+          <div className="py-6 text-center text-sm font-semibold text-[#A89F94]">Belum ada data latency.</div>
+        ) : (
+          <div className="flex h-24 items-end gap-1">
+            {lat.map((value, i) => {
+              const h = Math.max(4, Math.round((value / max) * 88))
+              return (
+                <div key={i} className="flex-1 rounded-sm bg-[#FF7048]" style={{ height: `${h}px` }} title={`${value} ms`} />
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl border border-[#EFE3D6] bg-[#FFFAF5] px-4 py-3 text-sm">
+        <span className="font-semibold text-[#7B7067]">Request terakhir</span>
+        <span className="font-bold text-[#171411]">{stats?.last_request_at ? relativeTime(stats.last_request_at) : 'Belum ada'}</span>
+      </div>
     </div>
   )
 }
 
-function MiniLight({ label, value }: { label: string; value: string }) {
+function IntegrationPanel({ baseUrl, sampleKey, curlSample, copyKey, onCopy }: { baseUrl: string; sampleKey: string; curlSample: string; copyKey: string | null; onCopy: (label: string, value: string) => void }) {
   return (
-    <div className="rounded-2xl bg-white p-3 ring-1 ring-[#F0D8C8]">
-      <div className="text-xs font-black uppercase tracking-[0.12em] text-[#A15A40]">{label}</div>
-      <div className="mt-1 text-sm font-black text-[#171411]">{value}</div>
+    <div className="space-y-4">
+      <CopyRow label="Base URL" value={`${baseUrl}/digiconnect`} copied={copyKey === 'base'} onCopy={() => onCopy('base', `${baseUrl}/digiconnect`)} />
+      <CopyRow label="Authorization header" value={`Authorization: Bearer ${sampleKey}`} mono copied={copyKey === 'auth'} onCopy={() => onCopy('auth', `Authorization: Bearer ${sampleKey}`)} />
+
+      <div className="rounded-xl border border-[#EFE3D6] bg-[#171411] p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-[0.12em] text-orange-100/70">Contoh curl</span>
+          <button type="button" onClick={() => onCopy('curl', curlSample)} className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1 text-[11px] font-bold text-white transition hover:bg-white/20">
+            <Copy className="h-3 w-3" /> {copyKey === 'curl' ? 'Tersalin' : 'Salin'}
+          </button>
+        </div>
+        <pre className="overflow-x-auto whitespace-pre rounded-md bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-orange-50">{curlSample}</pre>
+      </div>
+
+      <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
+        <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Endpoint tersedia</div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <EndpointChip method="GET" path="/models" />
+          <EndpointChip method="POST" path="/chat/completions" />
+          <EndpointChip method="POST" path="/responses" />
+        </div>
+        <p className="mt-3 text-sm leading-relaxed text-[#7B7067]">
+          Pakai base URL ini sebagai endpoint OpenAI-compatible di 9router, AI SDK, atau client lain. Kirim API key DigiConnect sebagai bearer token.
+        </p>
+      </div>
     </div>
   )
 }
 
-function Empty({ text }: { text: string }) {
-  return <div className="rounded-2xl border border-dashed border-[#E7DDD1] bg-[#FBF8F4] p-5 text-sm font-semibold text-[#8A8178]">{text}</div>
+function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, onCreate, onClearCreated, copyKey, onCopy }: { keys: DigiConnectApiKey[]; newKeyName: string; setNewKeyName: (v: string) => void; createdKey: string | null; creating: boolean; onCreate: () => void; onClearCreated: () => void; copyKey: string | null; onCopy: (label: string, value: string) => void }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-[#EFE3D6] bg-[#FFFAF5] p-4">
+        <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Buat API key baru</div>
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+          <input
+            value={newKeyName}
+            onChange={(event) => setNewKeyName(event.target.value)}
+            className="min-h-10 flex-1 rounded-lg border border-[#EFE3D6] bg-white px-3 text-sm font-semibold text-[#171411] outline-none transition focus:border-[#FF5733]"
+            placeholder="Nama key, contoh: Production"
+          />
+          <button
+            type="button"
+            onClick={onCreate}
+            disabled={creating || !newKeyName.trim()}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#FF5733] px-4 text-sm font-bold text-white transition hover:bg-[#E64A28] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Buat key
+          </button>
+        </div>
+      </div>
+
+      {createdKey ? (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold text-amber-900">Simpan sekarang. Plain key cuma muncul satu kali.</div>
+            <button type="button" onClick={() => onCopy('plain', createdKey)} className="mt-2 inline-flex w-full items-center justify-between gap-2 break-all rounded-md bg-white px-3 py-2 text-left font-mono text-xs text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100">
+              <span className="break-all">{createdKey}</span>
+              <Copy className="h-4 w-4 shrink-0" />
+            </button>
+            <div className="mt-2 text-[11px] font-semibold text-amber-800">{copyKey === 'plain' ? 'Tersalin ke clipboard.' : 'Klik untuk menyalin.'}</div>
+          </div>
+          <button type="button" onClick={onClearCreated} className="text-amber-700 hover:text-amber-900" aria-label="Tutup">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
+
+      {keys.length === 0 ? (
+        <Empty icon={<Key className="h-5 w-5" />} title="Belum ada API key" hint="Buat satu key untuk mulai memanggil DigiConnect dari aplikasi atau workflow kamu." />
+      ) : (
+        <div className="space-y-2">
+          {keys.map((key) => (
+            <div key={key.id} className="flex flex-col gap-2 rounded-xl border border-[#EFE3D6] bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-[#171411]">{key.name}</span>
+                  <Pill tone={statusTone(key.status)}>{statusLabel(key.status)}</Pill>
+                </div>
+                <div className="mt-1 truncate font-mono text-xs font-semibold text-[#7B7067]">{key.masked_key}</div>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-semibold text-[#A89F94]">
+                  <span>Dibuat {formatDateOnly(key.created_at)}</span>
+                  <span>•</span>
+                  <span>Terakhir dipakai {key.last_used_at ? relativeTime(key.last_used_at) : 'belum'}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onCopy(`mask-${key.id}`, key.masked_key)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-[#EFE3D6] px-2.5 py-1.5 text-xs font-bold text-[#7B7067] transition hover:border-[#FF5733] hover:text-[#FF5733]"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {copyKey === `mask-${key.id}` ? 'Tersalin' : 'Salin'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RequestRow({ request, onClick }: { request: DigiConnectRequest; onClick: () => void }) {
+  const tone = statusTone(request.status)
+  const modelLabel = [request.router_provider, request.router_model].filter(Boolean).join(' / ')
+  return (
+    <button type="button" onClick={onClick} className="block w-full rounded-xl border border-[#EFE3D6] bg-white p-3 text-left transition hover:border-[#FF5733]/40 hover:shadow-sm">
+      <div className="flex items-start gap-3">
+        <Pill tone={tone}>{statusLabel(request.status)}</Pill>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px] font-bold text-[#171411]" title={request.request_id}>#{shortRequestId(request.request_id)}</span>
+            <span className="text-[11px] font-semibold text-[#A89F94]">{relativeTime(request.created_at)}</span>
+          </div>
+          <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-[#3F3A35]">{request.input_preview || request.service_alias || '-'}</p>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-semibold text-[#7B7067]">
+            <span>{request.router_latency_ms ? `${request.router_latency_ms} ms` : '-'}</span>
+            <span>•</span>
+            <span>{request.amount ? currency.format(request.amount) : 'Gratis'}</span>
+            {modelLabel ? <><span>•</span><span className="font-mono">{modelLabel}</span></> : null}
+          </div>
+        </div>
+        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#A89F94]" />
+      </div>
+    </button>
+  )
+}
+
+function RequestDetail({ request, onClose }: { request: DigiConnectRequest; onClose: () => void }) {
+  const tone = statusTone(request.status)
+  const modelLabel = [request.router_provider, request.router_model].filter(Boolean).join(' / ') || '-'
+  const items: { label: string; value: string }[] = [
+    { label: 'Status', value: statusLabel(request.status) },
+    { label: 'Service', value: request.service_alias || '-' },
+    { label: 'Model', value: modelLabel },
+    { label: 'Latency', value: request.router_latency_ms ? `${request.router_latency_ms} ms` : '-' },
+    { label: 'Router HTTP', value: request.router_status ? String(request.router_status) : '-' },
+    { label: 'Billing', value: `${request.billing_decision || '-'} (${request.billing_source || '-'})` },
+    { label: 'Biaya', value: request.amount ? currency.format(request.amount) : '-' },
+    { label: 'Started', value: formatDate(request.started_at) },
+    { label: 'Completed', value: formatDate(request.completed_at) },
+    { label: 'Created', value: formatDate(request.created_at) },
+  ]
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
+      <div className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <Pill tone={tone}>{statusLabel(request.status)}</Pill>
+              <span className="font-mono text-xs font-bold text-[#7B7067]">#{shortRequestId(request.request_id)}</span>
+            </div>
+            <h3 className="mt-2 text-lg font-bold tracking-tight text-[#171411]">Detail request</h3>
+          </div>
+          <button type="button" onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#7B7067] hover:bg-stone-100 hover:text-[#171411]" aria-label="Tutup">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="rounded-xl border border-[#EFE3D6] bg-[#FFFAF5] p-3">
+          <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A89F94]">Input preview</div>
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-[#3F3A35]">{request.input_preview || '-'}</p>
+        </div>
+
+        {request.public_error_code ? (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <div className="font-bold">Error</div>
+              <code className="font-mono text-xs">{request.public_error_code}</code>
+            </div>
+          </div>
+        ) : null}
+
+        <dl className="mt-4 grid gap-x-4 gap-y-2 sm:grid-cols-2">
+          {items.map((item) => (
+            <div key={item.label} className="flex items-baseline justify-between gap-3 border-b border-dashed border-[#EFE3D6] pb-1 text-sm">
+              <dt className="font-semibold text-[#7B7067]">{item.label}</dt>
+              <dd className="text-right font-bold text-[#171411]">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </div>
+  )
+}
+
+function HeadStat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: Tone }) {
+  const valueColor = tone === 'success' ? 'text-emerald-700' : tone === 'error' ? 'text-rose-700' : tone === 'warn' ? 'text-amber-700' : 'text-[#171411]'
+  return (
+    <div className="rounded-xl border border-[#EFE3D6] bg-[#FFFAF5] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#A89F94]">{label}</div>
+      <div className={`mt-1 truncate text-sm font-bold ${valueColor}`}>{value}</div>
+      {hint ? <div className="mt-0.5 truncate text-[11px] font-semibold text-[#A89F94]">{hint}</div> : null}
+    </div>
+  )
+}
+
+function BigStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
+      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A89F94]">{label}</div>
+      <div className="mt-1 truncate text-xl font-bold text-[#171411]">{value}</div>
+      {hint ? <div className="mt-0.5 text-[11px] font-semibold text-emerald-700">{hint}</div> : null}
+    </div>
+  )
+}
+
+function CopyRow({ label, value, mono = false, copied, onCopy }: { label: string; value: string; mono?: boolean; copied: boolean; onCopy: () => void }) {
+  return (
+    <div className="rounded-xl border border-[#EFE3D6] bg-white p-3">
+      <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">{label}</div>
+      <button type="button" onClick={onCopy} className="mt-1.5 flex w-full items-center justify-between gap-3 rounded-md bg-[#FFFAF5] px-3 py-2 text-left text-sm font-semibold text-[#171411] transition hover:bg-[#FFF0EA]">
+        <span className={`min-w-0 truncate ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
+        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-[#FF5733]">
+          <Copy className="h-3.5 w-3.5" />
+          {copied ? 'Tersalin' : 'Salin'}
+        </span>
+      </button>
+    </div>
+  )
+}
+
+function EndpointChip({ method, path }: { method: string; path: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-[#EFE3D6] bg-[#FFFAF5] px-2.5 py-1.5">
+      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${method === 'GET' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>{method}</span>
+      <code className="truncate font-mono text-xs font-semibold text-[#171411]">{path}</code>
+    </div>
+  )
+}
+
+function Pill({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${toneClass(tone)}`}>{children}</span>
+}
+
+function Empty({ icon, title, hint }: { icon: React.ReactNode; title: string; hint?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#E7DDD1] bg-[#FBF8F4] px-4 py-8 text-center">
+      <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#FFF0EA] text-[#FF5733]">{icon}</div>
+      <div className="text-sm font-bold text-[#171411]">{title}</div>
+      {hint ? <div className="mt-1 max-w-sm text-xs font-semibold text-[#7B7067]">{hint}</div> : null}
+    </div>
+  )
 }
