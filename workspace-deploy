@@ -161,6 +161,9 @@ LAST_SUCCESS_COMMIT_FILE="${LAST_SUCCESS_COMMIT_FILE:-${DEPLOY_STATE_DIR}/worksp
 # Health targets (workspace ports)
 FE_HEALTH_URL="${FE_HEALTH_URL:-http://127.0.0.1:3005/}"
 BE_HEALTH_URL="${BE_HEALTH_URL:-http://127.0.0.1:18082/healthz}"
+FE_HEALTH_ATTEMPTS="${FE_HEALTH_ATTEMPTS:-20}"
+BE_HEALTH_ATTEMPTS="${BE_HEALTH_ATTEMPTS:-30}"
+HEALTH_RETRY_SLEEP_SECONDS="${HEALTH_RETRY_SLEEP_SECONDS:-1}"
 
 # Workspace systemd services ONLY
 SERVICES=(
@@ -876,10 +879,10 @@ fi
 step_start "WORKSPACE HEALTHCHECK"
 
 log_info "Checking frontend endpoint: ${FE_HEALTH_URL}"
-wait_for_http "${FE_HEALTH_URL}" "Workspace Frontend" 20 1
+wait_for_http "${FE_HEALTH_URL}" "Workspace Frontend" "${FE_HEALTH_ATTEMPTS}" "${HEALTH_RETRY_SLEEP_SECONDS}"
 
 log_info "Checking backend health endpoint: ${BE_HEALTH_URL}"
-wait_for_http "${BE_HEALTH_URL}" "Workspace Backend(healthz)" 10 1
+wait_for_http "${BE_HEALTH_URL}" "Workspace Backend(healthz)" "${BE_HEALTH_ATTEMPTS}" "${HEALTH_RETRY_SLEEP_SECONDS}"
 
 step_done "WORKSPACE HEALTHCHECK"
 
