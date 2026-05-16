@@ -225,10 +225,10 @@ export default function DigiConnectDashboardPage() {
                           <div className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</div>
                           <h2 className="mt-3 text-2xl font-black text-[#171411]">{activePlan.name}</h2>
                           <p className="mt-2 text-sm font-semibold leading-6 text-[#7B7067]">{activePlan.description}</p>
-                          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                            <MiniLight label="Harga" value={activePlan.price_label || currency.format(activePlan.price)} />
-                            <MiniLight label="Billing" value={activePlan.billing_model === 'pay_per_request' ? 'Per request sukses' : `${activePlan.duration_days} hari`} />
-                            <MiniLight label="Status" value={activePlanEntitlement ? 'Aktif' : activePlan.available === false ? 'Stok habis' : 'Belum aktif'} />
+                          <div className="mt-5 overflow-hidden rounded-2xl border border-[#F0D8C8] bg-white/80">
+                            <AccessSummaryRow label="Harga" value={activePlan.price_label || currency.format(activePlan.price)} />
+                            <AccessSummaryRow label="Billing" value={activePlan.billing_model === 'pay_per_request' ? 'Per request sukses' : `${activePlan.duration_days} hari`} />
+                            <AccessSummaryRow label="Status" value={activePlanEntitlement ? 'Aktif' : activePlan.available === false ? 'Stok habis' : 'Belum aktif'} />
                           </div>
                         </div>
                         <button
@@ -391,6 +391,15 @@ function Card({ title, icon, children }: { title: string; icon: React.ReactNode;
 
 function RequestChip({ children, mono = false }: { children: React.ReactNode; mono?: boolean }) {
   return <span className={`max-w-full truncate rounded-full bg-[#FFF7F1] px-2.5 py-1 ring-1 ring-[#F0D8C8] ${mono ? 'font-mono' : ''}`}>{children}</span>
+}
+
+function AccessSummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-[#F0D8C8] px-4 py-3 last:border-b-0">
+      <div className="text-xs font-black uppercase tracking-[0.12em] text-[#A15A40]">{label}</div>
+      <div className="text-right text-sm font-black leading-5 text-[#171411]">{value}</div>
+    </div>
+  )
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
