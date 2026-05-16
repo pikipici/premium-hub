@@ -2,7 +2,7 @@
 
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, CheckCircle2, Copy, Globe2, KeyRound, Loader2, Plus, RadioTower, Sparkles, WalletCards } from 'lucide-react'
+import { Activity, CheckCircle2, Copy, Loader2, Plus, RadioTower, Sparkles } from 'lucide-react'
 
 import { digiconnectService } from '@/services/digiconnectService'
 import type { DigiConnectApiKey, DigiConnectEntitlement, DigiConnectPlan, DigiConnectPlanDashboard, DigiConnectPlanTab } from '@/types/digiconnect'
@@ -70,6 +70,7 @@ export default function DigiConnectDashboardPage() {
   const [plans, setPlans] = useState<DigiConnectPlan[]>([])
   const [tabs, setTabs] = useState<DigiConnectPlanTab[]>([])
   const [activeTab, setActiveTab] = useState<string>('')
+  const [activePanel, setActivePanel] = useState<'akses' | 'stat' | 'integrasi' | 'api-key'>('akses')
   const [checkingOut, setCheckingOut] = useState(false)
   const [newKeyName, setNewKeyName] = useState('Production key')
   const [createdKey, setCreatedKey] = useState<string | null>(null)
@@ -196,63 +197,93 @@ export default function DigiConnectDashboardPage() {
           </div>
         ) : (
           <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] xl:grid-cols-[0.85fr_1.15fr]">
-            <section className="space-y-6">
-              <Card title="Pilih akses DigiConnect" icon={<Sparkles className="h-5 w-5" />}>
-                {plans.length ? (
-                  <div className="space-y-4">
-                    {activePlan ? (
-                      <div className="overflow-hidden rounded-3xl border border-[#F0D8C8] bg-[linear-gradient(135deg,#FFF8F2,#FFFFFF)]">
-                        <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-[1fr_auto] xl:items-start">
-                          <div className="min-w-0">
-                            <div className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</div>
-                            <h2 className="mt-3 text-2xl font-black text-[#171411]">{activePlan.name}</h2>
-                            <p className="mt-2 text-sm font-semibold leading-6 text-[#7B7067]">{activePlan.description}</p>
-                            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                              <MiniLight label="Harga" value={activePlan.price_label || currency.format(activePlan.price)} />
-                              <MiniLight label="Billing" value={activePlan.billing_model === 'pay_per_request' ? 'Per request sukses' : `${activePlan.duration_days} hari`} />
-                              <MiniLight label="Status" value={activePlanEntitlement ? 'Aktif' : activePlan.available === false ? 'Stok habis' : 'Belum aktif'} />
-                            </div>
+            <Card title="Kontrol DigiConnect" icon={<Sparkles className="h-5 w-5" />}>
+              <div className="mb-5 flex gap-2 overflow-x-auto rounded-2xl bg-[#FFF7F1] p-1 [scrollbar-width:none]">
+                {[
+                  { key: 'akses', label: 'Akses' },
+                  { key: 'stat', label: 'Stat' },
+                  { key: 'integrasi', label: 'Integrasi' },
+                  { key: 'api-key', label: 'API Key' },
+                ].map((panel) => (
+                  <button
+                    key={panel.key}
+                    type="button"
+                    onClick={() => setActivePanel(panel.key as typeof activePanel)}
+                    className={`shrink-0 rounded-xl px-4 py-2 text-xs font-black transition ${activePanel === panel.key ? 'bg-[#171411] text-white shadow-lg shadow-orange-950/10' : 'text-[#7B7067] hover:bg-white hover:text-[#FF5733]'}`}
+                  >
+                    {panel.label}
+                  </button>
+                ))}
+              </div>
+
+              {activePanel === 'akses' ? (
+                <div className="space-y-4">
+                  {plans.length && activePlan ? (
+                    <div className="overflow-hidden rounded-3xl border border-[#F0D8C8] bg-[linear-gradient(135deg,#FFF8F2,#FFFFFF)]">
+                      <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-[1fr_auto] xl:items-start">
+                        <div className="min-w-0">
+                          <div className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</div>
+                          <h2 className="mt-3 text-2xl font-black text-[#171411]">{activePlan.name}</h2>
+                          <p className="mt-2 text-sm font-semibold leading-6 text-[#7B7067]">{activePlan.description}</p>
+                          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                            <MiniLight label="Harga" value={activePlan.price_label || currency.format(activePlan.price)} />
+                            <MiniLight label="Billing" value={activePlan.billing_model === 'pay_per_request' ? 'Per request sukses' : `${activePlan.duration_days} hari`} />
+                            <MiniLight label="Status" value={activePlanEntitlement ? 'Aktif' : activePlan.available === false ? 'Stok habis' : 'Belum aktif'} />
                           </div>
-                          <button
-                            type="button"
-                            onClick={checkoutActivePlan}
-                            disabled={checkingOut || activePlan.available === false}
-                            className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#FF5733] px-5 text-sm font-black text-white shadow-lg shadow-orange-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 xl:w-auto"
-                          >
-                            {checkingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {activePlanEntitlement ? 'Aktifkan lagi' : activePlan.available === false ? 'Stok habis' : activePlan.cta || 'Checkout paket'}
-                          </button>
                         </div>
-                        <div className="grid gap-3 border-t border-[#F0D8C8] bg-white/70 p-5 lg:grid-cols-[1fr_0.9fr]">
-                          <div className="space-y-2">
-                            {(activePlan.features || []).map((feature) => (
-                              <div key={feature} className="flex items-center gap-2 text-sm font-bold text-[#4C463F]"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> {feature}</div>
-                            ))}
-                          </div>
-                          <div>
-                            {activePlan.stock_managed ? <div className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">Stok tersisa {activePlan.stock_remaining ?? 0}/{activePlan.stock_total ?? 0}</div> : null}
-                            <div className="flex flex-wrap gap-2">
-                              {(activePlan.model_labels || []).slice(0, 7).map((label) => <span key={label} className="rounded-full bg-[#FFF0EA] px-3 py-1 text-xs font-bold text-[#A15A40]">{label}</span>)}
-                              {(activePlan.model_labels?.length || 0) > 7 ? <span className="rounded-full bg-[#171411] px-3 py-1 text-xs font-bold text-white">+{(activePlan.model_labels?.length || 0) - 7} model</span> : null}
-                            </div>
+                        <button
+                          type="button"
+                          onClick={checkoutActivePlan}
+                          disabled={checkingOut || activePlan.available === false}
+                          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#FF5733] px-5 text-sm font-black text-white shadow-lg shadow-orange-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 xl:w-auto"
+                        >
+                          {checkingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          {activePlanEntitlement ? 'Aktifkan lagi' : activePlan.available === false ? 'Stok habis' : activePlan.cta || 'Checkout paket'}
+                        </button>
+                      </div>
+                      <div className="grid gap-3 border-t border-[#F0D8C8] bg-white/70 p-5 lg:grid-cols-[1fr_0.9fr]">
+                        <div className="space-y-2">
+                          {(activePlan.features || []).map((feature) => (
+                            <div key={feature} className="flex items-center gap-2 text-sm font-bold text-[#4C463F]"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> {feature}</div>
+                          ))}
+                        </div>
+                        <div>
+                          {activePlan.stock_managed ? <div className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">Stok tersisa {activePlan.stock_remaining ?? 0}/{activePlan.stock_total ?? 0}</div> : null}
+                          <div className="flex flex-wrap gap-2">
+                            {(activePlan.model_labels || []).slice(0, 7).map((label) => <span key={label} className="rounded-full bg-[#FFF0EA] px-3 py-1 text-xs font-bold text-[#A15A40]">{label}</span>)}
+                            {(activePlan.model_labels?.length || 0) > 7 ? <span className="rounded-full bg-[#171411] px-3 py-1 text-xs font-bold text-white">+{(activePlan.model_labels?.length || 0) - 7} model</span> : null}
                           </div>
                         </div>
                       </div>
-                    ) : null}
-                  </div>
-                ) : <Empty text="Paket DigiConnect belum tersedia." />}
-              </Card>
+                    </div>
+                  ) : <Empty text="Paket DigiConnect belum tersedia." />}
 
-              <Card title="Stat tab aktif" icon={<Activity className="h-5 w-5" />}>
+                  {activePlanEntitlement ? (
+                    <div className="rounded-2xl bg-[#171411] p-5 text-white">
+                      <div className="text-sm text-orange-100/80">{activePlanEntitlement.billing_model === 'pay_per_request' ? 'Pay per request' : 'Paket durasi'}</div>
+                      <div className="mt-1 text-2xl font-black">{planLabel(activePlanEntitlement.plan_code)}</div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <Mini label="Harga" value={planPricing(activePlanEntitlement)} />
+                        <Mini label="Fair use" value={activePlanEntitlement.daily_fair_use_limit ? `${activePlanEntitlement.daily_fair_use_limit}/hari` : 'Unlimited'} />
+                        <Mini label="Expired" value={formatDate(activePlanEntitlement.expires_at)} />
+                      </div>
+                    </div>
+                  ) : (
+                    <Empty text="Belum ada entitlement aktif untuk tab ini." />
+                  )}
+                </div>
+              ) : null}
+
+              {activePanel === 'stat' ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <MiniLight label="Total request" value={String(activeStats?.total_requests ?? 0)} />
                   <MiniLight label="Request sukses" value={String(activeStats?.completed_count ?? 0)} />
                   <MiniLight label="Rata-rata latency" value={activeStats?.avg_latency_ms ? `${activeStats.avg_latency_ms} ms` : '-'} />
                   <MiniLight label="Request terakhir" value={formatDate(activeStats?.last_request_at)} />
                 </div>
-              </Card>
+              ) : null}
 
-              <Card title="OpenAI-compatible Base URL" icon={<Globe2 className="h-5 w-5" />}>
+              {activePanel === 'integrasi' ? (
                 <div className="rounded-2xl bg-[#FFF7F1] p-4">
                   <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#A15A40]">Base URL untuk 9router</div>
                   <button type="button" onClick={() => void navigator.clipboard?.writeText(baseUrl)} className="mt-2 flex w-full items-center justify-between gap-3 rounded-xl border border-[#F0D8C8] bg-white px-3 py-3 text-left font-mono text-xs font-bold text-[#171411] transition hover:border-[#FF5733]">
@@ -266,64 +297,50 @@ export default function DigiConnectDashboardPage() {
                   </div>
                   <p className="mt-3 text-sm font-semibold text-[#7B7067]">Paste base URL ini ke 9router OpenAI Compatible Chat atau Responses dan pakai API key DigiConnect sebagai bearer token.</p>
                 </div>
-              </Card>
+              ) : null}
 
-              <Card title="API key" icon={<KeyRound className="h-5 w-5" />}>
-                <div className="flex flex-col gap-3 rounded-2xl bg-[#FFF7F1] p-3 sm:flex-row">
-                  <input
-                    value={newKeyName}
-                    onChange={(event) => setNewKeyName(event.target.value)}
-                    className="min-h-11 flex-1 rounded-xl border border-[#F0D8C8] bg-white px-4 text-sm font-semibold outline-none focus:border-[#FF5733]"
-                    placeholder="Nama key"
-                  />
-                  <button
-                    type="button"
-                    onClick={createKey}
-                    disabled={creating}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#FF5733] px-4 text-sm font-bold text-white shadow-lg shadow-orange-500/20 disabled:opacity-60"
-                  >
-                    {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    Buat key
-                  </button>
-                </div>
-                {createdKey ? (
-                  <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                    <div className="font-bold">Simpan sekarang. Plain key cuma muncul sekali.</div>
-                    <button type="button" onClick={() => void navigator.clipboard?.writeText(createdKey)} className="mt-2 inline-flex items-center gap-2 break-all rounded-xl bg-white px-3 py-2 font-mono text-xs text-amber-900 ring-1 ring-amber-200">
-                      <Copy className="h-4 w-4" /> {createdKey}
+              {activePanel === 'api-key' ? (
+                <div>
+                  <div className="flex flex-col gap-3 rounded-2xl bg-[#FFF7F1] p-3 sm:flex-row">
+                    <input
+                      value={newKeyName}
+                      onChange={(event) => setNewKeyName(event.target.value)}
+                      className="min-h-11 flex-1 rounded-xl border border-[#F0D8C8] bg-white px-4 text-sm font-semibold outline-none focus:border-[#FF5733]"
+                      placeholder="Nama key"
+                    />
+                    <button
+                      type="button"
+                      onClick={createKey}
+                      disabled={creating}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#FF5733] px-4 text-sm font-bold text-white shadow-lg shadow-orange-500/20 disabled:opacity-60"
+                    >
+                      {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      Buat key
                     </button>
                   </div>
-                ) : null}
-                <div className="mt-4 space-y-3">
-                  {keys.map((key) => (
-                    <div key={key.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#EFE8DF] bg-white p-4">
-                      <div>
-                        <div className="font-bold text-[#171411]">{key.name}</div>
-                        <div className="font-mono text-xs text-[#8A8178]">{key.masked_key}</div>
+                  {createdKey ? (
+                    <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                      <div className="font-bold">Simpan sekarang. Plain key cuma muncul sekali.</div>
+                      <button type="button" onClick={() => void navigator.clipboard?.writeText(createdKey)} className="mt-2 inline-flex items-center gap-2 break-all rounded-xl bg-white px-3 py-2 font-mono text-xs text-amber-900 ring-1 ring-amber-200">
+                        <Copy className="h-4 w-4" /> {createdKey}
+                      </button>
+                    </div>
+                  ) : null}
+                  <div className="mt-4 space-y-3">
+                    {keys.map((key) => (
+                      <div key={key.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#EFE8DF] bg-white p-4">
+                        <div className="min-w-0">
+                          <div className="font-bold text-[#171411]">{key.name}</div>
+                          <div className="truncate font-mono text-xs text-[#8A8178]">{key.masked_key}</div>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusClass(key.status)}`}>{key.status}</span>
                       </div>
-                      <span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusClass(key.status)}`}>{key.status}</span>
-                    </div>
-                  ))}
-                  {keys.length === 0 ? <Empty text="Belum ada API key." /> : null}
-                </div>
-              </Card>
-
-              <Card title="Entitlement tab ini" icon={<WalletCards className="h-5 w-5" />}>
-                {activePlanEntitlement ? (
-                  <div className="rounded-2xl bg-[#171411] p-5 text-white">
-                    <div className="text-sm text-orange-100/80">{activePlanEntitlement.billing_model === 'pay_per_request' ? 'Pay per request' : 'Paket durasi'}</div>
-                    <div className="mt-1 text-2xl font-black">{planLabel(activePlanEntitlement.plan_code)}</div>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <Mini label="Harga" value={planPricing(activePlanEntitlement)} />
-                      <Mini label="Fair use" value={activePlanEntitlement.daily_fair_use_limit ? `${activePlanEntitlement.daily_fair_use_limit}/hari` : 'Unlimited'} />
-                      <Mini label="Expired" value={formatDate(activePlanEntitlement.expires_at)} />
-                    </div>
+                    ))}
+                    {keys.length === 0 ? <Empty text="Belum ada API key." /> : null}
                   </div>
-                ) : (
-                  <Empty text="Belum ada entitlement aktif untuk tab ini." />
-                )}
-              </Card>
-            </section>
+                </div>
+              ) : null}
+            </Card>
 
             <Card title="Request terbaru" icon={<Activity className="h-5 w-5" />}>
               <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1 [scrollbar-width:thin]">
