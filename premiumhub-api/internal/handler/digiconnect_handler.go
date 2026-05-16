@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"strings"
@@ -114,6 +116,10 @@ func (h *DigiConnectHandler) OpenAICompatibleResponses(c *gin.Context) {
 		writeDigiConnectError(c, publicErr)
 		return
 	}
+	if input.Stream {
+		writeOpenAICompatibleResponseStream(c, res)
+		return
+	}
 	c.JSON(http.StatusOK, res)
 }
 
@@ -129,7 +135,96 @@ func (h *DigiConnectHandler) OpenAICompatibleChatCompletions(c *gin.Context) {
 		writeDigiConnectError(c, publicErr)
 		return
 	}
+	if input.Stream {
+		writeOpenAICompatibleChatStream(c, res)
+		return
+	}
 	c.JSON(http.StatusOK, res)
+}
+
+func writeOpenAICompatibleChatStream(c *gin.Context, res map[string]interface{}) {
+	id, _ := res["id"].(string)
+	if id == "" {
+		id = "chatcmpl_stream"
+	}
+	model, _ := res["model"].(string)
+	text := extractChatCompletionText(res)
+	created := time.Now().Unix()
+	if value, ok := res["created"].(int64); ok {
+		created = value
+	}
+	writeOpenAIStreamHeaders(c)
+	writeSSEData(c, map[string]interface{}{"id": id, "object": "chat.completion.chunk", "created": created, "model": model, "choices": []map[string]interface{}{{"index": 0, "delta": map[string]interface{}{"role": "assistant"}, "finish_reason": nil}}})
+	if text != "" {
+		writeSSEData(c, map[string]interface{}{"id": id, "object": "chat.completion.chunk", "created": created, "model": model, "choices": []map[string]interface{}{{"index": 0, "delta": map[string]interface{}{"content": text}, "finish_reason": nil}}})
+	}
+	writeSSEData(c, map[string]interface{}{"id": id, "object": "chat.completion.chunk", "created": created, "model": model, "choices": []map[string]interface{}{{"index": 0, "delta": map[string]interface{}{}, "finish_reason": "stop"}}})
+	writeSSEDone(c)
+}
+
+func writeOpenAICompatibleResponseStream(c *gin.Context, res map[string]interface{}) {
+	id, _ := res["id"].(string)
+	if id == "" {
+		id = "resp_stream"
+	}
+	model, _ := res["model"].(string)
+	text := extractResponseText(res)
+	writeOpenAIStreamHeaders(c)
+	writeSSEData(c, map[string]interface{}{"type": "response.created", "response": map[string]interface{}{"id": id, "object": "response", "status": "in_progress", "model": model}})
+	if text != "" {
+		writeSSEData(c, map[string]interface{}{"type": "response.output_text.delta", "item_id": "msg_0", "output_index": 0, "content_index": 0, "delta": text})
+	}
+	writeSSEData(c, map[string]interface{}{"type": "response.output_text.done", "item_id": "msg_0", "output_index": 0, "content_index": 0, "text": text})
+	writeSSEData(c, map[string]interface{}{"type": "response.completed", "response": res})
+	writeSSEDone(c)
+}
+
+func writeOpenAIStreamHeaders(c *gin.Context) {
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Status(http.StatusOK)
+}
+
+func writeSSEData(c *gin.Context, payload interface{}) {
+	encoded, _ := json.Marshal(payload)
+	_, _ = fmt.Fprintf(c.Writer, "data: %s\n\n", encoded)
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func writeSSEDone(c *gin.Context) {
+	_, _ = fmt.Fprint(c.Writer, "data: [DONE]\n\n")
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func extractChatCompletionText(res map[string]interface{}) string {
+	choices, ok := res["choices"].([]map[string]interface{})
+	if !ok || len(choices) == 0 {
+		return ""
+	}
+	message, ok := choices[0]["message"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	text, _ := message["content"].(string)
+	return strings.TrimSpace(text)
+}
+
+func extractResponseText(res map[string]interface{}) string {
+	output, ok := res["output"].([]map[string]interface{})
+	if !ok || len(output) == 0 {
+		return ""
+	}
+	content, ok := output[0]["content"].([]map[string]interface{})
+	if !ok || len(content) == 0 {
+		return ""
+	}
+	text, _ := content[0]["text"].(string)
+	return strings.TrimSpace(text)
 }
 
 func (h *DigiConnectHandler) ListRequests(c *gin.Context) {

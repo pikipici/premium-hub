@@ -581,6 +581,7 @@ type OpenAICompatibleResponseInput struct {
 	Instructions    string                 `json:"instructions"`
 	Temperature     *float64               `json:"temperature"`
 	MaxOutputTokens *int                   `json:"max_output_tokens"`
+	Stream          bool                   `json:"stream"`
 	Metadata        map[string]interface{} `json:"metadata"`
 }
 
