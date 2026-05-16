@@ -143,38 +143,38 @@ export default function DigiConnectDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F7F4EE] px-4 py-6 text-[#171411] sm:px-6 lg:px-8">
-      <section className="mx-auto max-w-7xl space-y-6">
+    <main className="min-h-screen overflow-x-hidden bg-[#F7F4EE] px-3 py-5 text-[#171411] sm:px-5 lg:px-7">
+      <section className="mx-auto w-full max-w-6xl space-y-5">
         {tabs.length ? (
-          <div className="mx-auto max-w-3xl rounded-[28px] border border-[#F0D8C8] bg-white/90 p-2 shadow-lg shadow-orange-950/5 backdrop-blur">
-            <div className="grid gap-2 sm:grid-cols-3">
+          <div className="mx-auto max-w-2xl rounded-[24px] border border-[#F0D8C8] bg-white/90 p-1.5 shadow-lg shadow-orange-950/5 backdrop-blur">
+            <div className="grid grid-cols-3 gap-1.5">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setActiveTab(tab.key)}
-                  className={`rounded-2xl px-4 py-3 text-left transition ${activeTab === tab.key ? 'bg-[#171411] text-white shadow-xl shadow-orange-950/20' : 'bg-[#FFF7F1] text-[#7B7067] hover:bg-white hover:text-[#FF5733]'}`}
+                  className={`min-w-0 rounded-[18px] px-2.5 py-2.5 text-left transition sm:px-4 sm:py-3 ${activeTab === tab.key ? 'bg-[#171411] text-white shadow-xl shadow-orange-950/20' : 'bg-[#FFF7F1] text-[#7B7067] hover:bg-white hover:text-[#FF5733]'}`}
                 >
-                  <span className="block text-sm font-black">{tab.label}</span>
-                  {tab.badge ? <span className="mt-1 block text-xs font-bold opacity-70">{tab.badge}</span> : null}
+                  <span className="block truncate text-xs font-black sm:text-sm">{tab.label}</span>
+                  {tab.badge ? <span className="mt-1 block truncate text-[11px] font-bold opacity-70 sm:text-xs">{tab.badge}</span> : null}
                 </button>
               ))}
             </div>
           </div>
         ) : null}
 
-        <div className="overflow-hidden rounded-[32px] border border-[#F0D8C8] bg-[linear-gradient(135deg,#24140D,#B73B20_58%,#FF7048)] p-6 text-white shadow-xl shadow-orange-950/10 sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
+        <div className="overflow-hidden rounded-[28px] border border-[#F0D8C8] bg-[linear-gradient(135deg,#24140D,#B73B20_58%,#FF7048)] p-5 text-white shadow-xl shadow-orange-950/10 sm:p-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 max-w-2xl">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/14 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-orange-50 ring-1 ring-white/20">
                 <RadioTower className="h-4 w-4" /> DigiConnect API
               </div>
-              <h1 className="text-3xl font-black tracking-tight sm:text-5xl">{activePlanDashboard?.dashboard_headline || 'Pusat kontrol AI API kamu'}</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-orange-50/88 sm:text-base">
+              <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">{activePlanDashboard?.dashboard_headline || 'Pusat kontrol AI API kamu'}</h1>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-orange-50/88 sm:text-base">
                 {activePlanDashboard?.dashboard_summary || 'Kelola API key, pantau entitlement, dan cek request terbaru sebelum integrasi ke app atau workflow eksternal.'}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
+            <div className="grid w-full grid-cols-2 gap-3 lg:w-[340px] lg:shrink-0">
               <Stat label="Status" value={activePlanEntitlement?.status || 'inactive'} />
               <Stat label="Request" value={String(activeStats?.total_requests ?? 0)} />
               <Stat label="Sukses" value={String(activeStats?.completed_count ?? 0)} />
@@ -190,15 +190,15 @@ export default function DigiConnectDashboardPage() {
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         ) : (
-          <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] xl:grid-cols-[0.85fr_1.15fr]">
             <section className="space-y-6">
               <Card title="Pilih akses DigiConnect" icon={<Sparkles className="h-5 w-5" />}>
                 {plans.length ? (
                   <div className="space-y-4">
                     {activePlan ? (
                       <div className="overflow-hidden rounded-3xl border border-[#F0D8C8] bg-[linear-gradient(135deg,#FFF8F2,#FFFFFF)]">
-                        <div className="grid gap-4 p-5 lg:grid-cols-[1fr_auto] lg:items-start">
-                          <div>
+                        <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-[1fr_auto] xl:items-start">
+                          <div className="min-w-0">
                             <div className="inline-flex rounded-full bg-[#FFE7DD] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#B73B20]">{activePlan.short_name || activePlan.name}</div>
                             <h2 className="mt-3 text-2xl font-black text-[#171411]">{activePlan.name}</h2>
                             <p className="mt-2 text-sm font-semibold leading-6 text-[#7B7067]">{activePlan.description}</p>
@@ -212,7 +212,7 @@ export default function DigiConnectDashboardPage() {
                             type="button"
                             onClick={checkoutActivePlan}
                             disabled={checkingOut || activePlan.available === false}
-                            className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#FF5733] px-5 text-sm font-black text-white shadow-lg shadow-orange-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#FF5733] px-5 text-sm font-black text-white shadow-lg shadow-orange-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 xl:w-auto"
                           >
                             {checkingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             {activePlanEntitlement ? 'Aktifkan lagi' : activePlan.available === false ? 'Stok habis' : activePlan.cta || 'Checkout paket'}
@@ -323,18 +323,18 @@ export default function DigiConnectDashboardPage() {
             <Card title="Request terbaru" icon={<Activity className="h-5 w-5" />}>
               <div className="space-y-3">
                 {activePlanRequests.map((request) => (
-                  <div key={request.id} className="rounded-2xl border border-[#EFE8DF] bg-white p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate font-mono text-xs text-[#8A8178]">{request.request_id}</div>
-                        <div className="mt-1 truncate text-sm font-bold text-[#171411]">{request.input_preview || request.service_alias}</div>
+                  <div key={request.id} className="rounded-2xl border border-[#EFE8DF] bg-white p-4 transition hover:border-[#F0D8C8] hover:shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-mono text-[11px] font-semibold text-[#8A8178]">{request.request_id}</div>
+                        <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-[#171411]">{request.input_preview || request.service_alias}</p>
                       </div>
-                      <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusClass(request.status)}`}>{request.status}</span>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${statusClass(request.status)}`}>{request.status}</span>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#6F675F] sm:grid-cols-4">
-                      <span>{request.billing_source}</span>
-                      <span>{request.amount ? currency.format(request.amount) : '-'}</span>
-                      <span>{request.router_latency_ms} ms</span>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-[#6F675F] sm:grid-cols-4">
+                      <span className="truncate">{request.billing_source}</span>
+                      <span className="truncate">{request.amount ? currency.format(request.amount) : '-'}</span>
+                      <span className="truncate">{request.router_latency_ms} ms</span>
                       <span className="truncate font-mono">{request.router_provider || '-'} / {request.router_model || '-'}</span>
                     </div>
                   </div>
@@ -351,8 +351,8 @@ export default function DigiConnectDashboardPage() {
 
 function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-[28px] border border-[#EFE8DF] bg-white p-5 shadow-sm shadow-orange-950/5">
-      <div className="mb-4 flex items-center gap-2 text-lg font-black text-[#171411]">
+    <section className="rounded-[26px] border border-[#EFE8DF] bg-white p-4 shadow-sm shadow-orange-950/5 sm:p-5">
+      <div className="mb-4 flex items-center gap-2 text-base font-black text-[#171411] sm:text-lg">
         <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFF0EA] text-[#FF5733]">{icon}</span>
         {title}
       </div>
