@@ -257,43 +257,43 @@ func (s *DigiConnectService) PublicPlansView() DigiConnectPlansResponse {
 			Code:                 "digiconnect_ppr_hemat",
 			TabKey:               "ppr_hemat",
 			TabLabel:             "Rp150/request",
-			Name:                 "Bayar per Request Hemat",
-			ShortName:            "Hemat",
-			Description:          "Akses model GPT pilihan dengan biaya lebih ringan, bayar hanya request billable yang berhasil.",
+			Name:                 "Bayar per Request — GPT",
+			ShortName:            "GPT",
+			Description:          "Akses model GPT untuk workflow harian dengan biaya per request. Hanya request sukses yang ditagihkan.",
 			Price:                150,
 			PriceLabel:           "Rp150/request",
 			BillingModel:         "pay_per_request",
 			PayPerRequestEnabled: true,
 			ModelLabels:          digiConnectCXModelLabels,
 			ModelIDs:             digiConnectCXModelIDs,
-			Features:             []string{"Bayar hanya request sukses", "Cocok untuk workflow hemat", "OpenAI-compatible Models, Chat, dan Responses"},
-			CTA:                  "Aktifkan Rp150/request",
+			Features:             []string{"Akses model GPT pilihan", "Bayar hanya request sukses", "OpenAI-compatible Models, Chat, dan Responses"},
+			CTA:                  "Aktifkan GPT (Rp150/request)",
 			Available:            true,
 		},
 		{
 			Code:                 "digiconnect_ppr_premium",
 			TabKey:               "ppr_premium",
 			TabLabel:             "Rp200/request",
-			Name:                 "Bayar per Request Premium",
-			ShortName:            "Premium",
-			Description:          "Akses model AI premium tanpa paket durasi, cocok buat workflow yang butuh pilihan model lebih kuat.",
+			Name:                 "Bayar per Request — Pro",
+			ShortName:            "Pro",
+			Description:          "Akses model AI kelas atas untuk pekerjaan yang butuh reasoning lebih dalam. Bayar per request, hanya yang sukses ditagihkan.",
 			Price:                200,
 			PriceLabel:           "Rp200/request",
 			BillingModel:         "pay_per_request",
 			PayPerRequestEnabled: true,
 			ModelLabels:          []string{"Claude Opus 4.6", "Claude Opus 4.7", "Auto", "Claude Opus 4.5", "Claude Sonnet 4.6", "Claude Sonnet 4.5", "Claude Haiku 4.5", "DeepSeek 3.2", "Qwen3 Coder Next", "GLM 5", "MiniMax M2.5"},
 			ModelIDs:             digiConnectPremiumModelIDs,
-			Features:             []string{"Model premium dan auto-router", "Bayar hanya request sukses", "OpenAI-compatible Models, Chat, dan Responses"},
-			CTA:                  "Aktifkan Rp200/request",
+			Features:             []string{"Model kelas atas dan auto-router", "Bayar hanya request sukses", "OpenAI-compatible Models, Chat, dan Responses"},
+			CTA:                  "Aktifkan Pro (Rp200/request)",
 			Available:            true,
 		},
 		{
 			Code:                 "digiconnect_2d",
 			TabKey:               "package_2d",
 			TabLabel:             "Paket 2 hari",
-			Name:                 "Paket 2 Hari",
-			ShortName:            "2 Hari",
-			Description:          "Aktif 2 hari untuk request fair-use. Cocok buat sprint pendek, testing intensif, atau demo client.",
+			Name:                 "Pass 2 Hari (GPT)",
+			ShortName:            "Pass 2 Hari",
+			Description:          "Akses model GPT aktif 2 hari penuh dengan fair-use harian. Cocok buat sprint pendek, testing intensif, atau demo client.",
 			Price:                15000,
 			PriceLabel:           "Rp15.000 / 2 hari",
 			BillingModel:         "duration_package",
@@ -303,7 +303,7 @@ func (s *DigiConnectService) PublicPlansView() DigiConnectPlansResponse {
 			ModelLabels:          digiConnectCXModelLabels,
 			ModelIDs:             digiConnectCXModelIDs,
 			Features:             []string{"Aktif 2 hari sejak checkout", "Fair-use 1000 request per hari", "Stok terbatas untuk menjaga kapasitas"},
-			CTA:                  "Beli paket Rp15.000",
+			CTA:                  "Beli Pass 2 Hari (Rp15.000)",
 			StockManaged:         true,
 			StockTotal:           digiConnectTwoDayStockTotal,
 			StockUsed:            int(twoDayStockUsed),
@@ -330,11 +330,11 @@ func tabsForDigiConnectPlans(plans []DigiConnectPlanResponse) []DigiConnectPlanT
 func dashboardHeadlineForDigiConnectPlan(plan DigiConnectPlanResponse) string {
 	switch plan.Code {
 	case "digiconnect_ppr_hemat":
-		return "Dashboard request hemat"
+		return "Dashboard model GPT"
 	case "digiconnect_ppr_premium":
-		return "Dashboard model premium"
+		return "Dashboard model Pro"
 	case "digiconnect_2d":
-		return "Dashboard paket 2 hari"
+		return "Dashboard Pass 2 Hari"
 	default:
 		return "Dashboard " + plan.Name
 	}
@@ -343,11 +343,11 @@ func dashboardHeadlineForDigiConnectPlan(plan DigiConnectPlanResponse) string {
 func dashboardSummaryForDigiConnectPlan(plan DigiConnectPlanResponse) string {
 	switch plan.Code {
 	case "digiconnect_ppr_hemat":
-		return "Pantau request hemat, saldo terpakai, dan model CX yang sering dipakai."
+		return "Pantau request GPT, biaya wallet, dan model GPT yang sering kamu pakai."
 	case "digiconnect_ppr_premium":
-		return "Pantau request premium, biaya wallet, dan akses model kelas atas."
+		return "Pantau request Pro, biaya wallet, dan akses model AI kelas atas."
 	case "digiconnect_2d":
-		return "Pantau masa aktif paket, fair-use harian, stok, dan request yang masuk ke kuota paket."
+		return "Pantau masa aktif Pass 2 Hari, fair-use harian, stok, dan request yang masuk ke kuota paket."
 	default:
 		return plan.Description
 	}

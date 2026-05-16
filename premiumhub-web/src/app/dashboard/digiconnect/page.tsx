@@ -121,8 +121,6 @@ function billingDescriptor(plan: DigiConnectPlan) {
 }
 
 function compactPlanName(plan: DigiConnectPlan) {
-  if (plan.code === 'digiconnect_ppr_hemat') return 'Bayar per Request — Hemat'
-  if (plan.code === 'digiconnect_ppr_premium') return 'Bayar per Request — Premium'
   return plan.name
 }
 
@@ -291,8 +289,8 @@ export default function DigiConnectDashboardPage() {
                     onClick={() => setActiveTab(tab.key)}
                     className={`flex shrink-0 flex-col items-start gap-0.5 rounded-xl px-4 py-2.5 text-left transition ${isActive ? 'bg-[#171411] text-white shadow-sm' : 'text-[#7B7067] hover:bg-[#FFF7F1] hover:text-[#171411]'}`}
                   >
-                    <span className="text-[13px] font-bold leading-tight">{tab.label}</span>
-                    {tab.badge ? <span className={`text-[11px] font-semibold leading-tight ${isActive ? 'text-orange-100/80' : 'text-[#A89F94]'}`}>{tab.badge}</span> : null}
+                    <span className="text-[13px] font-bold leading-tight">{tab.badge || tab.label}</span>
+                    <span className={`text-[11px] font-semibold leading-tight ${isActive ? 'text-orange-100/80' : 'text-[#A89F94]'}`}>{tab.badge ? tab.label : ''}</span>
                   </button>
                 )
               })}
