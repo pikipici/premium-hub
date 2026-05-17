@@ -251,6 +251,25 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),
 		digiConnectHandler.CreateAPIRequest,
 	)
+	// OpenAI-compatible aliases under /api/v1/digiconnect so clients that
+	// auto-discover models from `${base_url}/models` work when base_url is
+	// set to `<host>/api/v1/digiconnect` (the value rendered in the
+	// dashboard Integrasi panel snippet).
+	api.GET(
+		"/digiconnect/models",
+		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),
+		digiConnectHandler.OpenAICompatibleModels,
+	)
+	api.POST(
+		"/digiconnect/responses",
+		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),
+		digiConnectHandler.OpenAICompatibleResponses,
+	)
+	api.POST(
+		"/digiconnect/chat/completions",
+		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),
+		digiConnectHandler.OpenAICompatibleChatCompletions,
+	)
 
 	// Protected routes
 	protected := api.Group("")
