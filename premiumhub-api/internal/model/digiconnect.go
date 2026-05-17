@@ -33,15 +33,15 @@ func (k *DigiConnectAPIKey) BeforeCreate(_ *gorm.DB) error {
 type DigiConnectEntitlement struct {
 	ID uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 
-	UserID uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
+	UserID uuid.UUID `gorm:"type:uuid;not null;index;index:idx_digiconnect_entitlement_active,priority:1" json:"user_id"`
 	User   User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 
 	PlanCode                    string     `gorm:"size:60;not null;index" json:"plan_code"`
 	BillingModel                string     `gorm:"size:40;not null;index" json:"billing_model"`
-	Status                      string     `gorm:"size:30;not null;default:active;index" json:"status"`
+	Status                      string     `gorm:"size:30;not null;default:active;index;index:idx_digiconnect_entitlement_active,priority:2" json:"status"`
 	Price                       int64      `gorm:"not null;default:0" json:"price"`
 	StartsAt                    time.Time  `gorm:"not null;index" json:"starts_at"`
-	ExpiresAt                   *time.Time `gorm:"index" json:"expires_at"`
+	ExpiresAt                   *time.Time `gorm:"index;index:idx_digiconnect_entitlement_active,priority:3" json:"expires_at"`
 	PayPerRequestEnabled        bool       `gorm:"not null;default:false" json:"pay_per_request_enabled"`
 	OveragePayPerRequestEnabled bool       `gorm:"not null;default:false" json:"overage_pay_per_request_enabled"`
 	DailyFairUseLimit           int        `gorm:"not null;default:0" json:"daily_fair_use_limit"`

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type DigiConnectHandler struct {
@@ -82,7 +84,11 @@ func (h *DigiConnectHandler) RevokeAPIKey(c *gin.Context) {
 	}
 	res, err := h.svc.RevokeAPIKey(userID, keyID)
 	if err != nil {
-		response.NotFound(c, "API key tidak ditemukan")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.NotFound(c, "API key tidak ditemukan")
+			return
+		}
+		response.InternalError(c)
 		return
 	}
 	response.Success(c, "API key DigiConnect dicabut", res)
