@@ -312,7 +312,7 @@ export default function Navbar() {
                         className="inline-flex items-center gap-1.5 rounded-full border border-[#FFD5C8] bg-[#FFF3EF] px-3 py-1.5 text-xs font-bold text-[#FF5733] transition-colors hover:bg-[#FFE6DD]"
                       >
                         <Shield className="h-3.5 w-3.5" />
-                        Admin Mode
+                        Admin
                       </Link>
                     ) : null}
 
@@ -637,7 +637,7 @@ export default function Navbar() {
                           }`}
                           onClick={() => setOpen(false)}
                         >
-                          <Shield className="h-4 w-4" /> Admin Mode
+                          <Shield className="h-4 w-4" /> Admin
                         </Link>
                       </div>
                     ) : null}
