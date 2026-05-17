@@ -740,7 +740,10 @@ func (s *DigiConnectService) CreateOpenAICompatibleResponse(ctx context.Context,
 }
 
 func (s *DigiConnectService) CreateOpenAICompatibleChatCompletion(ctx context.Context, apiKey string, input OpenAICompatibleChatInput, idempotencyKey string) (map[string]interface{}, DigiConnectPublicError) {
-	_, entitlement, publicErr := s.validateOpenAICompatibleAccess(apiKey)
+	if s.cfg == nil || !s.cfg.DigiConnectEnabled {
+		return nil, DigiConnectPublicError{Code: "SERVICE_BUSY", HTTPStatus: http.StatusServiceUnavailable, Message: "Jaringan sedang ramai, coba lagi sebentar lagi."}
+	}
+	key, entitlement, publicErr := s.validateOpenAICompatibleAccess(apiKey)
 	if publicErr.Code != "" {
 		return nil, publicErr
 	}
@@ -751,7 +754,42 @@ func (s *DigiConnectService) CreateOpenAICompatibleChatCompletion(ctx context.Co
 	if len(input.Messages) == 0 {
 		return nil, MapDigiConnectPublicError("MISSING_INPUT")
 	}
-	textInput := normalizeOpenAICompatibleMessages(input.Messages)
+
+	// Build the upstream-bound passthrough body. We pass messages + tools +
+	// tool_choice + response_format verbatim. Stream is forced to false on the
+	// non-stream code path; streaming uses StreamOpenAICompatibleChatCompletion.
+	routerBody := map[string]interface{}{
+		"model":    modelID,
+		"messages": chatCompletionsMessagesToInterface(input.Messages),
+	}
+	if input.Temperature != nil {
+		routerBody["temperature"] = *input.Temperature
+	}
+	if input.MaxTokens != nil {
+		routerBody["max_tokens"] = *input.MaxTokens
+	}
+	if len(input.Tools) > 0 {
+		routerBody["tools"] = input.Tools
+	}
+	if input.ToolChoice != nil {
+		routerBody["tool_choice"] = input.ToolChoice
+	}
+	if input.ResponseFormat != nil {
+		routerBody["response_format"] = input.ResponseFormat
+	}
+
+	// Build the persistence-layer input. Service stores messages+tools as the
+	// audit payload (Input field) so admins can inspect what the user sent.
+	auditInputBytes, _ := json.Marshal(map[string]interface{}{
+		"messages":    input.Messages,
+		"tools":       input.Tools,
+		"tool_choice": input.ToolChoice,
+	})
+	auditInput := string(auditInputBytes)
+	if strings.TrimSpace(auditInput) == "" {
+		auditInput = "[]"
+	}
+
 	options := map[string]interface{}{"model": modelID}
 	if input.Temperature != nil {
 		options["temperature"] = *input.Temperature
@@ -759,19 +797,252 @@ func (s *DigiConnectService) CreateOpenAICompatibleChatCompletion(ctx context.Co
 	if input.MaxTokens != nil {
 		options["max_tokens"] = *input.MaxTokens
 	}
+	if len(input.Tools) > 0 {
+		options["has_tools"] = true
+	}
 	metadata := input.Metadata
 	if metadata == nil {
 		metadata = map[string]interface{}{}
 	}
 	metadata["compat"] = "openai_chat_completions"
-	res, err := s.CreateAPIRequest(ctx, apiKey, DigiConnectAPIRequestInput{Service: "digiconnect-smart", Type: "text", Input: textInput, Options: options, Metadata: metadata}, idempotencyKey)
-	if err.Code != "" {
-		return nil, err
+
+	persistInput := DigiConnectAPIRequestInput{
+		Service:  "digiconnect-smart",
+		Type:     "text",
+		Input:    auditInput,
+		Options:  options,
+		Metadata: metadata,
 	}
-	requestID, _ := res["request_id"].(string)
-	if requestID == "" {
-		requestID = "chatcmpl_" + uuid.NewString()
+
+	payloadHash := hashDigiConnectPayload(persistInput)
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if idempotencyKey != "" {
+		existing, lookupErr := s.repo.FindRequestByUserAndIdempotencyKey(key.UserID, idempotencyKey)
+		if lookupErr == nil {
+			if checkErr := CheckDigiConnectIdempotency(existing.IdempotencyRequestHash, payloadHash); checkErr != nil {
+				return nil, MapDigiConnectPublicError("IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD")
+			}
+			if cached := decodeStoredChatCompletionsResponse(existing); cached != nil {
+				return cached, DigiConnectPublicError{}
+			}
+			// Fallback when no stored response is available (e.g. legacy row).
+			return chatCompletionsFallbackEnvelope(modelID, existing.RequestID), DigiConnectPublicError{}
+		}
+		if !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+			return nil, MapDigiConnectPublicError("DATABASE_ERROR")
+		}
 	}
+
+	now := time.Now()
+	entitlementState := &DigiConnectEntitlementState{
+		Status:                      entitlement.Status,
+		ExpiresAt:                   entitlement.ExpiresAt,
+		PayPerRequestEnabled:        entitlement.PayPerRequestEnabled,
+		OveragePayPerRequestEnabled: entitlement.OveragePayPerRequestEnabled,
+	}
+	walletBalance := int64(0)
+	if s.walletRepo != nil {
+		if user, userErr := s.walletRepo.LockUserByIDTx(s.walletRepo.DB(), key.UserID); userErr == nil {
+			walletBalance = user.WalletBalance
+		}
+	}
+	payPerRequestPrice := entitlement.Price
+	fairUseExceeded := false
+	if entitlement.DailyFairUseLimit > 0 {
+		todayWindow := digiConnectDailyWindow(now)
+		if counter, err := s.repo.GetUsageCounter(key.UserID, nil, "user_daily", todayWindow); err == nil {
+			if counter.Count >= int64(entitlement.DailyFairUseLimit) {
+				fairUseExceeded = true
+			}
+		}
+	}
+	billing := DecideDigiConnectBilling(now, entitlementState, walletBalance, payPerRequestPrice, fairUseExceeded)
+	if !billing.Allowed {
+		return nil, billingPublicError(billing.Reason)
+	}
+
+	requestID := "dc_req_" + uuid.NewString()
+	planCode := entitlement.PlanCode
+	routerRoute := digiConnectResolvedRouterRoute{Provider: "kiro", ModelID: modelID}
+	if route, ok := digiConnectRouterPlanRoutes[planCode]; ok {
+		routerRoute.Provider = route.Provider
+	}
+
+	request := &model.DigiConnectRequest{
+		RequestID:              requestID,
+		UserID:                 key.UserID,
+		APIKeyID:               &key.ID,
+		ServiceAlias:           persistInput.Service,
+		RequestType:            persistInput.Type,
+		PlanCode:               planCode,
+		RouterProvider:         routerRoute.Provider,
+		RouterModel:            routerRoute.ModelID,
+		Status:                 "processing",
+		InputHash:              HashDigiConnectSecret(auditInput),
+		InputPreview:           previewDigiConnectInput(chatCompletionsAuditPreview(input.Messages)),
+		PayloadHash:            payloadHash,
+		IdempotencyRequestHash: payloadHash,
+		BillingDecision:        billing.Decision,
+		BillingStatus:          "reserved",
+		BillingSource:          billing.Source,
+		Amount:                 billing.Amount,
+		Currency:               "IDR",
+		StartedAt:              &now,
+	}
+	if idempotencyKey != "" {
+		request.IdempotencyKey = &idempotencyKey
+	}
+	if optionsJSON, err := json.Marshal(persistInput.Options); err == nil {
+		request.OptionsJSON = string(optionsJSON)
+	}
+	if metadataJSON, err := json.Marshal(persistInput.Metadata); err == nil {
+		request.MetadataJSON = string(metadataJSON)
+	}
+	if err := s.repo.CreateRequest(request); err != nil {
+		return nil, MapDigiConnectPublicError("DATABASE_ERROR")
+	}
+
+	routerStarted := time.Now()
+	upstream, status, routerErr := s.callRouterChatCompletions(ctx, routerBody)
+	latency := time.Since(routerStarted).Milliseconds()
+	completedAt := time.Now()
+	request.RouterLatencyMS = latency
+	request.CompletedAt = &completedAt
+	request.RouterStatus = status
+
+	if routerErr != nil {
+		// Pending verification on connectivity/timeout/SSE parse errors;
+		// upstream non-2xx already mapped via NINEROUTER_UPSTREAM_<code>.
+		request.Status = "pending_verification"
+		request.BillingDecision = "pending_verification"
+		request.BillingStatus = "pending_verification"
+		request.PublicErrorCode = "REQUEST_PENDING_VERIFICATION"
+		request.PublicErrorMessage = "Request sedang diverifikasi. Cek status beberapa saat lagi."
+		request.InternalErrorCode = routerErr.InternalCode
+		if routerErr.Err != nil {
+			request.InternalErrorMessage = routerErr.Err.Error()
+		}
+		_ = s.repo.SaveRequest(request)
+		if strings.HasPrefix(routerErr.InternalCode, "NINEROUTER_UPSTREAM_") {
+			return nil, DigiConnectPublicError{Code: "UPSTREAM_ERROR", HTTPStatus: http.StatusBadGateway, Message: "Layanan sedang mengalami gangguan. Coba lagi nanti."}
+		}
+		return nil, MapDigiConnectPublicError(routerErr.InternalCode)
+	}
+
+	if billing.Source == DigiConnectBillingSourceWallet {
+		if err := s.chargeWalletAndFinalize(ctx, key.UserID, request, billing.Amount, completedAt); err != nil {
+			request.Status = "pending_verification"
+			request.BillingDecision = "pending_verification"
+			request.BillingStatus = "pending_verification"
+			request.InternalErrorCode = "WALLET_CHARGE_FAILED"
+			request.InternalErrorMessage = err.Error()
+			_ = s.repo.SaveRequest(request)
+			return nil, MapDigiConnectPublicError("NINEROUTER_TIMEOUT")
+		}
+	} else {
+		request.BillingStatus = DigiConnectBillingStatusIncluded
+		request.Status = "completed"
+		if err := s.repo.SaveRequest(request); err != nil {
+			return nil, MapDigiConnectPublicError("DATABASE_ERROR")
+		}
+	}
+
+	// Build the OpenAI-shaped response by passing upstream body through, then
+	// rebinding the id to our internal request_id for traceability.
+	envelope := chatCompletionsEnvelopeFromUpstream(upstream, modelID, requestID)
+
+	// Persist the response JSON for idempotent replay.
+	if encoded, err := json.Marshal(envelope); err == nil {
+		request.ResponseJSON = string(encoded)
+		_ = s.repo.SaveRequest(request)
+	}
+
+	s.recordDigiConnectSuccessSideEffects(key, request, completedAt)
+	return envelope, DigiConnectPublicError{}
+}
+
+// chatCompletionsMessagesToInterface converts the typed Messages slice into a
+// generic []interface{} so json.Marshal preserves all fields including
+// content (any), name, tool_call_id, tool_calls.
+func chatCompletionsMessagesToInterface(messages []OpenAICompatibleChatMessage) []interface{} {
+	out := make([]interface{}, 0, len(messages))
+	for _, m := range messages {
+		entry := map[string]interface{}{"role": m.Role, "content": m.Content}
+		if m.Name != "" {
+			entry["name"] = m.Name
+		}
+		if m.ToolCallID != "" {
+			entry["tool_call_id"] = m.ToolCallID
+		}
+		if len(m.ToolCalls) > 0 {
+			entry["tool_calls"] = m.ToolCalls
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// chatCompletionsAuditPreview returns a short preview of the latest user-or-system
+// message for InputPreview persistence.
+func chatCompletionsAuditPreview(messages []OpenAICompatibleChatMessage) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		role := strings.TrimSpace(messages[i].Role)
+		if role == "user" || role == "system" {
+			text := normalizeOpenAICompatibleInput(messages[i].Content)
+			if strings.TrimSpace(text) != "" {
+				return text
+			}
+		}
+	}
+	if len(messages) > 0 {
+		return normalizeOpenAICompatibleInput(messages[0].Content)
+	}
+	return ""
+}
+
+// chatCompletionsEnvelopeFromUpstream prepares the response body returned to
+// the OpenAI-compatible client. Upstream `id` (e.g. chatcmpl-xxx) is rebound
+// to our internal `request_id` for end-to-end traceability. Extra DigiConnect
+// metadata is added under the (OpenAI-tolerated) `digiconnect` key.
+func chatCompletionsEnvelopeFromUpstream(upstream map[string]interface{}, modelID, requestID string) map[string]interface{} {
+	out := make(map[string]interface{}, len(upstream)+2)
+	for k, v := range upstream {
+		out[k] = v
+	}
+	out["id"] = requestID
+	if _, ok := out["object"].(string); !ok {
+		out["object"] = "chat.completion"
+	}
+	if _, ok := out["model"].(string); !ok && modelID != "" {
+		out["model"] = modelID
+	}
+	if _, ok := out["created"]; !ok {
+		out["created"] = time.Now().Unix()
+	}
+	out["digiconnect"] = map[string]interface{}{"request_id": requestID}
+	return out
+}
+
+// decodeStoredChatCompletionsResponse extracts the persisted response JSON for
+// idempotent replay. Returns nil when nothing was stored.
+func decodeStoredChatCompletionsResponse(request *model.DigiConnectRequest) map[string]interface{} {
+	if request == nil || strings.TrimSpace(request.ResponseJSON) == "" {
+		return nil
+	}
+	var decoded map[string]interface{}
+	if err := json.Unmarshal([]byte(request.ResponseJSON), &decoded); err != nil {
+		return nil
+	}
+	if dc, ok := decoded["digiconnect"].(map[string]interface{}); ok {
+		dc["idempotent_replay"] = true
+		decoded["digiconnect"] = dc
+	} else {
+		decoded["digiconnect"] = map[string]interface{}{"request_id": request.RequestID, "idempotent_replay": true}
+	}
+	return decoded
+}
+
+func chatCompletionsFallbackEnvelope(modelID, requestID string) map[string]interface{} {
 	return map[string]interface{}{
 		"id":      requestID,
 		"object":  "chat.completion",
@@ -779,12 +1050,11 @@ func (s *DigiConnectService) CreateOpenAICompatibleChatCompletion(ctx context.Co
 		"model":   modelID,
 		"choices": []map[string]interface{}{{
 			"index":         0,
-			"message":       map[string]interface{}{"role": "assistant", "content": extractDigiConnectText(res)},
+			"message":       map[string]interface{}{"role": "assistant", "content": ""},
 			"finish_reason": "stop",
 		}},
-		"usage":       map[string]int{"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-		"digiconnect": res,
-	}, DigiConnectPublicError{}
+		"digiconnect": map[string]interface{}{"request_id": requestID, "idempotent_replay": true, "replay_kind": "fallback"},
+	}
 }
 
 func (s *DigiConnectService) validateOpenAICompatibleAccess(apiKey string) (*model.DigiConnectAPIKey, *model.DigiConnectEntitlement, DigiConnectPublicError) {

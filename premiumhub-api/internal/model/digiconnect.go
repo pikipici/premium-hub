@@ -84,6 +84,7 @@ type DigiConnectRequest struct {
 
 	IdempotencyKey         *string `gorm:"size:100;uniqueIndex:idx_digiconnect_request_idempotency" json:"-"`
 	IdempotencyRequestHash string  `gorm:"size:128" json:"-"`
+	ResponseJSON           string  `gorm:"type:text" json:"-"`
 
 	BillingDecision string `gorm:"size:40;not null;default:not_billable;index" json:"billing_decision"`
 	BillingStatus   string `gorm:"size:40;not null;default:none;index" json:"billing_status"`
