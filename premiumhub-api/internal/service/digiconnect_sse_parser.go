@@ -227,3 +227,179 @@ func aggregateSSEResponseBody(ctx context.Context, r io.Reader) (map[string]inte
 	}
 	return body, nil
 }
+
+// aggregateChatCompletionsSSE folds upstream chat.completion.chunk SSE events
+// into a single chat.completion-shaped map. Used as a defensive fallback in
+// callRouterChatCompletions when upstream ignores stream:false and returns
+// text/event-stream anyway.
+//
+// Aggregation rules:
+//   - delta.role: captured once on first occurrence
+//   - delta.content: concatenated into message.content
+//   - delta.tool_calls[]: merged by index. id/type/name captured on first
+//     occurrence; arguments concatenated as a string in delta order
+//   - finish_reason: captured from the chunk that emits it
+//   - usage: captured if upstream emits it (typically on the final chunk)
+func aggregateChatCompletionsSSE(ctx context.Context, r io.Reader) (map[string]interface{}, error) {
+	type toolCallAgg struct {
+		ID       string
+		Type     string
+		Name     string
+		ArgsBuf  strings.Builder
+		Seen     bool
+	}
+	var (
+		role         string
+		contentBuf   strings.Builder
+		toolCalls    = make(map[int]*toolCallAgg)
+		toolOrder    []int
+		finishReason string
+		respID       string
+		modelID      string
+		object       string
+		usage        map[string]interface{}
+	)
+
+	parseErr := parseSSEStream(ctx, r, func(ev sseEvent) error {
+		var payload map[string]interface{}
+		if err := json.Unmarshal([]byte(ev.Data), &payload); err != nil {
+			return nil
+		}
+		if id, ok := payload["id"].(string); ok && id != "" && respID == "" {
+			respID = id
+		}
+		if m, ok := payload["model"].(string); ok && m != "" && modelID == "" {
+			modelID = m
+		}
+		if o, ok := payload["object"].(string); ok && o != "" {
+			object = o
+		}
+		if u, ok := payload["usage"].(map[string]interface{}); ok {
+			usage = u
+		}
+		choices, ok := payload["choices"].([]interface{})
+		if !ok {
+			return nil
+		}
+		for _, raw := range choices {
+			choice, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if fr, ok := choice["finish_reason"].(string); ok && fr != "" {
+				finishReason = fr
+			}
+			delta, ok := choice["delta"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if r, ok := delta["role"].(string); ok && r != "" && role == "" {
+				role = r
+			}
+			if c, ok := delta["content"].(string); ok {
+				contentBuf.WriteString(c)
+			}
+			if rawTC, ok := delta["tool_calls"].([]interface{}); ok {
+				for _, rawCall := range rawTC {
+					call, ok := rawCall.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					idx := 0
+					if v, ok := call["index"].(float64); ok {
+						idx = int(v)
+					}
+					agg, exists := toolCalls[idx]
+					if !exists {
+						agg = &toolCallAgg{}
+						toolCalls[idx] = agg
+						toolOrder = append(toolOrder, idx)
+					}
+					if id, ok := call["id"].(string); ok && id != "" && agg.ID == "" {
+						agg.ID = id
+					}
+					if tp, ok := call["type"].(string); ok && tp != "" && agg.Type == "" {
+						agg.Type = tp
+					}
+					if fn, ok := call["function"].(map[string]interface{}); ok {
+						if name, ok := fn["name"].(string); ok && name != "" && agg.Name == "" {
+							agg.Name = name
+						}
+						if args, ok := fn["arguments"].(string); ok {
+							agg.ArgsBuf.WriteString(args)
+						}
+					}
+					agg.Seen = true
+				}
+			}
+		}
+		return nil
+	})
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	if role == "" {
+		role = "assistant"
+	}
+	if object == "" {
+		object = "chat.completion"
+	} else if strings.HasSuffix(object, ".chunk") {
+		object = strings.TrimSuffix(object, ".chunk")
+	}
+	if finishReason == "" {
+		if len(toolCalls) > 0 {
+			finishReason = "tool_calls"
+		} else {
+			finishReason = "stop"
+		}
+	}
+
+	message := map[string]interface{}{"role": role}
+	if contentBuf.Len() > 0 {
+		message["content"] = contentBuf.String()
+	} else {
+		message["content"] = nil
+	}
+	if len(toolOrder) > 0 {
+		out := make([]interface{}, 0, len(toolOrder))
+		for _, idx := range toolOrder {
+			agg := toolCalls[idx]
+			if !agg.Seen {
+				continue
+			}
+			tcType := agg.Type
+			if tcType == "" {
+				tcType = "function"
+			}
+			out = append(out, map[string]interface{}{
+				"id":   agg.ID,
+				"type": tcType,
+				"function": map[string]interface{}{
+					"name":      agg.Name,
+					"arguments": agg.ArgsBuf.String(),
+				},
+			})
+		}
+		if len(out) > 0 {
+			message["tool_calls"] = out
+		}
+	}
+
+	body := map[string]interface{}{
+		"id":     respID,
+		"object": object,
+		"model":  modelID,
+		"choices": []interface{}{
+			map[string]interface{}{
+				"index":         0,
+				"message":       message,
+				"finish_reason": finishReason,
+			},
+		},
+	}
+	if usage != nil {
+		body["usage"] = usage
+	}
+	return body, nil
+}

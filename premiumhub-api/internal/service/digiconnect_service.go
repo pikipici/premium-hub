@@ -1275,6 +1275,85 @@ func (s *DigiConnectService) callRouterOnce(ctx context.Context, input DigiConne
 	return &digiConnectRouterResponse{StatusCode: res.StatusCode, Body: decoded}, nil
 }
 
+// callRouterChatCompletions performs a raw passthrough POST to the upstream
+// 9router /v1/chat/completions endpoint. Unlike callRouterOnce (which targets
+// /v1/responses with a flattened input string), this preserves the OpenAI
+// chat-completions request shape verbatim — including messages, tools,
+// tool_choice, response_format — so OpenAI-shaped clients can use native
+// function calling end-to-end.
+//
+// stream is always forced to false here. The streaming path lives in
+// streamRouterChatCompletionsCall (see digiconnect_stream.go).
+//
+// The defensive Content-Type check folds upstream SSE into a chat.completion
+// shape via aggregateChatCompletionsSSE so callers always see a single
+// non-stream JSON response — even if upstream ignores stream:false.
+func (s *DigiConnectService) callRouterChatCompletions(ctx context.Context, body map[string]interface{}) (map[string]interface{}, int, *digiConnectRouterError) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	baseURL := strings.TrimRight(s.cfg.DigiConnectRouterBaseURL, "/")
+	if baseURL == "" {
+		return nil, 0, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: errors.New("digiconnect router base URL is empty")}
+	}
+	chatPath := strings.TrimSpace(s.cfg.DigiConnectRouterChatCompletionsPath)
+	if chatPath == "" {
+		chatPath = "/v1/chat/completions"
+	}
+	if body == nil {
+		body = map[string]interface{}{}
+	}
+	// Caller can override stream:true here, but the non-stream path always
+	// pins it to false. Streaming clients use streamRouterChatCompletionsCall.
+	body["stream"] = false
+
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return nil, 0, &digiConnectRouterError{InternalCode: "INVALID_PAYLOAD", Err: err}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+chatPath, bytes.NewReader(encoded))
+	if err != nil {
+		return nil, 0, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: err}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	if token := strings.TrimSpace(s.cfg.DigiConnectRouterInternalAPIKey); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	res, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, &digiConnectRouterError{InternalCode: "NINEROUTER_TIMEOUT", Err: err}
+	}
+	defer res.Body.Close()
+
+	contentType := strings.ToLower(strings.TrimSpace(res.Header.Get("Content-Type")))
+	if res.StatusCode/100 != 2 {
+		raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+		return nil, res.StatusCode, &digiConnectRouterError{
+			InternalCode: fmt.Sprintf("NINEROUTER_UPSTREAM_%d", res.StatusCode),
+			Err:          fmt.Errorf("upstream %d: %s", res.StatusCode, strings.TrimSpace(string(raw))),
+		}
+	}
+	if strings.HasPrefix(contentType, "text/event-stream") {
+		decoded, sseErr := aggregateChatCompletionsSSE(ctx, res.Body)
+		if sseErr != nil {
+			return nil, res.StatusCode, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: sseErr}
+		}
+		return decoded, res.StatusCode, nil
+	}
+	raw, readErr := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+	if readErr != nil {
+		return nil, res.StatusCode, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: readErr}
+	}
+	decoded := map[string]interface{}{}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &decoded); err != nil {
+			return nil, res.StatusCode, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: err}
+		}
+	}
+	return decoded, res.StatusCode, nil
+}
+
 func (s *DigiConnectService) chargeWalletAndFinalize(ctx context.Context, userID uuid.UUID, request *model.DigiConnectRequest, amount int64, completedAt time.Time) error {
 	if s.walletRepo == nil {
 		return errors.New("wallet repo belum dikonfigurasi")
