@@ -884,11 +884,14 @@ func extractDigiConnectText(res map[string]interface{}) string {
 				return value
 			}
 		}
-		encoded, _ := json.Marshal(router)
-		return string(encoded)
+		// Intentionally do NOT json.Marshal(router) here. If we cannot extract
+		// real model content, returning the internal struct as user-visible text
+		// leaks transport/debug data (e.g. raw_preview) into the chat reply.
+		// Empty string is the safe contract; the caller surfaces the request as
+		// failed/pending_verification via billing/router status fields.
+		return ""
 	}
-	encoded, _ := json.Marshal(res)
-	return string(encoded)
+	return ""
 }
 
 func extractOpenAIChatText(router map[string]interface{}) string {
@@ -1210,12 +1213,16 @@ func (s *DigiConnectService) callRouterOnce(ctx context.Context, input DigiConne
 	}
 	if len(input.Options) > 0 {
 		for key, value := range input.Options {
-			if key == "model" {
+			if key == "model" || key == "stream" {
 				continue
 			}
 			body[key] = value
 		}
 	}
+	// Force non-stream mode on the request line. 9router defaults to
+	// text/event-stream when `stream` is absent, which we cannot json.Unmarshal.
+	// Streaming clients use the dedicated streamRouter path.
+	body["stream"] = false
 	encoded, err := json.Marshal(body)
 	if err != nil {
 		return nil, &digiConnectRouterError{InternalCode: "INVALID_PAYLOAD", Err: err}
@@ -1225,6 +1232,7 @@ func (s *DigiConnectService) callRouterOnce(ctx context.Context, input DigiConne
 		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: err}
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 	if provider := strings.TrimSpace(route.Provider); provider != "" {
 		req.Header.Set("X-DigiConnect-Router-Provider", provider)
 	}
@@ -1236,6 +1244,18 @@ func (s *DigiConnectService) callRouterOnce(ctx context.Context, input DigiConne
 		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_TIMEOUT", Err: err}
 	}
 	defer res.Body.Close()
+	contentType := strings.ToLower(strings.TrimSpace(res.Header.Get("Content-Type")))
+	if strings.HasPrefix(contentType, "text/event-stream") {
+		// Defensive: even though we asked for stream:false, some upstream builds
+		// keep returning SSE. Aggregate the deltas + completion event into a
+		// single chat.completion-shaped body so extractDigiConnectText can read
+		// real content instead of leaking raw bytes to the user.
+		body, sseErr := aggregateSSEResponseBody(ctx, res.Body)
+		if sseErr != nil {
+			return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: sseErr}
+		}
+		return &digiConnectRouterResponse{StatusCode: res.StatusCode, Body: body}, nil
+	}
 	raw, readErr := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 	if readErr != nil {
 		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: readErr}
@@ -1243,7 +1263,7 @@ func (s *DigiConnectService) callRouterOnce(ctx context.Context, input DigiConne
 	decoded := map[string]interface{}{}
 	if len(raw) > 0 {
 		if err := json.Unmarshal(raw, &decoded); err != nil {
-			decoded = map[string]interface{}{"raw_preview": previewDigiConnectInput(string(raw))}
+			return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: err}
 		}
 	}
 	return &digiConnectRouterResponse{StatusCode: res.StatusCode, Body: decoded}, nil
