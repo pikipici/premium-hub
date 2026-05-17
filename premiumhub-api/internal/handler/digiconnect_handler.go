@@ -200,6 +200,17 @@ func streamOpenAIChatCompletion(c *gin.Context, svc *service.DigiConnectService,
 					"finish_reason": nil,
 				}},
 			})
+		case "raw_chat_chunk":
+			// Tool-aware passthrough: forward upstream chat.completion.chunk
+			// payload verbatim so tool_calls deltas / finish_reason:tool_calls
+			// reach the client untouched.
+			if !headerWritten {
+				writeOpenAIStreamHeaders(c)
+				headerWritten = true
+			}
+			if strings.TrimSpace(chunk.Delta) != "" {
+				writeSSERaw(c, chunk.Delta)
+			}
 		case "completed":
 			if !headerWritten {
 				// No deltas streamed (e.g. upstream returned single body fallback)
@@ -346,6 +357,16 @@ func writeSSEData(c *gin.Context, payload interface{}) {
 
 func writeSSEDone(c *gin.Context) {
 	_, _ = fmt.Fprint(c.Writer, "data: [DONE]\n\n")
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// writeSSERaw forwards an upstream SSE data payload verbatim. Used for
+// chat.completions tool-aware passthrough where we must preserve exact
+// upstream structure (incremental tool_calls deltas + finish_reason:tool_calls).
+func writeSSERaw(c *gin.Context, raw string) {
+	_, _ = fmt.Fprintf(c.Writer, "data: %s\n\n", raw)
 	if flusher, ok := c.Writer.(http.Flusher); ok {
 		flusher.Flush()
 	}

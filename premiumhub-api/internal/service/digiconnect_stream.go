@@ -20,9 +20,10 @@ import (
 // DigiConnectStreamChunk represents one piece of work flowing back to the
 // client during a streaming OpenAI-compatible call. Type values:
 //
-//	"delta"        - incremental assistant text content
-//	"completed"    - terminal event with the final aggregated text + usage
-//	"error"        - terminal event with a public-safe error message
+//	"delta"            - incremental assistant text content (Responses path)
+//	"raw_chat_chunk"   - upstream chat.completion.chunk SSE payload (verbatim)
+//	"completed"        - terminal event with final aggregated text + usage
+//	"error"            - terminal event with a public-safe error message
 type DigiConnectStreamChunk struct {
 	Type         string
 	Delta        string
@@ -166,12 +167,13 @@ func (s *DigiConnectService) streamRouterCall(
 }
 
 // StreamOpenAICompatibleChatCompletion handles streaming /chat/completions.
-// onChunk receives translated chat.completion.chunk events; the caller writes
-// SSE bytes to the client. Billing + audit follow the same charge-after-success
-// pattern as CreateAPIRequest: request stays in `processing` until the stream
-// ends, then chargeWalletAndFinalize commits the wallet debit + final state in
-// one transaction. Mid-stream upstream failures fall to `pending_verification`
-// so the reconcile worker recovers.
+// It pipes upstream chat.completion.chunk SSE events directly to the client
+// (preserving content + tool_calls deltas) instead of translating from the
+// /responses event format. Billing + audit follow the same charge-after-
+// success pattern as the non-stream path: request stays in `processing`
+// until the stream ends, then chargeWalletAndFinalize commits the wallet
+// debit + final state in one transaction. Mid-stream upstream failures
+// fall to `pending_verification` so the reconcile worker recovers.
 func (s *DigiConnectService) StreamOpenAICompatibleChatCompletion(
 	ctx context.Context,
 	apiKey string,
@@ -179,6 +181,9 @@ func (s *DigiConnectService) StreamOpenAICompatibleChatCompletion(
 	idempotencyKey string,
 	onChunk func(DigiConnectStreamChunk),
 ) DigiConnectPublicError {
+	if s.cfg == nil || !s.cfg.DigiConnectEnabled {
+		return DigiConnectPublicError{Code: "SERVICE_BUSY", HTTPStatus: http.StatusServiceUnavailable, Message: "Jaringan sedang ramai, coba lagi sebentar lagi."}
+	}
 	key, entitlement, publicErr := s.validateOpenAICompatibleAccess(apiKey)
 	if publicErr.Code != "" {
 		return publicErr
@@ -190,7 +195,39 @@ func (s *DigiConnectService) StreamOpenAICompatibleChatCompletion(
 	if len(input.Messages) == 0 {
 		return MapDigiConnectPublicError("MISSING_INPUT")
 	}
-	textInput := normalizeOpenAICompatibleMessages(input.Messages)
+
+	// Build router body (raw passthrough). stream:true forced inside transport.
+	routerBody := map[string]interface{}{
+		"model":    modelID,
+		"messages": chatCompletionsMessagesToInterface(input.Messages),
+	}
+	if input.Temperature != nil {
+		routerBody["temperature"] = *input.Temperature
+	}
+	if input.MaxTokens != nil {
+		routerBody["max_tokens"] = *input.MaxTokens
+	}
+	if len(input.Tools) > 0 {
+		routerBody["tools"] = input.Tools
+	}
+	if input.ToolChoice != nil {
+		routerBody["tool_choice"] = input.ToolChoice
+	}
+	if input.ResponseFormat != nil {
+		routerBody["response_format"] = input.ResponseFormat
+	}
+
+	// Audit input (messages+tools serialized).
+	auditInputBytes, _ := json.Marshal(map[string]interface{}{
+		"messages":    input.Messages,
+		"tools":       input.Tools,
+		"tool_choice": input.ToolChoice,
+	})
+	auditInput := string(auditInputBytes)
+	if strings.TrimSpace(auditInput) == "" {
+		auditInput = "[]"
+	}
+
 	options := map[string]interface{}{"model": modelID}
 	if input.Temperature != nil {
 		options["temperature"] = *input.Temperature
@@ -198,13 +235,370 @@ func (s *DigiConnectService) StreamOpenAICompatibleChatCompletion(
 	if input.MaxTokens != nil {
 		options["max_tokens"] = *input.MaxTokens
 	}
+	if len(input.Tools) > 0 {
+		options["has_tools"] = true
+	}
+	options["stream"] = true
 	metadata := input.Metadata
 	if metadata == nil {
 		metadata = map[string]interface{}{}
 	}
 	metadata["compat"] = "openai_chat_completions_stream"
-	apiInput := DigiConnectAPIRequestInput{Service: "digiconnect-smart", Type: "text", Input: textInput, Options: options, Metadata: metadata}
-	return s.streamAPIRequest(ctx, key, entitlement, apiInput, idempotencyKey, modelID, "chat", onChunk)
+	persistInput := DigiConnectAPIRequestInput{
+		Service:  "digiconnect-smart",
+		Type:     "text",
+		Input:    auditInput,
+		Options:  options,
+		Metadata: metadata,
+	}
+
+	payloadHash := hashDigiConnectPayload(persistInput)
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if idempotencyKey != "" {
+		existing, err := s.repo.FindRequestByUserAndIdempotencyKey(key.UserID, idempotencyKey)
+		if err == nil {
+			if checkErr := CheckDigiConnectIdempotency(existing.IdempotencyRequestHash, payloadHash); checkErr != nil {
+				return MapDigiConnectPublicError("IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD")
+			}
+			emitChatCompletionsReplayChunks(existing, modelID, onChunk)
+			return DigiConnectPublicError{}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return MapDigiConnectPublicError("DATABASE_ERROR")
+		}
+	}
+
+	now := time.Now()
+	walletBalance := int64(0)
+	if s.walletRepo != nil {
+		if user, userErr := s.walletRepo.LockUserByIDTx(s.walletRepo.DB(), key.UserID); userErr == nil {
+			walletBalance = user.WalletBalance
+		}
+	}
+	entitlementState := &DigiConnectEntitlementState{
+		Status:                      entitlement.Status,
+		ExpiresAt:                   entitlement.ExpiresAt,
+		PayPerRequestEnabled:        entitlement.PayPerRequestEnabled,
+		OveragePayPerRequestEnabled: entitlement.OveragePayPerRequestEnabled,
+	}
+	payPerRequestPrice := entitlement.Price
+	fairUseExceeded := false
+	if entitlement.DailyFairUseLimit > 0 {
+		todayWindow := digiConnectDailyWindow(now)
+		if counter, err := s.repo.GetUsageCounter(key.UserID, nil, "user_daily", todayWindow); err == nil {
+			if counter.Count >= int64(entitlement.DailyFairUseLimit) {
+				fairUseExceeded = true
+			}
+		}
+	}
+	billing := DecideDigiConnectBilling(now, entitlementState, walletBalance, payPerRequestPrice, fairUseExceeded)
+	if !billing.Allowed {
+		return billingPublicError(billing.Reason)
+	}
+
+	requestID := "dc_req_" + uuid.NewString()
+	planCode := entitlement.PlanCode
+	routerRoute := digiConnectResolvedRouterRoute{Provider: "kiro", ModelID: modelID}
+	if route, ok := digiConnectRouterPlanRoutes[planCode]; ok {
+		routerRoute.Provider = route.Provider
+	}
+
+	request := &model.DigiConnectRequest{
+		RequestID:              requestID,
+		UserID:                 key.UserID,
+		APIKeyID:               &key.ID,
+		ServiceAlias:           persistInput.Service,
+		RequestType:            persistInput.Type,
+		PlanCode:               planCode,
+		RouterProvider:         routerRoute.Provider,
+		RouterModel:            routerRoute.ModelID,
+		Status:                 "processing",
+		InputHash:              HashDigiConnectSecret(auditInput),
+		InputPreview:           previewDigiConnectInput(chatCompletionsAuditPreview(input.Messages)),
+		PayloadHash:            payloadHash,
+		IdempotencyRequestHash: payloadHash,
+		BillingDecision:        billing.Decision,
+		BillingStatus:          "reserved",
+		BillingSource:          billing.Source,
+		Amount:                 billing.Amount,
+		Currency:               "IDR",
+		StartedAt:              &now,
+	}
+	if idempotencyKey != "" {
+		request.IdempotencyKey = &idempotencyKey
+	}
+	if optionsJSON, err := json.Marshal(persistInput.Options); err == nil {
+		request.OptionsJSON = string(optionsJSON)
+	}
+	if metadataJSON, err := json.Marshal(persistInput.Metadata); err == nil {
+		request.MetadataJSON = string(metadataJSON)
+	}
+	if err := s.repo.CreateRequest(request); err != nil {
+		return MapDigiConnectPublicError("DATABASE_ERROR")
+	}
+
+	routerStarted := time.Now()
+	aggregateText, finishReason, statusCode, routerErr := s.streamRouterChatCompletionsCall(ctx, routerBody, func(rawData string) error {
+		// Forward the upstream chunk verbatim. Skip [DONE] sentinel; handler
+		// emits its own [DONE] after billing settles.
+		if strings.TrimSpace(rawData) == "[DONE]" {
+			return nil
+		}
+		onChunk(DigiConnectStreamChunk{
+			Type:      "raw_chat_chunk",
+			Delta:     rawData,
+			Model:     modelID,
+			RequestID: requestID,
+		})
+		return nil
+	})
+	latency := time.Since(routerStarted).Milliseconds()
+	completedAt := time.Now()
+	request.RouterLatencyMS = latency
+	request.RouterStatus = statusCode
+	request.CompletedAt = &completedAt
+
+	if routerErr != nil {
+		request.Status = "pending_verification"
+		request.BillingDecision = "pending_verification"
+		request.BillingStatus = "pending_verification"
+		request.PublicErrorCode = "REQUEST_PENDING_VERIFICATION"
+		request.PublicErrorMessage = "Request sedang diverifikasi. Cek status beberapa saat lagi."
+		request.InternalErrorCode = routerErr.InternalCode
+		if routerErr.Err != nil {
+			request.InternalErrorMessage = routerErr.Err.Error()
+		}
+		_ = s.repo.SaveRequest(request)
+		var publicErr DigiConnectPublicError
+		if strings.HasPrefix(routerErr.InternalCode, "NINEROUTER_UPSTREAM_") {
+			publicErr = DigiConnectPublicError{Code: "UPSTREAM_ERROR", HTTPStatus: http.StatusBadGateway, Message: "Layanan sedang mengalami gangguan. Coba lagi nanti."}
+		} else {
+			publicErr = MapDigiConnectPublicError(routerErr.InternalCode)
+		}
+		onChunk(DigiConnectStreamChunk{
+			Type:      "error",
+			RequestID: requestID,
+			Model:     modelID,
+			Error:     publicErr,
+		})
+		return publicErr
+	}
+
+	if billing.Source == DigiConnectBillingSourceWallet {
+		if err := s.chargeWalletAndFinalize(ctx, key.UserID, request, billing.Amount, completedAt); err != nil {
+			request.Status = "pending_verification"
+			request.BillingDecision = "pending_verification"
+			request.BillingStatus = "pending_verification"
+			request.InternalErrorCode = "WALLET_CHARGE_FAILED"
+			request.InternalErrorMessage = err.Error()
+			_ = s.repo.SaveRequest(request)
+			publicErr := MapDigiConnectPublicError("NINEROUTER_TIMEOUT")
+			onChunk(DigiConnectStreamChunk{Type: "error", RequestID: requestID, Model: modelID, Error: publicErr})
+			return publicErr
+		}
+	} else {
+		request.BillingStatus = DigiConnectBillingStatusIncluded
+		request.Status = "completed"
+		if err := s.repo.SaveRequest(request); err != nil {
+			return MapDigiConnectPublicError("DATABASE_ERROR")
+		}
+	}
+
+	// Persist a synthetic chat.completion envelope for idempotent replay.
+	envelope := map[string]interface{}{
+		"id":      requestID,
+		"object":  "chat.completion",
+		"created": time.Now().Unix(),
+		"model":   modelID,
+		"choices": []map[string]interface{}{{
+			"index":         0,
+			"message":       map[string]interface{}{"role": "assistant", "content": aggregateText},
+			"finish_reason": finishReason,
+		}},
+		"digiconnect": map[string]interface{}{"request_id": requestID, "stream": true},
+	}
+	if encoded, err := json.Marshal(envelope); err == nil {
+		request.ResponseJSON = string(encoded)
+		_ = s.repo.SaveRequest(request)
+	}
+
+	s.recordDigiConnectSuccessSideEffects(key, request, completedAt)
+
+	if finishReason == "" {
+		finishReason = "stop"
+	}
+	onChunk(DigiConnectStreamChunk{
+		Type:         "completed",
+		Text:         aggregateText,
+		FinishReason: finishReason,
+		Model:        modelID,
+		RequestID:    requestID,
+	})
+	return DigiConnectPublicError{}
+}
+
+// streamRouterChatCompletionsCall posts the body to the upstream
+// /v1/chat/completions endpoint with stream:true and dispatches each upstream
+// SSE `data:` payload verbatim through onRawChunk. It tracks an aggregate of
+// content text + finish_reason for billing+audit purposes.
+func (s *DigiConnectService) streamRouterChatCompletionsCall(
+	ctx context.Context,
+	body map[string]interface{},
+	onRawChunk func(rawData string) error,
+) (aggregateText string, finishReason string, statusCode int, err *digiConnectRouterError) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	baseURL := strings.TrimRight(s.cfg.DigiConnectRouterBaseURL, "/")
+	if baseURL == "" {
+		return "", "", 0, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: errors.New("digiconnect router base URL is empty")}
+	}
+	chatPath := strings.TrimSpace(s.cfg.DigiConnectRouterChatCompletionsPath)
+	if chatPath == "" {
+		chatPath = "/v1/chat/completions"
+	}
+	if body == nil {
+		body = map[string]interface{}{}
+	}
+	body["stream"] = true
+
+	encoded, marshalErr := json.Marshal(body)
+	if marshalErr != nil {
+		return "", "", 0, &digiConnectRouterError{InternalCode: "INVALID_PAYLOAD", Err: marshalErr}
+	}
+	req, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+chatPath, bytes.NewReader(encoded))
+	if reqErr != nil {
+		return "", "", 0, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: reqErr}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	if token := strings.TrimSpace(s.cfg.DigiConnectRouterInternalAPIKey); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	res, doErr := s.httpClient.Do(req)
+	if doErr != nil {
+		return "", "", 0, &digiConnectRouterError{InternalCode: "NINEROUTER_TIMEOUT", Err: doErr}
+	}
+	defer res.Body.Close()
+	statusCode = res.StatusCode
+
+	if statusCode/100 != 2 {
+		raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+		return "", "", statusCode, &digiConnectRouterError{
+			InternalCode: fmt.Sprintf("NINEROUTER_UPSTREAM_%d", statusCode),
+			Err:          fmt.Errorf("upstream stream %d: %s", statusCode, strings.TrimSpace(string(raw))),
+		}
+	}
+
+	contentType := strings.ToLower(strings.TrimSpace(res.Header.Get("Content-Type")))
+	if !strings.HasPrefix(contentType, "text/event-stream") {
+		// Defensive: upstream returned single JSON despite stream:true.
+		// Fold the body and emit a synthetic single chunk so handlers still
+		// flush something.
+		raw, readErr := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+		if readErr != nil {
+			return "", "", statusCode, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: readErr}
+		}
+		_ = onRawChunk(string(raw))
+		// Best-effort decode for aggregate.
+		var decoded map[string]interface{}
+		_ = json.Unmarshal(raw, &decoded)
+		text, fr := extractChatCompletionsContentAndFinish(decoded)
+		return text, fr, statusCode, nil
+	}
+
+	var aggregate strings.Builder
+	parseErr := parseSSEStream(ctx, res.Body, func(ev sseEvent) error {
+		// Forward raw payload verbatim before extracting aggregate.
+		if cbErr := onRawChunk(ev.Data); cbErr != nil {
+			return cbErr
+		}
+		var payload map[string]interface{}
+		if jsonErr := json.Unmarshal([]byte(ev.Data), &payload); jsonErr != nil {
+			return nil
+		}
+		choices, ok := payload["choices"].([]interface{})
+		if !ok {
+			return nil
+		}
+		for _, raw := range choices {
+			choice, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if fr, ok := choice["finish_reason"].(string); ok && fr != "" {
+				finishReason = fr
+			}
+			delta, ok := choice["delta"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if c, ok := delta["content"].(string); ok {
+				aggregate.WriteString(c)
+			}
+		}
+		return nil
+	})
+	if parseErr != nil {
+		return aggregate.String(), finishReason, statusCode, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: parseErr}
+	}
+	return aggregate.String(), finishReason, statusCode, nil
+}
+
+// extractChatCompletionsContentAndFinish extracts message content + finish_reason
+// from a chat.completion (non-stream) shape body for the synthetic-fallback path.
+func extractChatCompletionsContentAndFinish(body map[string]interface{}) (string, string) {
+	if body == nil {
+		return "", ""
+	}
+	choices, ok := body["choices"].([]interface{})
+	if !ok || len(choices) == 0 {
+		return "", ""
+	}
+	choice, ok := choices[0].(map[string]interface{})
+	if !ok {
+		return "", ""
+	}
+	finishReason, _ := choice["finish_reason"].(string)
+	msg, ok := choice["message"].(map[string]interface{})
+	if !ok {
+		return "", finishReason
+	}
+	content, _ := msg["content"].(string)
+	return content, finishReason
+}
+
+// emitChatCompletionsReplayChunks re-emits a stored chat completion as a
+// synthetic single-chunk + completed terminator so streaming clients still see
+// an SSE shape on idempotent replay.
+func emitChatCompletionsReplayChunks(
+	existing *model.DigiConnectRequest,
+	modelID string,
+	onChunk func(DigiConnectStreamChunk),
+) {
+	requestID := existing.RequestID
+	text := ""
+	finishReason := "stop"
+	if strings.TrimSpace(existing.ResponseJSON) != "" {
+		var decoded map[string]interface{}
+		if err := json.Unmarshal([]byte(existing.ResponseJSON), &decoded); err == nil {
+			text, finishReason = extractChatCompletionsContentAndFinish(decoded)
+			if finishReason == "" {
+				finishReason = "stop"
+			}
+		}
+	}
+	if text != "" {
+		raw := fmt.Sprintf(`{"id":%q,"object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"role":"assistant","content":%q},"finish_reason":null}]}`, requestID, modelID, text)
+		onChunk(DigiConnectStreamChunk{Type: "raw_chat_chunk", Delta: raw, Model: modelID, RequestID: requestID})
+	}
+	onChunk(DigiConnectStreamChunk{
+		Type:         "completed",
+		Text:         text,
+		FinishReason: finishReason,
+		Model:        modelID,
+		RequestID:    requestID,
+	})
 }
 
 // StreamOpenAICompatibleResponse mirrors the chat path for /responses. Events
