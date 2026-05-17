@@ -246,6 +246,18 @@ func (r *DigiConnectRepo) IncrementUsageCounter(counter *model.DigiConnectUsageC
 	}).Create(counter).Error
 }
 
+func (r *DigiConnectRepo) GetUsageCounter(userID uuid.UUID, apiKeyID *uuid.UUID, scope, window string) (*model.DigiConnectUsageCounter, error) {
+	var counter model.DigiConnectUsageCounter
+	q := r.db.Where("user_id = ? AND scope = ? AND window = ?", userID, strings.TrimSpace(scope), strings.TrimSpace(window))
+	if apiKeyID != nil {
+		q = q.Where("api_key_id = ?", *apiKeyID)
+	} else {
+		q = q.Where("api_key_id IS NULL")
+	}
+	err := q.First(&counter).Error
+	return &counter, err
+}
+
 func (r *DigiConnectRepo) RequestStatusCounts(since time.Time) (map[string]int64, error) {
 	type row struct {
 		Status string

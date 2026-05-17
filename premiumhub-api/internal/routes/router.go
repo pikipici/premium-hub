@@ -209,9 +209,21 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.GET("/public/sosmed/services", sosmedServiceHandler.PublicList)
 	api.GET("/public/sosmed/bundles", sosmedBundleHandler.PublicList)
 	api.GET("/public/digiconnect/plans", digiConnectHandler.PublicPlans)
-	api.GET("/models", digiConnectHandler.OpenAICompatibleModels)
-	api.POST("/responses", digiConnectHandler.OpenAICompatibleResponses)
-	api.POST("/chat/completions", digiConnectHandler.OpenAICompatibleChatCompletions)
+	api.GET(
+		"/models",
+		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),
+		digiConnectHandler.OpenAICompatibleModels,
+	)
+	api.POST(
+		"/responses",
+		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),
+		digiConnectHandler.OpenAICompatibleResponses,
+	)
+	api.POST(
+		"/chat/completions",
+		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),
+		digiConnectHandler.OpenAICompatibleChatCompletions,
+	)
 	api.GET("/public/sosmed/bundles/:key", sosmedBundleHandler.PublicDetail)
 	api.GET(
 		"/convert/track/:token",

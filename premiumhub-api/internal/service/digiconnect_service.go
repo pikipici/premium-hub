@@ -945,7 +945,16 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 	if entitlement != nil {
 		payPerRequestPrice = entitlement.Price
 	}
-	billing := DecideDigiConnectBilling(now, entitlementState, walletBalance, payPerRequestPrice, false)
+	fairUseExceeded := false
+	if entitlement != nil && entitlement.DailyFairUseLimit > 0 {
+		todayWindow := digiConnectDailyWindow(now)
+		if counter, err := s.repo.GetUsageCounter(key.UserID, nil, "user_daily", todayWindow); err == nil {
+			if counter.Count >= int64(entitlement.DailyFairUseLimit) {
+				fairUseExceeded = true
+			}
+		}
+	}
+	billing := DecideDigiConnectBilling(now, entitlementState, walletBalance, payPerRequestPrice, fairUseExceeded)
 	if !billing.Allowed {
 		return nil, billingPublicError(billing.Reason)
 	}
@@ -996,9 +1005,10 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 		request.BillingDecision = "rejected"
 		request.BillingStatus = "failed"
 		request.PublicErrorCode = "UPSTREAM_ERROR"
+		request.PublicErrorMessage = "Layanan sedang mengalami gangguan. Coba lagi nanti."
 		request.InternalErrorCode = fmt.Sprintf("NINEROUTER_%d", routerRes.StatusCode)
 		_ = s.repo.SaveRequest(request)
-		return nil, DigiConnectPublicError{Code: "UPSTREAM_ERROR", HTTPStatus: http.StatusBadGateway, Message: "Layanan sedang mengalami gangguan. Coba lagi nanti."}
+		return mapDigiConnectRequestResponse(request, false), DigiConnectPublicError{Code: "UPSTREAM_ERROR", HTTPStatus: http.StatusBadGateway, Message: "Layanan sedang mengalami gangguan. Coba lagi nanti."}
 	}
 	if billing.Source == DigiConnectBillingSourceWallet {
 		if err := s.chargeWalletAfterRouterSuccess(ctx, key.UserID, request.ID, billing.Amount); err != nil {
@@ -1011,6 +1021,7 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 			return mapDigiConnectRequestResponse(request, false), MapDigiConnectPublicError("NINEROUTER_TIMEOUT")
 		}
 		request.BillingStatus = DigiConnectBillingStatusCharged
+		request.WalletReference = digiConnectChargeReference(request.ID)
 	} else {
 		request.BillingStatus = DigiConnectBillingStatusIncluded
 	}
@@ -1018,9 +1029,49 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 	if err := s.repo.SaveRequest(request); err != nil {
 		return nil, MapDigiConnectPublicError("DATABASE_ERROR")
 	}
+	s.recordDigiConnectSuccessSideEffects(key, request, completedAt)
 	res := mapDigiConnectRequestResponse(request, false)
 	res["router_response"] = routerRes.Body
 	return res, DigiConnectPublicError{}
+}
+
+func digiConnectDailyWindow(now time.Time) string {
+	return "daily:" + now.UTC().Format("2006-01-02")
+}
+
+func digiConnectDailyResetAt(now time.Time) time.Time {
+	utc := now.UTC()
+	return time.Date(utc.Year(), utc.Month(), utc.Day(), 0, 0, 0, 0, time.UTC).Add(24 * time.Hour)
+}
+
+func digiConnectChargeReference(requestID uuid.UUID) string {
+	return "digiconnect:" + requestID.String() + ":charge"
+}
+
+func (s *DigiConnectService) recordDigiConnectSuccessSideEffects(key *model.DigiConnectAPIKey, request *model.DigiConnectRequest, completedAt time.Time) {
+	if key == nil || request == nil {
+		return
+	}
+	window := digiConnectDailyWindow(completedAt)
+	resetAt := digiConnectDailyResetAt(completedAt)
+	_ = s.repo.IncrementUsageCounter(&model.DigiConnectUsageCounter{
+		UserID:  key.UserID,
+		Scope:   "user_daily",
+		Window:  window,
+		Count:   1,
+		ResetAt: resetAt,
+	})
+	apiKeyID := key.ID
+	_ = s.repo.IncrementUsageCounter(&model.DigiConnectUsageCounter{
+		UserID:   key.UserID,
+		APIKeyID: &apiKeyID,
+		Scope:    "api_key_daily",
+		Window:   window,
+		Count:    1,
+		ResetAt:  resetAt,
+	})
+	key.LastUsedAt = &completedAt
+	_ = s.repo.SaveAPIKey(key)
 }
 
 func mapDigiConnectAPIKey(key model.DigiConnectAPIKey, plain string) DigiConnectAPIKeyResponse {
