@@ -97,8 +97,8 @@ export default function HomePage() {
   }, [])
 
   const smmMiniStatLabel = sosmedServicesCount !== null
-    ? `${formatNumber(sosmedServicesCount)}+ layanan aktif`
-    : 'Data layanan sedang dimuat'
+    ? `${formatNumber(sosmedServicesCount)}+ layanan`
+    : 'Memuat layanan'
   const showDigiConnectCard = visibleProductCards.includes('/product/digiconnect')
   const showSosmedCard = visibleProductCards.includes('/product/sosmed')
   const visibleCardsCount = Number(showDigiConnectCard) + Number(showSosmedCard)
@@ -120,13 +120,13 @@ export default function HomePage() {
           <header className="mx-auto mb-6 max-w-3xl text-center lg:mb-10">
             <p className="inline-flex items-center gap-2 rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-4 py-1.5 text-xs font-bold text-[#FF5733]">
               <Rocket className="h-3.5 w-3.5" />
-              DigiConnect + DigiSosmed dalam satu wallet
+              DigiConnect + DigiSosmed
             </p>
             <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] text-[#141414] sm:text-5xl">
-Gateway AI dan growth sosial, satu tempat.
+Gateway AI dan growth sosial.
             </h1>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[#6B7280] sm:text-base">
-              Aktifkan DigiConnect untuk akses API berbasis wallet, sambil tetap pakai DigiSosmed untuk kebutuhan followers, views, dan engagement.
+              DigiConnect untuk akses API. DigiSosmed untuk followers, views, engagement.
             </p>
             <div className="mt-5 grid grid-cols-3 gap-2 text-[11px] font-bold text-[#3A3A3A] sm:mx-auto sm:max-w-xl sm:text-xs">
               <span className="inline-flex items-center justify-center gap-1 rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 shadow-[0_8px_18px_rgba(20,20,20,0.04)]">
@@ -139,7 +139,7 @@ Gateway AI dan growth sosial, satu tempat.
               </span>
               <span className="inline-flex items-center justify-center gap-1 rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 shadow-[0_8px_18px_rgba(20,20,20,0.04)]">
                 <Network className="h-3.5 w-3.5 text-[#FF5733]" />
-                API Ready
+                API ready
               </span>
             </div>
           </header>
@@ -152,28 +152,27 @@ Gateway AI dan growth sosial, satu tempat.
                   DigiConnect
                 </p>
                 <h2 className="relative mt-3 text-2xl font-extrabold tracking-tight text-[#141414]">
-                  Gateway AI Siap Dipakai dari Wallet
+                  Gateway AI dari wallet
                 </h2>
                 <p className="relative mt-2 text-sm leading-relaxed text-[#6B7280] md:text-[15px]">
-                  Beli paket, buat API key, lalu kirim request lewat gateway DigiMarket.
+                  Beli paket, buat API key, kirim request.
                 </p>
 
                 <ul className="relative mt-4 space-y-2 text-sm text-[#2E2E2E]">
                   <li className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#A36A00]" />
-                    OpenAI-compatible request shape untuk bot dan workflow internal
+                    OpenAI-compatible. Untuk bot dan workflow.
                   </li>
                   <li className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#A36A00]" />
-                    Dashboard API key, entitlement, dan usage request
+                    API key, entitlement, usage
                   </li>
                 </ul>
 
                 <div className="relative mt-5 rounded-2xl border border-[#F4DE8D] bg-[#FFFBEA] px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8B6200]">Fokus baru</p>
                   <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-bold text-[#141414]">
                     <Code2 className="h-4 w-4 text-[#A36A00]" />
-                    API gateway + wallet billing
+                    Wallet billing aktif
                   </p>
                 </div>
 
@@ -181,7 +180,7 @@ Gateway AI dan growth sosial, satu tempat.
                   href="/product/digiconnect"
                   className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-[#141414] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#2A2A2A]"
                 >
-                  Lihat DigiConnect
+                  Lihat detail
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </article>
@@ -194,25 +193,24 @@ Gateway AI dan growth sosial, satu tempat.
                   DigiSosmed
                 </p>
                 <h2 className="relative mt-3 text-2xl font-extrabold tracking-tight text-[#141414]">
-                  Naikin Follower, Viewer, dan Engagement
+                  Naikin follower, view, engagement
                 </h2>
                 <p className="relative mt-2 text-sm leading-relaxed text-[#6B7280] md:text-[15px]">
-                  Order praktis dengan progres instant.
+                  Order langsung jalan.
                 </p>
 
                 <ul className="relative mt-4 space-y-2 text-sm text-[#2E2E2E]">
                   <li className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#2853A6]" />
-                    Instagram, TikTok, YouTube, Telegram, Traffic, dan lainnya
+                    Instagram, TikTok, YouTube, Telegram, dan lainnya
                   </li>
                   <li className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#2853A6]" />
-                    Proses otomatis + garansi refill 30 hari
+                    Otomatis + refill 30 hari
                   </li>
                 </ul>
 
                 <div className="relative mt-5 rounded-2xl border border-[#DEE8FA] bg-[#F5F8FF] px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#476AA8]">Layanan aktif</p>
                   <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-bold text-[#141414]">
                     <BarChart3 className="h-4 w-4 text-[#2853A6]" />
                     {smmMiniStatLabel}
@@ -223,7 +221,7 @@ Gateway AI dan growth sosial, satu tempat.
                   href="/product/sosmed"
                   className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-[#2853A6] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#204486]"
                 >
-                  Lihat DigiSosmed
+                  Lihat detail
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </article>
@@ -232,10 +230,10 @@ Gateway AI dan growth sosial, satu tempat.
             {!hasVisibleCards ? (
               <article className="rounded-3xl border border-[#EBEBEB] bg-white p-6 text-center shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:col-span-2 lg:p-7">
                 <h2 className="text-xl font-extrabold tracking-tight text-[#141414]">
-                  Produk sementara disembunyikan
+                  Produk belum tersedia
                 </h2>
                 <p className="mt-2 text-sm text-[#6B7280]">
-                  Coba lagi sebentar atau hubungi admin untuk info produk yang sedang aktif.
+                  Coba lagi nanti atau hubungi admin.
                 </p>
               </article>
             ) : null}
