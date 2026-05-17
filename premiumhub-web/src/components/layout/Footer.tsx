@@ -89,7 +89,7 @@ export default function Footer() {
               <span className="text-xl font-extrabold">Digi<span className="text-[#FF5733]">Market</span></span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
-              Platform DigiConnect dan DigiSosmed untuk bantu workflow, otomasi, dan pertumbuhan akun sosial dalam satu wallet.
+              DigiConnect dan DigiSosmed dalam satu wallet. Untuk workflow, otomasi, dan growth sosial.
             </p>
           </div>
 
@@ -113,8 +113,8 @@ export default function Footer() {
             <div className="space-y-2">
               <Link href="/faq" className="block text-sm text-gray-400 hover:text-white transition-colors">FAQ</Link>
               <Link href="/lupa-password" className="block text-sm text-gray-400 hover:text-white transition-colors">Lupa Password</Link>
-              <Link href="/login" className="block text-sm text-gray-400 hover:text-white transition-colors">Masuk Akun</Link>
-              <Link href="/register" className="block text-sm text-gray-400 hover:text-white transition-colors">Daftar Akun</Link>
+              <Link href="/login" className="block text-sm text-gray-400 hover:text-white transition-colors">Masuk</Link>
+              <Link href="/register" className="block text-sm text-gray-400 hover:text-white transition-colors">Daftar</Link>
             </div>
           </div>
 
