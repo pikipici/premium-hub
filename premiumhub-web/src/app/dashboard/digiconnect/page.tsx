@@ -451,7 +451,7 @@ export default function DigiConnectDashboardPage() {
               ) : null}
 
               {activePanel === 'integrasi' ? (
-                <IntegrationPanel baseUrl={baseUrl} sampleKey={sampleKey} curlSample={curlSample} copyKey={copyKey} onCopy={copyText} hasActiveKey={keys.some((k) => k.status === 'active')} onGoToApiKey={() => setActivePanel('api-key')} />
+                <IntegrationPanel baseUrl={baseUrl} sampleKey={sampleKey} sampleModel={sampleModel} curlSample={curlSample} copyKey={copyKey} onCopy={copyText} hasActiveKey={keys.some((k) => k.status === 'active')} onGoToApiKey={() => setActivePanel('api-key')} />
               ) : null}
 
               {activePanel === 'api-key' ? (
@@ -676,7 +676,15 @@ function StatsPanel({ stats, requests }: { stats?: DigiConnectPlanStats; request
   )
 }
 
-function IntegrationPanel({ baseUrl, sampleKey, curlSample, copyKey, onCopy, hasActiveKey, onGoToApiKey }: { baseUrl: string; sampleKey: string; curlSample: string; copyKey: string | null; onCopy: (label: string, value: string) => void; hasActiveKey: boolean; onGoToApiKey: () => void }) {
+function IntegrationPanel({ baseUrl, sampleKey, sampleModel, curlSample, copyKey, onCopy, hasActiveKey, onGoToApiKey }: { baseUrl: string; sampleKey: string; sampleModel: string; curlSample: string; copyKey: string | null; onCopy: (label: string, value: string) => void; hasActiveKey: boolean; onGoToApiKey: () => void }) {
+  const [lang, setLang] = useState<'curl' | 'node' | 'python'>('curl')
+  const fullBase = `${baseUrl}/digiconnect`
+  const envSnippet = `OPENAI_BASE_URL=${fullBase}\nOPENAI_API_KEY=${sampleKey}`
+  const nodeSnippet = `import OpenAI from 'openai'\n\nconst client = new OpenAI({\n  baseURL: '${fullBase}',\n  apiKey: process.env.OPENAI_API_KEY,\n})\n\nconst res = await client.chat.completions.create({\n  model: '${sampleModel}',\n  messages: [{ role: 'user', content: 'halo' }],\n})\n\nconsole.log(res.choices[0].message.content)`
+  const pythonSnippet = `import os\nfrom openai import OpenAI\n\nclient = OpenAI(\n    base_url="${fullBase}",\n    api_key=os.environ["OPENAI_API_KEY"],\n)\n\nres = client.chat.completions.create(\n    model="${sampleModel}",\n    messages=[{"role": "user", "content": "halo"}],\n)\nprint(res.choices[0].message.content)`
+  const snippets: Record<typeof lang, string> = { curl: curlSample, node: nodeSnippet, python: pythonSnippet }
+  const activeSnippet = snippets[lang]
+
   return (
     <div className="space-y-4">
       {!hasActiveKey ? (
@@ -690,31 +698,93 @@ function IntegrationPanel({ baseUrl, sampleKey, curlSample, copyKey, onCopy, has
           </button>
         </div>
       ) : null}
-      <CopyRow label="Base URL" value={`${baseUrl}/digiconnect`} copied={copyKey === 'base'} onCopy={() => onCopy('base', `${baseUrl}/digiconnect`)} />
-      <CopyRow label="Authorization header" value={`Authorization: Bearer ${sampleKey}`} mono copied={copyKey === 'auth'} onCopy={() => onCopy('auth', `Authorization: Bearer ${sampleKey}`)} />
 
-      <div className="rounded-xl border border-[#EFE3D6] bg-[#171411] p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-orange-100/70">Contoh curl</span>
-          <button type="button" onClick={() => onCopy('curl', curlSample)} className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1 text-[11px] font-bold text-white transition hover:bg-white/20">
-            <Copy className="h-3 w-3" /> {copyKey === 'curl' ? 'Tersalin' : 'Salin'}
-          </button>
+      <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm font-bold text-[#171411]">1. Konfigurasi</div>
+          <span className="text-[11px] font-semibold text-[#A89F94]">OpenAI-compatible</span>
         </div>
-        <pre className="overflow-x-auto whitespace-pre rounded-md bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-orange-50">{curlSample}</pre>
+        <div className="space-y-3">
+          <ConfigField label="Base URL" value={fullBase} copied={copyKey === 'base'} onCopy={() => onCopy('base', fullBase)} />
+          <ConfigField label="API key" value={sampleKey} copied={copyKey === 'auth'} onCopy={() => onCopy('auth', sampleKey)} placeholder={!hasActiveKey} />
+          <div className="rounded-lg bg-[#FFFAF5] p-3 ring-1 ring-[#EFE3D6]">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#A89F94]">Untuk .env</span>
+              <button type="button" onClick={() => onCopy('env', envSnippet)} aria-label="Salin .env snippet" className="inline-flex items-center gap-1 text-[11px] font-bold text-[#FF5733] hover:text-[#E64A28]">
+                <Copy className="h-3 w-3" /> {copyKey === 'env' ? 'Tersalin' : 'Salin'}
+              </button>
+            </div>
+            <pre className="overflow-x-auto whitespace-pre font-mono text-[11px] leading-relaxed text-[#171411]">{envSnippet}</pre>
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
-        <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Endpoint tersedia</div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <EndpointChip method="GET" path="/models" />
-          <EndpointChip method="POST" path="/chat/completions" />
-          <EndpointChip method="POST" path="/responses" />
+        <div className="mb-3 text-sm font-bold text-[#171411]">2. Endpoint</div>
+        <div className="space-y-2">
+          <EndpointRow method="POST" path="/chat/completions" desc="Multi-turn chat dengan messages array. Paling umum dipakai." />
+          <EndpointRow method="POST" path="/responses" desc="Stateful response API untuk agent / multi-step reasoning." />
+          <EndpointRow method="GET" path="/models" desc="List model yang tersedia untuk plan kamu." />
         </div>
-        <p className="mt-3 text-sm leading-relaxed text-[#7B7067]">
-          Endpoint OpenAI-compatible untuk 9router, AI SDK, atau client lain. Pakai API key sebagai bearer token.
-        </p>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-[#EFE3D6] bg-[#171411]">
+        <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+          <div className="flex items-center gap-1" role="tablist" aria-label="Bahasa quick start">
+            <LangTab active={lang === 'curl'} onClick={() => setLang('curl')}>curl</LangTab>
+            <LangTab active={lang === 'node'} onClick={() => setLang('node')}>Node.js</LangTab>
+            <LangTab active={lang === 'python'} onClick={() => setLang('python')}>Python</LangTab>
+          </div>
+          <button type="button" onClick={() => onCopy('snippet', activeSnippet)} aria-label="Salin snippet" className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1 text-[11px] font-bold text-white transition hover:bg-white/20">
+            <Copy className="h-3 w-3" /> {copyKey === 'snippet' ? 'Tersalin' : 'Salin'}
+          </button>
+        </div>
+        <pre className="overflow-x-auto whitespace-pre p-3 font-mono text-[11px] leading-relaxed text-orange-50">{activeSnippet}</pre>
       </div>
     </div>
+  )
+}
+
+function ConfigField({ label, value, copied, onCopy, placeholder = false }: { label: string; value: string; copied: boolean; onCopy: () => void; placeholder?: boolean }) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[#A89F94]">{label}</span>
+        <button type="button" onClick={onCopy} aria-label={`Salin ${label}`} className="inline-flex items-center gap-1 text-[11px] font-bold text-[#FF5733] hover:text-[#E64A28]">
+          <Copy className="h-3 w-3" /> {copied ? 'Tersalin' : 'Salin'}
+        </button>
+      </div>
+      <div className={`break-all rounded-md border border-[#EFE3D6] bg-[#FFFAF5] px-3 py-2 font-mono text-xs ${placeholder ? 'text-[#A89F94]' : 'text-[#171411]'}`} aria-live="polite">
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function EndpointRow({ method, path, desc }: { method: string; path: string; desc: string }) {
+  const methodCls = method === 'GET' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-[#EFE3D6] bg-[#FFFAF5] p-2.5 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex items-center gap-2 sm:w-44 sm:shrink-0">
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${methodCls}`}>{method}</span>
+        <code className="font-mono text-xs font-semibold text-[#171411]">{path}</code>
+      </div>
+      <p className="text-xs leading-relaxed text-[#7B7067]">{desc}</p>
+    </div>
+  )
+}
+
+function LangTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition ${active ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white/90'}`}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -909,30 +979,6 @@ function BigStat({ label, value, hint }: { label: string; value: string; hint?: 
       <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A89F94]">{label}</div>
       <div className="mt-1 truncate text-xl font-bold text-[#171411]">{value}</div>
       {hint ? <div className="mt-0.5 text-[11px] font-semibold text-emerald-700">{hint}</div> : null}
-    </div>
-  )
-}
-
-function CopyRow({ label, value, mono = false, copied, onCopy }: { label: string; value: string; mono?: boolean; copied: boolean; onCopy: () => void }) {
-  return (
-    <div className="rounded-xl border border-[#EFE3D6] bg-white p-3">
-      <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">{label}</div>
-      <button type="button" onClick={onCopy} className="mt-1.5 flex w-full items-center justify-between gap-3 rounded-md bg-[#FFFAF5] px-3 py-2 text-left text-sm font-semibold text-[#171411] transition hover:bg-[#FFF0EA]">
-        <span className={`min-w-0 truncate ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
-        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-[#FF5733]">
-          <Copy className="h-3.5 w-3.5" />
-          {copied ? 'Tersalin' : 'Salin'}
-        </span>
-      </button>
-    </div>
-  )
-}
-
-function EndpointChip({ method, path }: { method: string; path: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-md border border-[#EFE3D6] bg-[#FFFAF5] px-2.5 py-1.5">
-      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${method === 'GET' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>{method}</span>
-      <code className="truncate font-mono text-xs font-semibold text-[#171411]">{path}</code>
     </div>
   )
 }
