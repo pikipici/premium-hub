@@ -656,17 +656,23 @@ type OpenAICompatibleResponseInput struct {
 }
 
 type OpenAICompatibleChatMessage struct {
-	Role    string      `json:"role"`
-	Content interface{} `json:"content"`
+	Role       string                   `json:"role"`
+	Content    interface{}              `json:"content"`
+	Name       string                   `json:"name,omitempty"`
+	ToolCallID string                   `json:"tool_call_id,omitempty"`
+	ToolCalls  []map[string]interface{} `json:"tool_calls,omitempty"`
 }
 
 type OpenAICompatibleChatInput struct {
-	Model       string                        `json:"model"`
-	Messages    []OpenAICompatibleChatMessage `json:"messages"`
-	Temperature *float64                      `json:"temperature"`
-	MaxTokens   *int                          `json:"max_tokens"`
-	Stream      bool                          `json:"stream"`
-	Metadata    map[string]interface{}        `json:"metadata"`
+	Model          string                        `json:"model"`
+	Messages       []OpenAICompatibleChatMessage `json:"messages"`
+	Temperature    *float64                      `json:"temperature,omitempty"`
+	MaxTokens      *int                          `json:"max_tokens,omitempty"`
+	Stream         bool                          `json:"stream,omitempty"`
+	Metadata       map[string]interface{}        `json:"metadata,omitempty"`
+	Tools          []map[string]interface{}      `json:"tools,omitempty"`
+	ToolChoice     interface{}                   `json:"tool_choice,omitempty"`
+	ResponseFormat map[string]interface{}        `json:"response_format,omitempty"`
 }
 
 func (s *DigiConnectService) OpenAICompatibleModels(apiKey string) ([]string, DigiConnectPublicError) {

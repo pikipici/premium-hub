@@ -63,6 +63,7 @@ type Config struct {
 	ChatRedisChannel                                                            string
 	DigiConnectRouterBaseURL, DigiConnectRouterHealthPath                       string
 	DigiConnectRouterResponsesPath, DigiConnectRouterTimeoutMS                  string
+	DigiConnectRouterChatCompletionsPath                                        string
 	DigiConnectRouterInternalAPIKey                                             string
 	DigiConnectEnabled                                                          bool
 	DigiConnectReconcileWorkerEnabled                                           bool
@@ -199,6 +200,7 @@ func Load() *Config {
 		DigiConnectRouterBaseURL:             e("DIGICONNECT_ROUTER_BASE_URL", "http://127.0.0.1:20128"),
 		DigiConnectRouterHealthPath:          e("DIGICONNECT_ROUTER_HEALTH_PATH", "/api/health"),
 		DigiConnectRouterResponsesPath:       e("DIGICONNECT_ROUTER_RESPONSES_PATH", "/v1/responses"),
+		DigiConnectRouterChatCompletionsPath: e("DIGICONNECT_ROUTER_CHAT_COMPLETIONS_PATH", "/v1/chat/completions"),
 		DigiConnectRouterTimeoutMS:           e("DIGICONNECT_ROUTER_TIMEOUT_MS", "60000"),
 		DigiConnectRouterInternalAPIKey:      e("DIGICONNECT_ROUTER_INTERNAL_API_KEY", ""),
 		DigiConnectEnabled:                   eb("DIGICONNECT_ENABLED", false),
