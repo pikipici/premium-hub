@@ -23,7 +23,15 @@ export const useAuthStore = create<AuthState>()(
       walletBalance: 0,
       hasHydrated: false,
       isBootstrapped: false,
-      setUser: (user) => set({ user, isAuthenticated: !!user, walletBalance: 0, isBootstrapped: true }),
+      setUser: (user) =>
+        set((state) => ({
+          user,
+          isAuthenticated: !!user,
+          isBootstrapped: true,
+          // Reset wallet only when user identity changes (different user or sign-out).
+          // Otherwise keep existing balance to prevent flicker-to-zero on session refresh.
+          walletBalance: user && state.user?.id === user.id ? state.walletBalance : 0,
+        })),
       setWalletBalance: (walletBalance) => set({ walletBalance }),
       logout: () => set({ user: null, isAuthenticated: false, walletBalance: 0 }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -34,7 +42,8 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
-        walletBalance: state.walletBalance,
+        // walletBalance intentionally NOT persisted — must always be fresh from server.
+        // WalletBadge useQuery refetches on mount/focus, so no stale balance is shown.
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)
