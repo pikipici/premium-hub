@@ -237,7 +237,7 @@ function PromoUrgencyBar({ promotion }: { promotion?: SosmedPromotionPrice }) {
     <div className="mt-2 hidden items-center justify-between gap-2 rounded-2xl border border-[#FFC7B7] bg-[#FFF0EA] px-2.5 py-2 text-[11px] font-black uppercase tracking-wide text-[#B4161B] shadow-inner sm:flex sm:px-3 sm:text-[11px]">
       <span className="inline-flex items-center gap-1">
         <Clock3 className="h-3.5 w-3.5" />
-        Promo berakhir
+        Berakhir dalam
       </span>
       <span className="rounded-full bg-white px-2 py-0.5 text-[#D83A1D] shadow-sm">{formatPromoRemaining(promotion.ends_at)}</span>
     </div>
@@ -477,7 +477,7 @@ export default function ProductSosmedLandingPage() {
           <header data-anime="sosmed-hero" className="mb-6 max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FF5733]">DigiSosmed</p>
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#141414] md:text-4xl">
-              Growth sosial praktis lewat DigiSosmed
+              Naikin akun sosial lewat DigiSosmed
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-[#666] md:text-base">
               Layanan SMM untuk followers, views, dan engagement. Aman, cepat, tanpa password.
@@ -721,7 +721,7 @@ export default function ProductSosmedLandingPage() {
               )}
               {bundleCatalogState === 'fallback' && (
                 <div className="rounded-2xl border border-[#FFE2CF] bg-[#FFF8F5] px-4 py-3 text-center text-xs font-semibold text-[#9A4B16] shadow-sm">
-                  Katalog backend belum siap, sementara tampil preview. Harga final dicek di checkout.
+                  Katalog belum siap, ini tampilan preview. Cek total harga di checkout.
                 </div>
               )}
               {bundleCatalogState === 'ready' && !bundleCards.length && (
@@ -740,7 +740,7 @@ export default function ProductSosmedLandingPage() {
           <section className="mt-8 rounded-2xl border border-[#FFD5C8] bg-[#FFF3EF] p-6">
             <h2 className="text-xl font-extrabold text-[#141414]">Bingung pilih paket?</h2>
             <p className="mt-2 text-sm leading-relaxed text-[#666]">
-              Paket hemat untuk coba dulu. Paket prioritas kalau butuh proses lebih cepat. Total harga dicek ulang di checkout.
+              Paket hemat untuk coba dulu. Paket prioritas kalau butuh proses lebih cepat. Cek total harga di checkout.
             </p>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
