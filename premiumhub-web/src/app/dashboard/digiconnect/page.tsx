@@ -646,7 +646,7 @@ function StatsPanel({ stats, requests }: { stats?: DigiConnectPlanStats; request
               {recentBars.map((bar, i) => {
                 const h = Math.max(4, Math.round((bar.value / max) * 88))
                 const tone = statusTone(bar.status)
-                const barColor = tone === 'success' ? 'bg-[#FF7048]' : tone === 'error' ? 'bg-rose-400' : tone === 'warn' ? 'bg-amber-400' : 'bg-stone-300'
+                const barColor = tone === 'success' ? 'bg-emerald-500' : tone === 'error' ? 'bg-rose-500' : tone === 'warn' ? 'bg-amber-400' : 'bg-stone-300'
                 const ts = bar.createdAt ? relativeTime(bar.createdAt) : ''
                 return (
                   <div
@@ -659,8 +659,8 @@ function StatsPanel({ stats, requests }: { stats?: DigiConnectPlanStats; request
               })}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-[#7B7067]">
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-[#FF7048]" /> Sukses</span>
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-rose-400" /> Gagal</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-emerald-500" /> Sukses</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-rose-500" /> Gagal</span>
               <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-amber-400" /> Diproses</span>
               <span className="ml-auto font-mono">unit: ms</span>
             </div>
