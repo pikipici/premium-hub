@@ -28,33 +28,33 @@ const formatRupiah = (value: number) =>
 
 const heroStatChips = [
   { icon: ShieldCheck, label: 'Wallet aman' },
-  { icon: Zap, label: 'Charge per request' },
+  { icon: Zap, label: 'Bayar per request' },
   { icon: Network, label: 'API ready' },
 ]
 
 const howItWorks = [
   {
     icon: Wallet,
-    title: 'Pilih paket dari wallet',
-    body: 'Bayar pakai saldo DigiMarket. Aktif langsung tanpa langganan rumit.',
+    title: 'Pilih paket',
+    body: 'Bayar dari saldo DigiMarket. Aktif tanpa langganan.',
   },
   {
     icon: KeyRound,
     title: 'Buat API key',
-    body: 'Generate key dari dashboard. Simpan secret-nya, sisanya bisa di-rotate kapan aja.',
+    body: 'Generate dari dashboard. Bisa di-rotate kapan saja.',
   },
   {
     icon: Cpu,
     title: 'Kirim request',
-    body: 'Hit gateway DigiConnect. Billing kepotong cuma kalau request billable berhasil.',
+    body: 'Billing jalan cuma kalau request berhasil.',
   },
 ]
 
 const trustStrip = [
-  { icon: ShieldCheck, title: 'Billing transparan', body: 'Cuma request billable yang dipotong. Gagal? Refund otomatis ke wallet.' },
-  { icon: Sparkles, title: 'OpenAI-compatible', body: 'Request shape standar, gampang dipasang ke bot, dashboard, atau workflow lama.' },
-  { icon: Network, title: 'Routing tersembunyi', body: 'Detail provider & model di-handle gateway, kamu fokus ke fitur produk.' },
-  { icon: Wallet, title: 'Satu wallet semua produk', body: 'Saldo yang sama dipakai DigiSosmed, prem-apps, dan DigiConnect.' },
+  { icon: ShieldCheck, title: 'Billing transparan', body: 'Cuma request berhasil yang dipotong. Sisanya refund.' },
+  { icon: Sparkles, title: 'OpenAI-compatible', body: 'Request shape standar. Plug ke bot, dashboard, atau workflow.' },
+  { icon: Network, title: 'Routing tersembunyi', body: 'Provider & model di-handle gateway.' },
+  { icon: Wallet, title: 'Satu wallet', body: 'Dipakai DigiSosmed, prem-apps, DigiConnect.' },
 ]
 
 export default function DigiConnectProductPage() {
@@ -73,7 +73,7 @@ export default function DigiConnectProductPage() {
         if (alive) setPlans(res.data?.plans || [])
       })
       .catch(() => {
-        if (alive) setMessage('Belum bisa ambil paket DigiConnect. Coba refresh sebentar lagi.')
+        if (alive) setMessage('Gagal memuat paket. Coba refresh.')
       })
       .finally(() => {
         if (alive) setLoading(false)
@@ -85,7 +85,7 @@ export default function DigiConnectProductPage() {
 
   const checkout = async (plan: DigiConnectPlan) => {
     if (plan.available === false) {
-      setMessage('Paket ini sedang tidak tersedia. Pilih paket lain dulu.')
+      setMessage('Paket tidak tersedia.')
       return
     }
     if (!hasHydrated) return
@@ -100,7 +100,7 @@ export default function DigiConnectProductPage() {
       router.push('/dashboard/digiconnect')
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } }
-      setMessage(error.response?.data?.message || 'Checkout gagal. Pastikan saldo wallet cukup.')
+      setMessage(error.response?.data?.message || 'Checkout gagal. Saldo wallet kurang.')
     } finally {
       setCheckingOut(null)
     }
@@ -127,10 +127,10 @@ export default function DigiConnectProductPage() {
                 DigiConnect
               </p>
               <h1 className="mt-4 max-w-3xl text-4xl font-black leading-[1.05] tracking-[-0.04em] text-[#141414] sm:text-5xl lg:text-[56px]">
-                Gateway AI yang langsung kepotong dari wallet kamu.
+                Gateway AI dari wallet kamu.
               </h1>
               <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#6B7280] sm:text-lg">
-                Beli paket, buat API key, lalu kirim request lewat gateway DigiMarket. Cocok buat bot, dashboard internal, dan workflow otomatis tanpa expose detail routing.
+                Beli paket, buat API key, kirim request. Untuk bot, dashboard, dan workflow otomatis.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-2">
@@ -175,7 +175,7 @@ export default function DigiConnectProductPage() {
                     </span>
                   </div>
                   <span className="rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-2.5 py-0.5 text-[10px] font-bold text-[#FF5733] sm:text-[11px]">
-                    billable safe
+                    billable
                   </span>
                 </div>
                 <pre className="overflow-x-auto rounded-2xl bg-[#0F0F0F] p-4 text-[12px] leading-relaxed text-slate-100 sm:text-sm">
@@ -189,15 +189,15 @@ export default function DigiConnectProductPage() {
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
                   <div className="rounded-2xl border border-[#EBEBEB] bg-[#F7F7F5] p-3 text-[12px] leading-snug text-[#3A3A3A]">
                     <CheckCircle2 className="mb-1.5 h-4 w-4 text-[#FF5733]" />
-                    Pilih harga per request atau paket durasi 2 hari.
+                    Per request atau paket 2 hari.
                   </div>
                   <div className="rounded-2xl border border-[#EBEBEB] bg-[#F7F7F5] p-3 text-[12px] leading-snug text-[#3A3A3A]">
                     <CheckCircle2 className="mb-1.5 h-4 w-4 text-[#FF5733]" />
-                    Wallet dipotong cuma untuk request billable berhasil.
+                    Cuma request berhasil yang dipotong.
                   </div>
                   <div className="rounded-2xl border border-[#EBEBEB] bg-[#F7F7F5] p-3 text-[12px] leading-snug text-[#3A3A3A]">
                     <CheckCircle2 className="mb-1.5 h-4 w-4 text-[#FF5733]" />
-                    Dashboard API key, entitlement, dan usage request.
+                    API key, entitlement, usage.
                   </div>
                 </div>
               </div>
@@ -212,11 +212,11 @@ export default function DigiConnectProductPage() {
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#FF5733]">Cara kerja</p>
                 <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-[#141414] sm:text-3xl">
-                  Tiga langkah dari wallet ke gateway.
+                  Tiga langkah aktivasi.
                 </h2>
               </div>
               <p className="max-w-md text-sm leading-relaxed text-[#6B7280]">
-                Setup ringan, ga perlu integrasi billing terpisah. Semua aktivasi jalan di satu wallet DigiMarket.
+                Tanpa integrasi billing. Semua dari wallet DigiMarket.
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
@@ -246,13 +246,13 @@ export default function DigiConnectProductPage() {
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-16">
             <div className="mb-8 flex flex-col justify-between gap-3 md:flex-row md:items-end">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#FF5733]">Paket wallet</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#FF5733]">Paket</p>
                 <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-[#141414] sm:text-3xl">
-                  Aktifkan akses API dalam satu checkout.
+                  Aktifkan dalam satu checkout.
                 </h2>
               </div>
               <p className="max-w-md text-sm leading-relaxed text-[#6B7280]">
-                Bayar pakai saldo wallet. Setelah aktif, kamu bisa buat API key dari dashboard dan pantau request terbaru.
+                Pakai saldo wallet. Setelahnya buat API key dan pantau request di dashboard.
               </p>
             </div>
 
@@ -324,8 +324,8 @@ export default function DigiConnectProductPage() {
                         <li className="flex items-start gap-2">
                           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5733]" />
                           {plan.billing_model === 'pay_per_request'
-                            ? 'Charge per request billable berhasil'
-                            : 'Fair-use aktif selama paket berjalan'}
+                            ? 'Cuma request berhasil yang dipotong'
+                            : 'Fair-use selama paket aktif'}
                         </li>
                         <li className="flex items-start gap-2">
                           <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5733]" />
@@ -335,7 +335,7 @@ export default function DigiConnectProductPage() {
 
                       {plan.stock_managed ? (
                         <p className="mt-4 rounded-2xl border border-[#FFD9CF] bg-[#FFF0ED] px-4 py-2.5 text-xs font-bold text-[#B4161B]">
-                          Stok tersisa {plan.stock_remaining ?? 0} dari {plan.stock_total ?? 0} slot
+                          Sisa {plan.stock_remaining ?? 0}/{plan.stock_total ?? 0} slot
                         </p>
                       ) : null}
 
@@ -364,7 +364,7 @@ export default function DigiConnectProductPage() {
                           className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#141414] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#2A2A2A] disabled:cursor-not-allowed disabled:bg-[#3A3A3A] disabled:opacity-70"
                         >
                           {checkingOut === plan.code ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                          {unavailable ? 'Stok habis' : 'Checkout pakai wallet'}
+                          {unavailable ? 'Stok habis' : 'Checkout'}
                         </button>
                       </div>
                     </article>
