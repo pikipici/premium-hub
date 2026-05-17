@@ -258,6 +258,35 @@ func (r *DigiConnectRepo) GetUsageCounter(userID uuid.UUID, apiKeyID *uuid.UUID,
 	return &counter, err
 }
 
+func (r *DigiConnectRepo) ListPendingVerificationRequests(olderThan time.Time, maxAge time.Time, limit int) ([]model.DigiConnectRequest, error) {
+	var rows []model.DigiConnectRequest
+	if limit <= 0 {
+		limit = 50
+	}
+	err := r.db.Model(&model.DigiConnectRequest{}).
+		Where("status = ?", "pending_verification").
+		Where("created_at < ?", olderThan).
+		Where("created_at >= ?", maxAge).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&rows).Error
+	return rows, err
+}
+
+func (r *DigiConnectRepo) ListStalePendingVerificationRequests(maxAge time.Time, limit int) ([]model.DigiConnectRequest, error) {
+	var rows []model.DigiConnectRequest
+	if limit <= 0 {
+		limit = 50
+	}
+	err := r.db.Model(&model.DigiConnectRequest{}).
+		Where("status = ?", "pending_verification").
+		Where("created_at < ?", maxAge).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&rows).Error
+	return rows, err
+}
+
 func (r *DigiConnectRepo) RequestStatusCounts(since time.Time) (map[string]int64, error) {
 	type row struct {
 		Status string

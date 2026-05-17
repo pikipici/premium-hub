@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"premiumhub-api/config"
@@ -22,10 +23,13 @@ import (
 )
 
 type DigiConnectService struct {
-	cfg        *config.Config
-	repo       *repository.DigiConnectRepo
-	walletRepo *repository.WalletRepo
-	httpClient *http.Client
+	cfg            *config.Config
+	repo           *repository.DigiConnectRepo
+	walletRepo     *repository.WalletRepo
+	httpClient     *http.Client
+	routerHealthMu sync.Mutex
+	routerHealth   map[string]interface{}
+	routerHealthAt time.Time
 }
 
 type DigiConnectSummaryResponse struct {
@@ -588,10 +592,57 @@ func (s *DigiConnectService) RevokeAPIKey(userID uuid.UUID, keyID uuid.UUID) (*D
 
 func (s *DigiConnectService) RouterHealth() map[string]interface{} {
 	base := ""
+	healthPath := "/api/health"
 	if s.cfg != nil {
 		base = strings.TrimRight(s.cfg.DigiConnectRouterBaseURL, "/")
+		if hp := strings.TrimSpace(s.cfg.DigiConnectRouterHealthPath); hp != "" {
+			healthPath = hp
+		}
 	}
-	return map[string]interface{}{"status": "not_checked", "router_configured": base != "", "checked_at": time.Now()}
+	if base == "" {
+		return map[string]interface{}{"status": "not_configured", "router_configured": false, "checked_at": time.Now()}
+	}
+	s.routerHealthMu.Lock()
+	if s.routerHealth != nil && time.Since(s.routerHealthAt) < 30*time.Second {
+		cached := make(map[string]interface{}, len(s.routerHealth))
+		for k, v := range s.routerHealth {
+			cached[k] = v
+		}
+		s.routerHealthMu.Unlock()
+		return cached
+	}
+	s.routerHealthMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	probeStart := time.Now()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+healthPath, nil)
+	if err != nil {
+		return s.cacheRouterHealth(map[string]interface{}{"status": "down", "router_configured": true, "error": "request_build_failed", "checked_at": time.Now()})
+	}
+	res, err := s.httpClient.Do(req)
+	latencyMS := time.Since(probeStart).Milliseconds()
+	if err != nil {
+		return s.cacheRouterHealth(map[string]interface{}{"status": "down", "router_configured": true, "error": "unreachable", "latency_ms": latencyMS, "checked_at": time.Now()})
+	}
+	defer res.Body.Close()
+	status := "ok"
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		status = "degraded"
+	}
+	return s.cacheRouterHealth(map[string]interface{}{"status": status, "router_configured": true, "router_status": res.StatusCode, "latency_ms": latencyMS, "checked_at": time.Now()})
+}
+
+func (s *DigiConnectService) cacheRouterHealth(payload map[string]interface{}) map[string]interface{} {
+	s.routerHealthMu.Lock()
+	defer s.routerHealthMu.Unlock()
+	s.routerHealth = payload
+	s.routerHealthAt = time.Now()
+	cached := make(map[string]interface{}, len(payload))
+	for k, v := range payload {
+		cached[k] = v
+	}
+	return cached
 }
 
 type OpenAICompatibleResponseInput struct {
@@ -1011,7 +1062,7 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 		return mapDigiConnectRequestResponse(request, false), DigiConnectPublicError{Code: "UPSTREAM_ERROR", HTTPStatus: http.StatusBadGateway, Message: "Layanan sedang mengalami gangguan. Coba lagi nanti."}
 	}
 	if billing.Source == DigiConnectBillingSourceWallet {
-		if err := s.chargeWalletAfterRouterSuccess(ctx, key.UserID, request.ID, billing.Amount); err != nil {
+		if err := s.chargeWalletAndFinalize(ctx, key.UserID, request, billing.Amount, completedAt); err != nil {
 			request.Status = "pending_verification"
 			request.BillingDecision = "pending_verification"
 			request.BillingStatus = "pending_verification"
@@ -1020,14 +1071,12 @@ func (s *DigiConnectService) CreateAPIRequest(ctx context.Context, apiKey string
 			_ = s.repo.SaveRequest(request)
 			return mapDigiConnectRequestResponse(request, false), MapDigiConnectPublicError("NINEROUTER_TIMEOUT")
 		}
-		request.BillingStatus = DigiConnectBillingStatusCharged
-		request.WalletReference = digiConnectChargeReference(request.ID)
 	} else {
 		request.BillingStatus = DigiConnectBillingStatusIncluded
-	}
-	request.Status = "completed"
-	if err := s.repo.SaveRequest(request); err != nil {
-		return nil, MapDigiConnectPublicError("DATABASE_ERROR")
+		request.Status = "completed"
+		if err := s.repo.SaveRequest(request); err != nil {
+			return nil, MapDigiConnectPublicError("DATABASE_ERROR")
+		}
 	}
 	s.recordDigiConnectSuccessSideEffects(key, request, completedAt)
 	res := mapDigiConnectRequestResponse(request, false)
@@ -1101,6 +1150,52 @@ type digiConnectRouterError struct {
 }
 
 func (s *DigiConnectService) callRouter(ctx context.Context, input DigiConnectAPIRequestInput, route digiConnectResolvedRouterRoute) (*digiConnectRouterResponse, *digiConnectRouterError) {
+	const maxAttempts = 3
+	var lastErr *digiConnectRouterError
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		res, err := s.callRouterOnce(ctx, input, route)
+		if err == nil {
+			return res, nil
+		}
+		lastErr = err
+		if !isDigiConnectRetryableRouterError(err) {
+			return nil, err
+		}
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_TIMEOUT", Err: ctx.Err()}
+			default:
+			}
+		}
+		if attempt < maxAttempts {
+			backoff := time.Duration(attempt) * 200 * time.Millisecond
+			if ctx != nil {
+				select {
+				case <-ctx.Done():
+					return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_TIMEOUT", Err: ctx.Err()}
+				case <-time.After(backoff):
+				}
+			} else {
+				time.Sleep(backoff)
+			}
+		}
+	}
+	return nil, lastErr
+}
+
+func isDigiConnectRetryableRouterError(err *digiConnectRouterError) bool {
+	if err == nil {
+		return false
+	}
+	switch err.InternalCode {
+	case "NINEROUTER_TIMEOUT", "NINEROUTER_HEALTH_FAILED", "NINEROUTER_INVALID_JSON", "NINEROUTER_CONNECT_REFUSED":
+		return true
+	}
+	return false
+}
+
+func (s *DigiConnectService) callRouterOnce(ctx context.Context, input DigiConnectAPIRequestInput, route digiConnectResolvedRouterRoute) (*digiConnectRouterResponse, *digiConnectRouterError) {
 	baseURL := strings.TrimRight(s.cfg.DigiConnectRouterBaseURL, "/")
 	if baseURL == "" {
 		return nil, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: errors.New("digiconnect router base URL is empty")}
@@ -1152,6 +1247,51 @@ func (s *DigiConnectService) callRouter(ctx context.Context, input DigiConnectAP
 		}
 	}
 	return &digiConnectRouterResponse{StatusCode: res.StatusCode, Body: decoded}, nil
+}
+
+func (s *DigiConnectService) chargeWalletAndFinalize(ctx context.Context, userID uuid.UUID, request *model.DigiConnectRequest, amount int64, completedAt time.Time) error {
+	if s.walletRepo == nil {
+		return errors.New("wallet repo belum dikonfigurasi")
+	}
+	reference := digiConnectChargeReference(request.ID)
+	return s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+		}
+		alreadyDebited := false
+		if _, err := s.walletRepo.FindLedgerByReferenceTx(tx, reference); err == nil {
+			alreadyDebited = true
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if !alreadyDebited && amount > 0 {
+			user, err := s.walletRepo.LockUserByIDTx(tx, userID)
+			if err != nil {
+				return err
+			}
+			if user.WalletBalance < amount {
+				return errors.New("saldo wallet tidak cukup")
+			}
+			before := user.WalletBalance
+			after := before - amount
+			user.WalletBalance = after
+			if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+				return err
+			}
+			if err := s.walletRepo.CreateLedgerTx(tx, &model.WalletLedger{UserID: userID, Type: "debit", Category: "digiconnect_request", Amount: amount, BalanceBefore: before, BalanceAfter: after, Reference: reference, Description: "DigiConnect request"}); err != nil {
+				return err
+			}
+		}
+		request.Status = "completed"
+		request.BillingStatus = DigiConnectBillingStatusCharged
+		request.WalletReference = reference
+		request.CompletedAt = &completedAt
+		return tx.Save(request).Error
+	})
 }
 
 func (s *DigiConnectService) chargeWalletAfterRouterSuccess(ctx context.Context, userID uuid.UUID, requestID uuid.UUID, amount int64) error {

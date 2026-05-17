@@ -65,6 +65,9 @@ type Config struct {
 	DigiConnectRouterResponsesPath, DigiConnectRouterTimeoutMS                  string
 	DigiConnectRouterInternalAPIKey                                             string
 	DigiConnectEnabled                                                          bool
+	DigiConnectReconcileWorkerEnabled                                           bool
+	DigiConnectReconcileWorkerInterval, DigiConnectReconcileMinAge              string
+	DigiConnectReconcileMaxAge, DigiConnectReconcileBatchLimit                  string
 }
 
 func Load() *Config {
@@ -199,6 +202,11 @@ func Load() *Config {
 		DigiConnectRouterTimeoutMS:           e("DIGICONNECT_ROUTER_TIMEOUT_MS", "60000"),
 		DigiConnectRouterInternalAPIKey:      e("DIGICONNECT_ROUTER_INTERNAL_API_KEY", ""),
 		DigiConnectEnabled:                   eb("DIGICONNECT_ENABLED", false),
+		DigiConnectReconcileWorkerEnabled:    eb("DIGICONNECT_RECONCILE_WORKER_ENABLED", true),
+		DigiConnectReconcileWorkerInterval:   e("DIGICONNECT_RECONCILE_WORKER_INTERVAL", "60s"),
+		DigiConnectReconcileMinAge:           e("DIGICONNECT_RECONCILE_MIN_AGE", "2m"),
+		DigiConnectReconcileMaxAge:           e("DIGICONNECT_RECONCILE_MAX_AGE", "30m"),
+		DigiConnectReconcileBatchLimit:       e("DIGICONNECT_RECONCILE_BATCH_LIMIT", "50"),
 	}
 }
 
