@@ -1,9 +1,9 @@
 "use client"
 
 import axios from 'axios'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CreditCard, ShieldCheck, WalletCards, Zap } from 'lucide-react'
+import { ShieldCheck, WalletCards } from 'lucide-react'
 
 import { buildLoginHref, buildPathWithSearch } from '@/lib/auth'
 import { clearCheckoutIdempotencyKey, getOrCreateCheckoutIdempotencyKey } from '@/lib/checkoutIdempotency'
@@ -92,6 +92,8 @@ function SosmedCheckoutContent() {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const confirmationRef = useRef<HTMLLabelElement | null>(null)
+  const [confirmationNudge, setConfirmationNudge] = useState(false)
 
   const checkoutPrice = useMemo(() => defaultCheckoutPrice(service), [service])
   const checkoutOriginalPrice = useMemo(() => originalCheckoutPrice(service), [service])
@@ -106,7 +108,6 @@ function SosmedCheckoutContent() {
   )
   const walletBalanceAfter = walletBalance === null ? null : walletBalance - totalPrice
   const walletEnough = walletBalance === null || walletBalanceAfter === null || walletBalanceAfter >= 0
-  const canSubmit = walletEnough && targetPublicConfirmed
 
   useEffect(() => {
     if (!authReady) return
@@ -270,6 +271,11 @@ function SosmedCheckoutContent() {
 
     if (!targetPublicConfirmed) {
       setError('Cek dulu syarat targetnya, lalu centang konfirmasi sebelum bayar.')
+      if (typeof window !== 'undefined' && confirmationRef.current) {
+        confirmationRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setConfirmationNudge(true)
+        window.setTimeout(() => setConfirmationNudge(false), 1800)
+      }
       return
     }
 
@@ -409,7 +415,7 @@ function SosmedCheckoutContent() {
       <Navbar />
       <section className="py-12 md:py-16">
         <div className="max-w-2xl mx-auto px-4">
-          <h1 className="text-2xl font-extrabold mb-8 text-center">{isBundleCheckout ? 'Checkout Paket Spesial' : 'Checkout DigiSosmed'}</h1>
+          <h1 className="text-2xl font-extrabold mb-8">{isBundleCheckout ? 'Checkout Paket Spesial' : 'Checkout DigiSosmed'}</h1>
 
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6">
             <h3 className="text-sm font-bold mb-4">{isBundleCheckout ? 'Ringkasan Paket' : 'Ringkasan Layanan'}</h3>
@@ -577,7 +583,14 @@ function SosmedCheckoutContent() {
                   <div className="rounded-xl border border-[#FDBA74] bg-white/75 px-3 py-2">Hindari order dobel sebelum selesai</div>
                 </div>
 
-                <label className="mt-4 flex cursor-pointer gap-3 rounded-xl border border-[#FDBA74] bg-white px-3 py-3 text-sm font-semibold text-[#141414]">
+                <label
+                  ref={confirmationRef}
+                  className={`mt-4 flex cursor-pointer gap-3 rounded-xl border bg-white px-3 py-3 text-sm font-semibold text-[#141414] transition ${
+                    confirmationNudge
+                      ? 'border-[#FF5733] ring-2 ring-[#FFD9CF] animate-pulse'
+                      : 'border-[#FDBA74]'
+                  }`}
+                >
                   <input
                     checked={targetPublicConfirmed}
                     onChange={(event) => setTargetPublicConfirmed(event.target.checked)}
@@ -612,17 +625,17 @@ function SosmedCheckoutContent() {
             <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAF8] p-4">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#888]">Saldo Sekarang</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#888]">Saldo Sekarang</p>
                   <p className="mt-1 text-sm font-extrabold text-[#141414]">
                     {loadingWallet ? 'Memuat...' : formatRupiah(walletBalance || 0)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#888]">Total Order</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#888]">Total Order</p>
                   <p className="mt-1 text-sm font-extrabold text-[#FF5733]">{formatRupiah(totalPrice)}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#888]">Sisa Saldo</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#888]">Sisa Saldo</p>
                   <p className={`mt-1 text-sm font-extrabold ${walletEnough ? 'text-emerald-600' : 'text-red-600'}`}>
                     {loadingWallet || walletBalanceAfter === null ? '-' : formatRupiah(Math.max(0, walletBalanceAfter))}
                   </p>
@@ -636,35 +649,16 @@ function SosmedCheckoutContent() {
             </div>
           </div>
 
-          <div className="bg-[#F7F7F5] rounded-2xl p-6 mb-6">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              {[
-                { icon: <Zap className="w-5 h-5" />, text: 'Pengiriman Instan' },
-                { icon: <ShieldCheck className="w-5 h-5" />, text: 'Garansi Layanan' },
-                { icon: <CreditCard className="w-5 h-5" />, text: 'Pembayaran Aman' },
-              ].map((f, i) => (
-                <div key={i} className="flex flex-col items-center gap-2">
-                  <div className="text-[#FF5733]">{f.icon}</div>
-                  <span className="text-xs font-medium text-[#888]">{f.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {error && (
             <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl mb-6 text-center font-medium">{error}</div>
           )}
 
           <button
             onClick={handleCheckout}
-            disabled={submitting || !canSubmit}
+            disabled={submitting || !walletEnough}
             className="w-full py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm"
           >
-            {submitting
-              ? 'Memproses Order...'
-              : !targetPublicConfirmed
-                ? 'Centang Konfirmasi Target Dulu'
-                : `Bayar Pakai Wallet ${formatRupiah(totalPrice)}`}
+            {submitting ? 'Memproses Order...' : `Bayar Pakai Wallet ${formatRupiah(totalPrice)}`}
           </button>
 
           <p className="text-xs text-center text-[#888] mt-4">
