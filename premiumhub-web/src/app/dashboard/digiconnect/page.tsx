@@ -126,8 +126,8 @@ function compactPlanName(plan: DigiConnectPlan) {
 
 function planDescription(plan: DigiConnectPlan) {
   if (plan.description) return plan.description
-  if (plan.billing_model === 'pay_per_request') return 'Akses model AI dengan biaya per request. Hanya request sukses yang ditagihkan.'
-  if (plan.duration_days) return `Akses DigiConnect aktif ${plan.duration_days} hari untuk workflow intensif.`
+  if (plan.billing_model === 'pay_per_request') return 'Bayar per request sukses.'
+  if (plan.duration_days) return `Aktif ${plan.duration_days} hari.`
   return 'Akses API DigiConnect.'
 }
 
@@ -249,7 +249,7 @@ export default function DigiConnectDashboardPage() {
       setPlanDashboards((prev) => prev.map((item) => item.plan.code === res.data.plan_code ? { ...item, entitlement: res.data } : item))
     } catch (err) {
       const e = err as { response?: { data?: { message?: string } } }
-      setError(e.response?.data?.message || 'Checkout gagal. Pastikan saldo wallet cukup.')
+      setError(e.response?.data?.message || 'Checkout gagal. Saldo wallet kurang.')
     } finally {
       setCheckingOut(false)
     }
@@ -271,7 +271,7 @@ export default function DigiConnectDashboardPage() {
   const curlSample = `curl ${baseUrl}/digiconnect/chat/completions \\\n  -H "Authorization: Bearer ${sampleKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"${sampleModel}","messages":[{"role":"user","content":"halo"}]}'`
 
   const headline = activePlanDashboard?.dashboard_headline || 'Pusat kontrol DigiConnect'
-  const summary = activePlanDashboard?.dashboard_summary || 'Kelola API key, pantau request, dan integrasi DigiConnect dari satu tempat.'
+  const summary = activePlanDashboard?.dashboard_summary || 'API key, request, dan integrasi—satu tempat.'
 
   return (
     <main className="min-h-screen bg-[#FBF8F4] px-3 py-5 text-[#171411] sm:px-5 lg:px-7">
@@ -390,7 +390,7 @@ export default function DigiConnectDashboardPage() {
               </div>
 
               {visibleRequests.length === 0 ? (
-                <Empty icon={<Sparkles className="h-5 w-5" />} title="Belum ada request" hint="Kirim panggilan pertama lewat panel Integrasi untuk melihat aktivitas di sini." />
+                <Empty icon={<Sparkles className="h-5 w-5" />} title="Belum ada request" hint="Kirim panggilan pertama dari panel Integrasi." />
               ) : (
                 <div className="space-y-2">
                   {visibleRequests.map((request) => (
@@ -409,7 +409,7 @@ export default function DigiConnectDashboardPage() {
 }
 
 function AccessPanel({ plan, entitlement, checkingOut, onCheckout }: { plan?: DigiConnectPlan; entitlement?: DigiConnectEntitlement; checkingOut: boolean; onCheckout: () => void }) {
-  if (!plan) return <Empty icon={<ShieldCheck className="h-5 w-5" />} title="Paket DigiConnect belum tersedia" hint="Coba refresh halaman atau hubungi support kalau masalah berlanjut." />
+  if (!plan) return <Empty icon={<ShieldCheck className="h-5 w-5" />} title="Paket DigiConnect belum tersedia" hint="Refresh halaman atau hubungi support." />
 
   const tone = accessTone(plan, entitlement)
   const isStockOut = plan.available === false
@@ -417,8 +417,8 @@ function AccessPanel({ plan, entitlement, checkingOut, onCheckout }: { plan?: Di
 
   const items: { label: string; value: string }[] = [
     { label: 'Billing', value: billingDescriptor(plan) },
-    { label: 'Fair use harian', value: plan.daily_fair_use_limit ? `${plan.daily_fair_use_limit} request` : 'Unlimited' },
-    { label: 'Berakhir', value: entitlement?.expires_at ? formatDateOnly(entitlement.expires_at) : (plan.duration_days ? '-' : 'Tanpa expired') },
+    { label: 'Fair use', value: plan.daily_fair_use_limit ? `${plan.daily_fair_use_limit} request` : 'Unlimited' },
+    { label: 'Berakhir', value: entitlement?.expires_at ? formatDateOnly(entitlement.expires_at) : (plan.duration_days ? '-' : 'Tanpa kadaluarsa') },
     { label: 'Stok', value: plan.stock_managed ? `${plan.stock_remaining ?? 0} / ${plan.stock_total ?? 0} tersisa` : 'Tidak terbatas' },
   ]
 
@@ -565,7 +565,7 @@ function IntegrationPanel({ baseUrl, sampleKey, curlSample, copyKey, onCopy }: {
           <EndpointChip method="POST" path="/responses" />
         </div>
         <p className="mt-3 text-sm leading-relaxed text-[#7B7067]">
-          Pakai base URL ini sebagai endpoint OpenAI-compatible di 9router, AI SDK, atau client lain. Kirim API key DigiConnect sebagai bearer token.
+          Endpoint OpenAI-compatible untuk 9router, AI SDK, atau client lain. Pakai API key sebagai bearer token.
         </p>
       </div>
     </div>
@@ -582,7 +582,7 @@ function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, on
             value={newKeyName}
             onChange={(event) => setNewKeyName(event.target.value)}
             className="min-h-10 flex-1 rounded-lg border border-[#EFE3D6] bg-white px-3 text-sm font-semibold text-[#171411] outline-none transition focus:border-[#FF5733]"
-            placeholder="Nama key, contoh: Production"
+            placeholder="Nama key, mis. Production"
           />
           <button
             type="button"
@@ -600,12 +600,12 @@ function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, on
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold text-amber-900">Simpan sekarang. Plain key cuma muncul satu kali.</div>
+            <div className="text-sm font-bold text-amber-900">Plain key muncul sekali. Simpan sekarang.</div>
             <button type="button" onClick={() => onCopy('plain', createdKey)} className="mt-2 inline-flex w-full items-center justify-between gap-2 break-all rounded-md bg-white px-3 py-2 text-left font-mono text-xs text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100">
               <span className="break-all">{createdKey}</span>
               <Copy className="h-4 w-4 shrink-0" />
             </button>
-            <div className="mt-2 text-[11px] font-semibold text-amber-800">{copyKey === 'plain' ? 'Tersalin ke clipboard.' : 'Klik untuk menyalin.'}</div>
+            <div className="mt-2 text-[11px] font-semibold text-amber-800">{copyKey === 'plain' ? 'Tersalin.' : 'Klik untuk salin.'}</div>
           </div>
           <button type="button" onClick={onClearCreated} className="text-amber-700 hover:text-amber-900" aria-label="Tutup">
             <X className="h-4 w-4" />
@@ -614,7 +614,7 @@ function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, on
       ) : null}
 
       {keys.length === 0 ? (
-        <Empty icon={<Key className="h-5 w-5" />} title="Belum ada API key" hint="Buat satu key untuk mulai memanggil DigiConnect dari aplikasi atau workflow kamu." />
+        <Empty icon={<Key className="h-5 w-5" />} title="Belum ada API key" hint="Buat key untuk mulai panggil DigiConnect." />
       ) : (
         <div className="space-y-2">
           {keys.map((key) => (
