@@ -132,13 +132,13 @@ func (h *DigiConnectHandler) OpenAICompatibleResponses(c *gin.Context) {
 		writeDigiConnectError(c, service.MapDigiConnectPublicError("INVALID_PAYLOAD"))
 		return
 	}
+	if input.Stream {
+		streamOpenAIResponse(c, h.svc, apiKey, input)
+		return
+	}
 	res, publicErr := h.svc.CreateOpenAICompatibleResponse(c.Request.Context(), apiKey, input, c.GetHeader("Idempotency-Key"))
 	if publicErr.Code != "" {
 		writeDigiConnectError(c, publicErr)
-		return
-	}
-	if input.Stream {
-		writeOpenAICompatibleResponseStream(c, res)
 		return
 	}
 	c.JSON(http.StatusOK, res)
@@ -151,53 +151,182 @@ func (h *DigiConnectHandler) OpenAICompatibleChatCompletions(c *gin.Context) {
 		writeDigiConnectError(c, service.MapDigiConnectPublicError("INVALID_PAYLOAD"))
 		return
 	}
+	if input.Stream {
+		streamOpenAIChatCompletion(c, h.svc, apiKey, input)
+		return
+	}
 	res, publicErr := h.svc.CreateOpenAICompatibleChatCompletion(c.Request.Context(), apiKey, input, c.GetHeader("Idempotency-Key"))
 	if publicErr.Code != "" {
 		writeDigiConnectError(c, publicErr)
 		return
 	}
-	if input.Stream {
-		writeOpenAICompatibleChatStream(c, res)
-		return
-	}
 	c.JSON(http.StatusOK, res)
 }
 
-func writeOpenAICompatibleChatStream(c *gin.Context, res map[string]interface{}) {
-	id, _ := res["id"].(string)
-	if id == "" {
-		id = "chatcmpl_stream"
-	}
-	model, _ := res["model"].(string)
-	text := extractChatCompletionText(res)
+func streamOpenAIChatCompletion(c *gin.Context, svc *service.DigiConnectService, apiKey string, input service.OpenAICompatibleChatInput) {
+	headerWritten := false
+	chunkID := ""
 	created := time.Now().Unix()
-	if value, ok := res["created"].(int64); ok {
-		created = value
+	publicErr := svc.StreamOpenAICompatibleChatCompletion(c.Request.Context(), apiKey, input, c.GetHeader("Idempotency-Key"), func(chunk service.DigiConnectStreamChunk) {
+		if chunkID == "" && chunk.RequestID != "" {
+			chunkID = chunk.RequestID
+		}
+		switch chunk.Type {
+		case "delta":
+			if !headerWritten {
+				writeOpenAIStreamHeaders(c)
+				headerWritten = true
+				// Initial role chunk per OpenAI spec.
+				writeSSEData(c, map[string]interface{}{
+					"id":      chunkID,
+					"object":  "chat.completion.chunk",
+					"created": created,
+					"model":   chunk.Model,
+					"choices": []map[string]interface{}{{
+						"index":         0,
+						"delta":         map[string]interface{}{"role": "assistant"},
+						"finish_reason": nil,
+					}},
+				})
+			}
+			writeSSEData(c, map[string]interface{}{
+				"id":      chunkID,
+				"object":  "chat.completion.chunk",
+				"created": created,
+				"model":   chunk.Model,
+				"choices": []map[string]interface{}{{
+					"index":         0,
+					"delta":         map[string]interface{}{"content": chunk.Delta},
+					"finish_reason": nil,
+				}},
+			})
+		case "completed":
+			if !headerWritten {
+				// No deltas streamed (e.g. upstream returned single body fallback)
+				// — emit role + full text + stop in one go.
+				writeOpenAIStreamHeaders(c)
+				headerWritten = true
+				writeSSEData(c, map[string]interface{}{
+					"id":      chunkID,
+					"object":  "chat.completion.chunk",
+					"created": created,
+					"model":   chunk.Model,
+					"choices": []map[string]interface{}{{
+						"index":         0,
+						"delta":         map[string]interface{}{"role": "assistant"},
+						"finish_reason": nil,
+					}},
+				})
+				if chunk.Text != "" {
+					writeSSEData(c, map[string]interface{}{
+						"id":      chunkID,
+						"object":  "chat.completion.chunk",
+						"created": created,
+						"model":   chunk.Model,
+						"choices": []map[string]interface{}{{
+							"index":         0,
+							"delta":         map[string]interface{}{"content": chunk.Text},
+							"finish_reason": nil,
+						}},
+					})
+				}
+			}
+			writeSSEData(c, map[string]interface{}{
+				"id":      chunkID,
+				"object":  "chat.completion.chunk",
+				"created": created,
+				"model":   chunk.Model,
+				"choices": []map[string]interface{}{{
+					"index":         0,
+					"delta":         map[string]interface{}{},
+					"finish_reason": chunk.FinishReason,
+				}},
+			})
+			writeSSEDone(c)
+		case "error":
+			if !headerWritten {
+				writeDigiConnectError(c, chunk.Error)
+				return
+			}
+			// Already streaming — emit error event then [DONE].
+			writeSSEData(c, map[string]interface{}{
+				"error": map[string]interface{}{
+					"code":    chunk.Error.Code,
+					"message": chunk.Error.Message,
+				},
+			})
+			writeSSEDone(c)
+		}
+	})
+	if publicErr.Code != "" && !headerWritten {
+		writeDigiConnectError(c, publicErr)
 	}
-	writeOpenAIStreamHeaders(c)
-	writeSSEData(c, map[string]interface{}{"id": id, "object": "chat.completion.chunk", "created": created, "model": model, "choices": []map[string]interface{}{{"index": 0, "delta": map[string]interface{}{"role": "assistant"}, "finish_reason": nil}}})
-	if text != "" {
-		writeSSEData(c, map[string]interface{}{"id": id, "object": "chat.completion.chunk", "created": created, "model": model, "choices": []map[string]interface{}{{"index": 0, "delta": map[string]interface{}{"content": text}, "finish_reason": nil}}})
-	}
-	writeSSEData(c, map[string]interface{}{"id": id, "object": "chat.completion.chunk", "created": created, "model": model, "choices": []map[string]interface{}{{"index": 0, "delta": map[string]interface{}{}, "finish_reason": "stop"}}})
-	writeSSEDone(c)
 }
 
-func writeOpenAICompatibleResponseStream(c *gin.Context, res map[string]interface{}) {
-	id, _ := res["id"].(string)
-	if id == "" {
-		id = "resp_stream"
+func streamOpenAIResponse(c *gin.Context, svc *service.DigiConnectService, apiKey string, input service.OpenAICompatibleResponseInput) {
+	headerWritten := false
+	publicErr := svc.StreamOpenAICompatibleResponse(c.Request.Context(), apiKey, input, c.GetHeader("Idempotency-Key"), func(chunk service.DigiConnectStreamChunk) {
+		switch chunk.Type {
+		case "completed":
+			if !headerWritten {
+				writeOpenAIStreamHeaders(c)
+				headerWritten = true
+				if chunk.Text != "" {
+					writeSSEData(c, map[string]interface{}{
+						"type":          "response.output_text.delta",
+						"item_id":       "msg_0",
+						"output_index":  0,
+						"content_index": 0,
+						"delta":         chunk.Text,
+					})
+				}
+			}
+			writeSSEData(c, map[string]interface{}{
+				"type": "response.completed",
+				"response": map[string]interface{}{
+					"id":     chunk.RequestID,
+					"object": "response",
+					"status": "completed",
+					"model":  chunk.Model,
+				},
+			})
+			writeSSEDone(c)
+		case "error":
+			if !headerWritten {
+				writeDigiConnectError(c, chunk.Error)
+				return
+			}
+			writeSSEData(c, map[string]interface{}{
+				"type":  "error",
+				"error": map[string]interface{}{"code": chunk.Error.Code, "message": chunk.Error.Message},
+			})
+			writeSSEDone(c)
+		default:
+			// passthrough:<event_name> — write the upstream payload verbatim.
+			if !strings.HasPrefix(chunk.Type, "passthrough:") {
+				return
+			}
+			eventName := strings.TrimPrefix(chunk.Type, "passthrough:")
+			if !headerWritten {
+				writeOpenAIStreamHeaders(c)
+				headerWritten = true
+			}
+			writeSSEEvent(c, eventName, chunk.Delta)
+		}
+	})
+	if publicErr.Code != "" && !headerWritten {
+		writeDigiConnectError(c, publicErr)
 	}
-	model, _ := res["model"].(string)
-	text := extractResponseText(res)
-	writeOpenAIStreamHeaders(c)
-	writeSSEData(c, map[string]interface{}{"type": "response.created", "response": map[string]interface{}{"id": id, "object": "response", "status": "in_progress", "model": model}})
-	if text != "" {
-		writeSSEData(c, map[string]interface{}{"type": "response.output_text.delta", "item_id": "msg_0", "output_index": 0, "content_index": 0, "delta": text})
+}
+
+func writeSSEEvent(c *gin.Context, eventName string, rawData string) {
+	if eventName != "" {
+		_, _ = fmt.Fprintf(c.Writer, "event: %s\n", eventName)
 	}
-	writeSSEData(c, map[string]interface{}{"type": "response.output_text.done", "item_id": "msg_0", "output_index": 0, "content_index": 0, "text": text})
-	writeSSEData(c, map[string]interface{}{"type": "response.completed", "response": res})
-	writeSSEDone(c)
+	_, _ = fmt.Fprintf(c.Writer, "data: %s\n\n", rawData)
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 func writeOpenAIStreamHeaders(c *gin.Context) {
