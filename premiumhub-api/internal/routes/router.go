@@ -317,6 +317,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.GET("/digiconnect/dashboard", digiConnectHandler.Dashboard)
 	protected.GET("/digiconnect/api-keys", digiConnectHandler.ListAPIKeys)
 	protected.POST("/digiconnect/api-keys", digiConnectHandler.CreateAPIKey)
+	protected.DELETE("/digiconnect/api-keys/:id", digiConnectHandler.RevokeAPIKey)
 	protected.GET("/digiconnect/entitlements", digiConnectHandler.ListEntitlements)
 	protected.POST("/digiconnect/checkout", digiConnectHandler.CheckoutWithWallet)
 	protected.GET("/digiconnect/requests", digiConnectHandler.ListRequests)

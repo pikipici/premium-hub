@@ -64,6 +64,12 @@ func (r *DigiConnectRepo) ListAPIKeysByUser(userID uuid.UUID) ([]model.DigiConne
 	return keys, err
 }
 
+func (r *DigiConnectRepo) FindAPIKeyByIDForUser(id, userID uuid.UUID) (*model.DigiConnectAPIKey, error) {
+	var key model.DigiConnectAPIKey
+	err := r.db.Where("id = ? AND user_id = ?", id, userID).First(&key).Error
+	return &key, err
+}
+
 func (r *DigiConnectRepo) LockAPIKeyByIDTx(tx *gorm.DB, id uuid.UUID) (*model.DigiConnectAPIKey, error) {
 	var key model.DigiConnectAPIKey
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&key, "id = ?", id).Error

@@ -44,6 +44,11 @@ export const digiconnectService = {
     return res.data
   },
 
+  revokeApiKey: async (id: string) => {
+    const res = await api.delete<ApiResponse<DigiConnectApiKey>>(`/digiconnect/api-keys/${id}`)
+    return res.data
+  },
+
   listEntitlements: async () => {
     const res = await api.get<ApiResponse<DigiConnectEntitlement[]>>('/digiconnect/entitlements')
     return res.data

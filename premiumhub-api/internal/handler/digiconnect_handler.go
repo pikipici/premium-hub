@@ -73,6 +73,21 @@ func (h *DigiConnectHandler) CreateAPIKey(c *gin.Context) {
 	response.Created(c, "API key DigiConnect dibuat", res)
 }
 
+func (h *DigiConnectHandler) RevokeAPIKey(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	keyID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID API key tidak valid")
+		return
+	}
+	res, err := h.svc.RevokeAPIKey(userID, keyID)
+	if err != nil {
+		response.NotFound(c, "API key tidak ditemukan")
+		return
+	}
+	response.Success(c, "API key DigiConnect dicabut", res)
+}
+
 func (h *DigiConnectHandler) CreateAPIRequest(c *gin.Context) {
 	apiKey := bearerToken(c.GetHeader("Authorization"))
 	var input service.DigiConnectAPIRequestInput

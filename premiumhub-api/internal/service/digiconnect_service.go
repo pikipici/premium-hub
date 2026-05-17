@@ -567,6 +567,25 @@ func (s *DigiConnectService) CreateAPIKey(userID uuid.UUID, input DigiConnectCre
 	return &res, nil
 }
 
+func (s *DigiConnectService) RevokeAPIKey(userID uuid.UUID, keyID uuid.UUID) (*DigiConnectAPIKeyResponse, error) {
+	key, err := s.repo.FindAPIKeyByIDForUser(keyID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if key.Status == "revoked" {
+		res := mapDigiConnectAPIKey(*key, "")
+		return &res, nil
+	}
+	now := time.Now()
+	key.Status = "revoked"
+	key.RevokedAt = &now
+	if err := s.repo.SaveAPIKey(key); err != nil {
+		return nil, err
+	}
+	res := mapDigiConnectAPIKey(*key, "")
+	return &res, nil
+}
+
 func (s *DigiConnectService) RouterHealth() map[string]interface{} {
 	base := ""
 	if s.cfg != nil {
