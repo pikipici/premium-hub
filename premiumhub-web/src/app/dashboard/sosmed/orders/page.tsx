@@ -7,6 +7,12 @@ import { animate, createScope, stagger } from 'animejs'
 import { CheckCircle2, ChevronDown, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw, X } from 'lucide-react'
 
 import {
+  sosmedOrderTone,
+  statusToneClasses,
+  type StatusTone,
+} from '@/lib/dashboardStatusPill'
+
+import {
   getUserRefillButtonState,
   getUserRefillDescription,
   getUserRefillMeta,
@@ -21,22 +27,8 @@ import type { SosmedOrder } from '@/types/sosmedOrder'
 
 
 function statusMeta(order: SosmedOrder) {
-  if (order.order_status === 'success') {
-    return { label: 'Sukses', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
-  }
-  if (order.order_status === 'processing') {
-    return { label: 'Diproses', className: 'bg-sky-100 text-sky-700 border-sky-200' }
-  }
-  if (order.order_status === 'failed') {
-    return { label: 'Gagal', className: 'bg-red-100 text-red-700 border-red-200' }
-  }
-  if (order.order_status === 'canceled') {
-    return { label: 'Dibatalkan', className: 'bg-gray-100 text-gray-700 border-gray-200' }
-  }
-  if (order.order_status === 'expired') {
-    return { label: 'Expired', className: 'bg-gray-100 text-gray-700 border-gray-200' }
-  }
-  return { label: 'Menunggu Bayar', className: 'bg-amber-100 text-amber-700 border-amber-200' }
+  const { tone, label } = sosmedOrderTone(order.order_status || 'pending')
+  return { label, className: statusToneClasses(tone).pill }
 }
 
 function formatDate(value: string) {
@@ -66,20 +58,26 @@ function compactTarget(value?: string) {
 }
 
 function refillHistoryStatusLabel(value?: string) {
-  switch ((value || '').toLowerCase()) {
-    case 'requested':
-      return { label: 'Dikirim', className: 'bg-violet-100 text-violet-700 border-violet-200' }
-    case 'processing':
-      return { label: 'Diproses', className: 'bg-sky-100 text-sky-700 border-sky-200' }
-    case 'completed':
-      return { label: 'Sukses', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
-    case 'failed':
-      return { label: 'Gagal', className: 'bg-red-100 text-red-700 border-red-200' }
-    case 'rejected':
-      return { label: 'Ditolak', className: 'bg-amber-100 text-amber-700 border-amber-200' }
-    default:
-      return { label: value || '-', className: 'bg-gray-100 text-gray-700 border-gray-200' }
+  const s = (value || '').toLowerCase()
+  let tone: StatusTone = 'neutral'
+  let label = value || '-'
+  if (s === 'requested') {
+    tone = 'info'
+    label = 'Dikirim'
+  } else if (s === 'processing') {
+    tone = 'info'
+    label = 'Diproses'
+  } else if (s === 'completed') {
+    tone = 'success'
+    label = 'Sukses'
+  } else if (s === 'failed') {
+    tone = 'fail'
+    label = 'Gagal'
+  } else if (s === 'rejected') {
+    tone = 'process'
+    label = 'Ditolak'
   }
+  return { label, className: statusToneClasses(tone).pill }
 }
 
 function paymentLabel(value: SosmedOrder['payment_status']) {
@@ -315,7 +313,7 @@ export default function DashboardSosmedOrdersPage() {
       </header>
 
       {error ? (
-        <section className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</section>
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</section>
       ) : null}
 
       {loading ? (
@@ -417,7 +415,7 @@ export default function DashboardSosmedOrdersPage() {
                                   step.done
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
                                     : step.danger
-                                      ? 'border-red-200 bg-red-50 text-red-600'
+                                      ? 'border-rose-200 bg-rose-50 text-rose-600'
                                       : step.active
                                         ? 'border-[#FFB29F] bg-[#FFF3EF] text-[#FF5733]'
                                         : 'border-[#E5E5E0] bg-white text-[#AAA]'
@@ -436,7 +434,7 @@ export default function DashboardSosmedOrdersPage() {
                                   step.done
                                     ? 'text-emerald-700'
                                     : step.danger
-                                      ? 'text-red-600'
+                                      ? 'text-rose-600'
                                       : step.active
                                         ? 'text-[#FF5733]'
                                         : 'text-[#999]'
@@ -459,7 +457,7 @@ export default function DashboardSosmedOrdersPage() {
                             : order.refill_status === 'completed'
                               ? 'border-emerald-200 bg-emerald-50'
                               : order.refill_status === 'failed' || order.refill_status === 'rejected'
-                                ? 'border-red-200 bg-red-50'
+                                ? 'border-rose-200 bg-rose-50'
                                 : 'border-sky-200 bg-sky-50'
                         }`}
                       >
@@ -535,7 +533,7 @@ export default function DashboardSosmedOrdersPage() {
                                   ) : null}
                                 </div>
                                 {attempt.provider_error ? (
-                                  <p className="mt-2 rounded-xl border border-red-100 bg-red-50 px-2.5 py-2 text-[11px] leading-relaxed text-red-700">
+                                  <p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] leading-relaxed text-rose-700">
                                     {attempt.provider_error}
                                   </p>
                                 ) : null}
@@ -577,7 +575,7 @@ export default function DashboardSosmedOrdersPage() {
                           className={`inline-flex items-center justify-center gap-1.5 rounded-xl border bg-white px-3 py-2 text-[11px] font-black disabled:cursor-not-allowed disabled:opacity-60 ${
                             orderDisplay.cancelAction.kind === 'provider'
                               ? 'border-amber-200 text-amber-700 hover:bg-amber-50'
-                              : 'border-red-200 text-red-600 hover:bg-red-50'
+                              : 'border-rose-200 text-rose-600 hover:bg-rose-50'
                           }`}
                         >
                           {cancelLoading === order.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}

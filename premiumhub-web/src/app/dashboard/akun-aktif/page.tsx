@@ -235,22 +235,22 @@ export default function AkunAktifPage() {
       {loading ? (
         <div className="space-y-3">
           {[...Array(4)].map((_, idx) => (
-            <div key={idx} className="h-40 animate-pulse rounded-2xl bg-white" />
+            <div key={idx} className="h-40 animate-pulse rounded-2xl bg-[#F4F4F2]" />
           ))}
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-          <p className="text-sm font-semibold text-red-700">{error}</p>
+        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
+          <p className="text-sm font-semibold text-rose-700">{error}</p>
           <button
             type="button"
             onClick={() => void loadOrders()}
-            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"
+            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
           >
             <Loader2 className="h-3.5 w-3.5" /> Coba lagi
           </button>
         </div>
       ) : !hasAnyAccountOrder ? (
-        <div className="rounded-2xl border border-[#EBEBEB] bg-white px-6 py-12 text-center">
+        <div className="rounded-3xl border border-[#EBEBEB] bg-white px-6 py-12 text-center">
           <PackageOpen className="mx-auto mb-3 h-10 w-10 text-[#D1D1CD]" />
           <p className="text-sm font-semibold text-[#444]">Belum ada akun aktif.</p>
           <p className="mt-1 text-xs text-[#888]">Kalau order lu sudah lunas, akun bakal muncul otomatis di sini.</p>
@@ -298,7 +298,7 @@ export default function AkunAktifPage() {
           </div>
 
           {visibleOrders.length === 0 ? (
-            <div className="rounded-2xl border border-[#EBEBEB] bg-white px-6 py-10 text-center">
+            <div className="rounded-3xl border border-[#EBEBEB] bg-white px-6 py-10 text-center">
               <PackageOpen className="mx-auto mb-3 h-8 w-8 text-[#D1D1CD]" />
               <p className="text-sm font-semibold text-[#444]">
                 {activeTab === 'active' ? 'Belum ada akun yang masih aktif.' : 'Belum ada akun yang expired.'}
@@ -317,12 +317,12 @@ export default function AkunAktifPage() {
                 const expiryDays = daysUntilExpiry(order.expires_at)
                 const expiryBadgeClass =
                   expiryDays === null
-                    ? 'bg-[#F1F1EE] text-[#666]'
+                    ? 'bg-stone-100 text-stone-600'
                     : expiryDays <= 0
-                      ? 'bg-red-100 text-red-700'
+                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
                       : expiryDays <= 3
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-green-100 text-green-700'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 const expiryLabel =
                   expiryDays === null
                     ? 'Tanpa tanggal expired'
@@ -344,7 +344,7 @@ export default function AkunAktifPage() {
                 const startedAt = order.paid_at || order.created_at
 
             return (
-              <div key={order.id} className="overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-4 sm:p-5">
+              <div key={order.id} className="overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
                   <div className="flex min-w-0 items-start gap-3">
                     <div className="text-3xl leading-none">{product.icon || '📦'}</div>
@@ -359,7 +359,7 @@ export default function AkunAktifPage() {
                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${expiryBadgeClass}`}>{expiryLabel}</span>
                     <span
                       className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                        expiredNow ? 'bg-red-100 text-red-700' : 'bg-[#ECFDF3] text-[#16774C]'
+                        expiredNow ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
                       }`}
                     >
                       {expiredNow ? 'Expired' : 'Aktif'}
@@ -379,7 +379,7 @@ export default function AkunAktifPage() {
                         className="inline-flex h-8 w-8 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40 sm:self-auto"
                         aria-label="Copy email akun"
                       >
-                        {copiedKey === `${order.id}:email` ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                        {copiedKey === `${order.id}:email` ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>
@@ -413,7 +413,7 @@ export default function AkunAktifPage() {
                           className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label="Copy password akun"
                         >
-                          {copiedKey === passwordKey ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                          {copiedKey === passwordKey ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                         </button>
                       </div>
                     </div>
@@ -439,14 +439,14 @@ export default function AkunAktifPage() {
                         className="inline-flex h-8 w-8 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] sm:self-auto"
                         aria-label="Copy order id"
                       >
-                        {copiedKey === `${order.id}:id` ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                        {copiedKey === `${order.id}:id` ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>
                 </div>
 
                 {!order.stock ? (
-                  <div className="mt-3 flex max-w-full items-start gap-1 rounded-lg bg-yellow-50 px-2.5 py-1 text-[11px] font-semibold text-yellow-700">
+                  <div className="mt-3 flex max-w-full items-start gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
                     <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0" />
                     <span className="break-words">Akun belum ter-assign. Hubungi admin kalau status ini bertahan lama.</span>
                   </div>

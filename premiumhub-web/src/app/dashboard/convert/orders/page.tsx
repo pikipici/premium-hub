@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { Loader2, RefreshCcw } from 'lucide-react'
 
 import { getHttpErrorMessage } from '@/lib/httpError'
+import { convertOrderTone, statusToneClasses } from '@/lib/dashboardStatusPill'
 import { convertService } from '@/services/convertService'
 import type { ConvertAssetType, ConvertOrderStatus, ConvertOrderSummary } from '@/types/convert'
 
@@ -29,27 +30,10 @@ function formatDate(value: string) {
 }
 
 function statusMeta(status: ConvertOrderStatus) {
-  switch (status) {
-    case 'pending_transfer':
-      return { label: 'Menunggu Transfer', className: 'bg-amber-100 text-amber-700 border-amber-200' }
-    case 'waiting_review':
-      return { label: 'Menunggu Review', className: 'bg-yellow-100 text-yellow-700 border-yellow-200' }
-    case 'approved':
-      return { label: 'Approved', className: 'bg-blue-100 text-blue-700 border-blue-200' }
-    case 'processing':
-      return { label: 'Diproses', className: 'bg-sky-100 text-sky-700 border-sky-200' }
-    case 'success':
-      return { label: 'Sukses', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
-    case 'failed':
-      return { label: 'Gagal', className: 'bg-red-100 text-red-700 border-red-200' }
-    case 'expired':
-      return { label: 'Expired', className: 'bg-gray-100 text-gray-700 border-gray-200' }
-    case 'canceled':
-      return { label: 'Dibatalkan', className: 'bg-gray-100 text-gray-700 border-gray-200' }
-    default:
-      return { label: status, className: 'bg-gray-100 text-gray-700 border-gray-200' }
-  }
+  const { tone, label } = convertOrderTone(status)
+  return { label, className: statusToneClasses(tone).pill }
 }
+
 
 function assetLabel(asset: ConvertAssetType) {
   if (asset === 'pulsa') return 'Pulsa'
@@ -155,36 +139,41 @@ function DashboardConvertOrdersPageContent() {
         </div>
       </header>
 
-      <section className="rounded-2xl border border-[#EBEBEB] bg-white p-4 md:p-5">
-        <div className="flex flex-wrap gap-2">
-          {FILTERS.map((filter) => (
-            <Link
-              key={filter.key}
-              href={filter.href}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                currentAsset === filter.key
-                  ? 'border-[#FF5733] bg-[#FFF0ED] text-[#FF5733]'
-                  : 'border-[#EBEBEB] bg-white text-[#666] hover:border-[#FF5733] hover:text-[#FF5733]'
-              }`}
-            >
-              {filter.label}
-            </Link>
-          ))}
+      <section className="rounded-3xl border border-[#EBEBEB] bg-white p-4 md:p-5">
+        <div role="tablist" aria-label="Filter tipe convert" className="flex flex-wrap gap-2">
+          {FILTERS.map((filter) => {
+            const active = currentAsset === filter.key
+            return (
+              <Link
+                key={filter.key}
+                href={filter.href}
+                role="tab"
+                aria-selected={active}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  active
+                    ? 'border-[#FF5733] bg-[#FFF0ED] text-[#FF5733]'
+                    : 'border-[#EBEBEB] bg-white text-[#6B7280] hover:border-[#FF5733] hover:text-[#FF5733]'
+                }`}
+              >
+                {filter.label}
+              </Link>
+            )
+          })}
         </div>
       </section>
 
       {error ? (
-        <section className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</section>
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</section>
       ) : null}
 
       {loading ? (
-        <section className="rounded-2xl border border-[#EBEBEB] bg-white p-8 text-center text-sm text-[#888]">
+        <section className="rounded-3xl border border-[#EBEBEB] bg-white p-8 text-center text-sm text-[#6B7280]">
           <span className="inline-flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Memuat riwayat convert...
           </span>
         </section>
       ) : orders.length === 0 ? (
-        <section className="rounded-2xl border border-[#EBEBEB] bg-white p-6 text-center">
+        <section className="rounded-3xl border border-[#EBEBEB] bg-white p-6 text-center">
           <p className="text-sm text-[#666]">Belum ada data order convert untuk filter ini.</p>
           <p className="mt-1 text-xs text-[#888]">Begitu order dibuat, status dan detail akan muncul di halaman ini.</p>
         </section>
@@ -197,7 +186,7 @@ function DashboardConvertOrdersPageContent() {
               <Link
                 key={order.id}
                 href={`/dashboard/convert/orders/${order.id}`}
-                className="block rounded-2xl border border-[#EBEBEB] bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
+                className="block rounded-3xl border border-[#EBEBEB] bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
@@ -231,7 +220,7 @@ function DashboardConvertOrdersPageContent() {
       )}
 
       {!loading && total > 0 ? (
-        <section className="rounded-2xl border border-[#EBEBEB] bg-white p-3">
+        <section className="rounded-3xl border border-[#EBEBEB] bg-white p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-[#666]">
               Menampilkan <span className="font-bold text-[#141414]">{orders.length}</span> item dari total{' '}

@@ -343,7 +343,7 @@ export default function DigiConnectDashboardPage() {
   const summary = activePlanDashboard?.dashboard_summary || 'API key, request, dan integrasi—satu tempat.'
 
   return (
-    <main className="min-h-screen bg-[#FBF8F4] px-3 py-5 text-[#171411] sm:px-5 lg:px-7">
+    <div className="text-[#171411]">
       <section className="mx-auto w-full max-w-6xl space-y-4">
 
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -510,7 +510,7 @@ export default function DigiConnectDashboardPage() {
           onConfirm={() => revokeKey(confirmRevokeKey.id)}
         />
       ) : null}
-    </main>
+    </div>
   )
 }
 

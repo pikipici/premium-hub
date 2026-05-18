@@ -11,7 +11,7 @@ export default function DashboardConvertOverviewPage() {
       <section className="grid gap-3 md:grid-cols-2">
         <Link
           href="/dashboard/convert/orders"
-          className="rounded-2xl border border-[#EBEBEB] bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
+          className="rounded-3xl border border-[#EBEBEB] bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
         >
           <h2 className="text-base font-extrabold text-[#141414]">Riwayat Order Convert</h2>
           <p className="mt-1 text-sm text-[#666]">Lihat status, detail, dan progress order convert yang sudah dibuat.</p>
@@ -19,7 +19,7 @@ export default function DashboardConvertOverviewPage() {
 
         <Link
           href="/product/convert"
-          className="rounded-2xl border border-[#EBEBEB] bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
+          className="rounded-3xl border border-[#EBEBEB] bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-sm"
         >
           <h2 className="text-base font-extrabold text-[#141414]">Buat Order Convert Baru</h2>
           <p className="mt-1 text-sm text-[#666]">Pilih layanan pulsa, PayPal, atau crypto sesuai kebutuhan transaksi.</p>

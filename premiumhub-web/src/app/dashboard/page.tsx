@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type SVGProps } from 'react'
-import { AlertTriangle, CheckCircle, Clock } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 
 import WalletCard from '@/components/shared/WalletCard'
+import { ReceiptRefundIcon, TransactionDollarIcon } from '@/components/icons/TransactionIcons'
 import { formatRupiah } from '@/lib/utils'
 import { activityService } from '@/services/activityService'
 import { orderService } from '@/services/orderService'
@@ -20,55 +21,13 @@ function activityAmountText(item: ActivityHistoryItem) {
 }
 
 function activityAmountClass(item: ActivityHistoryItem) {
-  return item.direction === 'credit' ? 'text-green-600' : 'text-[#141414]'
-}
-
-function TransactionDollarIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <path d="M20.8 13a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
-      <path d="M18 11v10" />
-      <path d="M3 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-      <path d="M15 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-      <path d="M7 5h8" />
-      <path d="M7 5v8a3 3 0 0 0 3 3h1" />
-    </svg>
-  )
-}
-
-function ReceiptRefundIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2" />
-      <path d="M15 14v-2a2 2 0 0 0 -2 -2h-4l2 -2m0 4l-2 -2" />
-    </svg>
-  )
+  return item.direction === 'credit' ? 'text-emerald-600' : 'text-[#141414]'
 }
 
 function renderActivityIcon(item: ActivityHistoryItem) {
   if (item.kind === 'nokos_purchase') {
     return (
-      <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF3EC] text-[#E0592A]">
+      <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF0ED] text-[#FF5733]">
         <TransactionDollarIcon className="h-5 w-5" />
       </div>
     )
@@ -76,7 +35,7 @@ function renderActivityIcon(item: ActivityHistoryItem) {
 
   if (item.kind === 'nokos_refund') {
     return (
-      <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ECFDF3] text-[#16774C]">
+      <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
         <ReceiptRefundIcon className="h-5 w-5" />
       </div>
     )
@@ -134,7 +93,10 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-extrabold">Halo, {user?.name}! 👋</h1>
+      <header className="mb-6">
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#A6A6A1]">Halo!</p>
+        <h1 className="mt-1 text-2xl font-extrabold text-[#141414]">{user?.name || 'Selamat datang'} 👋</h1>
+      </header>
 
       <WalletCard
         balance={wallet.balance}
@@ -145,26 +107,33 @@ export default function DashboardPage() {
       />
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {[
-          { icon: Clock, label: 'Pending', value: pendingOrders.length, color: '#FAE88A', iconColor: '#eab308' },
-          { icon: CheckCircle, label: 'Total Order', value: orders.length, color: '#C8E6F5', iconColor: '#3b82f6' },
-        ].map((s, i) => (
-          <div key={i} className="rounded-2xl border border-[#EBEBEB] bg-white p-5">
-            <div className="mb-3 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: s.color }}>
-                <s.icon className="h-5 w-5" style={{ color: s.iconColor }} />
-              </div>
-              <span className="text-sm font-medium text-[#888]">{s.label}</span>
+        <div className="rounded-3xl border border-[#EBEBEB] bg-white p-5">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <Clock className="h-5 w-5" />
             </div>
-            <div className="text-2xl font-extrabold">{s.value}</div>
+            <span className="text-sm font-semibold text-[#6B7280]">Pending</span>
           </div>
-        ))}
+          <div className="text-2xl font-extrabold text-[#141414]">{pendingOrders.length}</div>
+          <p className="mt-1 text-xs text-[#6B7280]">Order belum dibayar / sedang diproses</p>
+        </div>
+
+        <div className="rounded-3xl border border-[#EBEBEB] bg-white p-5">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <span className="text-sm font-semibold text-[#6B7280]">Total Order</span>
+          </div>
+          <div className="text-2xl font-extrabold text-[#141414]">{orders.length}</div>
+          <p className="mt-1 text-xs text-[#6B7280]">Total order yang udah lu buat</p>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-[#EBEBEB] bg-white p-6">
+      <div className="rounded-3xl border border-[#EBEBEB] bg-white p-5 md:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-bold">Aktivitas Terbaru</h3>
-          <Link href="/dashboard/riwayat-order" className="text-xs font-medium text-[#FF5733] hover:underline">
+          <h3 className="text-sm font-bold text-[#141414]">Aktivitas Terbaru</h3>
+          <Link href="/dashboard/riwayat-order" className="text-xs font-semibold text-[#FF5733] hover:underline">
             Lihat Semua
           </Link>
         </div>
@@ -177,9 +146,13 @@ export default function DashboardPage() {
           </div>
         ) : recentActivities.length === 0 ? (
           <div className="py-10 text-center">
-            <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-[#EBEBEB]" />
-            <p className="text-sm text-[#888]">Belum ada aktivitas</p>
-            <Link href="/product/prem-apps" className="mt-2 inline-block text-sm font-medium text-[#FF5733] hover:underline">
+            <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-[#D9D9D6]" />
+            <p className="text-sm font-semibold text-[#141414]">Belum ada aktivitas</p>
+            <p className="mt-1 text-xs text-[#6B7280]">Mulai belanja produk digital, transaksi lu bakal muncul di sini.</p>
+            <Link
+              href="/product/prem-apps"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#141414] px-4 py-2 text-xs font-extrabold text-white transition-colors hover:bg-[#2A2A2A]"
+            >
               Belanja Sekarang →
             </Link>
           </div>
@@ -194,8 +167,10 @@ export default function DashboardPage() {
                 <div className="flex min-w-0 items-center gap-3">
                   {renderActivityIcon(activity)}
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold">{activity.title}</div>
-                    <div className="truncate text-xs text-[#888]">{new Date(activity.occurred_at).toLocaleDateString('id-ID')} • {activity.source_label}</div>
+                    <div className="truncate text-sm font-semibold text-[#141414]">{activity.title}</div>
+                    <div className="truncate text-xs text-[#6B7280]">
+                      {new Date(activity.occurred_at).toLocaleDateString('id-ID')} • {activity.source_label}
+                    </div>
                   </div>
                 </div>
 

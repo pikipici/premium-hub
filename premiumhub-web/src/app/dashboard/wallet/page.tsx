@@ -3,9 +3,21 @@
 import { LOCAL_MUTATION_PAGE_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, CircleAlert, Loader2, RefreshCcw, Sparkles } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  ArrowRight,
+  CircleAlert,
+  CreditCard,
+  Loader2,
+  RefreshCcw,
+  RotateCcw,
+  ShoppingBag,
+  Sparkles,
+} from 'lucide-react'
+
+import { statusToneClasses, walletTopupTone } from '@/lib/dashboardStatusPill'
 
 import {
   FALLBACK_PAYMENT_METHODS,
@@ -60,30 +72,21 @@ function isCreditLedger(ledger: WalletLedger) {
   return type === 'credit' || group === 'topup' || group === 'refund'
 }
 
-function topupStatusClass(status: string) {
-  switch (status) {
-    case 'success':
-    case 'paid':
-      return 'bg-green-100 text-green-700'
-    case 'failed':
-      return 'bg-red-100 text-red-700'
-    case 'expired':
-      return 'bg-gray-200 text-gray-700'
-    default:
-      return 'bg-yellow-100 text-yellow-700'
-  }
+function topupStatusToneClass(status: string) {
+  const { tone } = walletTopupTone(status)
+  return statusToneClasses(tone).pill
 }
 
-function txVisual(group: LedgerGroup) {
+function txVisual(group: LedgerGroup): { icon: ReactElement; bg: string } {
   switch (group) {
     case 'topup':
-      return { icon: '⬆️', bg: 'bg-green-100' }
+      return { icon: <ArrowDownToLine className="h-4 w-4" />, bg: 'bg-emerald-50 text-emerald-600' }
     case 'purchase':
-      return { icon: '🛍️', bg: 'bg-amber-100' }
+      return { icon: <ShoppingBag className="h-4 w-4" />, bg: 'bg-amber-50 text-amber-600' }
     case 'refund':
-      return { icon: '↩️', bg: 'bg-blue-100' }
+      return { icon: <RotateCcw className="h-4 w-4" />, bg: 'bg-sky-50 text-sky-600' }
     default:
-      return { icon: '💳', bg: 'bg-slate-100' }
+      return { icon: <CreditCard className="h-4 w-4" />, bg: 'bg-stone-100 text-stone-600' }
   }
 }
 
@@ -349,47 +352,47 @@ export default function WalletPage() {
         </button>
       </div>
 
-      <section className="relative overflow-hidden rounded-2xl bg-[#141414] p-6 md:p-7 text-white">
-        <div className="pointer-events-none absolute -right-12 -top-12 h-52 w-52 rounded-full bg-white/5" />
-        <div className="pointer-events-none absolute -right-4 -bottom-14 h-36 w-36 rounded-full bg-white/5" />
+      <section className="relative overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white p-6 md:p-7 shadow-[0_16px_38px_rgba(20,20,20,0.06)]">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-60 w-60 rounded-full bg-[#FFE0D5] blur-2xl" />
+        <div className="pointer-events-none absolute -left-16 -bottom-20 h-44 w-44 rounded-full bg-[#FFF3EF] blur-2xl" />
 
         <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
           <div>
-            <div className="text-[11px] uppercase tracking-wider font-semibold text-white/45 mb-2">Saldo Tersedia</div>
-            <div className="text-3xl md:text-4xl font-extrabold tracking-tight">
+            <div className="text-[11px] uppercase tracking-wider font-semibold text-[#A6A6A1] mb-2">Saldo Tersedia</div>
+            <div className="text-3xl md:text-4xl font-extrabold tracking-tight text-[#141414]">
               {loading ? 'Memuat saldo...' : formatRupiah(balance)}
             </div>
-            <div className="text-sm text-white/45 mt-2">{walletBalanceHint}</div>
+            <div className="text-sm text-[#6B7280] mt-2">{walletBalanceHint}</div>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">
-            <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#EBEBEB] bg-[#F7F7F5] px-3 py-1.5 text-xs font-semibold text-[#3A3A3A]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             Aktif
           </div>
         </div>
 
-        <div className="relative grid grid-cols-3 overflow-hidden rounded-xl border border-white/10 bg-white/5">
-          <div className="p-3 md:p-4 border-r border-white/10">
-            <div className="text-[11px] text-white/45 mb-1">Total Isi Saldo</div>
-            <div className="text-sm md:text-base font-bold text-emerald-300">{formatRupiah(totalBalanceIn)}</div>
+        <div className="relative grid grid-cols-3 overflow-hidden rounded-2xl border border-[#EBEBEB] bg-[#F7F7F5]">
+          <div className="p-3 md:p-4 border-r border-[#EBEBEB]">
+            <div className="text-[11px] text-[#6B7280] mb-1">Total Isi Saldo</div>
+            <div className="text-sm md:text-base font-bold text-emerald-600">{formatRupiah(totalBalanceIn)}</div>
           </div>
-          <div className="p-3 md:p-4 border-r border-white/10">
-            <div className="text-[11px] text-white/45 mb-1">Total Dipakai Bersih</div>
-            <div className="text-sm md:text-base font-bold text-rose-300">{formatRupiah(totalSpentNet)}</div>
+          <div className="p-3 md:p-4 border-r border-[#EBEBEB]">
+            <div className="text-[11px] text-[#6B7280] mb-1">Total Dipakai Bersih</div>
+            <div className="text-sm md:text-base font-bold text-rose-600">{formatRupiah(totalSpentNet)}</div>
           </div>
           <div className="p-3 md:p-4">
-            <div className="text-[11px] text-white/45 mb-1">Total Refund</div>
-            <div className="text-sm md:text-base font-bold text-sky-300">{formatRupiah(totalRefund)}</div>
+            <div className="text-[11px] text-[#6B7280] mb-1">Total Refund</div>
+            <div className="text-sm md:text-base font-bold text-sky-600">{formatRupiah(totalRefund)}</div>
           </div>
         </div>
 
-        <div className="relative mt-2 text-[11px] text-white/45">
+        <div className="relative mt-2 text-[11px] text-[#6B7280]">
           Dipakai bersih = pembelian - refund • Refund {refundCount}/{purchaseCount} transaksi pembelian.
         </div>
       </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
+        <section className="bg-white border border-[#EBEBEB] rounded-3xl overflow-hidden">
           <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
             <h2 className="text-sm font-bold">Top Up Saldo</h2>
             <span className="text-xs text-[#888]">
@@ -496,7 +499,7 @@ export default function WalletPage() {
             </div>
 
             {error ? (
-              <div className="rounded-xl bg-red-50 text-red-600 px-3 py-2 text-sm inline-flex items-center gap-2">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-sm inline-flex items-center gap-2">
                 <CircleAlert className="w-4 h-4" />
                 {error}
               </div>
@@ -516,7 +519,7 @@ export default function WalletPage() {
         </section>
 
         <div className="space-y-4">
-          <section className="rounded-2xl bg-gradient-to-br from-[#141414] to-[#2A2A2A] p-5 text-white flex flex-col md:flex-row md:items-center gap-3">
+          <section className="rounded-3xl bg-gradient-to-br from-[#141414] to-[#2A2A2A] p-5 text-white flex flex-col md:flex-row md:items-center gap-3">
             <div className="text-3xl">⚡</div>
             <div className="flex-1">
               <h3 className="text-sm font-bold mb-1">Saldo Wallet Siap Dipakai</h3>
@@ -532,7 +535,7 @@ export default function WalletPage() {
             </div>
           </section>
 
-          <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
+          <section className="bg-white border border-[#EBEBEB] rounded-3xl overflow-hidden">
             <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
               <h2 className="text-sm font-bold">Riwayat Saldo</h2>
               <div className="text-xs text-[#888]">Halaman {txPage}/{mutationTotalPages}</div>
@@ -565,13 +568,13 @@ export default function WalletPage() {
                   return (
                     <div key={row.id} className="px-5 py-3 hover:bg-[#FAFAF8] transition-colors">
                       <div className="flex items-start gap-3">
-                        <div className={`h-10 w-10 rounded-xl ${visual.bg} flex items-center justify-center text-lg shrink-0`}>{visual.icon}</div>
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${visual.bg}`}>{visual.icon}</div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold truncate">{row.description}</div>
                           <div className="text-xs text-[#888] mt-0.5 truncate">{formatDate(row.createdAt)} • {row.reference}</div>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className={`text-sm font-extrabold ${row.credit ? 'text-green-600' : 'text-[#141414]'}`}>
+                          <div className={`text-sm font-extrabold ${row.credit ? 'text-emerald-600' : 'text-[#141414]'}`}>
                             {`${row.credit ? '+' : '-'}${formatRupiah(row.amount)}`}
                           </div>
                           <div className="text-[11px] text-[#888] mt-0.5">Saldo: {formatRupiah(row.balanceAfter)}</div>
@@ -608,7 +611,7 @@ export default function WalletPage() {
         </div>
       </div>
 
-      <section className="bg-white border border-[#EBEBEB] rounded-2xl overflow-hidden">
+      <section className="bg-white border border-[#EBEBEB] rounded-3xl overflow-hidden">
         <header className="flex items-center justify-between px-5 py-4 border-b border-[#EBEBEB]">
           <div>
             <h2 className="text-sm font-bold">Top Up Belum Selesai</h2>
@@ -643,7 +646,7 @@ export default function WalletPage() {
 
                   <div className="flex items-center justify-between gap-3 md:min-w-[200px] md:justify-end">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold capitalize ${topupStatusClass(topup.status)}`}>
+                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold capitalize border ${topupStatusToneClass(topup.status)}`}>
                         {topup.status}
                       </span>
                     </div>

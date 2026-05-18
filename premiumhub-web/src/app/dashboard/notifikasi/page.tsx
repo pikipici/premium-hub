@@ -1,7 +1,7 @@
 "use client"
 
 import { CUSTOMER_HISTORY_PAGE_LIMIT } from '@/config/pagination'
-import { useCallback, useEffect, useMemo, useState, type SVGProps } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Bell,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 
 import { ListPagination } from '@/components/shared/list-pagination'
+import { TransactionDollarIcon } from '@/components/icons/TransactionIcons'
 import { notificationService, type NotificationItem } from '@/services/notificationService'
 
 type NotificationFilter = 'all' | 'unread' | 'order' | 'wallet' | 'claim'
@@ -28,28 +29,6 @@ const FILTER_OPTIONS: { key: NotificationFilter; label: string }[] = [
   { key: 'claim', label: 'Klaim' },
 ]
 
-function TransactionDollarIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <path d="M20.8 13a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
-      <path d="M18 11v10" />
-      <path d="M3 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-      <path d="M15 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-      <path d="M7 5h8" />
-      <path d="M7 5v8a3 3 0 0 0 3 3h1" />
-    </svg>
-  )
-}
 
 function mapErrorMessage(err: unknown, fallback: string) {
   if (typeof err === 'object' && err !== null && 'response' in err) {
@@ -344,7 +323,7 @@ export default function NotifikasiPage() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 sm:p-6">
+      <section className="rounded-3xl border border-[#EBEBEB] bg-white p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-extrabold text-[#141414]">Notifikasi</h1>
@@ -378,44 +357,49 @@ export default function NotifikasiPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {FILTER_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => setFilter(option.key)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                filter === option.key
-                  ? 'border-[#141414] bg-[#141414] text-white'
-                  : 'border-[#E5E5E3] bg-white text-[#666] hover:bg-[#F7F7F5]'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div role="tablist" aria-label="Filter notifikasi" className="mt-4 flex flex-wrap gap-2">
+          {FILTER_OPTIONS.map((option) => {
+            const active = filter === option.key
+            return (
+              <button
+                key={option.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setFilter(option.key)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? 'border-[#141414] bg-[#141414] text-white'
+                    : 'border-[#EBEBEB] bg-white text-[#6B7280] hover:bg-[#F7F7F5]'
+                }`}
+              >
+                {option.label}
+              </button>
+            )
+          })}
         </div>
       </section>
 
       {loading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, index) => (
-            <div key={index} className="h-24 animate-pulse rounded-2xl bg-white" />
+            <div key={index} className="h-24 animate-pulse rounded-2xl bg-[#F4F4F2]" />
           ))}
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-          <p className="text-sm font-semibold text-red-700">{error}</p>
+        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
+          <p className="text-sm font-semibold text-rose-700">{error}</p>
           <button
             type="button"
             onClick={() => void loadNotifications()}
-            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"
+            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
           >
             <RefreshCcw className="h-3.5 w-3.5" /> Coba lagi
           </button>
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="rounded-2xl border border-[#EBEBEB] bg-white p-10 text-center">
-          <p className="text-sm text-[#888]">
+        <div className="rounded-3xl border border-[#EBEBEB] bg-white p-10 text-center">
+          <p className="text-sm text-[#6B7280]">
             {filter === 'all'
               ? 'Belum ada notifikasi.'
               : 'Tidak ada notifikasi untuk filter ini di halaman saat ini.'}

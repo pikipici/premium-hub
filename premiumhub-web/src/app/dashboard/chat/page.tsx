@@ -204,7 +204,7 @@ export default function DashboardChatPage() {
 
   return (
     <div className="flex min-h-[calc(100vh-200px)] flex-col gap-4">
-      <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 sm:p-6">
+      <section className="rounded-3xl border border-[#EBEBEB] bg-white p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -226,7 +226,7 @@ export default function DashboardChatPage() {
         </div>
       </section>
 
-      <section className="flex flex-1 flex-col rounded-2xl border border-[#EBEBEB] bg-white">
+      <section className="flex flex-1 flex-col rounded-3xl border border-[#EBEBEB] bg-white">
         <div
           ref={listRef}
           onScroll={onScroll}
@@ -286,7 +286,7 @@ export default function DashboardChatPage() {
         </div>
 
         {error ? (
-          <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700">
+          <div className="border-t border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700">
             {error}
           </div>
         ) : null}

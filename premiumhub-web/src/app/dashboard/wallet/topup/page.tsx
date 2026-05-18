@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, CircleAlert, CircleCheckBig, Clock3, Loader2, RefreshCcw } from 'lucide-react'
 
+import { walletTopupTone, statusToneClasses } from '@/lib/dashboardStatusPill'
+
 import { walletService } from '@/services/walletService'
 import type { WalletTopup } from '@/types/wallet'
 import { formatRupiah } from '@/lib/utils'
@@ -15,31 +17,12 @@ import GatewayPaymentDisplay from '@/components/payment/GatewayPaymentDisplay'
 const FINAL_TOPUP_STATUSES: WalletTopup['status'][] = ['success', 'paid', 'failed', 'expired']
 
 function statusTone(status: WalletTopup['status']) {
-  switch (status) {
-    case 'success':
-    case 'paid':
-      return 'bg-green-100 text-green-700 border-green-200'
-    case 'failed':
-      return 'bg-red-100 text-red-700 border-red-200'
-    case 'expired':
-      return 'bg-gray-100 text-gray-700 border-gray-200'
-    default:
-      return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-  }
+  const { tone } = walletTopupTone(status)
+  return statusToneClasses(tone).pill
 }
 
 function statusLabel(status: WalletTopup['status']) {
-  switch (status) {
-    case 'success':
-    case 'paid':
-      return 'berhasil'
-    case 'failed':
-      return 'gagal'
-    case 'expired':
-      return 'kedaluwarsa'
-    default:
-      return 'menunggu pembayaran'
-  }
+  return walletTopupTone(status).label.toLowerCase()
 }
 
 function isPayableTopup(topup: WalletTopup) {
@@ -51,21 +34,21 @@ function finalTopupCopy(status: WalletTopup['status']) {
     case 'success':
     case 'paid':
       return {
-        tone: 'border-green-100 bg-green-50 text-green-700',
+        tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
         title: 'Top up berhasil.',
         description: 'Saldo wallet sudah masuk otomatis dan siap dipakai.',
         cta: 'Kembali ke Wallet',
       }
     case 'failed':
       return {
-        tone: 'border-red-100 bg-red-50 text-red-700',
+        tone: 'border-rose-200 bg-rose-50 text-rose-700',
         title: 'Top up gagal diproses.',
         description: 'Jangan lakukan pembayaran ke invoice ini. Silakan buat top up ulang dengan metode pembayaran baru.',
         cta: 'Top Up Ulang',
       }
     case 'expired':
       return {
-        tone: 'border-gray-200 bg-gray-50 text-gray-700',
+        tone: 'border-stone-200 bg-stone-50 text-stone-700',
         title: 'Invoice top up sudah kedaluwarsa.',
         description: 'Jangan lakukan pembayaran ke invoice ini. Buat invoice baru untuk top up ulang.',
         cta: 'Buat Invoice Baru',
@@ -263,7 +246,7 @@ function WalletTopupStatusContent() {
 
   if (!topupId) {
     return (
-      <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6">
+      <div className="bg-white rounded-3xl border border-[#EBEBEB] p-6">
         <h1 className="text-xl font-extrabold mb-2">Topup tidak valid</h1>
         <p className="text-sm text-[#888] mb-4">ID topup tidak ditemukan di URL.</p>
         <Link href="/dashboard/wallet" className="inline-flex px-4 py-2 rounded-xl bg-[#141414] text-white text-sm font-semibold">
@@ -289,22 +272,23 @@ function WalletTopupStatusContent() {
         <h1 className="text-2xl font-extrabold tracking-tight">Status Topup</h1>
       </div>
 
-      <section className="relative overflow-hidden rounded-2xl bg-[#141414] p-6 text-white">
-        <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/5" />
+      <section className="relative overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)]">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#FFE0D5] blur-2xl" />
+        <div className="pointer-events-none absolute -left-16 -bottom-16 h-40 w-40 rounded-full bg-[#FFF3EF] blur-2xl" />
 
         {loading ? (
-          <div className="inline-flex items-center gap-2 text-sm text-white/70">
+          <div className="relative inline-flex items-center gap-2 text-sm text-[#6B7280]">
             <Loader2 className="w-4 h-4 animate-spin" />
             Memuat data topup...
           </div>
         ) : topup ? (
           <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-white/45 mb-2">Invoice</div>
-              <div className="text-sm font-bold break-all">{topup.gateway_ref ?? topup.id}</div>
+              <div className="text-[11px] uppercase tracking-wide text-[#A6A6A1] mb-2">Invoice</div>
+              <div className="text-sm font-bold text-[#141414] break-all">{topup.gateway_ref ?? topup.id}</div>
 
-              <div className="mt-5 text-[11px] uppercase tracking-wide text-white/45">Nominal Transfer</div>
-              <div className="text-3xl font-extrabold tracking-tight mt-1">{formatRupiah(transferAmount)}</div>
+              <div className="mt-5 text-[11px] uppercase tracking-wide text-[#A6A6A1]">Nominal Transfer</div>
+              <div className="text-3xl font-extrabold tracking-tight text-[#141414] mt-1">{formatRupiah(transferAmount)}</div>
             </div>
 
             <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold capitalize ${statusTone(effectiveStatus)}`}>
@@ -319,12 +303,12 @@ function WalletTopupStatusContent() {
             </span>
           </div>
         ) : (
-          <p className="text-sm text-white/70">Topup tidak ditemukan.</p>
+          <p className="relative text-sm text-[#6B7280]">Topup tidak ditemukan.</p>
         )}
       </section>
 
       {topup ? (
-        <section className="bg-white rounded-2xl border border-[#EBEBEB] p-5 md:p-6">
+        <section className="bg-white rounded-3xl border border-[#EBEBEB] p-5 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-[#F7F7F5] p-3">
               <div className="text-xs text-[#888] mb-1">Nominal Topup</div>
@@ -345,7 +329,7 @@ function WalletTopupStatusContent() {
           </div>
 
           {payableStatus && expiresAt ? (
-            <div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <span className="font-semibold">Bayar sebelum {formatDateTime(expiresAt)}</span>
                 <span className="font-extrabold">Sisa {formatCountdown(countdownMs)}</span>
@@ -374,7 +358,7 @@ function WalletTopupStatusContent() {
       ) : null}
 
       {error ? (
-        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 inline-flex items-center gap-2">
+        <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl px-4 py-3 inline-flex items-center gap-2">
           <CircleAlert className="w-4 h-4" />
           {error}
         </div>

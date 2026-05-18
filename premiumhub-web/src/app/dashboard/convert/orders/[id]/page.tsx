@@ -173,21 +173,21 @@ export default function DashboardConvertOrderDetailPage() {
         </button>
       </header>
 
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
 
       {loading ? (
-        <section className="rounded-2xl border border-[#EBEBEB] bg-white p-8 text-center text-sm text-[#888]">
+        <section className="rounded-3xl border border-[#EBEBEB] bg-white p-8 text-center text-sm text-[#6B7280]">
           <span className="inline-flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Memuat detail order...
           </span>
         </section>
       ) : !detail ? (
-        <section className="rounded-2xl border border-[#EBEBEB] bg-white p-6 text-center">
+        <section className="rounded-3xl border border-[#EBEBEB] bg-white p-6 text-center">
           <p className="text-sm text-[#666]">Order convert tidak ditemukan.</p>
         </section>
       ) : (
         <>
-          <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 md:p-6">
+          <section className="rounded-3xl border border-[#EBEBEB] bg-white p-5 md:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs text-[#888]">Order ID</p>
@@ -207,7 +207,7 @@ export default function DashboardConvertOrderDetailPage() {
               </div>
               <div className="rounded-xl bg-[#F7F7F5] px-3 py-2.5">
                 <p className="text-[11px] text-[#888]">Total fee</p>
-                <p className="mt-0.5 font-bold text-red-600">{formatRupiah(detail.order.total_fee)}</p>
+                <p className="mt-0.5 font-bold text-rose-600">{formatRupiah(detail.order.total_fee)}</p>
               </div>
               <div className="rounded-xl bg-[#F7F7F5] px-3 py-2.5">
                 <p className="text-[11px] text-[#888]">Total diterima</p>
@@ -230,7 +230,7 @@ export default function DashboardConvertOrderDetailPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 md:p-6">
+          <section className="rounded-3xl border border-[#EBEBEB] bg-white p-5 md:p-6">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#141414]">Upload Bukti Transfer</h3>
               <span className="text-xs text-[#888]">{proofSummary}</span>
@@ -290,7 +290,7 @@ export default function DashboardConvertOrderDetailPage() {
             )}
           </section>
 
-          <section className="rounded-2xl border border-[#EBEBEB] bg-white p-5 md:p-6">
+          <section className="rounded-3xl border border-[#EBEBEB] bg-white p-5 md:p-6">
             <div className="grid gap-4 lg:grid-cols-2">
               <div>
                 <div className="mb-2 flex items-center justify-between">
