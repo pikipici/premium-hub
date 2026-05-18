@@ -28,6 +28,7 @@ import {
   paymentMethodIcon,
 } from '@/lib/paymentMethods'
 import { formatDate, formatRupiah } from '@/lib/utils'
+import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
 import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
 import type { PaymentMethodOption, WalletLedger, WalletTopup } from '@/types/wallet'
@@ -286,6 +287,8 @@ export default function WalletPage() {
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
+
+  useVisibilityRefresh(() => fetchAll(true))
 
   useEffect(() => {
     setTxPage(1)

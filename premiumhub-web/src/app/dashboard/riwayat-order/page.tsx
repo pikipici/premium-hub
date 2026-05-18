@@ -3,11 +3,13 @@
 import { CUSTOMER_HISTORY_PAGE_LIMIT } from '@/config/pagination'
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, History, Loader2 } from 'lucide-react'
 
 import { ReceiptRefundIcon, TransactionDollarIcon } from '@/components/icons/TransactionIcons'
 import { formatRupiah } from '@/lib/utils'
 import { activityService } from '@/services/activityService'
+import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
+import { EmptyState } from '@/components/shared/EmptyState'
 import type { ActivityHistoryItem } from '@/types/activity'
 
 
@@ -102,6 +104,8 @@ export default function RiwayatOrderPage() {
     void loadHistory()
   }, [loadHistory])
 
+  useVisibilityRefresh(loadHistory)
+
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages)
@@ -131,9 +135,13 @@ export default function RiwayatOrderPage() {
           </button>
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-3xl border border-[#EBEBEB] bg-white p-10 text-center">
-          <p className="text-sm text-[#888]">Belum ada riwayat aktivitas.</p>
-        </div>
+        <EmptyState
+          icon={<History className="h-5 w-5" />}
+          title="Belum ada riwayat aktivitas"
+          hint="Aktivitas wallet, order, dan klaim kamu akan muncul di sini."
+          actionLabel="Lihat katalog"
+          actionHref="/product"
+        />
       ) : (
         <>
           <div className="space-y-3">

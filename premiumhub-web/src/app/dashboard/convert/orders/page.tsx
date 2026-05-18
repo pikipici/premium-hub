@@ -9,6 +9,8 @@ import { Loader2, RefreshCcw } from 'lucide-react'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { convertOrderTone, statusToneClasses } from '@/lib/dashboardStatusPill'
 import { convertService } from '@/services/convertService'
+import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
+import { EmptyState } from '@/components/shared/EmptyState'
 import type { ConvertAssetType, ConvertOrderStatus, ConvertOrderSummary } from '@/types/convert'
 
 const FILTERS: { key: 'all' | ConvertAssetType; label: string; href: string }[] = [
@@ -86,6 +88,8 @@ function DashboardConvertOrdersPageContent() {
 
     void load()
   }, [currentAsset, page])
+
+  useVisibilityRefresh(() => refresh())
 
   const refresh = async () => {
     setRefreshing(true)
@@ -173,10 +177,13 @@ function DashboardConvertOrdersPageContent() {
           </span>
         </section>
       ) : orders.length === 0 ? (
-        <section className="rounded-3xl border border-[#EBEBEB] bg-white p-6 text-center">
-          <p className="text-sm text-[#666]">Belum ada data order convert untuk filter ini.</p>
-          <p className="mt-1 text-xs text-[#888]">Begitu order dibuat, status dan detail akan muncul di halaman ini.</p>
-        </section>
+        <EmptyState
+          icon={<RefreshCcw className="h-5 w-5" />}
+          title="Belum ada order convert"
+          hint="Begitu order dibuat, status dan detail akan muncul di halaman ini."
+          actionLabel="Mulai convert"
+          actionHref="/product/convert"
+        />
       ) : (
         <section className="space-y-2">
           {orders.map((order) => {

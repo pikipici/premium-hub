@@ -7,6 +7,7 @@ import { AlertTriangle, Check, Copy, Eye, EyeOff, Loader2, PackageOpen, RefreshC
 
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
+import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
 import type { Order } from '@/types/order'
 
 type ProductLookup = Record<string, { name: string; icon: string }>
@@ -138,6 +139,8 @@ export default function AkunAktifPage() {
   useEffect(() => {
     void Promise.all([loadProducts(), loadOrders()])
   }, [loadOrders, loadProducts])
+
+  useVisibilityRefresh(() => loadOrders({ silent: true }))
 
   const accountOrders = useMemo(() => {
     const nowMs = Date.now()

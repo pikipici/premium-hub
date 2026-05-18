@@ -16,6 +16,8 @@ import {
 import { ListPagination } from '@/components/shared/list-pagination'
 import { TransactionDollarIcon } from '@/components/icons/TransactionIcons'
 import { notificationService, type NotificationItem } from '@/services/notificationService'
+import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
+import { EmptyState } from '@/components/shared/EmptyState'
 
 type NotificationFilter = 'all' | 'unread' | 'order' | 'wallet' | 'claim'
 type NotificationKind = 'order' | 'wallet' | 'claim' | 'other'
@@ -242,6 +244,8 @@ export default function NotifikasiPage() {
     void loadNotifications()
   }, [loadNotifications])
 
+  useVisibilityRefresh(() => loadNotifications({ silent: true }))
+
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages)
@@ -398,13 +402,15 @@ export default function NotifikasiPage() {
           </button>
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="rounded-3xl border border-[#EBEBEB] bg-white p-10 text-center">
-          <p className="text-sm text-[#6B7280]">
-            {filter === 'all'
-              ? 'Belum ada notifikasi.'
-              : 'Tidak ada notifikasi untuk filter ini di halaman saat ini.'}
-          </p>
-        </div>
+        <EmptyState
+          icon={<Bell className="h-5 w-5" />}
+          title={filter === 'all' ? 'Belum ada notifikasi' : 'Tidak ada notifikasi'}
+          hint={
+            filter === 'all'
+              ? 'Notifikasi penting (order, wallet, klaim) akan muncul di sini.'
+              : 'Coba ganti filter di atas untuk lihat notifikasi lain.'
+          }
+        />
       ) : (
         <>
           <div className="space-y-3">

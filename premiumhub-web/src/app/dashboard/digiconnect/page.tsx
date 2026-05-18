@@ -28,6 +28,7 @@ import { digiconnectService } from '@/services/digiconnectService'
 import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
 import { formatRupiah } from '@/lib/utils'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import type {
   DigiConnectApiKey,
   DigiConnectEntitlement,
@@ -214,7 +215,8 @@ export default function DigiConnectDashboardPage() {
   const [baseUrl, setBaseUrl] = useState('/api/v1')
   const [showAllRequests, setShowAllRequests] = useState(false)
   const [activeRequest, setActiveRequest] = useState<DigiConnectRequest | null>(null)
-  const [copyKey, setCopyKey] = useState<string | null>(null)
+  const [copiedKeys, setCopiedKeys] = useState<Set<string>>(() => new Set())
+  const isCopied = (label: string) => copiedKeys.has(label)
   const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null)
   const [confirmRevokeKey, setConfirmRevokeKey] = useState<DigiConnectApiKey | null>(null)
 
@@ -328,8 +330,19 @@ export default function DigiConnectDashboardPage() {
     if (typeof navigator === 'undefined' || !navigator.clipboard) return
     try {
       await navigator.clipboard.writeText(value)
-      setCopyKey(label)
-      window.setTimeout(() => setCopyKey((current) => current === label ? null : current), 1500)
+      setCopiedKeys((prev) => {
+        const next = new Set(prev)
+        next.add(label)
+        return next
+      })
+      window.setTimeout(() => {
+        setCopiedKeys((prev) => {
+          if (!prev.has(label)) return prev
+          const next = new Set(prev)
+          next.delete(label)
+          return next
+        })
+      }, 1500)
     } catch {
       // ignore
     }
@@ -451,7 +464,7 @@ export default function DigiConnectDashboardPage() {
               ) : null}
 
               {activePanel === 'integrasi' ? (
-                <IntegrationPanel baseUrl={baseUrl} sampleKey={sampleKey} sampleModel={sampleModel} curlSample={curlSample} copyKey={copyKey} onCopy={copyText} hasActiveKey={keys.some((k) => k.status === 'active')} onGoToApiKey={() => setActivePanel('api-key')} />
+                <IntegrationPanel baseUrl={baseUrl} sampleKey={sampleKey} sampleModel={sampleModel} curlSample={curlSample} isCopied={isCopied} onCopy={copyText} hasActiveKey={keys.some((k) => k.status === 'active')} onGoToApiKey={() => setActivePanel('api-key')} />
               ) : null}
 
               {activePanel === 'api-key' ? (
@@ -463,7 +476,7 @@ export default function DigiConnectDashboardPage() {
                   creating={creating}
                   onCreate={createKey}
                   onClearCreated={() => setCreatedKey(null)}
-                  copyKey={copyKey}
+                  isCopied={isCopied}
                   onCopy={copyText}
                   revokingKeyId={revokingKeyId}
                   onRequestRevoke={(key) => setConfirmRevokeKey(key)}
@@ -503,11 +516,25 @@ export default function DigiConnectDashboardPage() {
 
       {activeRequest ? <RequestDetail request={activeRequest} onClose={() => setActiveRequest(null)} /> : null}
       {confirmRevokeKey ? (
-        <ConfirmRevokeModal
-          apiKey={confirmRevokeKey}
-          revoking={revokingKeyId === confirmRevokeKey.id}
+        <ConfirmDialog
+          open
+          title="Cabut API key?"
+          description={
+            <>
+              Key <span className="font-bold text-[#141414]">{confirmRevokeKey.name}</span> akan langsung tidak bisa dipakai. Aplikasi yang masih pakai key ini akan dapat 401 Unauthorized.
+            </>
+          }
+          preview={
+            <div className="truncate rounded-md bg-[#FFFAF5] px-2 py-1 font-mono text-xs text-[#7B7067] ring-1 ring-[#EFE3D6]">
+              {confirmRevokeKey.masked_key}
+            </div>
+          }
+          confirmLabel="Ya, cabut"
+          cancelLabel="Batal"
+          destructive
+          loading={revokingKeyId === confirmRevokeKey.id}
           onCancel={() => setConfirmRevokeKey(null)}
-          onConfirm={() => revokeKey(confirmRevokeKey.id)}
+          onConfirm={() => void revokeKey(confirmRevokeKey.id)}
         />
       ) : null}
     </div>
@@ -676,7 +703,7 @@ function StatsPanel({ stats, requests }: { stats?: DigiConnectPlanStats; request
   )
 }
 
-function IntegrationPanel({ baseUrl, sampleKey, sampleModel, curlSample, copyKey, onCopy, hasActiveKey, onGoToApiKey }: { baseUrl: string; sampleKey: string; sampleModel: string; curlSample: string; copyKey: string | null; onCopy: (label: string, value: string) => void; hasActiveKey: boolean; onGoToApiKey: () => void }) {
+function IntegrationPanel({ baseUrl, sampleKey, sampleModel, curlSample, isCopied, onCopy, hasActiveKey, onGoToApiKey }: { baseUrl: string; sampleKey: string; sampleModel: string; curlSample: string; isCopied: (label: string) => boolean; onCopy: (label: string, value: string) => void; hasActiveKey: boolean; onGoToApiKey: () => void }) {
   const [lang, setLang] = useState<'curl' | 'node' | 'python'>('curl')
   const fullBase = `${baseUrl}/digiconnect`
   const envSnippet = `OPENAI_BASE_URL=${fullBase}\nOPENAI_API_KEY=${sampleKey}`
@@ -705,13 +732,13 @@ function IntegrationPanel({ baseUrl, sampleKey, sampleModel, curlSample, copyKey
           <span className="text-[11px] font-semibold text-[#A89F94]">OpenAI-compatible</span>
         </div>
         <div className="space-y-3">
-          <ConfigField label="Base URL" value={fullBase} copied={copyKey === 'base'} onCopy={() => onCopy('base', fullBase)} />
-          <ConfigField label="API key" value={sampleKey} copied={copyKey === 'auth'} onCopy={() => onCopy('auth', sampleKey)} placeholder={!hasActiveKey} />
+          <ConfigField label="Base URL" value={fullBase} copied={isCopied('base')} onCopy={() => onCopy('base', fullBase)} />
+          <ConfigField label="API key" value={sampleKey} copied={isCopied('auth')} onCopy={() => onCopy('auth', sampleKey)} placeholder={!hasActiveKey} />
           <div className="rounded-lg bg-[#FFFAF5] p-3 ring-1 ring-[#EFE3D6]">
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-[#A89F94]">Untuk .env</span>
               <button type="button" onClick={() => onCopy('env', envSnippet)} aria-label="Salin .env snippet" className="inline-flex items-center gap-1 text-[11px] font-bold text-[#FF5733] hover:text-[#E64A28]">
-                <Copy className="h-3 w-3" /> {copyKey === 'env' ? 'Tersalin' : 'Salin'}
+                <Copy className="h-3 w-3" /> {isCopied('env') ? 'Tersalin' : 'Salin'}
               </button>
             </div>
             <pre className="overflow-x-auto whitespace-pre font-mono text-[11px] leading-relaxed text-[#171411]">{envSnippet}</pre>
@@ -736,7 +763,7 @@ function IntegrationPanel({ baseUrl, sampleKey, sampleModel, curlSample, copyKey
             <LangTab active={lang === 'python'} onClick={() => setLang('python')}>Python</LangTab>
           </div>
           <button type="button" onClick={() => onCopy('snippet', activeSnippet)} aria-label="Salin snippet" className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1 text-[11px] font-bold text-white transition hover:bg-white/20">
-            <Copy className="h-3 w-3" /> {copyKey === 'snippet' ? 'Tersalin' : 'Salin'}
+            <Copy className="h-3 w-3" /> {isCopied('snippet') ? 'Tersalin' : 'Salin'}
           </button>
         </div>
         <pre className="overflow-x-auto whitespace-pre p-3 font-mono text-[11px] leading-relaxed text-orange-50">{activeSnippet}</pre>
@@ -788,7 +815,7 @@ function LangTab({ active, onClick, children }: { active: boolean; onClick: () =
   )
 }
 
-function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, onCreate, onClearCreated, copyKey, onCopy, revokingKeyId, onRequestRevoke }: { keys: DigiConnectApiKey[]; newKeyName: string; setNewKeyName: (v: string) => void; createdKey: string | null; creating: boolean; onCreate: () => void; onClearCreated: () => void; copyKey: string | null; onCopy: (label: string, value: string) => void; revokingKeyId: string | null; onRequestRevoke: (key: DigiConnectApiKey) => void }) {
+function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, onCreate, onClearCreated, isCopied, onCopy, revokingKeyId, onRequestRevoke }: { keys: DigiConnectApiKey[]; newKeyName: string; setNewKeyName: (v: string) => void; createdKey: string | null; creating: boolean; onCreate: () => void; onClearCreated: () => void; isCopied: (label: string) => boolean; onCopy: (label: string, value: string) => void; revokingKeyId: string | null; onRequestRevoke: (key: DigiConnectApiKey) => void }) {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-[#EFE3D6] bg-[#FFFAF5] p-4">
@@ -821,7 +848,7 @@ function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, on
               <span className="break-all">{createdKey}</span>
               <Copy className="h-4 w-4 shrink-0" />
             </button>
-            <div className="mt-2 text-[11px] font-semibold text-amber-800">{copyKey === 'plain' ? 'Tersalin.' : 'Klik untuk salin.'}</div>
+            <div className="mt-2 text-[11px] font-semibold text-amber-800">{isCopied('plain') ? 'Tersalin.' : 'Klik untuk salin.'}</div>
           </div>
           <button type="button" onClick={onClearCreated} className="text-amber-700 hover:text-amber-900" aria-label="Tutup">
             <X className="h-4 w-4" />
@@ -854,7 +881,7 @@ function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, on
                   className="inline-flex items-center justify-center gap-1.5 rounded-md border border-[#EFE3D6] px-2.5 py-1.5 text-xs font-bold text-[#7B7067] transition hover:border-[#FF5733] hover:text-[#FF5733]"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  {copyKey === `mask-${key.id}` ? 'Tersalin' : 'Salin'}
+                  {isCopied(`mask-${key.id}`) ? 'Tersalin' : 'Salin'}
                 </button>
                 {key.status === 'active' ? (
                   <button
@@ -1018,52 +1045,6 @@ function DashboardSkeleton() {
           ))}
         </div>
       </section>
-    </div>
-  )
-}
-
-function ConfirmRevokeModal({ apiKey, revoking, onCancel, onConfirm }: { apiKey: DigiConnectApiKey; revoking: boolean; onCancel: () => void; onConfirm: () => void }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !revoking) onCancel() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel, revoking])
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="revoke-title" onClick={() => { if (!revoking) onCancel() }}>
-      <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start gap-3">
-          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600">
-            <AlertCircle className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 id="revoke-title" className="text-base font-bold text-[#171411]">Cabut API key?</h3>
-            <p className="mt-1 text-sm leading-relaxed text-[#7B7067]">
-              Key <span className="font-bold text-[#171411]">{apiKey.name}</span> akan langsung tidak bisa dipakai. Aplikasi yang masih pakai key ini akan dapat 401 Unauthorized.
-            </p>
-            <div className="mt-2 truncate rounded-md bg-[#FFFAF5] px-2 py-1 font-mono text-xs text-[#7B7067] ring-1 ring-[#EFE3D6]">{apiKey.masked_key}</div>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={revoking}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#EFE3D6] px-4 text-sm font-bold text-[#7B7067] transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={revoking}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {revoking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            Ya, cabut
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

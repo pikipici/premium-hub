@@ -11,6 +11,7 @@ import { formatRupiah } from '@/lib/utils'
 import { activityService } from '@/services/activityService'
 import { orderService } from '@/services/orderService'
 import { walletService } from '@/services/walletService'
+import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
 import { useAuthStore } from '@/store/authStore'
 import type { ActivityHistoryItem } from '@/types/activity'
 import type { Order } from '@/types/order'
@@ -88,6 +89,29 @@ export default function DashboardPage() {
       .catch(() => {})
       .finally(() => setWalletLoading(false))
   }, [setWalletBalance])
+
+  useVisibilityRefresh(() => {
+    void walletService
+      .getWallet()
+      .then((res) => {
+        setWallet({
+          balance: res.balance,
+          totalTopup: res.total_topup ?? 0,
+          totalSpent: res.total_spent ?? 0,
+        })
+        setWalletBalance(res.balance)
+      })
+      .catch(() => {})
+    void orderService.list({ limit: 20 }).then((res) => {
+      if (res.success) setOrders(res.data)
+    }).catch(() => {})
+    void activityService
+      .listHistory({ page: 1, limit: 5 })
+      .then((res) => {
+        if (res.success) setRecentActivities(res.data)
+      })
+      .catch(() => {})
+  })
 
   const pendingOrders = orders.filter((o) => o.payment_status === 'pending')
 

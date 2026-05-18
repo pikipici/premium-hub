@@ -4,7 +4,9 @@ import { CUSTOMER_PAGE_LIMIT } from '@/config/pagination'
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { animate, createScope, stagger } from 'animejs'
-import { CheckCircle2, ChevronDown, CircleDashed, Clock3, Link2, Loader2, RefreshCcw, RotateCcw, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, CircleDashed, Clock3, Link2, Loader2, Megaphone, RefreshCcw, RotateCcw, X } from 'lucide-react'
+
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 
 import {
   sosmedOrderTone,
@@ -24,6 +26,8 @@ import { buildUserSosmedOrderDisplay } from '@/lib/sosmedOrderDisplay'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
 import type { SosmedOrder } from '@/types/sosmedOrder'
+import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
+import { EmptyState } from '@/components/shared/EmptyState'
 
 
 function statusMeta(order: SosmedOrder) {
@@ -137,6 +141,7 @@ export default function DashboardSosmedOrdersPage() {
   const [refillTarget, setRefillTarget] = useState<SosmedOrder | null>(null)
   const [refillAgreement, setRefillAgreement] = useState(false)
   const [openRefillHistoryOrderID, setOpenRefillHistoryOrderID] = useState<string | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<SosmedOrder | null>(null)
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / CUSTOMER_PAGE_LIMIT)), [total])
 
@@ -166,6 +171,8 @@ export default function DashboardSosmedOrdersPage() {
     void loadOrders()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
+
+  useVisibilityRefresh(() => loadOrders(true))
 
   useEffect(() => {
     if (!refillTarget) return
@@ -220,14 +227,22 @@ export default function DashboardSosmedOrdersPage() {
     return () => scope.current.revert()
   }, [refillTarget])
 
-  const handleCancel = async (order: SosmedOrder) => {
+  const requestCancel = (order: SosmedOrder) => {
     if (cancelLoading === order.id) return
-
     const action = buildUserSosmedOrderDisplay(order).cancelAction
     if (!action) return
+    setCancelTarget(order)
+  }
 
-    const confirmed = window.confirm(action.confirmMessage)
-    if (!confirmed) return
+  const confirmCancel = async () => {
+    const order = cancelTarget
+    if (!order) return
+
+    const action = buildUserSosmedOrderDisplay(order).cancelAction
+    if (!action) {
+      setCancelTarget(null)
+      return
+    }
 
     setCancelLoading(order.id)
     setRefreshing(true)
@@ -247,6 +262,7 @@ export default function DashboardSosmedOrdersPage() {
     } finally {
       setCancelLoading(null)
       setRefreshing(false)
+      setCancelTarget(null)
     }
   }
 
@@ -323,10 +339,13 @@ export default function DashboardSosmedOrdersPage() {
           </span>
         </section>
       ) : orders.length === 0 ? (
-        <section className="rounded-2xl border border-[#EBEBEB] bg-white p-6 text-center">
-          <p className="text-sm text-[#666]">Belum ada order sosmed.</p>
-          <p className="mt-1 text-xs text-[#888]">Begitu lu checkout dari katalog, order akan muncul di sini.</p>
-        </section>
+        <EmptyState
+          icon={<Megaphone className="h-5 w-5" />}
+          title="Belum ada order sosmed"
+          hint="Begitu lu checkout dari katalog, order akan muncul di sini."
+          actionLabel="Lihat katalog DigiSosmed"
+          actionHref="/product/sosmed"
+        />
       ) : (
         <section className="space-y-2">
           {orders.map((order) => {
@@ -570,7 +589,7 @@ export default function DashboardSosmedOrdersPage() {
                       {orderDisplay.cancelAction ? (
                         <button
                           type="button"
-                          onClick={() => void handleCancel(order)}
+                          onClick={() => requestCancel(order)}
                           disabled={cancelLoading === order.id}
                           className={`inline-flex items-center justify-center gap-1.5 rounded-xl border bg-white px-3 py-2 text-[11px] font-black disabled:cursor-not-allowed disabled:opacity-60 ${
                             orderDisplay.cancelAction.kind === 'provider'
@@ -708,6 +727,33 @@ export default function DashboardSosmedOrdersPage() {
           </section>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        title={
+          cancelTarget && buildUserSosmedOrderDisplay(cancelTarget).cancelAction?.kind === 'provider'
+            ? 'Ajukan cancel ke supplier?'
+            : 'Batalkan order ini?'
+        }
+        description={
+          cancelTarget
+            ? buildUserSosmedOrderDisplay(cancelTarget).cancelAction?.confirmMessage
+            : ''
+        }
+        confirmLabel={
+          cancelTarget && buildUserSosmedOrderDisplay(cancelTarget).cancelAction?.kind === 'provider'
+            ? 'Ya, ajukan'
+            : 'Ya, batalkan'
+        }
+        cancelLabel="Tutup"
+        destructive
+        loading={cancelTarget !== null && cancelLoading === cancelTarget.id}
+        onConfirm={() => void confirmCancel()}
+        onCancel={() => {
+          if (cancelTarget && cancelLoading === cancelTarget.id) return
+          setCancelTarget(null)
+        }}
+      />
     </div>
   )
 }
