@@ -9,6 +9,7 @@ import ConvertTimelineSection from '@/components/convert/ConvertTimelineSection'
 import { getConvertStatusSummary, isFinalConvertStatus } from '@/lib/convertTimeline'
 import { getHttpErrorMessage } from '@/lib/httpError'
 import { convertService } from '@/services/convertService'
+import { LOADING_COPY } from '@/lib/copy/loading'
 import type { ConvertOrderDetail, ConvertProof } from '@/types/convert'
 
 function formatRupiah(value: number) {
@@ -178,7 +179,7 @@ export default function DashboardConvertOrderDetailPage() {
       {loading ? (
         <section className="rounded-3xl border border-[#EBEBEB] bg-white p-8 text-center text-sm text-[#6B7280]">
           <span className="inline-flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> Memuat detail order...
+            <Loader2 className="h-4 w-4 animate-spin" /> {LOADING_COPY.detail}
           </span>
         </section>
       ) : !detail ? (

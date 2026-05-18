@@ -23,6 +23,7 @@ import {
 } from '@/lib/sosmedRefillUi'
 import { getRefillHistoryToggleLabel, isRefillHistoryExpanded } from '@/lib/sosmedRefillHistoryUi'
 import { buildUserSosmedOrderDisplay } from '@/lib/sosmedOrderDisplay'
+import { LOADING_COPY } from '@/lib/copy/loading'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
 import type { SosmedOrder } from '@/types/sosmedOrder'
@@ -335,7 +336,7 @@ export default function DashboardSosmedOrdersPage() {
       {loading ? (
         <section className="rounded-2xl border border-[#EBEBEB] bg-white p-8 text-center text-sm text-[#888]">
           <span className="inline-flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> Memuat order sosmed...
+            <Loader2 className="h-4 w-4 animate-spin" /> {LOADING_COPY.orders}
           </span>
         </section>
       ) : orders.length === 0 ? (

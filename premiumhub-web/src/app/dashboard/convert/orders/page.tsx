@@ -11,6 +11,7 @@ import { convertOrderTone, statusToneClasses } from '@/lib/dashboardStatusPill'
 import { convertService } from '@/services/convertService'
 import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { LOADING_COPY } from '@/lib/copy/loading'
 import type { ConvertAssetType, ConvertOrderStatus, ConvertOrderSummary } from '@/types/convert'
 
 const FILTERS: { key: 'all' | ConvertAssetType; label: string; href: string }[] = [
@@ -173,7 +174,7 @@ function DashboardConvertOrdersPageContent() {
       {loading ? (
         <section className="rounded-3xl border border-[#EBEBEB] bg-white p-8 text-center text-sm text-[#6B7280]">
           <span className="inline-flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> Memuat riwayat convert...
+            <Loader2 className="h-4 w-4 animate-spin" /> {LOADING_COPY.history}
           </span>
         </section>
       ) : orders.length === 0 ? (
@@ -264,7 +265,7 @@ function DashboardConvertOrdersPageContent() {
 
 export default function DashboardConvertOrdersPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-[#888]">Memuat riwayat convert...</div>}>
+    <Suspense fallback={<div className="text-sm text-[#888]">{LOADING_COPY.history}</div>}>
       <DashboardConvertOrdersPageContent />
     </Suspense>
   )

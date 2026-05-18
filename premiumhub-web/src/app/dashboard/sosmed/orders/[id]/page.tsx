@@ -10,6 +10,7 @@ import { buildSosmedOrderTimeline, formatSosmedTimelineDate, shortSosmedOrderID 
 import { sosmedOrderTone, statusToneClasses } from '@/lib/dashboardStatusPill'
 import { formatRupiah } from '@/lib/utils'
 import { sosmedOrderService } from '@/services/sosmedOrderService'
+import { LOADING_COPY } from '@/lib/copy/loading'
 import type { SosmedOrderDetail } from '@/types/sosmedOrder'
 
 function compactTarget(value?: string) {
@@ -114,7 +115,7 @@ export default function SosmedOrderDetailPage() {
       {loading ? (
         <section className="rounded-3xl border border-[#EBEBEB] bg-white p-8 text-center text-sm text-[#6B7280]">
           <span className="inline-flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> Memuat detail order...
+            <Loader2 className="h-4 w-4 animate-spin" /> {LOADING_COPY.detail}
           </span>
         </section>
       ) : order && display ? (

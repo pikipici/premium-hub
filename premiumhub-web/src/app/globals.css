@@ -128,3 +128,23 @@
     @apply font-sans;
   }
 }
+
+/*
+ * L1 — Honor prefers-reduced-motion across the app.
+ * Many pages use Tailwind utilities (animate-spin, animate-pulse, animate-bounce, animate-ping)
+ * plus inline transitions. Users with vestibular sensitivities asking the OS for
+ * reduced motion expect those animations toned down to a single frame.
+ *
+ * We keep tiny content-meaningful animations (e.g. progress bars) by leaving
+ * `animation-duration` minimally non-zero so semantics stay intact.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

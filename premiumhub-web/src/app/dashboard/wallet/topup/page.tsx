@@ -11,6 +11,7 @@ import { walletTopupTone, statusToneClasses } from '@/lib/dashboardStatusPill'
 import { walletService } from '@/services/walletService'
 import type { WalletTopup } from '@/types/wallet'
 import { formatRupiah } from '@/lib/utils'
+import { LOADING_COPY } from '@/lib/copy/loading'
 import { useAuthStore } from '@/store/authStore'
 import GatewayPaymentDisplay from '@/components/payment/GatewayPaymentDisplay'
 
@@ -279,7 +280,7 @@ function WalletTopupStatusContent() {
         {loading ? (
           <div className="relative inline-flex items-center gap-2 text-sm text-[#6B7280]">
             <Loader2 className="w-4 h-4 animate-spin" />
-            Memuat data topup...
+            {LOADING_COPY.topup}
           </div>
         ) : topup ? (
           <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -390,7 +391,7 @@ function WalletTopupStatusContent() {
 
 export default function WalletTopupPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-[#888]">Memuat topup...</div>}>
+    <Suspense fallback={<div className="text-sm text-[#888]">{LOADING_COPY.topup}</div>}>
       <WalletTopupStatusContent />
     </Suspense>
   )

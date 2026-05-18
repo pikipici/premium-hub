@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 
 import { statusToneClasses, walletTopupTone } from '@/lib/dashboardStatusPill'
+import { LOADING_COPY } from '@/lib/copy/loading'
 
 import {
   FALLBACK_PAYMENT_METHODS,
@@ -384,7 +385,7 @@ export default function WalletPage() {
           <div>
             <div className="text-[11px] uppercase tracking-wider font-semibold text-[#A6A6A1] mb-2">Saldo Tersedia</div>
             <div className="text-3xl md:text-4xl font-extrabold tracking-tight text-[#141414]">
-              {loading ? 'Memuat saldo...' : formatRupiah(balance)}
+              {loading ? LOADING_COPY.walletBalance : formatRupiah(balance)}
             </div>
             <div className="text-sm text-[#6B7280] mt-2">{walletBalanceHint}</div>
           </div>
@@ -565,24 +566,42 @@ export default function WalletPage() {
               <div className="text-xs text-[#888]">Halaman {txPage}/{mutationTotalPages}</div>
             </header>
 
-            <div className="px-4 py-3 border-b border-[#EBEBEB] flex gap-2 overflow-x-auto">
-              {(['all', 'topup', 'purchase', 'refund'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  type="button"
-                  onClick={() => setTxFilter(filter)}
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                    txFilter === filter
-                      ? 'bg-[#141414] border-[#141414] text-white'
-                      : 'bg-white border-[#EBEBEB] text-[#888] hover:border-[#141414] hover:text-[#141414]'
-                  }`}
-                >
-                  {filter === 'all' ? 'Semua' : filter === 'topup' ? 'Isi Saldo' : filter === 'purchase' ? 'Pembelian' : 'Refund'}
-                </button>
-              ))}
+            <div
+              className="px-4 py-3 border-b border-[#EBEBEB] flex gap-2 overflow-x-auto"
+              role="tablist"
+              aria-label="Filter riwayat saldo"
+            >
+              {(['all', 'topup', 'purchase', 'refund'] as const).map((filter) => {
+                const isActive = txFilter === filter
+                const label =
+                  filter === 'all'
+                    ? 'Semua'
+                    : filter === 'topup'
+                      ? 'Isi Saldo'
+                      : filter === 'purchase'
+                        ? 'Pembelian'
+                        : 'Refund'
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-controls="wallet-mutation-list"
+                    onClick={() => setTxFilter(filter)}
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                      isActive
+                        ? 'bg-[#141414] border-[#141414] text-white'
+                        : 'bg-white border-[#EBEBEB] text-[#888] hover:border-[#141414] hover:text-[#141414]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
             </div>
 
-            <div className="divide-y divide-[#EBEBEB]">
+            <div className="divide-y divide-[#EBEBEB]" id="wallet-mutation-list" role="tabpanel">
               {filteredMutationRows.length === 0 ? (
                 <div className="p-5 text-sm text-[#888]">Belum ada mutasi untuk filter ini.</div>
               ) : (

@@ -272,9 +272,16 @@ export default function AkunAktifPage() {
         </div>
       ) : (
         <>
-          <div className="mb-4 inline-flex rounded-xl border border-[#E4E4DF] bg-white p-1">
+          <div
+            className="mb-4 inline-flex rounded-xl border border-[#E4E4DF] bg-white p-1"
+            role="tablist"
+            aria-label="Filter status akun"
+          >
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'active'}
+              aria-controls="akun-aktif-list"
               onClick={() => setActiveTab('active')}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                 activeTab === 'active'
@@ -286,6 +293,9 @@ export default function AkunAktifPage() {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'expired'}
+              aria-controls="akun-aktif-list"
               onClick={() => setActiveTab('expired')}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                 activeTab === 'expired'
@@ -298,7 +308,11 @@ export default function AkunAktifPage() {
           </div>
 
           {visibleOrders.length === 0 ? (
-            <div className="rounded-3xl border border-[#EBEBEB] bg-white px-6 py-10 text-center">
+            <div
+              id="akun-aktif-list"
+              role="tabpanel"
+              className="rounded-3xl border border-[#EBEBEB] bg-white px-6 py-10 text-center"
+            >
               <PackageOpen className="mx-auto mb-3 h-8 w-8 text-[#D1D1CD]" />
               <p className="text-sm font-semibold text-[#444]">
                 {activeTab === 'active' ? 'Belum ada akun yang masih aktif.' : 'Belum ada akun yang expired.'}
@@ -310,7 +324,7 @@ export default function AkunAktifPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div id="akun-aktif-list" role="tabpanel" className="space-y-4">
               {visibleOrders.map((order) => {
                 const product = resolveProduct(order)
                 const expiredNow = isOrderExpired(order)
