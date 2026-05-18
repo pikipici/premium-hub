@@ -337,7 +337,7 @@ func (s *DigiConnectService) StreamOpenAICompatibleChatCompletion(
 	}
 
 	routerStarted := time.Now()
-	aggregateText, finishReason, statusCode, routerErr := s.streamRouterChatCompletionsCall(ctx, routerBody, func(rawData string) error {
+	aggregate, statusCode, routerErr := s.streamRouterChatCompletionsCall(ctx, routerBody, func(rawData string) error {
 		// Forward the upstream chunk verbatim. Skip [DONE] sentinel; handler
 		// emits its own [DONE] after billing settles.
 		if strings.TrimSpace(rawData) == "[DONE]" {
@@ -351,6 +351,8 @@ func (s *DigiConnectService) StreamOpenAICompatibleChatCompletion(
 		})
 		return nil
 	})
+	aggregateText := aggregate.Content
+	finishReason := aggregate.FinishReason
 	latency := time.Since(routerStarted).Milliseconds()
 	completedAt := time.Now()
 	request.RouterLatencyMS = latency
@@ -404,6 +406,16 @@ func (s *DigiConnectService) StreamOpenAICompatibleChatCompletion(
 	}
 
 	// Persist a synthetic chat.completion envelope for idempotent replay.
+	message := map[string]interface{}{"role": "assistant", "content": aggregateText}
+	if len(aggregate.ToolCalls) > 0 {
+		// Clone tool_calls so persisted envelope doesn't share pointers with
+		// any future mutation (defensive).
+		cloned := make([]map[string]interface{}, len(aggregate.ToolCalls))
+		for i, tc := range aggregate.ToolCalls {
+			cloned[i] = tc
+		}
+		message["tool_calls"] = cloned
+	}
 	envelope := map[string]interface{}{
 		"id":      requestID,
 		"object":  "chat.completion",
@@ -411,7 +423,7 @@ func (s *DigiConnectService) StreamOpenAICompatibleChatCompletion(
 		"model":   modelID,
 		"choices": []map[string]interface{}{{
 			"index":         0,
-			"message":       map[string]interface{}{"role": "assistant", "content": aggregateText},
+			"message":       message,
 			"finish_reason": finishReason,
 		}},
 		"digiconnect": map[string]interface{}{"request_id": requestID, "stream": true},
@@ -436,21 +448,91 @@ func (s *DigiConnectService) StreamOpenAICompatibleChatCompletion(
 	return DigiConnectPublicError{}
 }
 
+// chatCompletionsStreamAggregate is the accumulated state from streaming a
+// chat.completion across many `chat.completion.chunk` SSE deltas. Persisting
+// this struct lets idempotent replay reproduce the original message verbatim,
+// including tool-calling protocol payloads.
+type chatCompletionsStreamAggregate struct {
+	Content      string
+	FinishReason string
+	// ToolCalls aggregated by `delta.tool_calls[i].index`. Each entry is the
+	// composed OpenAI shape `{index, id, type, function:{name, arguments}}`
+	// where `function.arguments` is the concatenation of every streamed
+	// argument fragment. Order in the slice matches index order.
+	ToolCalls []map[string]interface{}
+}
+
+// applyChatCompletionsDelta folds a single upstream `delta` map into the
+// running aggregate. It is exported (lowercase but package-internal) for unit
+// testing. Returns nil; mutations land on the receiver.
+func (a *chatCompletionsStreamAggregate) applyDelta(delta map[string]interface{}) {
+	if delta == nil {
+		return
+	}
+	if c, ok := delta["content"].(string); ok {
+		a.Content += c
+	}
+	rawTC, ok := delta["tool_calls"].([]interface{})
+	if !ok {
+		return
+	}
+	for _, raw := range rawTC {
+		tc, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		idx := 0
+		if v, ok := tc["index"].(float64); ok {
+			idx = int(v)
+		}
+		// Grow slice to fit index.
+		for len(a.ToolCalls) <= idx {
+			a.ToolCalls = append(a.ToolCalls, map[string]interface{}{
+				"index":    len(a.ToolCalls),
+				"type":     "function",
+				"function": map[string]interface{}{"name": "", "arguments": ""},
+			})
+		}
+		entry := a.ToolCalls[idx]
+		if id, ok := tc["id"].(string); ok && id != "" {
+			entry["id"] = id
+		}
+		if t, ok := tc["type"].(string); ok && t != "" {
+			entry["type"] = t
+		}
+		if fn, ok := tc["function"].(map[string]interface{}); ok {
+			efn, _ := entry["function"].(map[string]interface{})
+			if efn == nil {
+				efn = map[string]interface{}{"name": "", "arguments": ""}
+			}
+			if name, ok := fn["name"].(string); ok && name != "" {
+				efn["name"] = name
+			}
+			if args, ok := fn["arguments"].(string); ok && args != "" {
+				existing, _ := efn["arguments"].(string)
+				efn["arguments"] = existing + args
+			}
+			entry["function"] = efn
+		}
+		a.ToolCalls[idx] = entry
+	}
+}
+
 // streamRouterChatCompletionsCall posts the body to the upstream
 // /v1/chat/completions endpoint with stream:true and dispatches each upstream
 // SSE `data:` payload verbatim through onRawChunk. It tracks an aggregate of
-// content text + finish_reason for billing+audit purposes.
+// content text + finish_reason + tool_calls for billing+audit+replay purposes.
 func (s *DigiConnectService) streamRouterChatCompletionsCall(
 	ctx context.Context,
 	body map[string]interface{},
 	onRawChunk func(rawData string) error,
-) (aggregateText string, finishReason string, statusCode int, err *digiConnectRouterError) {
+) (aggregate chatCompletionsStreamAggregate, statusCode int, err *digiConnectRouterError) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	baseURL := strings.TrimRight(s.cfg.DigiConnectRouterBaseURL, "/")
 	if baseURL == "" {
-		return "", "", 0, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: errors.New("digiconnect router base URL is empty")}
+		return aggregate, 0, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: errors.New("digiconnect router base URL is empty")}
 	}
 	chatPath := strings.TrimSpace(s.cfg.DigiConnectRouterChatCompletionsPath)
 	if chatPath == "" {
@@ -463,11 +545,11 @@ func (s *DigiConnectService) streamRouterChatCompletionsCall(
 
 	encoded, marshalErr := json.Marshal(body)
 	if marshalErr != nil {
-		return "", "", 0, &digiConnectRouterError{InternalCode: "INVALID_PAYLOAD", Err: marshalErr}
+		return aggregate, 0, &digiConnectRouterError{InternalCode: "INVALID_PAYLOAD", Err: marshalErr}
 	}
 	req, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+chatPath, bytes.NewReader(encoded))
 	if reqErr != nil {
-		return "", "", 0, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: reqErr}
+		return aggregate, 0, &digiConnectRouterError{InternalCode: "NINEROUTER_HEALTH_FAILED", Err: reqErr}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
@@ -477,14 +559,14 @@ func (s *DigiConnectService) streamRouterChatCompletionsCall(
 
 	res, doErr := s.httpClient.Do(req)
 	if doErr != nil {
-		return "", "", 0, &digiConnectRouterError{InternalCode: "NINEROUTER_TIMEOUT", Err: doErr}
+		return aggregate, 0, &digiConnectRouterError{InternalCode: "NINEROUTER_TIMEOUT", Err: doErr}
 	}
 	defer res.Body.Close()
 	statusCode = res.StatusCode
 
 	if statusCode/100 != 2 {
 		raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
-		return "", "", statusCode, &digiConnectRouterError{
+		return aggregate, statusCode, &digiConnectRouterError{
 			InternalCode: fmt.Sprintf("NINEROUTER_UPSTREAM_%d", statusCode),
 			Err:          fmt.Errorf("upstream stream %d: %s", statusCode, strings.TrimSpace(string(raw))),
 		}
@@ -497,17 +579,19 @@ func (s *DigiConnectService) streamRouterChatCompletionsCall(
 		// flush something.
 		raw, readErr := io.ReadAll(io.LimitReader(res.Body, 4<<20))
 		if readErr != nil {
-			return "", "", statusCode, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: readErr}
+			return aggregate, statusCode, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: readErr}
 		}
 		_ = onRawChunk(string(raw))
-		// Best-effort decode for aggregate.
+		// Best-effort decode for aggregate (non-stream shape).
 		var decoded map[string]interface{}
 		_ = json.Unmarshal(raw, &decoded)
-		text, fr := extractChatCompletionsContentAndFinish(decoded)
-		return text, fr, statusCode, nil
+		text, fr, toolCalls := extractChatCompletionsMessageFields(decoded)
+		aggregate.Content = text
+		aggregate.FinishReason = fr
+		aggregate.ToolCalls = toolCalls
+		return aggregate, statusCode, nil
 	}
 
-	var aggregate strings.Builder
 	parseErr := parseSSEStream(ctx, res.Body, func(ev sseEvent) error {
 		// Forward raw payload verbatim before extracting aggregate.
 		if cbErr := onRawChunk(ev.Data); cbErr != nil {
@@ -527,50 +611,66 @@ func (s *DigiConnectService) streamRouterChatCompletionsCall(
 				continue
 			}
 			if fr, ok := choice["finish_reason"].(string); ok && fr != "" {
-				finishReason = fr
+				aggregate.FinishReason = fr
 			}
 			delta, ok := choice["delta"].(map[string]interface{})
 			if !ok {
 				continue
 			}
-			if c, ok := delta["content"].(string); ok {
-				aggregate.WriteString(c)
-			}
+			aggregate.applyDelta(delta)
 		}
 		return nil
 	})
 	if parseErr != nil {
-		return aggregate.String(), finishReason, statusCode, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: parseErr}
+		return aggregate, statusCode, &digiConnectRouterError{InternalCode: "NINEROUTER_INVALID_JSON", Err: parseErr}
 	}
-	return aggregate.String(), finishReason, statusCode, nil
+	return aggregate, statusCode, nil
 }
 
 // extractChatCompletionsContentAndFinish extracts message content + finish_reason
 // from a chat.completion (non-stream) shape body for the synthetic-fallback path.
 func extractChatCompletionsContentAndFinish(body map[string]interface{}) (string, string) {
+	content, finishReason, _ := extractChatCompletionsMessageFields(body)
+	return content, finishReason
+}
+
+// extractChatCompletionsMessageFields extracts message content + finish_reason +
+// tool_calls from a chat.completion (non-stream) shape body. Returned tool_calls
+// is the verbatim slice from upstream (pointer-shared); callers that mutate the
+// slice should clone first.
+func extractChatCompletionsMessageFields(body map[string]interface{}) (string, string, []map[string]interface{}) {
 	if body == nil {
-		return "", ""
+		return "", "", nil
 	}
 	choices, ok := body["choices"].([]interface{})
 	if !ok || len(choices) == 0 {
-		return "", ""
+		return "", "", nil
 	}
 	choice, ok := choices[0].(map[string]interface{})
 	if !ok {
-		return "", ""
+		return "", "", nil
 	}
 	finishReason, _ := choice["finish_reason"].(string)
 	msg, ok := choice["message"].(map[string]interface{})
 	if !ok {
-		return "", finishReason
+		return "", finishReason, nil
 	}
 	content, _ := msg["content"].(string)
-	return content, finishReason
+	var toolCalls []map[string]interface{}
+	if rawTC, ok := msg["tool_calls"].([]interface{}); ok {
+		for _, raw := range rawTC {
+			if tc, ok := raw.(map[string]interface{}); ok {
+				toolCalls = append(toolCalls, tc)
+			}
+		}
+	}
+	return content, finishReason, toolCalls
 }
 
 // emitChatCompletionsReplayChunks re-emits a stored chat completion as a
 // synthetic single-chunk + completed terminator so streaming clients still see
-// an SSE shape on idempotent replay.
+// an SSE shape on idempotent replay. Preserves tool_calls when present so
+// function-calling clients (Hermes, Cursor) can re-execute the same tool plan.
 func emitChatCompletionsReplayChunks(
 	existing *model.DigiConnectRequest,
 	modelID string,
@@ -579,16 +679,45 @@ func emitChatCompletionsReplayChunks(
 	requestID := existing.RequestID
 	text := ""
 	finishReason := "stop"
+	var toolCalls []map[string]interface{}
 	if strings.TrimSpace(existing.ResponseJSON) != "" {
 		var decoded map[string]interface{}
 		if err := json.Unmarshal([]byte(existing.ResponseJSON), &decoded); err == nil {
-			text, finishReason = extractChatCompletionsContentAndFinish(decoded)
+			text, finishReason, toolCalls = extractChatCompletionsMessageFields(decoded)
 			if finishReason == "" {
 				finishReason = "stop"
 			}
 		}
 	}
-	if text != "" {
+	if len(toolCalls) > 0 {
+		// Emit upstream-shaped chat.completion.chunk with tool_calls so the
+		// downstream client (Hermes etc.) reconstructs the tool-call protocol
+		// exactly the same way it would on a live stream.
+		delta := map[string]interface{}{"role": "assistant", "tool_calls": toolCalls}
+		if text != "" {
+			delta["content"] = text
+		}
+		chunk := map[string]interface{}{
+			"id":      requestID,
+			"object":  "chat.completion.chunk",
+			"model":   modelID,
+			"choices": []map[string]interface{}{{"index": 0, "delta": delta, "finish_reason": nil}},
+		}
+		if encoded, err := json.Marshal(chunk); err == nil {
+			onChunk(DigiConnectStreamChunk{Type: "raw_chat_chunk", Delta: string(encoded), Model: modelID, RequestID: requestID})
+		}
+		// Emit terminating finish_reason chunk separately so clients that
+		// trigger on finish_reason transition see it cleanly.
+		final := map[string]interface{}{
+			"id":      requestID,
+			"object":  "chat.completion.chunk",
+			"model":   modelID,
+			"choices": []map[string]interface{}{{"index": 0, "delta": map[string]interface{}{}, "finish_reason": finishReason}},
+		}
+		if encoded, err := json.Marshal(final); err == nil {
+			onChunk(DigiConnectStreamChunk{Type: "raw_chat_chunk", Delta: string(encoded), Model: modelID, RequestID: requestID})
+		}
+	} else if text != "" {
 		raw := fmt.Sprintf(`{"id":%q,"object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"role":"assistant","content":%q},"finish_reason":null}]}`, requestID, modelID, text)
 		onChunk(DigiConnectStreamChunk{Type: "raw_chat_chunk", Delta: raw, Model: modelID, RequestID: requestID})
 	}
