@@ -18,6 +18,7 @@ import { TransactionDollarIcon } from '@/components/icons/TransactionIcons'
 import { notificationService, type NotificationItem } from '@/services/notificationService'
 import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton'
 
 type NotificationFilter = 'all' | 'unread' | 'order' | 'wallet' | 'claim'
 type NotificationKind = 'order' | 'wallet' | 'claim' | 'other'
@@ -385,11 +386,7 @@ export default function NotifikasiPage() {
       </section>
 
       {loading ? (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, index) => (
-            <div key={index} className="h-24 animate-pulse rounded-2xl bg-[#F4F4F2]" />
-          ))}
-        </div>
+        <DashboardSkeleton variant="list" rows={5} />
       ) : error ? (
         <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
           <p className="text-sm font-semibold text-rose-700">{error}</p>

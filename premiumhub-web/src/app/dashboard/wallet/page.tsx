@@ -49,6 +49,19 @@ type WalletMutationRow = {
   credit: boolean
 }
 
+function formatRelativeTime(date: Date) {
+  const diff = Date.now() - date.getTime()
+  const sec = Math.floor(diff / 1000)
+  if (sec < 5) return 'baru saja'
+  if (sec < 60) return `${sec} dtk lalu`
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `${min} mnt lalu`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr} jam lalu`
+  const day = Math.floor(hr / 24)
+  return `${day} hari lalu`
+}
+
 function formatCompactAmount(value: number) {
   if (value >= 1000) {
     return `Rp ${Math.round(value / 1000)}rb`
@@ -131,6 +144,7 @@ export default function WalletPage() {
   const { setWalletBalance } = useAuthStore()
 
   const [balance, setBalance] = useState(0)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [topups, setTopups] = useState<WalletTopup[]>([])
   const [ledgers, setLedgers] = useState<WalletLedger[]>([])
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>(FALLBACK_PAYMENT_METHODS)
@@ -264,6 +278,7 @@ export default function WalletPage() {
       if (ledgerRes.success) {
         setLedgers(ledgerRes.data)
       }
+      setLastUpdated(new Date())
 
       try {
         const methodRes = await walletService.listPaymentMethods(MIN_TOPUP_DEFAULT)
@@ -343,6 +358,12 @@ export default function WalletPage() {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Wallet Saya 💰</h1>
           <p className="text-sm text-[#888] mt-1">Kelola saldo dan riwayat transaksi kamu</p>
+          {lastUpdated ? (
+            <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#7B7067]" aria-live="polite">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Diperbarui {formatRelativeTime(lastUpdated)}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"

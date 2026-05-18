@@ -367,7 +367,7 @@ export default function DigiConnectDashboardPage() {
             >
               <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
             </Link>
-            <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#A89F94]">DigiConnect</span>
+            <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#7B7067]">DigiConnect</span>
           </div>
           {authReady && isAuthenticated ? (
             <Link
@@ -398,7 +398,7 @@ export default function DigiConnectDashboardPage() {
                   >
                     <span className="text-[13px] font-bold leading-tight">{tab.badge || tab.label}</span>
                     {tab.badge ? (
-                      <span className={`text-[11px] font-semibold leading-tight ${isActive ? 'text-orange-100/80' : 'text-[#A89F94]'}`}>{tab.label}</span>
+                      <span className={`text-[11px] font-semibold leading-tight ${isActive ? 'text-orange-100/80' : 'text-[#7B7067]'}`}>{tab.label}</span>
                     ) : null}
                   </button>
                 )
@@ -490,7 +490,7 @@ export default function DigiConnectDashboardPage() {
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#FFF0EA] text-[#FF5733]"><Activity className="h-4 w-4" /></span>
                   <div>
                     <div className="text-sm font-bold text-[#171411]">Request terbaru</div>
-                    <div className="text-xs font-semibold text-[#A89F94]">{activePlanRequests.length} entri</div>
+                    <div className="text-xs font-semibold text-[#7B7067]">{activePlanRequests.length} entri</div>
                   </div>
                 </div>
                 {activePlanRequests.length > 5 ? (
@@ -580,7 +580,7 @@ function AccessPanel({ plan, entitlement, checkingOut, walletBalance, onCheckout
           </div>
           <div className="flex flex-col items-stretch gap-2 sm:items-end">
             <div className="text-right">
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#A89F94]">Harga</div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7B7067]">Harga</div>
               <div className="text-lg font-bold text-[#171411]">{plan.price_label || currency.format(plan.price)}</div>
             </div>
             <button
@@ -614,7 +614,7 @@ function AccessPanel({ plan, entitlement, checkingOut, walletBalance, onCheckout
         <div className="grid gap-3 sm:grid-cols-2">
           {features.length ? (
             <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
-              <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Yang termasuk</div>
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#7B7067]">Yang termasuk</div>
               <ul className="space-y-1.5">
                 {features.slice(0, 5).map((feature, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-[#3F3A35]">
@@ -627,7 +627,7 @@ function AccessPanel({ plan, entitlement, checkingOut, walletBalance, onCheckout
           ) : null}
           {models.length ? (
             <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
-              <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Model tersedia</div>
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#7B7067]">Model tersedia</div>
               <div className="flex flex-wrap gap-1.5">
                 {models.slice(0, 8).map((model) => (
                   <span key={model} className="rounded-md bg-[#FFF0EA] px-2 py-1 font-mono text-[11px] font-semibold text-[#B73B20]">{model}</span>
@@ -660,13 +660,13 @@ function StatsPanel({ stats, requests }: { stats?: DigiConnectPlanStats; request
       <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Latency request terakhir</div>
+            <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#7B7067]">Latency request terakhir</div>
             <div className="text-sm font-semibold text-[#7B7067]">{recentBars.length} request terbaru · skala maks {max} ms</div>
           </div>
-          <Clock className="h-4 w-4 text-[#A89F94]" />
+          <Clock className="h-4 w-4 text-[#7B7067]" />
         </div>
         {recentBars.length === 0 ? (
-          <div className="py-6 text-center text-sm font-semibold text-[#A89F94]">Belum ada data latency.</div>
+          <div className="py-6 text-center text-sm font-semibold text-[#7B7067]">Belum ada data latency.</div>
         ) : (
           <div>
             <div className="flex h-24 items-end gap-1">
@@ -729,14 +729,14 @@ function IntegrationPanel({ baseUrl, sampleKey, sampleModel, curlSample, isCopie
       <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-bold text-[#171411]">1. Konfigurasi</div>
-          <span className="text-[11px] font-semibold text-[#A89F94]">OpenAI-compatible</span>
+          <span className="text-[11px] font-semibold text-[#7B7067]">OpenAI-compatible</span>
         </div>
         <div className="space-y-3">
           <ConfigField label="Base URL" value={fullBase} copied={isCopied('base')} onCopy={() => onCopy('base', fullBase)} />
           <ConfigField label="API key" value={sampleKey} copied={isCopied('auth')} onCopy={() => onCopy('auth', sampleKey)} placeholder={!hasActiveKey} />
           <div className="rounded-lg bg-[#FFFAF5] p-3 ring-1 ring-[#EFE3D6]">
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#A89F94]">Untuk .env</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#7B7067]">Untuk .env</span>
               <button type="button" onClick={() => onCopy('env', envSnippet)} aria-label="Salin .env snippet" className="inline-flex items-center gap-1 text-[11px] font-bold text-[#FF5733] hover:text-[#E64A28]">
                 <Copy className="h-3 w-3" /> {isCopied('env') ? 'Tersalin' : 'Salin'}
               </button>
@@ -776,12 +776,12 @@ function ConfigField({ label, value, copied, onCopy, placeholder = false }: { la
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-[#A89F94]">{label}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[#7B7067]">{label}</span>
         <button type="button" onClick={onCopy} aria-label={`Salin ${label}`} className="inline-flex items-center gap-1 text-[11px] font-bold text-[#FF5733] hover:text-[#E64A28]">
           <Copy className="h-3 w-3" /> {copied ? 'Tersalin' : 'Salin'}
         </button>
       </div>
-      <div className={`break-all rounded-md border border-[#EFE3D6] bg-[#FFFAF5] px-3 py-2 font-mono text-xs ${placeholder ? 'text-[#A89F94]' : 'text-[#171411]'}`} aria-live="polite">
+      <div className={`break-all rounded-md border border-[#EFE3D6] bg-[#FFFAF5] px-3 py-2 font-mono text-xs ${placeholder ? 'text-[#7B7067]' : 'text-[#171411]'}`} aria-live="polite">
         {value}
       </div>
     </div>
@@ -819,7 +819,7 @@ function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, on
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-[#EFE3D6] bg-[#FFFAF5] p-4">
-        <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#A89F94]">Buat API key baru</div>
+        <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#7B7067]">Buat API key baru</div>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row">
           <input
             value={newKeyName}
@@ -868,7 +868,7 @@ function ApiKeyPanel({ keys, newKeyName, setNewKeyName, createdKey, creating, on
                   <Pill tone={statusTone(key.status)}>{statusLabel(key.status)}</Pill>
                 </div>
                 <div className="mt-1 truncate font-mono text-xs font-semibold text-[#7B7067]">{key.masked_key}</div>
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-semibold text-[#A89F94]">
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-semibold text-[#7B7067]">
                   <span>Dibuat {formatDateOnly(key.created_at)}</span>
                   <span>•</span>
                   <span>Terakhir dipakai {key.last_used_at ? relativeTime(key.last_used_at) : 'belum'}</span>
@@ -914,7 +914,7 @@ function RequestRow({ request, onClick }: { request: DigiConnectRequest; onClick
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-mono text-[11px] font-bold text-[#171411]" title={request.request_id}>#{shortRequestId(request.request_id)}</span>
-            <span className="text-[11px] font-semibold text-[#A89F94]">{relativeTime(request.created_at)}</span>
+            <span className="text-[11px] font-semibold text-[#7B7067]">{relativeTime(request.created_at)}</span>
           </div>
           <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-[#3F3A35]">{request.input_preview || request.service_alias || '-'}</p>
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-semibold text-[#7B7067]">
@@ -924,7 +924,7 @@ function RequestRow({ request, onClick }: { request: DigiConnectRequest; onClick
             {modelLabel ? <><span>•</span><span className="font-mono">{modelLabel}</span></> : null}
           </div>
         </div>
-        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#A89F94]" />
+        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[#7B7067]" />
       </div>
     </button>
   )
@@ -956,13 +956,13 @@ function RequestDetail({ request, onClose }: { request: DigiConnectRequest; onCl
             </div>
             <h3 className="mt-2 text-lg font-bold tracking-tight text-[#171411]">Detail request</h3>
           </div>
-          <button type="button" onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#7B7067] hover:bg-stone-100 hover:text-[#171411]" aria-label="Tutup">
+          <button type="button" onClick={onClose} className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-[#7B7067] before:absolute before:-inset-1.5 before:content-[''] hover:bg-stone-100 hover:text-[#171411]" aria-label="Tutup">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="rounded-xl border border-[#EFE3D6] bg-[#FFFAF5] p-3">
-          <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A89F94]">Input preview</div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#7B7067]">Input preview</div>
           <p className="mt-1 whitespace-pre-wrap break-words text-sm text-[#3F3A35]">{request.input_preview || '-'}</p>
         </div>
 
@@ -993,9 +993,9 @@ function HeadStat({ label, value, hint, tone }: { label: string; value: string; 
   const valueColor = tone === 'success' ? 'text-emerald-700' : tone === 'error' ? 'text-rose-700' : tone === 'warn' ? 'text-amber-700' : 'text-[#171411]'
   return (
     <div className="rounded-xl border border-[#EFE3D6] bg-[#FFFAF5] p-3">
-      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#A89F94]">{label}</div>
+      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#7B7067]">{label}</div>
       <div className={`mt-1 truncate text-sm font-bold ${valueColor}`}>{value}</div>
-      {hint ? <div className="mt-0.5 truncate text-[11px] font-semibold text-[#A89F94]">{hint}</div> : null}
+      {hint ? <div className="mt-0.5 truncate text-[11px] font-semibold text-[#7B7067]">{hint}</div> : null}
     </div>
   )
 }
@@ -1003,7 +1003,7 @@ function HeadStat({ label, value, hint, tone }: { label: string; value: string; 
 function BigStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-xl border border-[#EFE3D6] bg-white p-4">
-      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#A89F94]">{label}</div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#7B7067]">{label}</div>
       <div className="mt-1 truncate text-xl font-bold text-[#171411]">{value}</div>
       {hint ? <div className="mt-0.5 text-[11px] font-semibold text-emerald-700">{hint}</div> : null}
     </div>

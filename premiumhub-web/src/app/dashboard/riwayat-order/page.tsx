@@ -9,6 +9,7 @@ import { ReceiptRefundIcon, TransactionDollarIcon } from '@/components/icons/Tra
 import { formatRupiah } from '@/lib/utils'
 import { activityService } from '@/services/activityService'
 import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
+import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { ActivityHistoryItem } from '@/types/activity'
 
@@ -118,11 +119,7 @@ export default function RiwayatOrderPage() {
       <p className="mb-6 text-sm text-[#888]">Aktivitas gabungan semua produk, diurutkan dari yang paling baru.</p>
 
       {loading ? (
-        <div className="space-y-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-2xl bg-[#F4F4F2]" />
-          ))}
-        </div>
+        <DashboardSkeleton variant="list" rows={6} />
       ) : error ? (
         <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
           <p className="text-sm font-semibold text-rose-700">{error}</p>

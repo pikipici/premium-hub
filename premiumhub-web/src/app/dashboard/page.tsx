@@ -12,6 +12,7 @@ import { activityService } from '@/services/activityService'
 import { orderService } from '@/services/orderService'
 import { walletService } from '@/services/walletService'
 import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
+import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton'
 import { useAuthStore } from '@/store/authStore'
 import type { ActivityHistoryItem } from '@/types/activity'
 import type { Order } from '@/types/order'
@@ -163,11 +164,7 @@ export default function DashboardPage() {
         </div>
 
         {activityLoading ? (
-          <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-16 animate-pulse rounded-xl bg-[#F4F4F2]" />
-            ))}
-          </div>
+          <DashboardSkeleton variant="list" rows={3} />
         ) : recentActivities.length === 0 ? (
           <div className="py-10 text-center">
             <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-[#D9D9D6]" />

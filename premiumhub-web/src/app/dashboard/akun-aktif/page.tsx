@@ -8,6 +8,7 @@ import { AlertTriangle, Check, Copy, Eye, EyeOff, Loader2, PackageOpen, RefreshC
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
 import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
+import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton'
 import type { Order } from '@/types/order'
 
 type ProductLookup = Record<string, { name: string; icon: string }>
@@ -236,11 +237,7 @@ export default function AkunAktifPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-3">
-          {[...Array(4)].map((_, idx) => (
-            <div key={idx} className="h-40 animate-pulse rounded-2xl bg-[#F4F4F2]" />
-          ))}
-        </div>
+        <DashboardSkeleton variant="card-grid" rows={4} />
       ) : error ? (
         <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
           <p className="text-sm font-semibold text-rose-700">{error}</p>
@@ -379,7 +376,7 @@ export default function AkunAktifPage() {
                         type="button"
                         onClick={() => void copyText(stockEmail, `${order.id}:email`)}
                         disabled={stockEmail === '-'}
-                        className="inline-flex h-8 w-8 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40 sm:self-auto"
+                        className="relative inline-flex h-9 w-9 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40 sm:self-auto"
                         aria-label="Copy email akun"
                       >
                         {copiedKey === `${order.id}:email` ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
@@ -404,8 +401,8 @@ export default function AkunAktifPage() {
                             }))
                           }
                           disabled={!passwordRaw}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
-                          aria-label="Tampilkan password"
+                          className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
@@ -413,7 +410,7 @@ export default function AkunAktifPage() {
                           type="button"
                           onClick={() => void copyText(passwordRaw, passwordKey)}
                           disabled={!passwordRaw}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
+                          className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label="Copy password akun"
                         >
                           {copiedKey === passwordKey ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
@@ -439,7 +436,7 @@ export default function AkunAktifPage() {
                       <button
                         type="button"
                         onClick={() => void copyText(order.id, `${order.id}:id`)}
-                        className="inline-flex h-8 w-8 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] hover:bg-[#F1F1EE] sm:self-auto"
+                        className="relative inline-flex h-9 w-9 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[#F1F1EE] sm:self-auto"
                         aria-label="Copy order id"
                       >
                         {copiedKey === `${order.id}:id` ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
