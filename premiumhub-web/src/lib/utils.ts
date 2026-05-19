@@ -10,3 +10,12 @@ export const formatRupiah = (n: number) =>
 
 export const formatDate = (d: string | Date) =>
   new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(d))
+
+export const formatDateTime = (d: string | Date) =>
+  new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(d))

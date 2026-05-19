@@ -16,7 +16,8 @@ import {
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { LOADING_COPY } from '@/lib/copy/loading'
 import { gmailSlotTone, statusToneClasses } from '@/lib/dashboardStatusPill'
-import { formatDate, formatRupiah } from '@/lib/utils'
+import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
+import { formatDate, formatDateTime, formatRupiah } from '@/lib/utils'
 import { gmailService } from '@/services/gmailService'
 import type { GmailSlot, GmailSlotResponse } from '@/types/gmail'
 
@@ -24,6 +25,11 @@ import type { GmailSlot, GmailSlotResponse } from '@/types/gmail'
 // stays accessible during refresh after first generation. Cleared
 // once user submits.
 const credsKey = (id: string) => `gmail-slot-creds:${id}`
+
+// One-shot read pattern: clear creds from sessionStorage immediately
+// after first read in detail page. User browser refresh = creds gone,
+// matches the "salin atau screenshot password sekarang" copy below.
+// Reduces window of exposure to malicious extensions / shoulder surfing.
 
 interface FreshCreds {
   email: string
@@ -62,10 +68,10 @@ export default function GmailSlotDetailPage() {
     }
   }, [id])
 
-  // On mount: try to read fresh creds from sessionStorage if this is
-  // the first view post-RequestSlot. Backend doesn't return password
-  // on subsequent fetches — we cache locally so refresh doesn't lose
-  // the one-time view.
+  // On mount: try to read fresh creds from sessionStorage (one-shot
+  // read — drop immediately after first read for tighter security). If
+  // user manually refreshes, creds will be gone — matches the warning
+  // copy "password muncul sekali, salin sekarang".
   useEffect(() => {
     if (!id) return
     if (typeof window !== 'undefined') {
@@ -74,8 +80,11 @@ export default function GmailSlotDetailPage() {
         try {
           const parsed = JSON.parse(raw) as FreshCreds
           setCreds(parsed)
+          // One-shot — drop after first successful read.
+          sessionStorage.removeItem(credsKey(id))
         } catch {
-          // ignore
+          // Drop bad payload too.
+          sessionStorage.removeItem(credsKey(id))
         }
       }
     }
@@ -100,6 +109,11 @@ export default function GmailSlotDetailPage() {
   useEffect(() => {
     fetchSlot()
   }, [fetchSlot])
+
+  // Auto-refresh saat tab kembali visible (mostly relevant untuk
+  // pending_verify status — admin verify async, user gak harus stuck
+  // di stale view).
+  useVisibilityRefresh(fetchSlot, 60_000)
 
   // Tick countdown every second when in pending_create.
   useEffect(() => {
@@ -211,7 +225,12 @@ export default function GmailSlotDetailPage() {
 
                   {/* Countdown */}
                   {remaining && (
-                    <div className="mt-4 rounded-2xl border border-[#EBEBEB] bg-[#F7F7F5] p-4">
+                    <div
+                      className="mt-4 rounded-2xl border border-[#EBEBEB] bg-[#F7F7F5] p-4"
+                      role="timer"
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
                       <div className="text-xs font-medium uppercase tracking-wide text-[#6B6B6B]">
                         Sisa waktu
                       </div>
@@ -219,7 +238,7 @@ export default function GmailSlotDetailPage() {
                         {expired ? 'Expired' : remaining}
                       </div>
                       <div className="text-xs text-[#6B6B6B]">
-                        Slot expired {expiry ? formatDate(expiry.toISOString()) : '—'}
+                        Slot expired {expiry ? formatDateTime(expiry.toISOString()) : '—'}
                       </div>
                     </div>
                   )}

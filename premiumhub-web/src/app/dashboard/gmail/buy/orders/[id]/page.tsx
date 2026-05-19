@@ -8,14 +8,19 @@ import {
   ArrowLeft,
   CheckCircle2,
   ClipboardCopy,
+  Eye,
+  EyeOff,
   Loader2,
+  RefreshCcw,
   ShieldCheck,
+  XCircle,
 } from 'lucide-react'
 
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { LOADING_COPY } from '@/lib/copy/loading'
 import { gmailClaimTone, statusToneClasses } from '@/lib/dashboardStatusPill'
-import { formatDate, formatRupiah } from '@/lib/utils'
+import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
+import { formatDate, formatDateTime, formatRupiah } from '@/lib/utils'
 import { gmailService } from '@/services/gmailService'
 import type {
   GmailClaim,
@@ -35,6 +40,8 @@ export default function GmailOrderDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  // Per-item password reveal state — default masked, click eye to show.
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({})
 
   // Claim dialog state.
   const [claimTarget, setClaimTarget] = useState<GmailOrderItemCreds | null>(null)
@@ -64,6 +71,10 @@ export default function GmailOrderDetailPage() {
     fetchAll()
   }, [fetchAll])
 
+  // Auto-refresh saat tab kembali visible — order status bisa berubah
+  // (claim verified by admin, etc).
+  useVisibilityRefresh(fetchAll, 60_000)
+
   // Build a quick lookup: gmail_account_id -> claim row.
   const claimByGmail = useMemo(() => {
     const m = new Map<string, GmailClaim>()
@@ -82,10 +93,14 @@ export default function GmailOrderDetailPage() {
   }, [order])
   const stillCoveredOverall = warrantyDeadline ? new Date() < warrantyDeadline : false
 
-  const copyToClipboard = (id: string, text: string) => {
+  const togglePassword = (gmailID: string) => {
+    setRevealed((prev) => ({ ...prev, [gmailID]: !prev[gmailID] }))
+  }
+
+  const copyToClipboard = (key: string, text: string) => {
     if (!navigator?.clipboard) return
     navigator.clipboard.writeText(text)
-    setCopiedId(id)
+    setCopiedId(key)
     window.setTimeout(() => setCopiedId(null), 1500)
   }
 
@@ -138,8 +153,19 @@ export default function GmailOrderDetailPage() {
           {LOADING_COPY.detail}
         </div>
       ) : error ? (
-        <div className="rounded-3xl border border-[#FFC3B7] bg-[#FFF1ED] p-6 text-sm text-[#A6260F]">
-          {error}
+        <div
+          className="rounded-3xl border border-[#FFC3B7] bg-[#FFF1ED] p-6 text-sm text-[#A6260F]"
+          role="alert"
+        >
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={fetchAll}
+            className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#A6260F] bg-white px-3 py-1.5 text-xs font-medium text-[#A6260F] hover:bg-[#FFE0D6]"
+          >
+            <RefreshCcw className="h-3 w-3" aria-hidden="true" />
+            Coba Lagi
+          </button>
         </div>
       ) : order ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -149,7 +175,7 @@ export default function GmailOrderDetailPage() {
               <p className="mt-1 text-xs text-[#6B6B6B]">
                 {items.length} akun dikirim. Garansi 1×24 jam aktif sampai{' '}
                 <span className="font-medium text-[#141414]">
-                  {warrantyDeadline ? formatDate(warrantyDeadline.toISOString()) : '—'}
+                  {warrantyDeadline ? formatDateTime(warrantyDeadline.toISOString()) : '—'}
                 </span>
                 .
               </p>
@@ -174,9 +200,9 @@ export default function GmailOrderDetailPage() {
                               type="button"
                               onClick={() => copyToClipboard(`email-${item.gmail_account_id}`, item.email)}
                               className="rounded-full p-1 text-[#6B6B6B] hover:bg-[#F7F7F5]"
-                              title="Copy email"
+                              aria-label="Salin email"
                             >
-                              <ClipboardCopy className="h-3 w-3" />
+                              <ClipboardCopy className="h-3 w-3" aria-hidden="true" />
                             </button>
                             {copiedId === `email-${item.gmail_account_id}` && (
                               <span className="text-xs text-[#10A37F]">Copied!</span>
@@ -184,15 +210,27 @@ export default function GmailOrderDetailPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="rounded-md bg-[#F7F7F5] px-2 py-1 text-xs font-mono text-[#141414]">
-                              {item.password}
+                              {revealed[item.gmail_account_id] ? item.password : '••••••••••'}
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => togglePassword(item.gmail_account_id)}
+                              className="rounded-full p-1 text-[#6B6B6B] hover:bg-[#F7F7F5]"
+                              aria-label={revealed[item.gmail_account_id] ? 'Sembunyikan password' : 'Tampilkan password'}
+                            >
+                              {revealed[item.gmail_account_id] ? (
+                                <EyeOff className="h-3 w-3" aria-hidden="true" />
+                              ) : (
+                                <Eye className="h-3 w-3" aria-hidden="true" />
+                              )}
+                            </button>
                             <button
                               type="button"
                               onClick={() => copyToClipboard(`pwd-${item.gmail_account_id}`, item.password)}
                               className="rounded-full p-1 text-[#6B6B6B] hover:bg-[#F7F7F5]"
-                              title="Copy password"
+                              aria-label="Salin password"
                             >
-                              <ClipboardCopy className="h-3 w-3" />
+                              <ClipboardCopy className="h-3 w-3" aria-hidden="true" />
                             </button>
                             {copiedId === `pwd-${item.gmail_account_id}` && (
                               <span className="text-xs text-[#10A37F]">Copied!</span>
@@ -311,18 +349,26 @@ export default function GmailOrderDetailPage() {
         loading={claimLoading}
         preview={
           <div className="space-y-2 text-left">
-            <label className="text-sm font-medium text-[#141414]">Alasan klaim</label>
+            <label htmlFor="claim-reason" className="text-sm font-medium text-[#141414]">
+              Alasan klaim
+            </label>
             <textarea
+              id="claim-reason"
               value={claimReason}
               onChange={(e) => setClaimReason(e.target.value)}
               rows={3}
               maxLength={255}
               placeholder="Akun banned dalam 5 menit setelah login pertama"
+              aria-describedby={claimError ? 'claim-reason-error' : undefined}
               className="w-full rounded-2xl border border-[#EBEBEB] bg-white px-4 py-3 text-sm focus:border-[#141414] focus:outline-none"
             />
             {claimError && (
-              <div className="flex items-center gap-2 text-xs text-[#A6260F]">
-                <AlertTriangle className="h-3.5 w-3.5" />
+              <div
+                id="claim-reason-error"
+                className="flex items-center gap-2 text-xs text-[#A6260F]"
+                role="alert"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                 {claimError}
               </div>
             )}
@@ -336,11 +382,12 @@ export default function GmailOrderDetailPage() {
 function ClaimBadge({ status }: { status: string }) {
   const t = gmailClaimTone(status)
   const classes = statusToneClasses(t.tone)
+  const Icon = status === 'rejected' ? XCircle : CheckCircle2
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${classes.pill}`}
     >
-      <CheckCircle2 className="h-3 w-3" />
+      <Icon className="h-3 w-3" aria-hidden="true" />
       {t.label}
     </span>
   )

@@ -82,7 +82,11 @@ export default function GmailMarketplaceHubPage() {
       </header>
 
       {/* Tab strip */}
-      <div className="flex items-center gap-2 rounded-full border border-[#EBEBEB] bg-white p-1 w-fit">
+      <div
+        role="tablist"
+        aria-label="Gmail marketplace"
+        className="flex items-center gap-2 rounded-full border border-[#EBEBEB] bg-white p-1 w-fit"
+      >
         {(Object.keys(TAB_META) as Tab[]).map((key) => {
           const meta = TAB_META[key]
           const active = tab === key
@@ -91,6 +95,11 @@ export default function GmailMarketplaceHubPage() {
             <button
               key={key}
               type="button"
+              role="tab"
+              id={`gmail-tab-${key}`}
+              aria-selected={active}
+              aria-controls={`gmail-panel-${key}`}
+              tabIndex={active ? 0 : -1}
               onClick={() => setTab(key)}
               className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
                 active
@@ -98,7 +107,7 @@ export default function GmailMarketplaceHubPage() {
                   : 'text-[#6B6B6B] hover:text-[#141414]'
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4" aria-hidden="true" />
               {meta.label}
             </button>
           )
@@ -106,24 +115,47 @@ export default function GmailMarketplaceHubPage() {
       </div>
 
       {error && (
-        <div className="rounded-2xl border border-[#FFC3B7] bg-[#FFF1ED] px-4 py-3 text-sm text-[#A6260F]">
-          {error}
+        <div
+          className="rounded-2xl border border-[#FFC3B7] bg-[#FFF1ED] px-4 py-3 text-sm text-[#A6260F]"
+          role="alert"
+        >
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={() => fetchAll()}
+            className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#A6260F] bg-white px-3 py-1.5 text-xs font-medium text-[#A6260F] hover:bg-[#FFE0D6]"
+          >
+            <RefreshCcw className="h-3 w-3" aria-hidden="true" />
+            Coba Lagi
+          </button>
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-3xl border border-[#EBEBEB] bg-white py-16 text-sm text-[#6B6B6B]">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <div
+          className="flex items-center justify-center rounded-3xl border border-[#EBEBEB] bg-white py-16 text-sm text-[#6B6B6B]"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
           {LOADING_COPY.detail}
         </div>
-      ) : tab === 'beli' ? (
-        <BeliPanel
-          pricing={pricing}
-          availability={availability}
-          tiers={tiers}
-        />
       ) : (
-        <JualPanel pricing={pricing} />
+        <div
+          role="tabpanel"
+          id={`gmail-panel-${tab}`}
+          aria-labelledby={`gmail-tab-${tab}`}
+        >
+          {tab === 'beli' ? (
+            <BeliPanel
+              pricing={pricing}
+              availability={availability}
+              tiers={tiers}
+            />
+          ) : (
+            <JualPanel pricing={pricing} />
+          )}
+        </div>
       )}
     </div>
   )
