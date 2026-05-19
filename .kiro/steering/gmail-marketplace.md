@@ -503,69 +503,78 @@ Public endpoints gak butuh auth tapi pake API throttler global.
 
 ## Round 3: Warranty + Replacement Flow (HIGH)
 
-**Objective:** Reuse `Claim` model untuk warranty 1×24 jam. Auto-replace dari inventory atau auto-refund kalo kosong.
+**Objective:** Buyer bisa klaim 1×24 jam kalo gmail kena banned. Auto-resolve immediate — replace dari inventory atau refund kalo kosong.
 
-### Task 3.1: Extend Claim model (kalo perlu)
+**Architectural decision (post-R2 consistency):** Pakai **isolated GmailClaim model** paralel ke Claim existing. Reasoning sama dengan R2 — Claim existing tightly coupled ke `Order` (premapps/sosmed). Modify itu = regression risk. Pattern ini juga konsisten dengan GmailOrder + GmailAccount.
 
-**Files:**
-- Modify: `premiumhub-api/internal/model/claim.go` (kalo perlu field tambahan)
+### Task 3.1: GmailClaim model + repo
 
-Field check current:
-- `OrderID` — link ke order yang di-claim
-- `OrderItemID` (kalo per-item granularity needed)
-- `Status` (pending/approved/rejected/replaced/refunded)
-- `Reason`
-- `AdminID, ReviewedAt`
+**Files (created):**
+- `premiumhub-api/internal/model/gmail_claim.go` — model with status enum (replaced/refunded), resolution_type, resolution links (replacement gmail id OR refund ledger id), reason
+- `premiumhub-api/internal/repository/gmail_claim_repo.go` — CreateTx/ExistsForGmail/ExistsForGmailTx/ListByOrder
+- `premiumhub-api/internal/model/gmail_account.go` — DisposedReason constant `banned_after_sale` (already exists from R1)
+- `config/database.go` — AutoMigrate `&model.GmailClaim{}`
 
-Untuk gmail: 1 order bisa punya N akun, tiap akun bisa di-claim independent. Berarti `Claim.OrderItemID` perlu (kalo belum ada, tambah). Atau pakai `Claim.GmailAccountID` direct link.
+### Task 3.2: GmailWarrantyService
 
-Tambah field di Claim kalo belum ada: `ResolutionType string` enum (`replaced` | `refunded`), `ReplacementGmailAccountID *uuid.UUID`, `RefundLedgerID *uuid.UUID`.
+**Files (created):**
+- `premiumhub-api/internal/service/gmail_warranty_service.go`
 
-### Task 3.2: Service — claim resolution
+`CreateClaim(buyerID, orderID, gmailID, reason)` — atomic in walletRepo.Transaction:
+1. Lock original gmail row (FOR UPDATE)
+2. Verify ownership (SoldToUserID == buyerID && SoldOrderID == orderID && Status == sold)
+3. Verify warranty window (now - SoldAt <= cfg.GmailWarrantyHours, default 24h)
+4. Double-claim guard via ExistsForGmailTx
+5. Try `LockOldestVerifiedForOrderTx(1)` for replacement
+6a. **Replace path**: dispose original (Status=disposed, DisposedReason=banned_after_sale), mark replacement sold + chain SoldOrderID, create claim row resolution=replaced + ReplacementGmailAccountID, notif "Akun diganti"
+6b. **Refund path** (no inventory): dispose original, lock buyer FOR UPDATE, credit `original.SoldPrice` to `WalletBalance` (pocket=spend), write WalletLedger credit row category=`gmail_warranty_refund`, create claim row resolution=refunded + RefundLedgerID, notif "Refund Rp X ke Saldo Utama"
 
-**Files:**
-- Create: `premiumhub-api/internal/service/gmail_warranty_service.go`
+`ListByOrder(buyerID, orderID)` — auth-scoped via orderRepo.GetByIDForUser prefilter.
 
-```go
-type GmailWarrantyService struct {
-    cfg          *config.Config
-    gmailRepo    *repository.GmailAccountRepo
-    claimRepo    *repository.ClaimRepo
-    orderRepo    *repository.OrderRepo
-    walletRepo   *repository.WalletRepo
-    pricingSvc   *GmailPricingService
-    notifSvc     *NotificationService
-}
-```
-
-Public `CreateClaim(buyerID, gmailAccountID, reason)`:
-1. Load gmail, validate `SoldToUserID == buyerID && Status == sold`
-2. Cek `now - SoldAt <= 24h` → kalo lewat → 400 "Garansi expired"
-3. Cek belum ada claim approved untuk gmail ini (1 replacement per akun)
-4. Buat Claim entry status=pending, link ke gmail
-5. **Auto-resolve immediately** (no admin approval needed untuk MVP):
-   a. Lock 1 row dari inventory verified (FIFO)
-   b. Kalo dapet → mark gmail original `Status=disposed, DisposedReason=banned_after_sale`, mark replacement `Status=sold, SoldOrderID=original.SoldOrderID` (chain), update Claim `Status=replaced, ResolutionType=replaced, ReplacementGmailAccountID=replacement.ID`, notif buyer "Replacement dikirim"
-   c. Kalo gagal (inventory empty) → mark gmail original `Status=disposed, DisposedReason=banned_after_sale`, refund original sold price ke buyer pocket=spend, update Claim `Status=refunded, ResolutionType=refunded, RefundLedgerID=ledger.ID`, notif buyer "Refund Rp X ke Saldo Utama"
-
-### Task 3.3: Handler
+### Task 3.3: Handler + routes
 
 **Files:**
-- Modify: `premiumhub-api/internal/handler/gmail_handler.go`
+- `premiumhub-api/internal/handler/gmail_warranty_handler.go` (created)
+- `premiumhub-api/internal/routes/router.go` (modified)
 
 ```
-POST   /api/v1/gmail/orders/:order_id/claims     → CreateClaim (body: gmail_account_id, reason)
-GET    /api/v1/gmail/orders/:order_id/claims     → list claims for buyer order
+POST   /api/v1/gmail/orders/:id/claims     → CreateClaim (body: gmail_account_id, reason)
+GET    /api/v1/gmail/orders/:id/claims     → list claims for buyer order
 ```
+
+Body: `{gmail_account_id, reason (min 3 chars)}`. PaymentRateLimit middleware applied.
+
+### Task 3.4: Audit + Tests
+
+**Audit checklist:**
+- [✓] Auth boundary (lock+ownership double-check on gmail+order, ListByOrder prefilter)
+- [✓] Input validation (reason min 3 max 255, UUID parse)
+- [✓] Money flow (full atomic in walletRepo.Transaction; both paths fully reversible)
+- [✓] Concurrency (FOR UPDATE on original, FOR UPDATE SKIP LOCKED on replacement, FOR UPDATE on buyer for refund, ExistsForGmailTx in-tx, unique index on gmail_account_id at DB level)
+- [✓] Audit trail (refund ledger ref=`gmail-warranty:<gmail_id>`, claim row stamps replacement_gmail_account_id OR refund_ledger_id+refund_amount, original.DisposedReason=banned_after_sale)
+- [✓] Idempotent retry (unique index + ExistsForGmailTx ensures only one claim row per gmail)
+
+**Tests (gmail_warranty_service_test.go):**
+- `Replace_Success` — replacement chained to original.SoldOrderID, original disposed, balance unchanged
+- `Refund_WhenNoInventory` — credit ledger written, balance += sold_price, refund ledger id stamped
+- `OtherUserCannotClaim` — ownership rejected
+- `WrongOrderID` — gmail/order mismatch rejected
+- `ExpiredWindow` — backdated SoldAt past 24h rejected
+- `NoDoubleClaim` — second attempt on same gmail fails
+- `RejectsEmptyReason` — whitespace-only rejected
+- `ListByOrder_AuthScoped` — cross-user list errors
+- `NoRace_OneClaimPerGmail` — parallel attempts → exactly 1 claim row exists (unique invariant)
+- `ReplaceKeepsBalance` — replace path doesn't refund
 
 ### Round 3 Verification
 
-- [ ] Buyer claim akun banned dalam 24 jam → instant replacement dari inventory
-- [ ] Buyer claim akun banned dalam 24 jam, inventory kosong → instant refund ke pocket=spend
-- [ ] Buyer claim 25 jam setelah beli → 400 "garansi expired"
-- [ ] Buyer claim akun yang udah pernah di-replace → 400 "already replaced"
-- [ ] Original gmail status=disposed setelah claim resolved
-- [ ] Replacement gmail.SoldOrderID == original.SoldOrderID (audit chain)
+- [✓] Buyer claim akun banned dalam 24 jam → instant replacement dari inventory
+- [✓] Buyer claim akun banned dalam 24 jam, inventory kosong → instant refund ke pocket=spend
+- [✓] Buyer claim 25 jam setelah beli → 400 "garansi expired"
+- [✓] Buyer claim akun yang udah pernah di-replace → 400 "already replaced"
+- [✓] Original gmail status=disposed setelah claim resolved
+- [✓] Replacement gmail.SoldOrderID == original.SoldOrderID (audit chain)
+- [✓] Build clean, binary 65MB, all tests green (10 warranty + 36 R1+R2)
 
 ---
 

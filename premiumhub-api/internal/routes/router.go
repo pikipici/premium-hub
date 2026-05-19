@@ -109,6 +109,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	gmailPricingRepo := repository.NewGmailPricingRepo(db)
 	gmailStrikeRepo := repository.NewGmailStrikeRepo(db)
 	gmailOrderRepo := repository.NewGmailOrderRepo(db)
+	gmailClaimRepo := repository.NewGmailClaimRepo(db)
 	gmailSvc := service.NewGmailService(
 		cfg,
 		gmailAccountRepo,
@@ -130,6 +131,9 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		stockCredentialCipher,
 	)
 	service.StartGmailSlotExpiryWorker(cfg, gmailSvc)
+	gmailWarrantySvc := service.NewGmailWarrantyService(
+		cfg, gmailAccountRepo, gmailOrderRepo, gmailClaimRepo, walletRepo,
+	)
 	// Wire PayoutRail. Manual is the default and only rail shipped
 	// in Round 4. Future API rails (Duitku/Xendit/Flip/Tripay) plug
 	// in here via env switch on cfg.WithdrawalRailKind.
@@ -183,6 +187,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	walletWithdrawalHandler := handler.NewWalletWithdrawalHandler(walletWithdrawalSvc)
 	gmailHandler := handler.NewGmailHandler(gmailSvc)
 	gmailBuyHandler := handler.NewGmailBuyHandler(gmailOrderSvc, gmailPricingSvc, gmailSvc)
+	gmailWarrantyHandler := handler.NewGmailWarrantyHandler(gmailWarrantySvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
 	nokosPublicHandler := handler.NewNokosPublicHandler(nokosLandingSvc)
 	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage, cfg)
@@ -422,6 +427,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.POST("/gmail/buy", gmailBuyRL, gmailBuyHandler.Buy)
 	protected.GET("/gmail/orders", gmailBuyHandler.ListMyOrders)
 	protected.GET("/gmail/orders/:id", gmailBuyHandler.GetMyOrder)
+
+	// Gmail marketplace — warranty 1×24h auto-resolve (Round 3).
+	gmailWarrantyRL := middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak klaim garansi. Coba lagi sebentar.")
+	protected.POST("/gmail/orders/:id/claims", gmailWarrantyRL, gmailWarrantyHandler.CreateClaim)
+	protected.GET("/gmail/orders/:id/claims", gmailWarrantyHandler.ListByOrder)
 
 	protected.GET("/digiconnect/summary", digiConnectHandler.Summary)
 	protected.GET("/digiconnect/dashboard", digiConnectHandler.Dashboard)
