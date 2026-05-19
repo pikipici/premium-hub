@@ -76,6 +76,10 @@ type Config struct {
 
 	// Warranty (Round 3)
 	GmailWarrantyHours int
+
+	// Low inventory worker (Round 5)
+	GmailLowInvCheckMinutes  int
+	GmailLowInvCooldownHours int
 	ConvertExpiryWorkerEnabled                                                  bool
 	ConvertExpiryWorkerInterval, ConvertExpiryWorkerBatchLimit                  string
 	ConvertProofStorageMode, ConvertProofLocalDir, ConvertProofMaxFileMB        string
@@ -218,6 +222,8 @@ func Load() *Config {
 		GmailSlotExpiryWorkerBatchLimit: ei("GMAIL_SLOT_EXPIRY_WORKER_BATCH_LIMIT", 100),
 		GmailBuyMaxQtyPerOrder:          ei("GMAIL_BUY_MAX_QTY_PER_ORDER", 50),
 		GmailWarrantyHours:              ei("GMAIL_WARRANTY_HOURS", 24),
+		GmailLowInvCheckMinutes:         ei("GMAIL_LOW_INV_CHECK_MINUTES", 30),
+		GmailLowInvCooldownHours:        ei("GMAIL_LOW_INV_COOLDOWN_HOURS", 6),
 		ConvertExpiryWorkerEnabled:           eb("CONVERT_EXPIRY_WORKER_ENABLED", true),
 		ConvertExpiryWorkerInterval:          e("CONVERT_EXPIRY_WORKER_INTERVAL", "1m"),
 		ConvertExpiryWorkerBatchLimit:        e("CONVERT_EXPIRY_WORKER_BATCH_LIMIT", "200"),

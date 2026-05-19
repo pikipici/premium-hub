@@ -475,6 +475,106 @@ func (s *GmailService) MarkExpired(slotID uuid.UUID) error {
 	})
 }
 
+// AdminListInventory returns gmail accounts filtered by status (or all
+// if status empty). Used by admin inventory browser.
+func (s *GmailService) AdminListInventory(status string, page, limit int) ([]model.GmailAccount, int64, error) {
+	return s.repo.ListInventory(status, page, limit)
+}
+
+// AdminInventoryCounts returns count per status. Used by inventory
+// dashboard summary chips. Returns map keyed by status string.
+func (s *GmailService) AdminInventoryCounts() (map[string]int64, error) {
+	statuses := []string{
+		model.GmailStatusPendingCreate,
+		model.GmailStatusPendingVerify,
+		model.GmailStatusVerified,
+		model.GmailStatusSold,
+		model.GmailStatusRejected,
+		model.GmailStatusExpired,
+		model.GmailStatusDisposed,
+	}
+	out := make(map[string]int64, len(statuses))
+	for _, st := range statuses {
+		n, err := s.repo.CountByStatus(st)
+		if err != nil {
+			return nil, err
+		}
+		out[st] = n
+	}
+	return out, nil
+}
+
+// AdminListStrikedUsers returns users with active strike count > 0 in
+// strike window. Aggregates per-user via repo strike list.
+type StrikedUser struct {
+	UserID            uuid.UUID  `json:"user_id"`
+	UserEmail         string     `json:"user_email"`
+	UserName          string     `json:"user_name"`
+	ActiveStrikeCount int64      `json:"active_strike_count"`
+	BannedUntil       *time.Time `json:"banned_until,omitempty"`
+}
+
+func (s *GmailService) AdminListStrikedUsers() ([]StrikedUser, error) {
+	since := time.Now().Add(-s.strikeWindow())
+	// Distinct user_ids that have strikes in window.
+	var userIDs []uuid.UUID
+	if err := s.repo.DB().
+		Model(&model.GmailStrike{}).
+		Distinct("user_id").
+		Where("created_at >= ?", since).
+		Pluck("user_id", &userIDs).Error; err != nil {
+		return nil, err
+	}
+	out := make([]StrikedUser, 0, len(userIDs))
+	for _, uid := range userIDs {
+		count, err := s.strikeRepo.CountActiveByUser(uid, since)
+		if err != nil {
+			return nil, err
+		}
+		user, err := s.userRepo.FindByID(uid)
+		if err != nil || user == nil {
+			continue
+		}
+		row := StrikedUser{
+			UserID:            uid,
+			UserEmail:         user.Email,
+			UserName:          user.Name,
+			ActiveStrikeCount: count,
+		}
+		if user.GmailSellBannedUntil != nil && user.GmailSellBannedUntil.After(time.Now()) {
+			t := *user.GmailSellBannedUntil
+			row.BannedUntil = &t
+		}
+		out = append(out, row)
+	}
+	return out, nil
+}
+
+// AdminResetStrikes clears the user's gmail-sell ban and marks all
+// strikes within window as cleared. Idempotent — safe to call on user
+// with no active strikes.
+func (s *GmailService) AdminResetStrikes(userID uuid.UUID) error {
+	return s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		user, err := s.walletRepo.LockUserByIDTx(tx, userID)
+		if err != nil {
+			return err
+		}
+		user.GmailSellBannedUntil = nil
+		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+			return err
+		}
+		// Soft-clear: bump CreatedAt of strikes outside window so future
+		// CountActiveByUserTx returns 0. Simpler than deleting (audit
+		// trail preserved). Use a sentinel timestamp = epoch.
+		if err := tx.Model(&model.GmailStrike{}).
+			Where("user_id = ? AND created_at >= ?", userID, time.Now().Add(-s.strikeWindow())).
+			Update("created_at", time.Unix(0, 0)).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
 // CountVerifiedInventory exposes the verified count for low-inventory
 // alerting and buy-side stock check (used in Round 2).
 func (s *GmailService) CountVerifiedInventory() (int64, error) {

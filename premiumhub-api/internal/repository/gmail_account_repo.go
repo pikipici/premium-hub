@@ -195,6 +195,33 @@ func (r *GmailAccountRepo) ListSlotsExpiring(now time.Time, limit int) ([]model.
 
 // ListMyContributions returns the user's sell-side history with optional
 // status filter.
+func (r *GmailAccountRepo) ListInventory(status string, page, limit int) ([]model.GmailAccount, int64, error) {
+	var rows []model.GmailAccount
+	var total int64
+
+	q := r.db.Model(&model.GmailAccount{})
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := q.Order("created_at DESC").Offset((page - 1) * limit).Limit(limit).Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
+}
+
+// CountByStatus returns total rows matching exact status. Lightweight
+// helper for low-inventory worker + analytics surface.
+func (r *GmailAccountRepo) CountByStatus(status string) (int64, error) {
+	var n int64
+	if err := r.db.Model(&model.GmailAccount{}).Where("status = ?", status).Count(&n).Error; err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 func (r *GmailAccountRepo) ListMyContributions(userID uuid.UUID, status string, page, limit int) ([]model.GmailAccount, int64, error) {
 	if page < 1 {
 		page = 1

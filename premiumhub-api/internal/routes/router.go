@@ -121,6 +121,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		stockCredentialCipher,
 	)
 	gmailPricingSvc := service.NewGmailPricingService(gmailPricingRepo)
+	gmailAnalyticsSvc := service.NewGmailAnalyticsService(db)
 	gmailOrderSvc := service.NewGmailOrderService(
 		cfg,
 		gmailAccountRepo,
@@ -131,6 +132,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		stockCredentialCipher,
 	)
 	service.StartGmailSlotExpiryWorker(cfg, gmailSvc)
+	service.StartGmailLowInventoryWorker(cfg, gmailSvc, gmailPricingSvc)
 	gmailWarrantySvc := service.NewGmailWarrantyService(
 		cfg, gmailAccountRepo, gmailOrderRepo, gmailClaimRepo, walletRepo,
 	)
@@ -186,6 +188,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	walletHandler := handler.NewWalletHandler(walletSvc).SetReconciliationService(walletReconSvc)
 	walletWithdrawalHandler := handler.NewWalletWithdrawalHandler(walletWithdrawalSvc)
 	gmailHandler := handler.NewGmailHandler(gmailSvc)
+	gmailAdminHandler := handler.NewGmailAdminHandler(gmailSvc, gmailPricingSvc, gmailAnalyticsSvc)
 	gmailBuyHandler := handler.NewGmailBuyHandler(gmailOrderSvc, gmailPricingSvc, gmailSvc)
 	gmailWarrantyHandler := handler.NewGmailWarrantyHandler(gmailWarrantySvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
@@ -683,6 +686,14 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.GET("/gmail/:id/credentials", gmailHandler.AdminGetCredentials)
 	admin.POST("/gmail/:id/verify", adminGmailRL, gmailHandler.AdminVerify)
 	admin.POST("/gmail/:id/reject", adminGmailRL, gmailHandler.AdminReject)
+
+	// Gmail admin Round 5: inventory + pricing + strikes + analytics
+	admin.GET("/gmail-inventory", gmailAdminHandler.AdminListInventory)
+	admin.GET("/gmail-pricing", gmailAdminHandler.AdminGetPricing)
+	admin.PUT("/gmail-pricing", adminGmailRL, gmailAdminHandler.AdminUpdatePricing)
+	admin.GET("/gmail-strikes", gmailAdminHandler.AdminListStrikedUsers)
+	admin.POST("/gmail-strikes/:user_id/reset", adminGmailRL, gmailAdminHandler.AdminResetStrikes)
+	admin.GET("/gmail-analytics", gmailAdminHandler.AdminAnalytics)
 	admin.GET("/wallet/reconciliation/export", walletHandler.AdminReconciliationExport)
 	admin.POST(
 		"/wallet/reconciliation/repair",
