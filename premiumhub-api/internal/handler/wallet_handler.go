@@ -40,6 +40,20 @@ func (h *WalletHandler) Balance(c *gin.Context) {
 	response.Success(c, "OK", res)
 }
 
+// BalanceDetailed returns the dual-pocket breakdown (Saldo Utama +
+// Saldo Pendapatan) introduced by the wallet-withdraw plan. The legacy
+// Balance handler is kept untouched for callers that only need a
+// single number.
+func (h *WalletHandler) BalanceDetailed(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	res, err := h.walletSvc.GetBalanceDetailed(userID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "OK", res)
+}
+
 func (h *WalletHandler) CreateTopup(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	var input service.CreateTopupInput

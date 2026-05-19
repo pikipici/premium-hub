@@ -55,6 +55,22 @@ type WalletBalanceResponse struct {
 	TotalSpent int64 `json:"total_spent"`
 }
 
+// WalletBalanceDetailedResponse exposes the dual-pocket balance —
+// Saldo Utama (spend) + Saldo Pendapatan (earn) — for the dual-wallet UI
+// shipped with the wallet-withdraw plan. Total = spend + earn.
+//
+// The legacy WalletBalanceResponse is kept untouched for callers that
+// still expect a single Balance number (sosmed checkout, digiconnect
+// debit, payment webhook, etc). New callers that care about the
+// breakdown should use this struct instead.
+type WalletBalanceDetailedResponse struct {
+	Spend      int64 `json:"spend"`
+	Earn       int64 `json:"earn"`
+	Total      int64 `json:"total"`
+	TotalTopup int64 `json:"total_topup"`
+	TotalSpent int64 `json:"total_spent"`
+}
+
 type WalletOrderPaymentResult struct {
 	OrderID       string `json:"order_id"`
 	Amount        int64  `json:"amount"`
@@ -164,6 +180,37 @@ func (s *WalletService) GetBalance(userID uuid.UUID) (*WalletBalanceResponse, er
 	}
 
 	return &WalletBalanceResponse{Balance: user.WalletBalance, TotalTopup: totalTopup, TotalSpent: totalSpent}, nil
+}
+
+// GetBalanceDetailed returns the dual-pocket balance breakdown plus the
+// same totalTopup/totalSpent figures as GetBalance. Callers that only
+// need a single number should keep using GetBalance — this is the
+// extended view for the post-withdraw dashboard.
+func (s *WalletService) GetBalanceDetailed(userID uuid.UUID) (*WalletBalanceDetailedResponse, error) {
+	user, err := s.ensureActiveUser(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	totalTopup, err := s.walletRepo.SumLedgerAmountByUser(userID, "credit", []string{"topup"})
+	if err != nil {
+		return nil, errors.New("gagal menghitung total topup wallet")
+	}
+	totalSpent, err := s.walletRepo.SumLedgerAmountByUser(userID, "debit", []string{"product_purchase", "sosmed_purchase", "sosmed_bundle_purchase", "5sim_purchase"})
+	if err != nil {
+		return nil, errors.New("gagal menghitung total penggunaan wallet")
+	}
+
+	spend := user.WalletBalance
+	earn := user.WalletBalanceEarn
+
+	return &WalletBalanceDetailedResponse{
+		Spend:      spend,
+		Earn:       earn,
+		Total:      spend + earn,
+		TotalTopup: totalTopup,
+		TotalSpent: totalSpent,
+	}, nil
 }
 
 func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID uuid.UUID) (*WalletOrderPaymentResult, error) {
@@ -284,6 +331,7 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 			UserID:        user.ID,
 			Type:          "debit",
 			Category:      "product_purchase",
+			Pocket:        model.WalletPocketSpend,
 			Amount:        order.TotalPrice,
 			BalanceBefore: balanceBefore,
 			BalanceAfter:  balanceAfter,
@@ -877,6 +925,7 @@ func (s *WalletService) settleSuccess(topupID uuid.UUID, providerStatus string, 
 			TopupID:       &topup.ID,
 			Type:          "credit",
 			Category:      "topup",
+			Pocket:        model.WalletPocketSpend,
 			Amount:        creditAmount,
 			BalanceBefore: before,
 			BalanceAfter:  after,

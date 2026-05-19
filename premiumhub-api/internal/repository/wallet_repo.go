@@ -131,3 +131,45 @@ func (r *WalletRepo) SaveUserTx(tx *gorm.DB, user *model.User) error {
 func (r *WalletRepo) Transaction(fn func(tx *gorm.DB) error) error {
 	return r.db.Transaction(fn)
 }
+
+// BalanceByPocket returns the user's balance in a single pocket. For
+// backward compatibility, model.WalletPocketSpend is mapped to
+// users.wallet_balance and model.WalletPocketEarn to
+// users.wallet_balance_earn. Unknown pockets return 0 with no error.
+func (r *WalletRepo) BalanceByPocket(userID uuid.UUID, pocket string) (int64, error) {
+	var user model.User
+	if err := r.db.Select("wallet_balance", "wallet_balance_earn").
+		Where("id = ?", userID).First(&user).Error; err != nil {
+		return 0, err
+	}
+	switch pocket {
+	case model.WalletPocketSpend:
+		return user.WalletBalance, nil
+	case model.WalletPocketEarn:
+		return user.WalletBalanceEarn, nil
+	default:
+		return 0, nil
+	}
+}
+
+// BalancesAllPockets returns a map of pocket → balance for the user.
+// Always includes both pockets, with 0 fallback for missing values.
+func (r *WalletRepo) BalancesAllPockets(userID uuid.UUID) (map[string]int64, error) {
+	var user model.User
+	if err := r.db.Select("wallet_balance", "wallet_balance_earn").
+		Where("id = ?", userID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return map[string]int64{
+		model.WalletPocketSpend: user.WalletBalance,
+		model.WalletPocketEarn:  user.WalletBalanceEarn,
+	}, nil
+}
+
+// LockUserEarnByIDTx is the earn-pocket counterpart to LockUserByIDTx —
+// lock the user row inside a transaction for safe earn-pocket mutation.
+// Returns the same User pointer so callers can read/write
+// WalletBalanceEarn under FOR UPDATE.
+func (r *WalletRepo) LockUserEarnByIDTx(tx *gorm.DB, userID uuid.UUID) (*model.User, error) {
+	return r.LockUserByIDTx(tx, userID)
+}

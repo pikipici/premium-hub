@@ -97,8 +97,31 @@ func InitDB(cfg *Config) *gorm.DB {
 		log.Fatal("DB payment migration:", err)
 	}
 
+	if err := applyWalletPocketBackfill(db); err != nil {
+		log.Fatal("DB wallet pocket migration:", err)
+	}
+
 	log.Println("DB connected & migrated")
 	return db
+}
+
+// applyWalletPocketBackfill ensures every existing wallet_ledgers row
+// has a non-empty pocket value after the dual-pocket schema migration.
+//
+// AutoMigrate adds the column with default 'spend' for new rows, but
+// rows inserted before the migration may end up with NULL on databases
+// where the existing rows weren't rewritten. This idempotent UPDATE
+// guarantees a clean state and is safe to run on every boot — it
+// touches at most the rows that still have NULL/empty pocket.
+func applyWalletPocketBackfill(db *gorm.DB) error {
+	res := db.Exec(`UPDATE wallet_ledgers SET pocket = ? WHERE pocket IS NULL OR pocket = ''`, model.WalletPocketSpend)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected > 0 {
+		log.Printf("wallet pocket backfill: tagged %d legacy ledger rows as %q", res.RowsAffected, model.WalletPocketSpend)
+	}
+	return nil
 }
 
 func ensureDefaultUserSidebarMenuSettings(db *gorm.DB) error {

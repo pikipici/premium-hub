@@ -336,6 +336,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	)
 
 	protected.GET("/wallet/balance", walletHandler.Balance)
+	protected.GET("/wallet/balance-detailed", walletHandler.BalanceDetailed)
 	protected.GET("/wallet/ledger", walletHandler.ListLedger)
 	protected.POST(
 		"/wallet/topups",
