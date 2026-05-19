@@ -187,3 +187,32 @@ export function genericOrderTone(status: string): { tone: StatusTone; label: str
     return { tone: 'neutral', label: s === 'expired' ? 'Expired' : 'Dibatalkan' }
   return { tone: 'neutral', label: status || 'Unknown' }
 }
+
+// Gmail marketplace — sell-side slot lifecycle.
+export function gmailSlotTone(status: string): { tone: StatusTone; label: string } {
+  const s = (status || '').toLowerCase()
+  if (s === 'pending_create') return { tone: 'process', label: 'Buat Akun' }
+  if (s === 'pending_verify') return { tone: 'info', label: 'Menunggu Admin' }
+  if (s === 'verified') return { tone: 'success', label: 'Diterima' }
+  if (s === 'rejected') return { tone: 'fail', label: 'Ditolak' }
+  if (s === 'expired') return { tone: 'neutral', label: 'Expired' }
+  if (s === 'sold') return { tone: 'info', label: 'Terjual' }
+  if (s === 'disposed') return { tone: 'neutral', label: 'Diganti/Refund' }
+  return { tone: 'neutral', label: status || 'Unknown' }
+}
+
+// Gmail marketplace — buy-side order + warranty claim.
+export function gmailOrderTone(status: string): { tone: StatusTone; label: string } {
+  const s = (status || '').toLowerCase()
+  if (s === 'completed') return { tone: 'success', label: 'Sukses' }
+  if (s === 'refunded') return { tone: 'info', label: 'Direfund' }
+  return { tone: 'neutral', label: status || 'Unknown' }
+}
+
+export function gmailClaimTone(status: string): { tone: StatusTone; label: string } {
+  const s = (status || '').toLowerCase()
+  if (s === 'replaced') return { tone: 'success', label: 'Diganti' }
+  if (s === 'refunded') return { tone: 'info', label: 'Direfund' }
+  if (s === 'rejected') return { tone: 'fail', label: 'Ditolak' }
+  return { tone: 'neutral', label: status || 'Unknown' }
+}
