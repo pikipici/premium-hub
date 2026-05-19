@@ -301,10 +301,11 @@ func (s *WalletWithdrawalService) CreateRequest(ctx context.Context, userID uuid
 	// forever. Best-effort: rail failure leaves it in approved and
 	// admin can retry.
 	if autoApproved && s.payoutRail != nil {
-		// adminID for auto-approve = system: we use the user's own
-		// ID as a sentinel since there's no admin row. Real admin
-		// audits should filter by AutoApproved=true.
-		dispatched, _ := s.dispatchToRail(ctx, withdrawal.UserID, withdrawal)
+		// adminID for auto-approve = uuid.Nil sentinel (no admin
+		// row). Downstream state setters guard against this so
+		// AdminID stays NULL on auto-approved entries — naive
+		// audit joins on admin_id won't dredge up user IDs.
+		dispatched, _ := s.dispatchToRail(ctx, uuid.Nil, withdrawal)
 		if dispatched != nil {
 			return dispatched, nil
 		}
@@ -529,7 +530,9 @@ func (s *WalletWithdrawalService) Reject(ctx context.Context, adminID, id uuid.U
 		now := time.Now()
 		w.Status = model.WithdrawalStatusRejected
 		w.RejectedAt = &now
-		w.AdminID = &adminID
+		if adminID != uuid.Nil {
+			w.AdminID = &adminID
+		}
 		w.AdminNote = note
 		if err := s.repo.SaveTx(tx, w); err != nil {
 			return errors.New("gagal update withdraw")
@@ -597,7 +600,9 @@ func (s *WalletWithdrawalService) MarkProcessingWithRail(ctx context.Context, ad
 
 		now := time.Now()
 		w.Status = model.WithdrawalStatusProcessing
-		w.AdminID = &adminID
+		if adminID != uuid.Nil {
+			w.AdminID = &adminID
+		}
 		w.PayoutRailKind = railKind
 		if strings.TrimSpace(railRef) != "" {
 			w.PayoutRailRef = strings.TrimSpace(railRef)
@@ -675,7 +680,9 @@ func (s *WalletWithdrawalService) MarkPaid(ctx context.Context, adminID, id uuid
 		now := time.Now()
 		w.Status = model.WithdrawalStatusPaid
 		w.PaidAt = &now
-		w.AdminID = &adminID
+		if adminID != uuid.Nil {
+			w.AdminID = &adminID
+		}
 		w.PayoutRailKind = payoutRailKind
 		w.PayoutRailRef = strings.TrimSpace(payoutRailRef)
 		if err := s.repo.SaveTx(tx, w); err != nil {
@@ -729,7 +736,9 @@ func (s *WalletWithdrawalService) MarkFailed(ctx context.Context, adminID, id uu
 			return err
 		}
 		w.Status = model.WithdrawalStatusFailed
-		w.AdminID = &adminID
+		if adminID != uuid.Nil {
+			w.AdminID = &adminID
+		}
 		w.FailureReason = reason
 		// Re-using PaidAt pointer as null, leaves it nil.
 		if err := s.repo.SaveTx(tx, w); err != nil {
@@ -879,7 +888,9 @@ func (s *WalletWithdrawalService) adminTransition(
 
 		now := time.Now()
 		w.Status = target
-		w.AdminID = &adminID
+		if adminID != uuid.Nil {
+			w.AdminID = &adminID
+		}
 		switch target {
 		case model.WithdrawalStatusApproved:
 			w.ApprovedAt = &now

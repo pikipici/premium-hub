@@ -95,6 +95,11 @@ type WalletWithdrawal struct {
 	DestinationAccount string `gorm:"type:varchar(64);not null" json:"destination_account"`
 	DestinationName    string `gorm:"type:varchar(128);not null" json:"destination_name"`
 
+	// AdminID is the admin who took the most recent action on this row.
+	// IMPORTANT: stays NULL when AutoApproved=true — auto-approved
+	// entries have no admin actor, so audit queries that JOIN on
+	// admin_id should account for the NULL case (or scope to
+	// auto_approved=false).
 	AdminID      *uuid.UUID `gorm:"type:uuid;index" json:"admin_id,omitempty"`
 	AdminNote    string     `gorm:"type:text" json:"admin_note,omitempty"`
 	AutoApproved bool       `gorm:"not null;default:false" json:"auto_approved"`

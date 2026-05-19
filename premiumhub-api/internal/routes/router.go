@@ -347,7 +347,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	protected.GET("/wallet/balance", walletHandler.Balance)
 	protected.GET("/wallet/balance-detailed", walletHandler.BalanceDetailed)
-	protected.POST("/wallet/transfer-earn-to-spend", walletHandler.TransferEarnToSpend)
+	protected.POST(
+		"/wallet/transfer-earn-to-spend",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request transfer saldo. Coba lagi sebentar."),
+		walletHandler.TransferEarnToSpend,
+	)
 	protected.GET("/wallet/ledger", walletHandler.ListLedger)
 	protected.POST(
 		"/wallet/topups",
