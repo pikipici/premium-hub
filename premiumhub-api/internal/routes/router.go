@@ -108,6 +108,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	gmailAccountRepo := repository.NewGmailAccountRepo(db)
 	gmailPricingRepo := repository.NewGmailPricingRepo(db)
 	gmailStrikeRepo := repository.NewGmailStrikeRepo(db)
+	gmailOrderRepo := repository.NewGmailOrderRepo(db)
 	gmailSvc := service.NewGmailService(
 		cfg,
 		gmailAccountRepo,
@@ -116,6 +117,16 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		walletRepo,
 		userRepo,
 		notifRepo,
+		stockCredentialCipher,
+	)
+	gmailPricingSvc := service.NewGmailPricingService(gmailPricingRepo)
+	gmailOrderSvc := service.NewGmailOrderService(
+		cfg,
+		gmailAccountRepo,
+		gmailOrderRepo,
+		walletRepo,
+		notifRepo,
+		gmailPricingSvc,
 		stockCredentialCipher,
 	)
 	service.StartGmailSlotExpiryWorker(cfg, gmailSvc)
@@ -171,6 +182,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	walletHandler := handler.NewWalletHandler(walletSvc).SetReconciliationService(walletReconSvc)
 	walletWithdrawalHandler := handler.NewWalletWithdrawalHandler(walletWithdrawalSvc)
 	gmailHandler := handler.NewGmailHandler(gmailSvc)
+	gmailBuyHandler := handler.NewGmailBuyHandler(gmailOrderSvc, gmailPricingSvc, gmailSvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
 	nokosPublicHandler := handler.NewNokosPublicHandler(nokosLandingSvc)
 	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage, cfg)
@@ -237,6 +249,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.GET("/public/sosmed/services", sosmedServiceHandler.PublicList)
 	api.GET("/public/sosmed/bundles", sosmedBundleHandler.PublicList)
 	api.GET("/public/digiconnect/plans", digiConnectHandler.PublicPlans)
+	api.GET("/public/gmail/pricing", gmailBuyHandler.PublicPricing)
+	api.GET("/public/gmail/availability", gmailBuyHandler.PublicAvailability)
 	api.GET(
 		"/models",
 		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),
@@ -402,6 +416,12 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	protected.POST("/gmail/slots/:id/submit", gmailSellRL, gmailHandler.SubmitSlot)
 	protected.GET("/gmail/slots", gmailHandler.ListMine)
 	protected.GET("/gmail/slots/:id", gmailHandler.GetMine)
+
+	// Gmail marketplace — buy-side user routes (Round 2).
+	gmailBuyRL := middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak aksi pembelian gmail. Coba lagi sebentar.")
+	protected.POST("/gmail/buy", gmailBuyRL, gmailBuyHandler.Buy)
+	protected.GET("/gmail/orders", gmailBuyHandler.ListMyOrders)
+	protected.GET("/gmail/orders/:id", gmailBuyHandler.GetMyOrder)
 
 	protected.GET("/digiconnect/summary", digiConnectHandler.Summary)
 	protected.GET("/digiconnect/dashboard", digiConnectHandler.Dashboard)

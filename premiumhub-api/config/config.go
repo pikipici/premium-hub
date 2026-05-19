@@ -64,12 +64,15 @@ type Config struct {
 	GmailGeneratedEmailPrefix string
 	GmailMaxPendingPerUser    int
 	GmailSlotExpiryHours      int
-	GmailStrikeWindowDays     int
-	GmailStrikeBanDays        int
-	GmailStrikeThreshold      int
+	GmailStrikeWindowDays         int
+	GmailStrikeBanDays            int
+	GmailStrikeThreshold          int
 	GmailSlotExpiryWorkerEnabled  bool
 	GmailSlotExpiryWorkerInterval string
 	GmailSlotExpiryWorkerBatchLimit int
+
+	// Buy-side
+	GmailBuyMaxQtyPerOrder int
 	ConvertExpiryWorkerEnabled                                                  bool
 	ConvertExpiryWorkerInterval, ConvertExpiryWorkerBatchLimit                  string
 	ConvertProofStorageMode, ConvertProofLocalDir, ConvertProofMaxFileMB        string
@@ -210,6 +213,7 @@ func Load() *Config {
 		GmailSlotExpiryWorkerEnabled:    eb("GMAIL_SLOT_EXPIRY_WORKER_ENABLED", true),
 		GmailSlotExpiryWorkerInterval:   e("GMAIL_SLOT_EXPIRY_WORKER_INTERVAL", "5m"),
 		GmailSlotExpiryWorkerBatchLimit: ei("GMAIL_SLOT_EXPIRY_WORKER_BATCH_LIMIT", 100),
+		GmailBuyMaxQtyPerOrder:          ei("GMAIL_BUY_MAX_QTY_PER_ORDER", 50),
 		ConvertExpiryWorkerEnabled:           eb("CONVERT_EXPIRY_WORKER_ENABLED", true),
 		ConvertExpiryWorkerInterval:          e("CONVERT_EXPIRY_WORKER_INTERVAL", "1m"),
 		ConvertExpiryWorkerBatchLimit:        e("CONVERT_EXPIRY_WORKER_BATCH_LIMIT", "200"),

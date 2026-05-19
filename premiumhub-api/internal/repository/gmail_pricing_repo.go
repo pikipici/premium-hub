@@ -29,6 +29,23 @@ func (r *GmailPricingRepo) Get() (*model.GmailPricing, error) {
 	return &p, nil
 }
 
+// GetTx returns the current pricing config from within a caller's tx.
+// Buy() reads pricing inside its tx so admin updates mid-flow don't
+// shift the price under the buyer.
+func (r *GmailPricingRepo) GetTx(tx *gorm.DB) (*model.GmailPricing, error) {
+	var p model.GmailPricing
+	if err := tx.First(&p).Error; err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+// Save persists a fully-formed pricing row (used by AdminUpdate which
+// builds the updated struct in-memory before hand-off).
+func (r *GmailPricingRepo) Save(p *model.GmailPricing) error {
+	return r.db.Save(p).Error
+}
+
 // Update applies field updates. adminID is recorded in UpdatedByAdminID.
 func (r *GmailPricingRepo) Update(updates map[string]any, adminID uuid.UUID) error {
 	if updates == nil {

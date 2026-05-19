@@ -52,6 +52,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.WalletLedger{},
 		&model.WalletWithdrawal{},
 		&model.GmailAccount{},
+		&model.GmailOrder{},
 		&model.GmailPricing{},
 		&model.GmailStrike{},
 		&model.DigiConnectAPIKey{},

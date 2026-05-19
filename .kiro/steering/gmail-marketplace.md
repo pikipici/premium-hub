@@ -378,36 +378,17 @@ Rate limit: pakai `NewUserRateLimiter` dengan `cfg.GmailSellRateLimitMax/Window`
 
 ## Round 2: Buy-side — Inventory + Order Flow (HIGH)
 
-**Objective:** Buyer bisa beli gmail (1-by-1 atau bulk), instant auto-deliver. Pakai `Order` flow existing tapi swap source.
+**Objective:** Buyer bisa beli gmail (1-by-1 atau bulk), instant auto-deliver dari verified pool.
 
-### Task 2.1: Product seed + service swap
+**Architectural decision (post-R1):** Pakai **isolated GmailOrderService + dedicated GmailOrder model** paralel, gak fork OrderService existing. Reasoning:
+- OrderService udah dipake premapps + sosmed (production stable). Modifying = regression risk.
+- Order model tightly coupled ke ProductPrice (`PriceID NOT NULL`) — gmail gak punya ProductPrice, semantically beda. Force-fit = schema bloat + nullable creep.
+- Isolated audit surface buat per-round audit workflow (cuma audit gmail-specific code).
+- Pattern sama dengan DigiConnect yang udah jalan paralel.
+- New model `GmailOrder` lean (UserID, Quantity, GrossAmount, DiscountAmount, NetAmount, Status, LedgerID).
+- New endpoint POST /api/v1/gmail/buy (gak shadow POST /api/v1/orders).
 
-**Files:**
-- Modify: `premiumhub-api/config/database.go` — add `ensureDefaultGmailProduct` seed
-- Modify: `premiumhub-api/internal/service/order_service.go` — handle product type=gmail
-
-Seed product baru:
-```
-slug: gmail-fresh
-name: "Akun Gmail Baru"
-type: gmail   // NEW type, distinguish dari premapps/sosmed
-price: pulled from GmailPricing.SellPrice (dynamic)
-```
-
-`Product.Type` field udah ada (atau perlu dicek). Kalo belum, tambah field `Type string` enum (`premapps`, `sosmed`, `gmail`).
-
-`OrderService.Create(input)` flow extend:
-- Kalo `product.type == gmail`:
-  - Validate `GmailPricing.GetCurrentSellPrice(qty)` → calculate gross dengan bulk discount kalo enabled
-  - Validate `BalanceByPocket(userID, "spend") >= total`
-  - Lock `qty` rows dari `gmail_accounts` via `LockOldestVerifiedForOrder(tx, qty)` (FIFO)
-  - Kalo locked rows < qty → rollback, return 409 "Stok cuma N, harap kurangi qty"
-  - Debit wallet pocket=spend
-  - Create Order row dengan `Type=gmail, Quantity=qty`
-  - Per locked row: `MarkSold(id, buyerID, orderID, unitPrice)`
-  - Return Order dengan `OrderItems` berisi credentials (decrypted on-the-fly buat response, jangan persist plain)
-
-### Task 2.2: Pricing service
+### Task 2.1: Pricing service (no schema change)
 
 **Files:**
 - Create: `premiumhub-api/internal/service/gmail_pricing_service.go`
@@ -419,7 +400,7 @@ type GmailPricingService struct {
 
 func (s *GmailPricingService) GetActive() (*model.GmailPricing, error)
 func (s *GmailPricingService) CalculateTotal(qty int64) (gross int64, discount int64, net int64, err error)
-func (s *GmailPricingService) AdminUpdate(adminID, input GmailPricingUpdateInput) error
+func (s *GmailPricingService) AdminUpdate(adminID uuid.UUID, input GmailPricingUpdateInput) error
 ```
 
 `CalculateTotal` logic:
@@ -427,29 +408,96 @@ func (s *GmailPricingService) AdminUpdate(adminID, input GmailPricingUpdateInput
 - Kalo `bulk_discount_enabled`: parse tiers JSON, find tier yang `qty >= min_qty` (terbesar), apply `discount_pct`
 - `net = gross - discount`
 
-### Task 2.3: Buy-side handler
+Validation di AdminUpdate:
+- `buy_price > 0`, `sell_price > buy_price` (margin guard)
+- Bulk tier JSON parseable, no overlap, ascending min_qty
+
+### Task 2.2: GmailOrderService — buy flow
+
+**Files:**
+- Create: `premiumhub-api/internal/service/gmail_order_service.go`
+
+```go
+type GmailOrderService struct {
+    cfg          *config.Config
+    gmailRepo    *repository.GmailAccountRepo
+    orderRepo    *repository.OrderRepo
+    walletRepo   *repository.WalletRepo
+    notifRepo    *repository.NotificationRepo
+    pricingSvc   *GmailPricingService
+    cipher       *credential.StockCipher
+}
+
+func (s *GmailOrderService) Buy(buyerID uuid.UUID, qty int64) (*BuyResult, error)
+func (s *GmailOrderService) ListMyOrders(buyerID uuid.UUID, page, limit int) ([]model.Order, int64, error)
+func (s *GmailOrderService) GetMyOrderWithCreds(buyerID, orderID uuid.UUID) (*OrderWithCreds, error)
+```
+
+`Buy` flow (atomic via walletRepo.Transaction):
+1. Validate qty >= 1 (max via cfg.GmailBuyMaxQtyPerOrder, default 50)
+2. CalculateTotal (gross/discount/net)
+3. Lock buyer user spend pocket via LockUserByIDTx
+4. Cek balance >= net → kalo gak cukup → 400 "Saldo Utama gak cukup"
+5. LockOldestVerifiedForOrderTx(tx, qty) — FIFO claim dengan SKIP LOCKED (sudah ada di repo R1)
+6. Kalo `len(locked) < qty` → rollback, 409 "Stok cuma N, kurangi qty"
+7. Debit buyer.WalletBalance (spend pocket) -= net
+8. Create Order row: Type="gmail", Status="completed" (instant), Quantity=qty, TotalPrice=net
+9. Per locked row: mark Status=sold, SoldToUserID=buyer, SoldOrderID=order.ID, SoldPrice=unit (gross/qty round), SoldAt=now
+10. CreateLedgerTx (credit reverse: type=debit, pocket=spend, category=gmail_buy, ref="gmail-order:<orderID>")
+11. writeNotifTx (gmail_purchased, "Pembelian sukses, X akun")
+
+`OrderWithCreds` decrypt creds on-the-fly buat response, gak pernah persist plain. `GetMyOrderWithCreds` cek buyer == user_id (ownership guard).
+
+### Task 2.3: Buy-side handler + routes
 
 **Files:**
 - Modify: `premiumhub-api/internal/handler/gmail_handler.go`
+- Modify: `premiumhub-api/internal/routes/router.go`
 
-Public/protected endpoints:
 ```
-GET    /api/v1/public/gmail/pricing              → public, return current sell_price + tier preview (kalo enabled)
-GET    /api/v1/public/gmail/availability         → public, return current verified count (cache 1 menit, biar gak bocor signal kompetitor)
-GET    /api/v1/gmail/orders                      → protected, list buyer orders type=gmail
-GET    /api/v1/gmail/orders/:id                  → protected, detail with credentials (auth check buyer = user)
+GET    /api/v1/public/gmail/pricing           → public, current sell_price + tier preview
+GET    /api/v1/public/gmail/availability      → public, current verified count (cache 60s biar gak bocor signal kompetitor)
+POST   /api/v1/gmail/buy                      → protected, body: { quantity }
+GET    /api/v1/gmail/orders                   → protected, list buyer orders type=gmail
+GET    /api/v1/gmail/orders/:id               → protected, detail with decrypted credentials (auth check buyer = user)
 ```
 
-Buy flow itself = `POST /api/v1/orders` existing endpoint, dengan `product_slug=gmail-fresh, quantity=N`. Reuse handler, gak bikin yang baru.
+Rate limit POST /gmail/buy dengan PaymentRateLimit middleware.
+
+Public endpoints gak butuh auth tapi pake API throttler global.
+
+### Task 2.4: Audit + Tests (mandatory per-round workflow)
+
+**Audit checklist** (sama kaya R1):
+1. Auth boundary — GetMyOrderWithCreds enforce buyer==user, ownership di order.UserID
+2. Input validation — qty >= 1 dan <= max, pricing valid
+3. Money flow — atomic dalam tx, idempotent guard (order.Status=completed udah final)
+4. TOCTOU — pricing + balance + claim + debit semua di tx, no count-then-act outside lock
+5. Rate limit — /buy endpoint
+6. Audit trail — order.Type="gmail", ledger.Reference="gmail-order:<id>"
+7. Notif clarity — "Pembelian sukses, X akun, total Rp Y"
+8. Credential leak — decrypted creds cuma di response, gak masuk log/db plain
+
+**Tests** (`gmail_order_service_test.go`):
+- Happy: buy 1, buy 5, buy with bulk discount tier
+- Stock exhausted: 409 dengan rollback (no balance debit, no order created)
+- Insufficient balance: 400 dengan rollback
+- Race regression: 5 parallel buys @ qty=2 dengan stock=5 (cuma yg lock duluan menang, total sold ≤ stock)
+- Auth scoping: GetMyOrderWithCreds nge-rejct cross-user access
+- Pricing validation: qty=0, qty>max
+- Idempotency: re-call atomic action gak double-debit/double-claim
 
 ### Round 2 Verification
 
-- [ ] Buyer beli 1 akun → instant order created, status=delivered, credentials tampil di order detail
+- [ ] Buyer beli 1 akun → instant order completed, credentials tampil di response
 - [ ] Buyer beli 5 akun bulk (flat pricing) → 5 rows ke-mark sold, total = 5×5000
-- [ ] Admin enable tier discount 10% di 50+ → buyer beli 50 → total 50×5000×0.9 = 225000
-- [ ] Buyer beli 10 saat inventory cuma 5 → 409 "Stok cuma 5"
-- [ ] Buyer balance pocket=spend insufficient → 400
-- [ ] Public pricing endpoint return correct config
+- [ ] Admin enable tier discount 10% di 50+ → buyer beli 50 → total = 50×5000×0.9 = 225000
+- [ ] Buyer beli 10 saat inventory cuma 5 → 409 "Stok cuma 5", balance gak ke-debit, no order row
+- [ ] Buyer balance pocket=spend insufficient → 400, no claim, no debit
+- [ ] Public pricing endpoint return correct config dan preview tier
+- [ ] Public availability endpoint cached 60s (cek header)
+- [ ] Race test PASS (parallel buys gak overcommit stock)
+- [ ] Audit + tests lulus, commit dengan summary lengkap
 
 ---
 
