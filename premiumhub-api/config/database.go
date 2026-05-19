@@ -50,6 +50,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.Notification{},
 		&model.WalletTopup{},
 		&model.WalletLedger{},
+		&model.WalletWithdrawal{},
 		&model.DigiConnectAPIKey{},
 		&model.DigiConnectEntitlement{},
 		&model.DigiConnectRequest{},

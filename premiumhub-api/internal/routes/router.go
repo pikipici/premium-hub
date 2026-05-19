@@ -101,6 +101,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	paymentSvc := service.NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, nil)
 	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
 	walletReconSvc := service.NewWalletReconciliationService(walletRepo)
+	walletWithdrawalRepo := repository.NewWalletWithdrawalRepo(db)
+	walletWithdrawalSvc := service.NewWalletWithdrawalService(cfg, walletWithdrawalRepo, walletRepo, notifRepo)
 	paymentSvc.SetWalletService(walletSvc)
 	paymentWebhookSvc := service.NewPaymentWebhookService(orderRepo, sosmedOrderRepo, walletRepo, paymentSvc, sosmedPaymentSvc, walletSvc)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)
@@ -144,6 +146,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc, paymentWebhookSvc)
 	walletHandler := handler.NewWalletHandler(walletSvc).SetReconciliationService(walletReconSvc)
+	walletWithdrawalHandler := handler.NewWalletWithdrawalHandler(walletWithdrawalSvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
 	nokosPublicHandler := handler.NewNokosPublicHandler(nokosLandingSvc)
 	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage, cfg)
@@ -345,6 +348,24 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	)
 	protected.GET("/wallet/topups", walletHandler.ListTopups)
 	protected.GET("/wallet/topups/:id", walletHandler.GetTopup)
+
+	// Withdraw flow — Round 2 of wallet-withdraw plan.
+	// Static destinations + policy listed first so client can render
+	// the form before submitting. Cancel + create are rate-limited
+	// like topup; list/get are not.
+	protected.GET("/wallet/withdrawals/destinations", walletWithdrawalHandler.Destinations)
+	protected.POST(
+		"/wallet/withdrawals",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request withdraw. Coba lagi sebentar."),
+		walletWithdrawalHandler.Create,
+	)
+	protected.GET("/wallet/withdrawals", walletWithdrawalHandler.ListMine)
+	protected.GET("/wallet/withdrawals/:id", walletWithdrawalHandler.GetMine)
+	protected.POST(
+		"/wallet/withdrawals/:id/cancel",
+		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request batalin withdraw. Coba lagi sebentar."),
+		walletWithdrawalHandler.Cancel,
+	)
 
 	protected.GET("/digiconnect/summary", digiConnectHandler.Summary)
 	protected.GET("/digiconnect/dashboard", digiConnectHandler.Dashboard)
@@ -577,6 +598,17 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		walletHandler.ReconcilePending,
 	)
 	admin.GET("/wallet/reconciliation", walletHandler.AdminReconciliationReport)
+
+	// Withdraw — admin queue + state transitions. Provider rate
+	// limit (more lenient) since admin operates from a single IP.
+	adminWithdrawRL := middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak aksi withdraw admin. Coba lagi sebentar.")
+	admin.GET("/wallet/withdrawals", walletWithdrawalHandler.AdminList)
+	admin.GET("/wallet/withdrawals/:id", walletWithdrawalHandler.AdminGet)
+	admin.POST("/wallet/withdrawals/:id/approve", adminWithdrawRL, walletWithdrawalHandler.AdminApprove)
+	admin.POST("/wallet/withdrawals/:id/reject", adminWithdrawRL, walletWithdrawalHandler.AdminReject)
+	admin.POST("/wallet/withdrawals/:id/mark-processing", adminWithdrawRL, walletWithdrawalHandler.AdminMarkProcessing)
+	admin.POST("/wallet/withdrawals/:id/mark-paid", adminWithdrawRL, walletWithdrawalHandler.AdminMarkPaid)
+	admin.POST("/wallet/withdrawals/:id/mark-failed", adminWithdrawRL, walletWithdrawalHandler.AdminMarkFailed)
 	admin.GET("/wallet/reconciliation/export", walletHandler.AdminReconciliationExport)
 	admin.POST(
 		"/wallet/reconciliation/repair",
