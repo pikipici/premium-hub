@@ -42,6 +42,16 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    label: 'Gmail',
+    items: [
+      { href: '/admin/gmail/verifikasi', label: 'Verifikasi Setoran', icon: '✓' },
+      { href: '/admin/gmail/inventory', label: 'Inventory', icon: '◳' },
+      { href: '/admin/gmail/pricing', label: 'Pricing', icon: '$' },
+      { href: '/admin/gmail/strikes', label: 'Strike Users', icon: '!' },
+      { href: '/admin/gmail/analytics', label: 'Analytics', icon: '📊' },
+    ],
+  },
+  {
     label: 'Support',
     items: [
       { href: '/admin/chat', label: 'Chat Support', icon: '◴' },

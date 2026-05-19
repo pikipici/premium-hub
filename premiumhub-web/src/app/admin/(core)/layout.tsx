@@ -58,6 +58,30 @@ function resolveCorePageMeta(pathname: string): PageMeta {
     return { title: 'Chat Support', sub: 'Balas pesan user secara realtime' }
   }
 
+  if (pathname.startsWith('/admin/gmail/verifikasi')) {
+    return { title: 'Verifikasi Setoran Gmail', sub: 'Antrian verify akun gmail dari seller' }
+  }
+
+  if (pathname.startsWith('/admin/gmail/inventory')) {
+    return { title: 'Inventory Gmail', sub: 'Browser akun gmail per status' }
+  }
+
+  if (pathname.startsWith('/admin/gmail/pricing')) {
+    return { title: 'Pricing Gmail', sub: 'Konfigurasi harga buy/sell + bulk discount + threshold' }
+  }
+
+  if (pathname.startsWith('/admin/gmail/strikes')) {
+    return { title: 'Strike Users', sub: 'User dengan strike aktif gmail sell-side' }
+  }
+
+  if (pathname.startsWith('/admin/gmail/analytics')) {
+    return { title: 'Sales Analytics Gmail', sub: 'Performance marketplace per minggu' }
+  }
+
+  if (pathname.startsWith('/admin/gmail')) {
+    return { title: 'Gmail Marketplace', sub: 'Kelola sell-side + buy-side gmail' }
+  }
+
   return { title: 'Admin', sub: 'Panel administrasi' }
 }
 
