@@ -103,6 +103,13 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	walletReconSvc := service.NewWalletReconciliationService(walletRepo)
 	walletWithdrawalRepo := repository.NewWalletWithdrawalRepo(db)
 	walletWithdrawalSvc := service.NewWalletWithdrawalService(cfg, walletWithdrawalRepo, walletRepo, notifRepo)
+	// Wire PayoutRail. Manual is the default and only rail shipped
+	// in Round 4. Future API rails (Duitku/Xendit/Flip/Tripay) plug
+	// in here via env switch on cfg.WithdrawalRailKind.
+	switch strings.ToLower(strings.TrimSpace(cfg.WithdrawalRailKind)) {
+	default:
+		walletWithdrawalSvc.SetPayoutRail(service.NewManualPayoutRail())
+	}
 	paymentSvc.SetWalletService(walletSvc)
 	paymentWebhookSvc := service.NewPaymentWebhookService(orderRepo, sosmedOrderRepo, walletRepo, paymentSvc, sosmedPaymentSvc, walletSvc)
 	fiveSimSvc := service.NewFiveSimService(cfg, userRepo, fiveSimOrderRepo, walletRepo, nil)

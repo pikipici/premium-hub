@@ -35,6 +35,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/order', label: 'Order', icon: '◉' },
       { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: '◎' },
       { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: '◬' },
+      { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: '↓' },
       { href: '/admin/digiconnect', label: 'DigiConnect', icon: '⌁' },
       { href: '/admin/convert', label: 'Control Convert', icon: '⇄' },
       { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌' },

@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -47,6 +48,17 @@ type Config struct {
 	ConvertProofRateLimitMax, ConvertProofRateLimitWindow                       string
 	ConvertAdminStatusRateLimitMax, ConvertAdminStatusRateLimitWindow           string
 	FiveSimBuyRateLimitMax, FiveSimBuyRateLimitWindow                           string
+	// Wallet withdrawal — Round 4 of WD plan. Server-side policy
+	// values (limits, fee, threshold). Mirrored to FE via the
+	// /wallet/withdrawals/destinations endpoint so client-side caps
+	// always match server enforcement. Tunable per-env.
+	WithdrawalMin                 int64
+	WithdrawalMax                 int64
+	WithdrawalFee                 int64
+	WithdrawalAutoApproveThreshold int64
+	WithdrawalDailyMaxRequests    int
+	WithdrawalDailyMaxTotal       int64
+	WithdrawalRailKind            string
 	ConvertExpiryWorkerEnabled                                                  bool
 	ConvertExpiryWorkerInterval, ConvertExpiryWorkerBatchLimit                  string
 	ConvertProofStorageMode, ConvertProofLocalDir, ConvertProofMaxFileMB        string
@@ -170,6 +182,13 @@ func Load() *Config {
 		ConvertAdminStatusRateLimitWindow:    e("CONVERT_ADMIN_STATUS_RATE_LIMIT_WINDOW", "1m"),
 		FiveSimBuyRateLimitMax:               e("FIVESIM_BUY_RATE_LIMIT_MAX", "8"),
 		FiveSimBuyRateLimitWindow:            e("FIVESIM_BUY_RATE_LIMIT_WINDOW", "1m"),
+		WithdrawalMin:                        ei64("WITHDRAWAL_MIN", 50_000),
+		WithdrawalMax:                        ei64("WITHDRAWAL_MAX", 500_000),
+		WithdrawalFee:                        ei64("WITHDRAWAL_FEE", 2_500),
+		WithdrawalAutoApproveThreshold:       ei64("WITHDRAWAL_AUTO_APPROVE_THRESHOLD", 100_000),
+		WithdrawalDailyMaxRequests:           ei("WITHDRAWAL_DAILY_MAX_REQUESTS", 5),
+		WithdrawalDailyMaxTotal:              ei64("WITHDRAWAL_DAILY_MAX_TOTAL", 2_500_000),
+		WithdrawalRailKind:                   e("WITHDRAWAL_RAIL_KIND", "manual"),
 		ConvertExpiryWorkerEnabled:           eb("CONVERT_EXPIRY_WORKER_ENABLED", true),
 		ConvertExpiryWorkerInterval:          e("CONVERT_EXPIRY_WORKER_INTERVAL", "1m"),
 		ConvertExpiryWorkerBatchLimit:        e("CONVERT_EXPIRY_WORKER_BATCH_LIMIT", "200"),
@@ -234,4 +253,32 @@ func eb(k string, fb bool) bool {
 	default:
 		return fb
 	}
+}
+
+// ei reads an int env var with fallback. Returns fb if unset or not parseable.
+func ei(k string, fb int) int {
+	v, ok := os.LookupEnv(k)
+	if !ok || strings.TrimSpace(v) == "" {
+		return fb
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil {
+		return fb
+	}
+	return n
+}
+
+// ei64 reads an int64 env var with fallback. Used for monetary values
+// (rupiah amounts) and other large numeric configs. Returns fb if
+// unset or not parseable.
+func ei64(k string, fb int64) int64 {
+	v, ok := os.LookupEnv(k)
+	if !ok || strings.TrimSpace(v) == "" {
+		return fb
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+	if err != nil {
+		return fb
+	}
+	return n
 }

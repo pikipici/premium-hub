@@ -59,6 +59,7 @@ type WalletWithdrawalService struct {
 	repo       *repository.WalletWithdrawalRepo
 	walletRepo *repository.WalletRepo
 	notifRepo  *repository.NotificationRepo
+	payoutRail PayoutRail
 }
 
 func NewWalletWithdrawalService(
@@ -72,6 +73,83 @@ func NewWalletWithdrawalService(
 		repo:       repo,
 		walletRepo: walletRepo,
 		notifRepo:  notifRepo,
+	}
+}
+
+// SetPayoutRail injects the active payout rail. Optional — service
+// works without one (Approve falls back to "manual" semantics: stay
+// in approved without dispatching anywhere). Wired in router.go after
+// service construction so the rail can also be hot-swapped in tests.
+func (s *WalletWithdrawalService) SetPayoutRail(rail PayoutRail) *WalletWithdrawalService {
+	s.payoutRail = rail
+	return s
+}
+
+// minAmount returns the configured minimum gross withdrawal amount,
+// falling back to the legacy constant if config is unset (zero).
+// Same fallback semantics for the other policy getters below.
+func (s *WalletWithdrawalService) minAmount() int64 {
+	if s.cfg != nil && s.cfg.WithdrawalMin > 0 {
+		return s.cfg.WithdrawalMin
+	}
+	return WithdrawalMinAmount
+}
+
+func (s *WalletWithdrawalService) maxAmount() int64 {
+	if s.cfg != nil && s.cfg.WithdrawalMax > 0 {
+		return s.cfg.WithdrawalMax
+	}
+	return WithdrawalMaxAmount
+}
+
+func (s *WalletWithdrawalService) flatFee() int64 {
+	if s.cfg != nil && s.cfg.WithdrawalFee > 0 {
+		return s.cfg.WithdrawalFee
+	}
+	return WithdrawalFlatFee
+}
+
+func (s *WalletWithdrawalService) maxRequestsPerDay() int64 {
+	if s.cfg != nil && s.cfg.WithdrawalDailyMaxRequests > 0 {
+		return int64(s.cfg.WithdrawalDailyMaxRequests)
+	}
+	return WithdrawalMaxRequestsPerDay
+}
+
+func (s *WalletWithdrawalService) maxAmountPerDay() int64 {
+	if s.cfg != nil && s.cfg.WithdrawalDailyMaxTotal > 0 {
+		return s.cfg.WithdrawalDailyMaxTotal
+	}
+	return WithdrawalMaxAmountPerDay
+}
+
+func (s *WalletWithdrawalService) autoApproveThreshold() int64 {
+	if s.cfg != nil && s.cfg.WithdrawalAutoApproveThreshold > 0 {
+		return s.cfg.WithdrawalAutoApproveThreshold
+	}
+	return WithdrawalAutoApproveThreshold
+}
+
+// PolicySnapshot returns the currently-active policy values. Used by
+// the destinations/policy endpoint so client-side caps always match
+// server enforcement (admin-tunable per env).
+type WithdrawalPolicy struct {
+	MinAmount            int64 `json:"min_amount"`
+	MaxAmount            int64 `json:"max_amount"`
+	FlatFee              int64 `json:"flat_fee"`
+	MaxRequestsPerDay    int   `json:"max_requests_per_day"`
+	MaxAmountPerDay      int64 `json:"max_amount_per_day"`
+	AutoApproveThreshold int64 `json:"auto_approve_threshold"`
+}
+
+func (s *WalletWithdrawalService) Policy() WithdrawalPolicy {
+	return WithdrawalPolicy{
+		MinAmount:            s.minAmount(),
+		MaxAmount:            s.maxAmount(),
+		FlatFee:              s.flatFee(),
+		MaxRequestsPerDay:    int(s.maxRequestsPerDay()),
+		MaxAmountPerDay:      s.maxAmountPerDay(),
+		AutoApproveThreshold: s.autoApproveThreshold(),
 	}
 }
 
@@ -106,19 +184,19 @@ func (s *WalletWithdrawalService) CreateRequest(ctx context.Context, userID uuid
 	if err != nil {
 		return nil, errors.New("gagal cek limit harian withdraw")
 	}
-	if count >= WithdrawalMaxRequestsPerDay {
-		return nil, fmt.Errorf("limit harian tercapai (max %d permintaan/hari)", WithdrawalMaxRequestsPerDay)
+	if count >= s.maxRequestsPerDay() {
+		return nil, fmt.Errorf("limit harian tercapai (max %d permintaan/hari)", s.maxRequestsPerDay())
 	}
-	if totalToday+input.Amount > WithdrawalMaxAmountPerDay {
-		return nil, fmt.Errorf("total nominal harian tidak boleh melebihi Rp %s", formatRupiahPlain(WithdrawalMaxAmountPerDay))
+	if totalToday+input.Amount > s.maxAmountPerDay() {
+		return nil, fmt.Errorf("total nominal harian tidak boleh melebihi Rp %s", formatRupiahPlain(s.maxAmountPerDay()))
 	}
 
 	withdrawal := &model.WalletWithdrawal{
 		ID:                 uuid.New(),
 		UserID:             userID,
 		Amount:             input.Amount,
-		Fee:                WithdrawalFlatFee,
-		NetAmount:          input.Amount - WithdrawalFlatFee,
+		Fee:                s.flatFee(),
+		NetAmount:          input.Amount - s.flatFee(),
 		Status:             model.WithdrawalStatusPending,
 		DestinationType:    strings.ToLower(strings.TrimSpace(input.DestinationType)),
 		DestinationCode:    strings.ToUpper(strings.TrimSpace(input.DestinationCode)),
@@ -127,7 +205,7 @@ func (s *WalletWithdrawalService) CreateRequest(ctx context.Context, userID uuid
 		PayoutRailKind:     PayoutRailKindManual,
 	}
 
-	autoApproved := input.Amount < WithdrawalAutoApproveThreshold
+	autoApproved := input.Amount < s.autoApproveThreshold()
 
 	err = s.walletRepo.Transaction(func(tx *gorm.DB) error {
 		if ctx != nil {
@@ -216,6 +294,20 @@ func (s *WalletWithdrawalService) CreateRequest(ctx context.Context, userID uuid
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// Auto-approve path needs to dispatch to rail too — without
+	// this, auto-approved withdrawals get stuck in "approved"
+	// forever. Best-effort: rail failure leaves it in approved and
+	// admin can retry.
+	if autoApproved && s.payoutRail != nil {
+		// adminID for auto-approve = system: we use the user's own
+		// ID as a sentinel since there's no admin row. Real admin
+		// audits should filter by AutoApproved=true.
+		dispatched, _ := s.dispatchToRail(ctx, withdrawal.UserID, withdrawal)
+		if dispatched != nil {
+			return dispatched, nil
+		}
 	}
 	return withdrawal, nil
 }
@@ -308,10 +400,22 @@ func (s *WalletWithdrawalService) GetAdmin(id uuid.UUID) (*model.WalletWithdrawa
 	return w, nil
 }
 
-// Approve transitions pending → approved. No saldo movement here —
-// the earn pocket was already debited at submit time.
+// Approve transitions pending → approved, then dispatches the payout
+// to the active rail. Rail outcome maps to terminal/intermediate
+// withdrawal status:
+//
+//	pending → withdrawal flips to processing (manual rail; admin
+//	          eventually marks paid by hand. async API rails reach
+//	          paid/failed via reconcile worker.)
+//	success → withdrawal flips to paid (sync API rails)
+//	failed  → withdrawal flips to failed and earn pocket is refunded
+//	          (rail rejected the payload outright)
+//
+// No saldo movement on the approve→processing path — the earn pocket
+// was already debited at submit time. The refund only happens on
+// rail-failure.
 func (s *WalletWithdrawalService) Approve(ctx context.Context, adminID, id uuid.UUID, note string) (*model.WalletWithdrawal, error) {
-	return s.transitionFromPending(ctx, adminID, id,
+	w, err := s.transitionFromPending(ctx, adminID, id,
 		model.WithdrawalStatusApproved,
 		strings.TrimSpace(note),
 		"withdrawal_approved",
@@ -320,6 +424,76 @@ func (s *WalletWithdrawalService) Approve(ctx context.Context, adminID, id uuid.
 			return fmt.Sprintf("Permintaan withdraw Rp %s disetujui dan akan segera diproses.", formatRupiahPlain(amount))
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	// No rail wired up = legacy manual semantics, leave it in approved.
+	// Admin will move it forward via MarkProcessing/MarkPaid manually.
+	if s.payoutRail == nil {
+		return w, nil
+	}
+	return s.dispatchToRail(ctx, adminID, w)
+}
+
+// dispatchToRail submits the (already-approved) withdrawal to the
+// payout rail and applies the resulting state transition. Idempotent
+// per call: if rail blows up we leave the withdrawal in approved so
+// the admin can retry (status flip only happens after rail returns).
+func (s *WalletWithdrawalService) dispatchToRail(ctx context.Context, adminID uuid.UUID, w *model.WalletWithdrawal) (*model.WalletWithdrawal, error) {
+	if s.payoutRail == nil {
+		return w, nil
+	}
+	req := PayoutRequest{
+		WithdrawalID:       w.ID,
+		Amount:             w.NetAmount,
+		DestinationType:    w.DestinationType,
+		DestinationCode:    w.DestinationCode,
+		DestinationAccount: w.DestinationAccount,
+		DestinationName:    w.DestinationName,
+	}
+	res, err := s.payoutRail.Submit(ctx, req)
+	if err != nil {
+		// Rail hard-failed (network, panic, panic-recover). Leave
+		// withdrawal in approved so admin sees the issue and can
+		// retry. Don't refund — the request is still "live".
+		return w, nil
+	}
+	railKind := string(s.payoutRail.Kind())
+
+	switch res.Status {
+	case PayoutStatusSuccess:
+		// Sync API rail completed payout immediately. Skip the
+		// processing-then-paid two-step and go straight to paid.
+		paid, mErr := s.MarkPaid(ctx, adminID, w.ID, railKind, res.RailRef)
+		if mErr != nil {
+			return w, nil
+		}
+		return paid, nil
+
+	case PayoutStatusFailed:
+		// Rail rejected payload (validation error, dest unreachable).
+		// Refund the earn pocket and notify user.
+		reason := strings.TrimSpace(res.Error)
+		if reason == "" {
+			reason = "rail menolak permintaan payout"
+		}
+		failed, mErr := s.MarkFailed(ctx, adminID, w.ID, reason)
+		if mErr != nil {
+			return w, nil
+		}
+		return failed, nil
+
+	default:
+		// Pending — most common path. For manual rails this is
+		// permanent until admin clicks mark-paid. For async API
+		// rails the reconcile worker (future) flips it later.
+		processed, mErr := s.MarkProcessingWithRail(ctx, adminID, w.ID, railKind, res.RailRef)
+		if mErr != nil {
+			return w, nil
+		}
+		return processed, nil
+	}
 }
 
 // Reject transitions pending → rejected. Refunds earn pocket. Note is
@@ -389,6 +563,60 @@ func (s *WalletWithdrawalService) MarkProcessing(ctx context.Context, adminID, i
 			return fmt.Sprintf("Withdraw Rp %s sedang diproses ke rekening tujuan.", formatRupiahPlain(amount))
 		},
 	)
+}
+
+// MarkProcessingWithRail is the rail-aware variant called by
+// dispatchToRail after Approve. Same state transition as
+// MarkProcessing but additionally stamps PayoutRailKind / RailRef on
+// the row so admins can see which rail is handling it (especially
+// useful when running multiple rails in parallel later).
+func (s *WalletWithdrawalService) MarkProcessingWithRail(ctx context.Context, adminID, id uuid.UUID, railKind, railRef string) (*model.WalletWithdrawal, error) {
+	railKind = strings.TrimSpace(railKind)
+	if railKind == "" {
+		railKind = PayoutRailKindManual
+	}
+	var result *model.WalletWithdrawal
+	err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+		}
+		w, err := s.repo.LockByIDTx(tx, id)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("permintaan withdraw tidak ditemukan")
+			}
+			return errors.New("gagal memuat withdraw")
+		}
+		if w.Status != model.WithdrawalStatusApproved {
+			return errors.New("withdraw belum bisa diproses (bukan status approved)")
+		}
+
+		now := time.Now()
+		w.Status = model.WithdrawalStatusProcessing
+		w.AdminID = &adminID
+		w.PayoutRailKind = railKind
+		if strings.TrimSpace(railRef) != "" {
+			w.PayoutRailRef = strings.TrimSpace(railRef)
+		}
+		_ = now
+		if err := s.repo.SaveTx(tx, w); err != nil {
+			return errors.New("gagal update withdraw")
+		}
+
+		_ = s.writeNotifTx(tx, w.UserID, "withdrawal_processing", "Withdraw Sedang Diproses",
+			fmt.Sprintf("Withdraw Rp %s sedang diproses ke rekening tujuan.", formatRupiahPlain(w.Amount)),
+			w.ID)
+		result = w
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // MarkPaid transitions processing → paid. Writes a withdrawal_final
@@ -527,13 +755,13 @@ func (s *WalletWithdrawalService) MarkFailed(ctx context.Context, adminID, id uu
 // ----- internals -----
 
 func (s *WalletWithdrawalService) validateInput(input CreateWithdrawalInput) error {
-	if input.Amount < WithdrawalMinAmount {
-		return fmt.Errorf("minimal withdraw Rp %s", formatRupiahPlain(WithdrawalMinAmount))
+	if input.Amount < s.minAmount() {
+		return fmt.Errorf("minimal withdraw Rp %s", formatRupiahPlain(s.minAmount()))
 	}
-	if input.Amount > WithdrawalMaxAmount {
-		return fmt.Errorf("maksimal withdraw Rp %s per permintaan", formatRupiahPlain(WithdrawalMaxAmount))
+	if input.Amount > s.maxAmount() {
+		return fmt.Errorf("maksimal withdraw Rp %s per permintaan", formatRupiahPlain(s.maxAmount()))
 	}
-	if input.Amount-WithdrawalFlatFee <= 0 {
+	if input.Amount-s.flatFee() <= 0 {
 		return errors.New("nominal terlalu kecil setelah dipotong biaya")
 	}
 	destType := strings.ToLower(strings.TrimSpace(input.DestinationType))

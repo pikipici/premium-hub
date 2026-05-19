@@ -95,18 +95,12 @@ func (h *WalletWithdrawalHandler) Cancel(c *gin.Context) {
 // Destinations handles GET /api/v1/wallet/withdrawals/destinations.
 // Returns the static list of supported banks + e-wallets along with
 // the daily limit / fee policy so the frontend doesn't have to
-// hardcode anything.
+// hardcode anything. Policy values come from the service so they
+// reflect runtime config (env-tunable).
 func (h *WalletWithdrawalHandler) Destinations(c *gin.Context) {
 	response.Success(c, "OK", gin.H{
 		"destinations": model.SupportedWithdrawalDestinations(),
-		"policy": gin.H{
-			"min_amount":             service.WithdrawalMinAmount,
-			"max_amount":             service.WithdrawalMaxAmount,
-			"flat_fee":               service.WithdrawalFlatFee,
-			"max_requests_per_day":   service.WithdrawalMaxRequestsPerDay,
-			"max_amount_per_day":     service.WithdrawalMaxAmountPerDay,
-			"auto_approve_threshold": service.WithdrawalAutoApproveThreshold,
-		},
+		"policy":       h.svc.Policy(),
 	})
 }
 
