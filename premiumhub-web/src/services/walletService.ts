@@ -1,6 +1,7 @@
 import api from '@/lib/api'
 import type { ApiResponse } from '@/types/api'
 import type { PaymentMethodOption, Wallet, WalletBalance, WalletLedger, WalletListParams, WalletTopup } from '@/types/wallet'
+import type { WalletBalanceDetailed } from '@/types/walletWithdrawal'
 
 interface CreateTopupPayload {
   amount: number
@@ -11,6 +12,14 @@ interface CreateTopupPayload {
 export const walletService = {
   getBalance: async () => {
     const res = await api.get<ApiResponse<WalletBalance>>('/wallet/balance')
+    return res.data
+  },
+
+  // Dual-pocket balance — Saldo Utama (spend) + Saldo Pendapatan (earn).
+  // Added in WD plan Round 1. New code should prefer this over
+  // getBalance for any UI that surfaces the breakdown.
+  getBalanceDetailed: async () => {
+    const res = await api.get<ApiResponse<WalletBalanceDetailed>>('/wallet/balance-detailed')
     return res.data
   },
 

@@ -151,6 +151,30 @@ export function claimTone(status: string): { tone: StatusTone; label: string } {
   return { tone: 'neutral', label: status || 'Unknown' }
 }
 
+// Wallet withdrawal status (7 enum). Mirror of WithdrawalStatus*
+// constants di backend (premiumhub-api/internal/model/wallet_withdrawal.go).
+export type WalletWithdrawalStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled'
+  | 'processing'
+  | 'paid'
+  | 'failed'
+  | string
+
+export function walletWithdrawalTone(status: string): { tone: StatusTone; label: string } {
+  const s = (status || '').toLowerCase()
+  if (s === 'pending') return { tone: 'process', label: 'Menunggu Review' }
+  if (s === 'approved') return { tone: 'info', label: 'Disetujui' }
+  if (s === 'processing') return { tone: 'info', label: 'Diproses' }
+  if (s === 'paid') return { tone: 'success', label: 'Cair' }
+  if (s === 'rejected') return { tone: 'fail', label: 'Ditolak' }
+  if (s === 'failed') return { tone: 'fail', label: 'Gagal' }
+  if (s === 'cancelled' || s === 'canceled') return { tone: 'neutral', label: 'Dibatalkan' }
+  return { tone: 'neutral', label: status || 'Unknown' }
+}
+
 // Generic order status (catch-all for activity, akun-aktif, riwayat-order)
 export function genericOrderTone(status: string): { tone: StatusTone; label: string } {
   const s = (status || '').toLowerCase()

@@ -145,6 +145,10 @@ export default function WalletPage() {
   const { setWalletBalance } = useAuthStore()
 
   const [balance, setBalance] = useState(0)
+  // Saldo Pendapatan (earn pocket) — fed by sell-side flows like
+  // gmail. Withdrawable; cannot be topped up. Defaults to 0 for users
+  // who haven't earned anything.
+  const [earnBalance, setEarnBalance] = useState(0)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [topups, setTopups] = useState<WalletTopup[]>([])
   const [ledgers, setLedgers] = useState<WalletLedger[]>([])
@@ -264,14 +268,15 @@ export default function WalletPage() {
 
     try {
       const [balanceRes, topupRes, ledgerRes] = await Promise.all([
-        walletService.getBalance(),
+        walletService.getBalanceDetailed(),
         walletService.listTopups({ page: 1, limit: 20 }),
         walletService.listLedger({ page: 1, limit: 50 }),
       ])
 
       if (balanceRes.success) {
-        setBalance(balanceRes.data.balance)
-        setWalletBalance(balanceRes.data.balance)
+        setBalance(balanceRes.data.spend)
+        setEarnBalance(balanceRes.data.earn)
+        setWalletBalance(balanceRes.data.spend)
       }
       if (topupRes.success) {
         setTopups(topupRes.data)
@@ -413,6 +418,54 @@ export default function WalletPage() {
 
         <div className="relative mt-2 text-[11px] text-[#6B7280]">
           Dipakai bersih = pembelian - refund • Refund {refundCount}/{purchaseCount} transaksi pembelian.
+        </div>
+      </section>
+
+      {/* Saldo Pendapatan (earn pocket) — only render the card when
+          the user has any earnings or has earned in the past. Showing
+          empty card to all users adds noise pre-launch of gmail
+          marketplace. */}
+      <section className="relative overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white p-5 md:p-6 shadow-[0_16px_38px_rgba(20,20,20,0.06)]">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-emerald-100/60 blur-2xl" />
+        <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-emerald-700 mb-2">
+              <ArrowDownToLine className="h-3.5 w-3.5" />
+              Saldo Pendapatan
+            </div>
+            <div className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#141414]">
+              {loading ? LOADING_COPY.walletBalance : formatRupiah(earnBalance)}
+            </div>
+            <p className="text-xs text-[#6B7280] mt-1.5 max-w-md">
+              Hasil penjualan akun di marketplace. Bisa kamu tarik ke rekening atau e-wallet.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+            <Link
+              href="/dashboard/wallet/withdrawals"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-[#EBEBEB] bg-white text-sm font-semibold text-[#141414] hover:bg-[#F7F7F5] transition-colors"
+            >
+              Riwayat WD
+            </Link>
+            <Link
+              href="/dashboard/wallet/withdrawals/new"
+              aria-disabled={earnBalance < 50000}
+              tabIndex={earnBalance < 50000 ? -1 : 0}
+              onClick={(e) => {
+                if (earnBalance < 50000) e.preventDefault()
+              }}
+              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-sm font-extrabold transition-colors ${
+                earnBalance >= 50000
+                  ? 'bg-[#141414] text-white hover:bg-[#2A2A2A]'
+                  : 'bg-[#F0F0EE] text-[#A6A6A1] cursor-not-allowed'
+              }`}
+              title={earnBalance < 50000 ? 'Minimum saldo Rp 50.000 untuk WD' : 'Tarik ke rekening'}
+            >
+              Tarik Saldo
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       </section>
 
