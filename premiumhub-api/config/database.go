@@ -51,6 +51,9 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.WalletTopup{},
 		&model.WalletLedger{},
 		&model.WalletWithdrawal{},
+		&model.GmailAccount{},
+		&model.GmailPricing{},
+		&model.GmailStrike{},
 		&model.DigiConnectAPIKey{},
 		&model.DigiConnectEntitlement{},
 		&model.DigiConnectRequest{},
@@ -92,6 +95,10 @@ func InitDB(cfg *Config) *gorm.DB {
 
 	if err := ensureDefaultNavbarMenuSettings(db); err != nil {
 		log.Fatal("DB navbar menu defaults:", err)
+	}
+
+	if err := ensureDefaultGmailPricing(db); err != nil {
+		log.Fatal("DB gmail pricing defaults:", err)
 	}
 
 	if err := applyPaymentSchemaCleanup(db); err != nil {
@@ -504,4 +511,30 @@ func ensureDefaultSosmedServices(db *gorm.DB) error {
 	}
 
 	return nil
+}
+
+// ensureDefaultGmailPricing seeds the single GmailPricing config row
+// on first boot. Matches admin-tunable defaults from the gmail
+// marketplace plan: platform pays seller Rp 3.000/account, charges
+// buyer Rp 5.000/account, bulk discount disabled, low-inventory alert
+// at 20 verified accounts.
+//
+// Idempotent — checks for existing rows first; admin updates persist
+// across reboots.
+func ensureDefaultGmailPricing(db *gorm.DB) error {
+	var count int64
+	if err := db.Model(&model.GmailPricing{}).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	row := &model.GmailPricing{
+		BuyPrice:              3000,
+		SellPrice:             5000,
+		BulkDiscountEnabled:   false,
+		BulkDiscountTiers:     "[]",
+		LowInventoryThreshold: 20,
+	}
+	return db.Create(row).Error
 }

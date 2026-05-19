@@ -103,6 +103,22 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	walletReconSvc := service.NewWalletReconciliationService(walletRepo)
 	walletWithdrawalRepo := repository.NewWalletWithdrawalRepo(db)
 	walletWithdrawalSvc := service.NewWalletWithdrawalService(cfg, walletWithdrawalRepo, walletRepo, notifRepo)
+
+	// Gmail marketplace (sell-side core, Round 1).
+	gmailAccountRepo := repository.NewGmailAccountRepo(db)
+	gmailPricingRepo := repository.NewGmailPricingRepo(db)
+	gmailStrikeRepo := repository.NewGmailStrikeRepo(db)
+	gmailSvc := service.NewGmailService(
+		cfg,
+		gmailAccountRepo,
+		gmailPricingRepo,
+		gmailStrikeRepo,
+		walletRepo,
+		userRepo,
+		notifRepo,
+		stockCredentialCipher,
+	)
+	service.StartGmailSlotExpiryWorker(cfg, gmailSvc)
 	// Wire PayoutRail. Manual is the default and only rail shipped
 	// in Round 4. Future API rails (Duitku/Xendit/Flip/Tripay) plug
 	// in here via env switch on cfg.WithdrawalRailKind.
@@ -154,6 +170,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	paymentHandler := handler.NewPaymentHandler(paymentSvc, paymentWebhookSvc)
 	walletHandler := handler.NewWalletHandler(walletSvc).SetReconciliationService(walletReconSvc)
 	walletWithdrawalHandler := handler.NewWalletWithdrawalHandler(walletWithdrawalSvc)
+	gmailHandler := handler.NewGmailHandler(gmailSvc)
 	fiveSimHandler := handler.NewFiveSimHandler(fiveSimSvc)
 	nokosPublicHandler := handler.NewNokosPublicHandler(nokosLandingSvc)
 	convertHandler := handler.NewConvertHandler(convertSvc, convertProofStorage, cfg)
@@ -378,6 +395,13 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request batalin withdraw. Coba lagi sebentar."),
 		walletWithdrawalHandler.Cancel,
 	)
+
+	// Gmail marketplace — sell-side user routes (Round 1).
+	gmailSellRL := middleware.NewUserRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak aksi gmail. Coba lagi sebentar.")
+	protected.POST("/gmail/slots", gmailSellRL, gmailHandler.RequestSlot)
+	protected.POST("/gmail/slots/:id/submit", gmailSellRL, gmailHandler.SubmitSlot)
+	protected.GET("/gmail/slots", gmailHandler.ListMine)
+	protected.GET("/gmail/slots/:id", gmailHandler.GetMine)
 
 	protected.GET("/digiconnect/summary", digiConnectHandler.Summary)
 	protected.GET("/digiconnect/dashboard", digiConnectHandler.Dashboard)
@@ -621,6 +645,14 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/wallet/withdrawals/:id/mark-processing", adminWithdrawRL, walletWithdrawalHandler.AdminMarkProcessing)
 	admin.POST("/wallet/withdrawals/:id/mark-paid", adminWithdrawRL, walletWithdrawalHandler.AdminMarkPaid)
 	admin.POST("/wallet/withdrawals/:id/mark-failed", adminWithdrawRL, walletWithdrawalHandler.AdminMarkFailed)
+
+	// Gmail marketplace — admin verify queue (Round 1).
+	adminGmailRL := middleware.NewUserRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Terlalu banyak aksi gmail admin. Coba lagi sebentar.")
+	admin.GET("/gmail", gmailHandler.AdminListPendingVerify)
+	admin.GET("/gmail/:id", gmailHandler.AdminGetByID)
+	admin.GET("/gmail/:id/credentials", gmailHandler.AdminGetCredentials)
+	admin.POST("/gmail/:id/verify", adminGmailRL, gmailHandler.AdminVerify)
+	admin.POST("/gmail/:id/reject", adminGmailRL, gmailHandler.AdminReject)
 	admin.GET("/wallet/reconciliation/export", walletHandler.AdminReconciliationExport)
 	admin.POST(
 		"/wallet/reconciliation/repair",

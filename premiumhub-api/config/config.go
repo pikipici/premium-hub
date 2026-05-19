@@ -59,6 +59,17 @@ type Config struct {
 	WithdrawalDailyMaxRequests    int
 	WithdrawalDailyMaxTotal       int64
 	WithdrawalRailKind            string
+
+	// Gmail marketplace (sell-side core).
+	GmailGeneratedEmailPrefix string
+	GmailMaxPendingPerUser    int
+	GmailSlotExpiryHours      int
+	GmailStrikeWindowDays     int
+	GmailStrikeBanDays        int
+	GmailStrikeThreshold      int
+	GmailSlotExpiryWorkerEnabled  bool
+	GmailSlotExpiryWorkerInterval string
+	GmailSlotExpiryWorkerBatchLimit int
 	ConvertExpiryWorkerEnabled                                                  bool
 	ConvertExpiryWorkerInterval, ConvertExpiryWorkerBatchLimit                  string
 	ConvertProofStorageMode, ConvertProofLocalDir, ConvertProofMaxFileMB        string
@@ -189,6 +200,16 @@ func Load() *Config {
 		WithdrawalDailyMaxRequests:           ei("WITHDRAWAL_DAILY_MAX_REQUESTS", 5),
 		WithdrawalDailyMaxTotal:              ei64("WITHDRAWAL_DAILY_MAX_TOTAL", 2_500_000),
 		WithdrawalRailKind:                   e("WITHDRAWAL_RAIL_KIND", "manual"),
+
+		GmailGeneratedEmailPrefix:       e("GMAIL_GENERATED_EMAIL_PREFIX", "premium"),
+		GmailMaxPendingPerUser:          ei("GMAIL_MAX_PENDING_PER_USER", 3),
+		GmailSlotExpiryHours:            ei("GMAIL_SLOT_EXPIRY_HOURS", 6),
+		GmailStrikeWindowDays:           ei("GMAIL_STRIKE_WINDOW_DAYS", 30),
+		GmailStrikeBanDays:              ei("GMAIL_STRIKE_BAN_DAYS", 30),
+		GmailStrikeThreshold:            ei("GMAIL_STRIKE_THRESHOLD", 3),
+		GmailSlotExpiryWorkerEnabled:    eb("GMAIL_SLOT_EXPIRY_WORKER_ENABLED", true),
+		GmailSlotExpiryWorkerInterval:   e("GMAIL_SLOT_EXPIRY_WORKER_INTERVAL", "5m"),
+		GmailSlotExpiryWorkerBatchLimit: ei("GMAIL_SLOT_EXPIRY_WORKER_BATCH_LIMIT", 100),
 		ConvertExpiryWorkerEnabled:           eb("CONVERT_EXPIRY_WORKER_ENABLED", true),
 		ConvertExpiryWorkerInterval:          e("CONVERT_EXPIRY_WORKER_INTERVAL", "1m"),
 		ConvertExpiryWorkerBatchLimit:        e("CONVERT_EXPIRY_WORKER_BATCH_LIMIT", "200"),

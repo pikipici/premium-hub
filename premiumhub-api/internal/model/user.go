@@ -25,6 +25,13 @@ type User struct {
 	// via wallet withdrawal. Cannot be fed by topup. See
 	// model/wallet_pocket.go for pocket semantics.
 	WalletBalanceEarn int64 `gorm:"not null;default:0" json:"wallet_balance_earn"`
+
+	// GmailSellBannedUntil — temporal flag. Set when user accumulates 3
+	// gmail-sell strikes within a 30-day rolling window. While
+	// now < this timestamp, RequestSlot returns 403 with remaining
+	// duration. Cleared automatically by clock-tick (no scheduled
+	// reset job needed).
+	GmailSellBannedUntil *time.Time `json:"gmail_sell_banned_until,omitempty"`
 	CreatedAt         time.Time      `json:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at"`
 	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
