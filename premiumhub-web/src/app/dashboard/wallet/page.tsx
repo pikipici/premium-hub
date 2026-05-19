@@ -2,11 +2,13 @@
 
 import { LOCAL_MUTATION_PAGE_LIMIT } from '@/config/pagination'
 import axios from 'axios'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowDownToLine,
+  ArrowLeftRight,
   ArrowRight,
   CircleAlert,
   CreditCard,
@@ -150,6 +152,11 @@ export default function WalletPage() {
   // who haven't earned anything.
   const [earnBalance, setEarnBalance] = useState(0)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  // Round 5 — transfer earn → spend modal state.
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferAmount, setTransferAmount] = useState('')
+  const [transferring, setTransferring] = useState(false)
+  const [transferError, setTransferError] = useState('')
   const [topups, setTopups] = useState<WalletTopup[]>([])
   const [ledgers, setLedgers] = useState<WalletLedger[]>([])
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>(FALLBACK_PAYMENT_METHODS)
@@ -324,6 +331,43 @@ export default function WalletPage() {
     return `topup-${Date.now()}-${suffix}`
   }
 
+  // Round 5 — handle earn → spend transfer.
+  const handleTransferEarnToSpend = async () => {
+    setTransferError('')
+    const amt = parseInt(transferAmount.replace(/\D/g, ''), 10)
+    if (!amt || amt <= 0) {
+      setTransferError('Nominal tidak valid')
+      return
+    }
+    if (amt > earnBalance) {
+      setTransferError('Saldo Pendapatan tidak cukup')
+      return
+    }
+    setTransferring(true)
+    try {
+      const res = await walletService.transferEarnToSpend(amt)
+      if (res.success && res.data) {
+        setBalance(res.data.balance_spend)
+        setEarnBalance(res.data.balance_earn)
+        setTransferOpen(false)
+        setTransferAmount('')
+        // Refresh ledger biar entry transfer baru langsung muncul.
+        fetchAll(true)
+      } else {
+        setTransferError(res.message || 'Gagal pindahkan saldo')
+      }
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const msg = (err.response?.data as { message?: string } | undefined)?.message
+        setTransferError(msg || 'Gagal pindahkan saldo')
+      } else {
+        setTransferError('Gagal pindahkan saldo')
+      }
+    } finally {
+      setTransferring(false)
+    }
+  }
+
   const handleCreateTopup = async () => {
     if (selectedAmount < selectedMinTopup) {
       setError(`Nominal minimal ${formatRupiah(selectedMinTopup)}`)
@@ -442,6 +486,26 @@ export default function WalletPage() {
           </div>
 
           <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={() => {
+                if (earnBalance > 0) {
+                  setTransferOpen(true)
+                  setTransferAmount('')
+                  setTransferError('')
+                }
+              }}
+              disabled={earnBalance <= 0 || transferring}
+              className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold transition-colors ${
+                earnBalance > 0
+                  ? 'border-[#EBEBEB] bg-white text-[#141414] hover:bg-[#F7F7F5]'
+                  : 'border-[#EBEBEB] bg-white text-[#A6A6A1] cursor-not-allowed'
+              }`}
+              title={earnBalance > 0 ? 'Pindahkan ke Saldo Utama' : 'Tidak ada saldo untuk dipindahkan'}
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              Pindahkan
+            </button>
             <Link
               href="/dashboard/wallet/withdrawals"
               className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-[#EBEBEB] bg-white text-sm font-semibold text-[#141414] hover:bg-[#F7F7F5] transition-colors"
@@ -764,6 +828,73 @@ export default function WalletPage() {
           Wallet masih kosong. Bikin topup pertama biar dashboard ini hidup.
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={transferOpen}
+        title="Pindahkan ke Saldo Utama"
+        confirmLabel={transferring ? 'Memproses...' : 'Pindahkan'}
+        cancelLabel="Batal"
+        loading={transferring}
+        onConfirm={handleTransferEarnToSpend}
+        onCancel={() => {
+          if (!transferring) {
+            setTransferOpen(false)
+            setTransferAmount('')
+            setTransferError('')
+          }
+        }}
+        description={
+          <div className="space-y-3">
+            <div className="text-sm text-[#3A3A3A]">
+              Pindahkan saldo dari Pendapatan ke Utama. Setelah dipindah, dana bisa dipakai untuk belanja
+              di marketplace tapi <strong>tidak bisa dibalik</strong> ke Saldo Pendapatan.
+            </div>
+
+            <div className="rounded-2xl border border-[#EBEBEB] bg-[#F7F7F5] p-3">
+              <div className="text-[11px] font-semibold text-[#6B7280]">Saldo Pendapatan saat ini</div>
+              <div className="text-base font-extrabold text-emerald-700">{formatRupiah(earnBalance)}</div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wide text-[#888] mb-1.5 block">
+                Nominal yang dipindahkan
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={transferAmount}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, '')
+                  setTransferAmount(raw)
+                }}
+                placeholder="0"
+                disabled={transferring}
+                className="w-full rounded-xl border border-[#EBEBEB] px-3 py-2 text-sm font-bold focus:outline-none focus:border-[#141414] disabled:opacity-60"
+              />
+              <div className="mt-1.5 flex items-center justify-between text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setTransferAmount(String(earnBalance))}
+                  disabled={transferring || earnBalance <= 0}
+                  className="font-semibold text-[#141414] hover:underline disabled:opacity-50"
+                >
+                  Pindahkan semua ({formatRupiah(earnBalance)})
+                </button>
+                {transferAmount && /^\d+$/.test(transferAmount) ? (
+                  <span className="text-[#6B7280]">{formatRupiah(parseInt(transferAmount, 10))}</span>
+                ) : null}
+              </div>
+            </div>
+
+            {transferError ? (
+              <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700">
+                <CircleAlert className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>{transferError}</span>
+              </div>
+            ) : null}
+          </div>
+        }
+      />
     </div>
   )
 }

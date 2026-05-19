@@ -54,6 +54,30 @@ func (h *WalletHandler) BalanceDetailed(c *gin.Context) {
 	response.Success(c, "OK", res)
 }
 
+// TransferEarnToSpend handles POST /api/v1/wallet/transfer-earn-to-spend.
+// Round 5 of WD plan. One-way: pendapatan (earn) → utama (spend).
+// Reverse direction is intentionally NOT exposed.
+type transferEarnToSpendBody struct {
+	Amount int64 `json:"amount" binding:"required,gt=0"`
+}
+
+func (h *WalletHandler) TransferEarnToSpend(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	var body transferEarnToSpendBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "amount harus lebih dari 0")
+		return
+	}
+	res, err := h.walletSvc.TransferEarnToSpend(c.Request.Context(), userID, service.TransferEarnToSpendInput{
+		Amount: body.Amount,
+	})
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "Saldo berhasil dipindahkan", res)
+}
+
 func (h *WalletHandler) CreateTopup(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	var input service.CreateTopupInput

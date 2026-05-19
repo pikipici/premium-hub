@@ -19,8 +19,25 @@ export const walletService = {
   // Added in WD plan Round 1. New code should prefer this over
   // getBalance for any UI that surfaces the breakdown.
   getBalanceDetailed: async () => {
-    const res = await api.get<ApiResponse<WalletBalanceDetailed>>('/wallet/balance-detailed')
-    return res.data
+    const response = await api.get<ApiResponse<WalletBalanceDetailed>>('/wallet/balance-detailed')
+    return response.data
+  },
+
+  // Transfer earn pocket -> spend pocket. One-way only — backend
+  // rejects (404) any attempt to go the other direction. See
+  // .kiro/steering/wallet-withdraw-system.md Round 5.
+  transferEarnToSpend: async (amount: number) => {
+    const response = await api.post<
+      ApiResponse<{
+        amount: number
+        balance_spend: number
+        balance_earn: number
+        ledger_reference_out: string
+        ledger_reference_in: string
+        transfer_id: string
+      }>
+    >('/wallet/transfer-earn-to-spend', { amount })
+    return response.data
   },
 
   getWallet: async (): Promise<Wallet> => {
