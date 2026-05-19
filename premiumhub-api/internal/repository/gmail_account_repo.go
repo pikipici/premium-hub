@@ -97,6 +97,19 @@ func (r *GmailAccountRepo) CountPendingByUser(userID uuid.UUID) (int64, error) {
 	return n, err
 }
 
+// CountPendingByUserTx is the tx variant — used by RequestSlot to
+// avoid the TOCTOU race where two parallel calls both see the same
+// pre-insert count.
+func (r *GmailAccountRepo) CountPendingByUserTx(tx *gorm.DB, userID uuid.UUID) (int64, error) {
+	var n int64
+	err := tx.Model(&model.GmailAccount{}).
+		Where("created_by_user_id = ? AND status IN ?",
+			userID,
+			[]string{model.GmailStatusPendingCreate, model.GmailStatusPendingVerify}).
+		Count(&n).Error
+	return n, err
+}
+
 // ListPendingVerify returns admin queue. Oldest-first (FIFO admin
 // review).
 func (r *GmailAccountRepo) ListPendingVerify(page, limit int) ([]model.GmailAccount, int64, error) {

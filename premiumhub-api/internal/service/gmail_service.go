@@ -121,26 +121,11 @@ type SlotResponse struct {
 // Side effects: creates GmailAccount row with status=pending_create,
 // slot_expires_at = now + 6h.
 func (s *GmailService) RequestSlot(userID uuid.UUID) (*SlotResponse, error) {
-	user, err := s.userRepo.FindByID(userID)
-	if err != nil {
-		return nil, errors.New("user tidak ditemukan")
-	}
-	now := time.Now()
-	if user.GmailSellBannedUntil != nil && now.Before(*user.GmailSellBannedUntil) {
-		remaining := time.Until(*user.GmailSellBannedUntil)
-		days := int(remaining.Hours()/24) + 1
-		return nil, fmt.Errorf("akun lu lagi di-ban dari setor gmail. Tunggu %d hari lagi", days)
-	}
-
-	pending, err := s.repo.CountPendingByUser(userID)
-	if err != nil {
-		return nil, errors.New("gagal cek slot pending")
-	}
-	if int(pending) >= s.maxPendingPerUser() {
-		return nil, fmt.Errorf("selesaikan dulu slot pending lu (max %d simultan)", s.maxPendingPerUser())
-	}
-
-	// Generate creds with email-uniqueness retry.
+	// Generate creds OUTSIDE transaction (cheap, but no DB I/O needed
+	// to be locked). Uniqueness check is also outside since collision
+	// is astronomically unlikely with 32-char random suffix and the
+	// uniqueIndex on email column will reject any real collision when
+	// the row is inserted inside the tx.
 	const maxAttempts = 10
 	var email, plainPassword string
 	for i := 0; i < maxAttempts; i++ {
@@ -165,23 +150,53 @@ func (s *GmailService) RequestSlot(userID uuid.UUID) (*SlotResponse, error) {
 		return nil, errors.New("gagal enkripsi password")
 	}
 
-	expiresAt := now.Add(s.slotExpiryDuration())
-	g := &model.GmailAccount{
-		CreatedByUserID: userID,
-		Status:          model.GmailStatusPendingCreate,
-		Email:           email,
-		PasswordEnc:     encPassword,
-		PasswordVersion: model.GmailPasswordVersionInitial,
-		SlotExpiresAt:   &expiresAt,
-	}
-	if err := s.repo.Create(g); err != nil {
-		return nil, errors.New("gagal membuat slot gmail")
-	}
+	// Atomicity: ban check + pending count + slot insert all happen
+	// inside one tx with the user row FOR UPDATE locked. This kills
+	// the TOCTOU race where a user could double-submit and bypass
+	// max-pending or the freshly-applied ban.
+	var result *SlotResponse
+	err = s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		user, err := s.walletRepo.LockUserByIDTx(tx, userID)
+		if err != nil {
+			return errors.New("user tidak ditemukan")
+		}
+		now := time.Now()
+		if user.GmailSellBannedUntil != nil && now.Before(*user.GmailSellBannedUntil) {
+			remaining := time.Until(*user.GmailSellBannedUntil)
+			days := int(remaining.Hours()/24) + 1
+			return fmt.Errorf("akun lu lagi di-ban dari setor gmail. Tunggu %d hari lagi", days)
+		}
 
-	return &SlotResponse{
-		GmailAccount:  g,
-		PlainPassword: plainPassword,
-	}, nil
+		pending, err := s.repo.CountPendingByUserTx(tx, userID)
+		if err != nil {
+			return errors.New("gagal cek slot pending")
+		}
+		if int(pending) >= s.maxPendingPerUser() {
+			return fmt.Errorf("selesaikan dulu slot pending lu (max %d simultan)", s.maxPendingPerUser())
+		}
+
+		expiresAt := now.Add(s.slotExpiryDuration())
+		g := &model.GmailAccount{
+			CreatedByUserID: userID,
+			Status:          model.GmailStatusPendingCreate,
+			Email:           email,
+			PasswordEnc:     encPassword,
+			PasswordVersion: model.GmailPasswordVersionInitial,
+			SlotExpiresAt:   &expiresAt,
+		}
+		if err := s.repo.CreateTx(tx, g); err != nil {
+			return errors.New("gagal membuat slot gmail")
+		}
+		result = &SlotResponse{
+			GmailAccount:  g,
+			PlainPassword: plainPassword,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // SubmitSlot moves a slot from pending_create -> pending_verify after
@@ -417,10 +432,14 @@ func (s *GmailService) AdminReject(adminID, gmailID uuid.UUID, reason, note stri
 					strikeCount, s.cfg.GmailStrikeWindowDays, banUntil.Format("2 Jan 2006")),
 				g.ID)
 		} else {
+			reasonHuman := gmailRejectReasonHuman(reason)
+			if reason == model.GmailStrikeReasonOther && strings.TrimSpace(note) != "" {
+				reasonHuman = strings.TrimSpace(note)
+			}
 			_ = s.writeNotifTx(tx, g.CreatedByUserID, "gmail_rejected",
 				"Setoran Ditolak",
 				fmt.Sprintf("Setoran %s ditolak: %s. Strike %d/%d.",
-					g.Email, gmailRejectReasonHuman(reason), strikeCount, threshold),
+					g.Email, reasonHuman, strikeCount, threshold),
 				g.ID)
 		}
 		result = g
