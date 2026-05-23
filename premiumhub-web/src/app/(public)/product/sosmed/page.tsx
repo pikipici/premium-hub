@@ -185,12 +185,42 @@ function isHotService(card: SosmedProductCard) {
   return card.isRecommended && !isPromoService(card)
 }
 
+/**
+ * Cap visible cards per section: mobile 4 (2 rows of 2) / tablet 6 (2 rows of 3) /
+ * desktop 4 (1 row of 4). When section is expanded ("Lihat semua" clicked) all
+ * cards are visible. Visibility is CSS-only so we keep SSR-friendly markup
+ * and don't reflow when toggling. `h-full` keeps the inner card stretching
+ * inside the CSS Grid row when the wrapper div sits between grid and card.
+ */
+function cardVisibilityClass(idx: number, expanded: boolean): string {
+  if (expanded) return 'h-full'
+  if (idx < 4) return 'h-full'
+  if (idx < 6) return 'hidden h-full sm:block lg:hidden'
+  return 'hidden'
+}
+
+/** Returns true when section has more cards than the visible cap (4 mobile, 6 tablet, 4 desktop = max 6). */
+function shouldOfferSeeAll(total: number) {
+  return total > 6
+}
+
 export default function ProductSosmedLandingPage() {
   const [services, setServices] = useState<SosmedService[]>([])
   const [servicesLoading, setServicesLoading] = useState(true)
   const [bundlePackages, setBundlePackages] = useState<SosmedBundlePackage[]>([])
   const [bundleCatalogState, setBundleCatalogState] = useState<'loading' | 'ready' | 'fallback'>('loading')
   const [activePlatform, setActivePlatform] = useState('Semua')
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+
+  const toggleExpand = (id: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const isExpanded = (id: string) => expandedSections.has(id)
 
   useEffect(() => {
     let alive = true
@@ -325,8 +355,18 @@ export default function ProductSosmedLandingPage() {
           <section id="layanan" className="mt-6 sm:mt-8">
             <SectionHeader
               title="Layanan"
-              countLabel={layananCards.length > 3 ? `${layananCards.length} produk` : undefined}
-              countTone="default"
+              action={
+                shouldOfferSeeAll(layananCards.length) ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand('layanan')}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#FF5733] transition hover:bg-[#FFF3EF] sm:text-xs"
+                  >
+                    {isExpanded('layanan') ? 'Tampilkan ringkas' : 'Lihat semua'}
+                    <ArrowRight className={`h-3.5 w-3.5 transition-transform ${isExpanded('layanan') ? 'rotate-90' : ''}`} />
+                  </button>
+                ) : undefined
+              }
             />
             {servicesLoading ? (
               <DigiLoadingCardGrid count={6} />
@@ -338,18 +378,19 @@ export default function ProductSosmedLandingPage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {layananCards.map((card) => {
+                {layananCards.map((card, idx) => {
                   const Icon = iconForPlatform(card.platformIcon)
                   return (
-                    <ServiceCardCompact
-                      key={card.key}
-                      href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
-                      title={card.buyerTitle}
-                      categoryLabel={card.badge || card.platform}
-                      isHighlight={card.isRecommended}
-                      Icon={Icon}
-                      toneClass={card.tone}
-                    />
+                    <div key={card.key} className={cardVisibilityClass(idx, isExpanded('layanan'))}>
+                      <ServiceCardCompact
+                        href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
+                        title={card.buyerTitle}
+                        categoryLabel={card.badge || card.platform}
+                        isHighlight={card.isRecommended}
+                        Icon={Icon}
+                        toneClass={card.tone}
+                      />
+                    </div>
                   )
                 })}
               </div>
@@ -362,27 +403,38 @@ export default function ProductSosmedLandingPage() {
               <SectionHeader
                 icon={<Flame className="h-4 w-4 text-orange-500" />}
                 title="Hot Pilihan"
-                countLabel={`${hotCards.length} produk`}
-                countTone="orange"
+                action={
+                  shouldOfferSeeAll(hotCards.length) ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand('hot')}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#FF5733] transition hover:bg-[#FFF3EF] sm:text-xs"
+                    >
+                      {isExpanded('hot') ? 'Tampilkan ringkas' : 'Lihat semua'}
+                      <ArrowRight className={`h-3.5 w-3.5 transition-transform ${isExpanded('hot') ? 'rotate-90' : ''}`} />
+                    </button>
+                  ) : undefined
+                }
               />
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {hotCards.map((card) => {
+                {hotCards.map((card, idx) => {
                   const Icon = iconForPlatform(card.platformIcon)
                   const original = card.originalPrice
                   const final = card.checkoutPrice
                   const discount = discountLabelFor(card.promotion, original, final)
                   return (
-                    <HotPickCard
-                      key={`hot-${card.key}`}
-                      href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
-                      title={card.buyerTitle}
-                      categoryLabel={card.badge || card.platform}
-                      originalPriceLabel={original ? formatCurrency(original) : undefined}
-                      priceLabel={card.priceLabel}
-                      discountLabel={discount}
-                      Icon={Icon}
-                      toneClass={card.tone}
-                    />
+                    <div key={`hot-${card.key}`} className={cardVisibilityClass(idx, isExpanded('hot'))}>
+                      <HotPickCard
+                        href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
+                        title={card.buyerTitle}
+                        categoryLabel={card.badge || card.platform}
+                        originalPriceLabel={original ? formatCurrency(original) : undefined}
+                        priceLabel={card.priceLabel}
+                        discountLabel={discount}
+                        Icon={Icon}
+                        toneClass={card.tone}
+                      />
+                    </div>
                   )
                 })}
               </div>
@@ -398,8 +450,18 @@ export default function ProductSosmedLandingPage() {
                 </span>
               }
               title="Paket Spesial"
-              countLabel={bundleCards.length ? `${bundleCards.length} paket` : undefined}
-              countTone="orange"
+              action={
+                shouldOfferSeeAll(bundleCards.length) ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand('bundle')}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#FF5733] transition hover:bg-[#FFF3EF] sm:text-xs"
+                  >
+                    {isExpanded('bundle') ? 'Tampilkan ringkas' : 'Lihat semua'}
+                    <ArrowRight className={`h-3.5 w-3.5 transition-transform ${isExpanded('bundle') ? 'rotate-90' : ''}`} />
+                  </button>
+                ) : undefined
+              }
             />
             {bundleCatalogState === 'loading' ? (
               <div className="rounded-2xl border border-[#FFE2CF] bg-white px-4 py-3 text-center text-xs font-semibold text-[#9A4B16] shadow-sm">
@@ -415,7 +477,7 @@ export default function ProductSosmedLandingPage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {bundleCards.map((bundle: SosmedBundleProductCard) => {
+                {bundleCards.map((bundle: SosmedBundleProductCard, idx) => {
                   const Icon = iconForPlatform(bundle.platformIcon)
                   const checkoutHref = bundle.variantKey
                     ? `/product/sosmed/checkout?bundle=${encodeURIComponent(bundle.bundleKey)}&variant=${encodeURIComponent(bundle.variantKey)}`
@@ -424,22 +486,23 @@ export default function ProductSosmedLandingPage() {
                     ? `-${bundle.promotion.discount_value}%`
                     : undefined
                   return (
-                    <BundlePromoCard
-                      key={bundle.key}
-                      href={checkoutHref}
-                      title={bundle.buyerTitle}
-                      subtitle={bundle.bestFor}
-                      platformLabel={bundle.platform}
-                      Icon={Icon}
-                      toneClass={bundle.tone}
-                      priceLabel={bundle.priceLabel}
-                      originalPriceLabel={bundle.originalPriceLabel}
-                      packageLabel={bundle.packageLabel}
-                      isRecommended={bundle.isRecommended}
-                      hasPromo={Boolean(bundle.promotion)}
-                      promoDiscountLabel={promoDiscount}
-                      canCheckout={Boolean(bundle.variantKey)}
-                    />
+                    <div key={bundle.key} className={cardVisibilityClass(idx, isExpanded('bundle'))}>
+                      <BundlePromoCard
+                        href={checkoutHref}
+                        title={bundle.buyerTitle}
+                        subtitle={bundle.bestFor}
+                        platformLabel={bundle.platform}
+                        Icon={Icon}
+                        toneClass={bundle.tone}
+                        priceLabel={bundle.priceLabel}
+                        originalPriceLabel={bundle.originalPriceLabel}
+                        packageLabel={bundle.packageLabel}
+                        isRecommended={bundle.isRecommended}
+                        hasPromo={Boolean(bundle.promotion)}
+                        promoDiscountLabel={promoDiscount}
+                        canCheckout={Boolean(bundle.variantKey)}
+                      />
+                    </div>
                   )
                 })}
               </div>
@@ -456,29 +519,40 @@ export default function ProductSosmedLandingPage() {
                   </span>
                 }
                 title="Promo Diskon"
-                countLabel={`${promoCards.length} produk`}
-                countTone="rose"
+                action={
+                  shouldOfferSeeAll(promoCards.length) ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand('promo')}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-rose-500 transition hover:bg-rose-50 sm:text-xs"
+                    >
+                      {isExpanded('promo') ? 'Tampilkan ringkas' : 'Lihat semua'}
+                      <ArrowRight className={`h-3.5 w-3.5 transition-transform ${isExpanded('promo') ? 'rotate-90' : ''}`} />
+                    </button>
+                  ) : undefined
+                }
               />
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {promoCards.map((card) => {
+                {promoCards.map((card, idx) => {
                   const Icon = iconForPlatform(card.platformIcon)
                   const original = card.originalPrice
                   const final = card.checkoutPrice
                   const discount = discountLabelFor(card.promotion, original, final)
                   const saving = savingLabelFor(card.promotion, original, final)
                   return (
-                    <PromoSavingCard
-                      key={`promo-${card.key}`}
-                      href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
-                      title={card.buyerTitle}
-                      categoryLabel={card.badge || card.platform}
-                      originalPriceLabel={original ? formatCurrency(original) : undefined}
-                      priceLabel={card.priceLabel}
-                      discountLabel={discount}
-                      savingLabel={saving}
-                      Icon={Icon}
-                      toneClass={card.tone}
-                    />
+                    <div key={`promo-${card.key}`} className={cardVisibilityClass(idx, isExpanded('promo'))}>
+                      <PromoSavingCard
+                        href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
+                        title={card.buyerTitle}
+                        categoryLabel={card.badge || card.platform}
+                        originalPriceLabel={original ? formatCurrency(original) : undefined}
+                        priceLabel={card.priceLabel}
+                        discountLabel={discount}
+                        savingLabel={saving}
+                        Icon={Icon}
+                        toneClass={card.tone}
+                      />
+                    </div>
                   )
                 })}
               </div>
