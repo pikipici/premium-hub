@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import type { ComponentType, SVGProps } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 
 import type { SosmedPlatformIconKey } from '@/lib/sosmedProductCards'
 
@@ -14,7 +14,6 @@ export type FeaturedMiniItem = {
   title: string
   priceLabel: string
   Icon: IconComp
-  iconBgClass?: string
 }
 
 export type HeroSlideContent = {
@@ -24,9 +23,6 @@ export type HeroSlideContent = {
   ctaLabel?: string
   ctaHref?: string
   Icon: IconComp
-  /** background gradient class (e.g. "bg-gradient-to-br from-[#FF5733] via-[#FF7A50] to-[#B4161B]") */
-  bgClass: string
-  ornamentClass?: string
 }
 
 export type HeroStripPanelProps = {
@@ -36,40 +32,46 @@ export type HeroStripPanelProps = {
 }
 
 /**
- * Koprol-style hero strip:
- *   grid grid-cols-5 gap-3 — mobile/tablet
- *     col-span-3: hero panel (180-220px) with bg gradient + dark overlay + icon chip + title + subtitle + CTA pill
+ * Koprol-style hero strip — DARK variant (v2).
+ *
+ * Background: solid `#141414` with subtle orange accent dot at top-right; gives the
+ * orange brand "room to breathe" by anchoring it on dark surface and letting the
+ * orange in product cards below pop instead of fighting an orange hero.
+ *
+ *   grid grid-cols-5 gap-3
+ *     col-span-3: dark hero panel (180-220px) with icon chip + title + subtitle + CTA pill
  *     col-span-2: 2 mini featured cards stacked (avatar + name + price + chevron)
- *   On desktop, panel scales up to ~360-440px tall with same proportions.
  */
 export function HeroStripPanel({ slide, featured }: HeroStripPanelProps) {
   const HeroIcon = slide.Icon
   return (
     <section className="grid grid-cols-5 gap-3 sm:gap-4">
       <article
-        className={`relative col-span-3 overflow-hidden rounded-3xl shadow-[0_18px_42px_rgba(20,20,20,0.10)] ring-1 ring-black/5 ${slide.bgClass}`}
+        className="relative col-span-3 overflow-hidden rounded-3xl bg-[#141414] shadow-[0_18px_42px_rgba(20,20,20,0.20)] ring-1 ring-black/5"
         style={{ minHeight: 180 }}
       >
-        {/* dark gradient overlay for text legibility */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/55 via-black/25 to-transparent" />
+        {/* subtle orange glow accents */}
+        <span aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#FF5733]/30 blur-3xl" />
+        <span aria-hidden className="pointer-events-none absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-[#FF5733]/15 blur-3xl" />
+        <span aria-hidden className="pointer-events-none absolute right-5 top-5 h-2.5 w-2.5 rounded-full bg-[#FF5733] shadow-[0_0_18px_rgba(255,87,51,0.85)]" />
         <div className="relative z-10 flex h-full flex-col justify-between p-5 text-white sm:p-7">
           <div>
-            <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/15 shadow-md backdrop-blur-sm sm:mb-4 sm:h-14 sm:w-14">
-              <HeroIcon className="h-6 w-6 sm:h-7 sm:w-7" />
+            <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 shadow-md backdrop-blur-sm sm:mb-4 sm:h-14 sm:w-14">
+              <HeroIcon className="h-6 w-6 text-[#FF5733] sm:h-7 sm:w-7" />
             </div>
             <h2 className="line-clamp-2 max-w-[90%] text-lg font-bold leading-tight tracking-tight drop-shadow-sm sm:text-2xl">
               {slide.title}
             </h2>
-            <p className="mt-1 line-clamp-2 max-w-[85%] text-xs opacity-90 sm:text-sm">{slide.subtitle}</p>
+            <p className="mt-1 line-clamp-2 max-w-[85%] text-xs text-white/75 sm:text-sm">{slide.subtitle}</p>
           </div>
           {slide.ctaHref && slide.ctaLabel ? (
             <div className="mt-4 sm:mt-5">
               <Link
                 href={slide.ctaHref}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1.5 text-xs font-bold text-[#141414] shadow-md shadow-black/20 transition-all duration-200 hover:scale-[1.03] hover:brightness-110 active:scale-95 sm:px-4 sm:py-2 sm:text-sm"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#FF5733] px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-[#FF5733]/30 transition-all duration-200 hover:scale-[1.03] hover:bg-[#E64A2E] active:scale-95 sm:px-4 sm:py-2 sm:text-sm"
               >
                 <span>{slide.ctaLabel}</span>
-                <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               </Link>
             </div>
           ) : null}
@@ -83,9 +85,9 @@ export function HeroStripPanel({ slide, featured }: HeroStripPanelProps) {
             <Link
               key={item.key}
               href={item.href}
-              className="group flex flex-1 min-w-0 items-center gap-2.5 rounded-3xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.06)] ring-1 ring-transparent transition-all duration-200 hover:-translate-y-0.5 hover:ring-[#FF5733]/30 active:scale-[0.98] sm:gap-3 sm:p-4"
+              className="group flex flex-1 min-w-0 items-center gap-2.5 rounded-3xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-transparent transition-all duration-200 hover:-translate-y-0.5 hover:ring-[#FF5733]/30 active:scale-[0.98] sm:gap-3 sm:p-4"
             >
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-gray-200 sm:h-12 sm:w-12 ${item.iconBgClass ?? 'bg-[#FFF3EF] text-[#FF5733]'}`}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F5F5F5] text-[#141414] ring-1 ring-gray-200 sm:h-12 sm:w-12">
                 <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <div className="min-w-0 flex-1">
@@ -94,7 +96,7 @@ export function HeroStripPanel({ slide, featured }: HeroStripPanelProps) {
                   {item.priceLabel}
                 </p>
               </div>
-              <ChevronRight className="hidden h-4 w-4 shrink-0 text-gray-400 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#FF5733] sm:block" />
+              <ArrowRight className="hidden h-4 w-4 shrink-0 text-gray-400 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#FF5733] sm:block" />
             </Link>
           )
         })}

@@ -133,23 +133,6 @@ function iconForPlatform(key: SosmedPlatformIconKey) {
   return PLATFORM_ICON_COMPONENTS[key] ?? PLATFORM_ICON_COMPONENTS.generic
 }
 
-const PLATFORM_BADGE_COLOR: Record<SosmedPlatformIconKey, string> = {
-  instagram: '#E1306C',
-  facebook: '#1877F2',
-  shopee: '#EE4D2D',
-  spotify: '#1DB954',
-  telegram: '#0088CC',
-  tiktok: '#111111',
-  'twitter-x': '#111111',
-  youtube: '#FF0000',
-  website: '#6475F2',
-  generic: '#FF5733',
-}
-
-function platformBadgeColor(key: SosmedPlatformIconKey) {
-  return PLATFORM_BADGE_COLOR[key] ?? '#FF5733'
-}
-
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 }
@@ -190,18 +173,16 @@ function sortPromoAndRecommendedFirst<T extends { isRecommended: boolean; promot
   return [...items].sort((a, b) => score(b) - score(a))
 }
 
-function isHotService(card: SosmedProductCard) {
-  // Hot = explicitly recommended or has discount
-  if (card.isRecommended) return true
-  if (card.originalPrice && card.checkoutPrice && card.originalPrice > card.checkoutPrice) return true
-  if (card.promotion) return true
-  return false
-}
-
 function isPromoService(card: SosmedProductCard) {
   if (card.promotion) return true
   if (card.originalPrice && card.checkoutPrice && card.originalPrice > card.checkoutPrice) return true
   return false
+}
+
+function isHotService(card: SosmedProductCard) {
+  // Hot = explicitly recommended (only). Promos go to "Promo Diskon" section.
+  // This split avoids showing the same card in both sections.
+  return card.isRecommended && !isPromoService(card)
 }
 
 export default function ProductSosmedLandingPage() {
@@ -264,6 +245,15 @@ export default function ProductSosmedLandingPage() {
   const hotCards = useMemo(() => filteredCards.filter(isHotService).slice(0, 9), [filteredCards])
   const promoCards = useMemo(() => filteredCards.filter(isPromoService).slice(0, 12), [filteredCards])
 
+  // Layanan = sisa yang tidak masuk Hot/Promo, biar ngga ke-render dobel.
+  const layananCards = useMemo(() => {
+    const featuredKeys = new Set<string>([
+      ...hotCards.map((c) => c.key),
+      ...promoCards.map((c) => c.key),
+    ])
+    return filteredCards.filter((c) => !featuredKeys.has(c.key))
+  }, [filteredCards, hotCards, promoCards])
+
   const heroFeatured = useMemo(() => {
     const top = allCards.slice(0, 2)
     return top.map((card) => {
@@ -293,7 +283,6 @@ export default function ProductSosmedLandingPage() {
               ctaLabel: 'Mulai Order',
               ctaHref: '#layanan',
               Icon: Sparkles,
-              bgClass: 'bg-gradient-to-br from-[#FF5733] via-[#FF7A50] to-[#B4161B]',
             }}
             featured={heroFeatured}
           />
@@ -336,18 +325,20 @@ export default function ProductSosmedLandingPage() {
           <section id="layanan" className="mt-6 sm:mt-8">
             <SectionHeader
               title="Layanan"
-              countLabel={`${filteredCards.length} produk`}
+              countLabel={layananCards.length > 3 ? `${layananCards.length} produk` : undefined}
               countTone="default"
             />
             {servicesLoading ? (
               <DigiLoadingCardGrid count={6} />
-            ) : filteredCards.length === 0 ? (
+            ) : layananCards.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#FFD5C8] bg-white px-4 py-8 text-center text-sm font-semibold text-[#666]">
-                Belum ada layanan untuk platform ini.
+                {filteredCards.length === 0
+                  ? 'Belum ada layanan untuk platform ini.'
+                  : 'Semua layanan sudah ada di Pilihan/Promo di atas.'}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {filteredCards.map((card) => {
+                {layananCards.map((card) => {
                   const Icon = iconForPlatform(card.platformIcon)
                   return (
                     <ServiceCardCompact
@@ -355,7 +346,7 @@ export default function ProductSosmedLandingPage() {
                       href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                       title={card.buyerTitle}
                       categoryLabel={card.badge || card.platform}
-                      categoryColor={platformBadgeColor(card.platformIcon)}
+                      isHighlight={card.isRecommended}
                       Icon={Icon}
                       toneClass={card.tone}
                     />
@@ -386,7 +377,6 @@ export default function ProductSosmedLandingPage() {
                       href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                       title={card.buyerTitle}
                       categoryLabel={card.badge || card.platform}
-                      categoryColor={platformBadgeColor(card.platformIcon)}
                       originalPriceLabel={original ? formatCurrency(original) : undefined}
                       priceLabel={card.priceLabel}
                       discountLabel={discount}
@@ -482,7 +472,6 @@ export default function ProductSosmedLandingPage() {
                       href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                       title={card.buyerTitle}
                       categoryLabel={card.badge || card.platform}
-                      categoryColor={platformBadgeColor(card.platformIcon)}
                       originalPriceLabel={original ? formatCurrency(original) : undefined}
                       priceLabel={card.priceLabel}
                       discountLabel={discount}

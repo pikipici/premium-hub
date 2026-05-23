@@ -9,7 +9,6 @@ export type PromoSavingCardProps = {
   href: string
   title: string
   categoryLabel: string
-  categoryColor?: string
   originalPriceLabel?: string
   priceLabel: string
   /** Already-formatted percentage label e.g. "-50%". */
@@ -22,37 +21,33 @@ export type PromoSavingCardProps = {
 }
 
 /**
- * Koprol-style "Promo Diskon" card vertical:
- *   row kepala (avatar 36×36 rounded-xl + title + category pill) + sash -% rose top-right
- *   harga gede text-rose-600
- *   footer divider with "Hemat Rp X" emerald chip + status dot/Habis
+ * Koprol-style "Promo Diskon" card vertical.
+ * Updated v2: neutral category pill, rose price + Hemat chip carry the discount signal.
+ * Discount sash dropped if `savingLabel` is shown (one signal at a time, not both).
  */
-export function PromoSavingCard({ href, title, categoryLabel, categoryColor, originalPriceLabel, priceLabel, discountLabel, savingLabel, stock = 'in-stock', Icon, toneClass }: PromoSavingCardProps) {
+export function PromoSavingCard({ href, title, categoryLabel, originalPriceLabel, priceLabel, discountLabel, savingLabel, stock = 'in-stock', Icon, toneClass }: PromoSavingCardProps) {
   const inStock = stock === 'in-stock'
   const containerClass = inStock
     ? 'cursor-pointer hover:shadow-[0_14px_36px_rgba(225,29,72,0.22)] active:scale-[0.97]'
     : 'opacity-50 cursor-not-allowed'
 
   const inner = (
-    <div className={`rounded-2xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.06)] ring-1 ring-black/5 transition-all duration-200 sm:p-4 ${containerClass}`}>
+    <div className={`relative rounded-2xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-black/5 transition-all duration-200 sm:p-4 ${containerClass}`}>
+      {discountLabel ? (
+        <span className="absolute -right-2 -top-2 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
+          {discountLabel}
+        </span>
+      ) : null}
       <div className="mb-3 flex items-start gap-2.5">
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ring-2 ring-gray-100 ${toneClass ?? 'from-[#FFF3EF] to-[#FFE4DA]'}`}>
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-black/5 ${toneClass ?? 'from-[#FFF3EF] to-[#FFE4DA]'}`}>
           <Icon className="h-4 w-4 text-[#141414]" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="line-clamp-2 text-[12px] font-semibold leading-snug text-[#141414] sm:text-[13px]">{title}</h3>
-          <span
-            className="mt-0.5 inline-flex max-w-[100px] items-center truncate rounded-full px-1.5 py-0.5 text-[9px] font-medium text-white sm:text-[10px]"
-            style={{ backgroundColor: categoryColor ?? '#FF5733' }}
-          >
+          <h3 className="line-clamp-2 pr-4 text-[12px] font-semibold leading-snug text-[#141414] sm:text-[13px]">{title}</h3>
+          <span className="mt-0.5 inline-flex max-w-[120px] items-center truncate rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-medium text-gray-600 sm:text-[10px]">
             {categoryLabel}
           </span>
         </div>
-        {discountLabel ? (
-          <span className="shrink-0 rounded-lg bg-rose-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white sm:text-[11px]">
-            {discountLabel}
-          </span>
-        ) : null}
       </div>
 
       <div className="mb-2.5 space-y-0.5">

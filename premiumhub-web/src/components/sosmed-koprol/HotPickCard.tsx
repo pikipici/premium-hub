@@ -9,7 +9,6 @@ export type HotPickCardProps = {
   href: string
   title: string
   categoryLabel: string
-  categoryColor?: string
   originalPriceLabel?: string
   priceLabel: string
   /** Already-formatted percentage label e.g. "-50%". */
@@ -20,19 +19,18 @@ export type HotPickCardProps = {
 }
 
 /**
- * Koprol-style "Hot Produk" card:
- *   border orange-200, sash gradient orange→red top-right -top-2 -right-2 saying "HOT".
- *   Vertical layout: title + category pill + price block (line-through original + bold current + rose -% pill).
- *   Out-of-stock dims to opacity-50 cursor-not-allowed.
+ * Koprol-style "Hot Produk" card.
+ * Updated v2: pill is neutral gray; the orange-red HOT sash + price color carry the urgency.
+ * Avoids stacking 3 colored badges on one card.
  */
-export function HotPickCard({ href, title, categoryLabel, categoryColor, originalPriceLabel, priceLabel, discountLabel, stock = 'in-stock', Icon, toneClass }: HotPickCardProps) {
+export function HotPickCard({ href, title, categoryLabel, originalPriceLabel, priceLabel, discountLabel, stock = 'in-stock', Icon, toneClass }: HotPickCardProps) {
   const inStock = stock === 'in-stock'
   const containerClass = inStock
     ? 'cursor-pointer hover:shadow-[0_14px_36px_rgba(255,87,51,0.22)] active:scale-[0.97]'
     : 'opacity-50 cursor-not-allowed'
 
   const inner = (
-    <div className={`relative rounded-2xl border border-orange-200/60 bg-white px-3 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.06)] transition-all duration-200 sm:px-4 sm:py-3.5 ${containerClass}`}>
+    <div className={`relative rounded-2xl border border-orange-200/60 bg-white px-3 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] transition-all duration-200 sm:px-4 sm:py-3.5 ${containerClass}`}>
       <span className="absolute -right-2 -top-2 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
         HOT
       </span>
@@ -42,10 +40,7 @@ export function HotPickCard({ href, title, categoryLabel, categoryColor, origina
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="line-clamp-2 pr-4 text-[13px] font-semibold leading-snug text-[#141414] sm:text-sm">{title}</h3>
-          <span
-            className="mt-0.5 inline-flex max-w-[120px] items-center truncate rounded-full px-1.5 py-0.5 text-[10px] font-medium text-white"
-            style={{ backgroundColor: categoryColor ?? '#FF5733' }}
-          >
+          <span className="mt-0.5 inline-flex max-w-[120px] items-center truncate rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
             {categoryLabel}
           </span>
         </div>
