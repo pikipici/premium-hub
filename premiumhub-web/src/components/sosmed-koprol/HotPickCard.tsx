@@ -30,7 +30,7 @@ export function HotPickCard({ href, title, categoryLabel, originalPriceLabel, pr
     : 'opacity-50 cursor-not-allowed'
 
   const inner = (
-    <div className={`relative rounded-2xl border border-orange-200/60 bg-white px-3 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] transition-all duration-200 sm:px-4 sm:py-3.5 ${containerClass}`}>
+    <div className={`relative flex h-full flex-col rounded-2xl border border-orange-200/60 bg-white px-3 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] transition-all duration-200 sm:px-4 sm:py-3.5 ${containerClass}`}>
       <span className="absolute -right-2 -top-2 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
         HOT
       </span>
@@ -45,7 +45,7 @@ export function HotPickCard({ href, title, categoryLabel, originalPriceLabel, pr
           </span>
         </div>
       </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1.5">
         {originalPriceLabel ? (
           <span className="text-[11px] text-gray-400 line-through">{originalPriceLabel}</span>
         ) : null}
@@ -62,7 +62,7 @@ export function HotPickCard({ href, title, categoryLabel, originalPriceLabel, pr
 
   if (!inStock) return inner
   return (
-    <Link href={href} className="block">
+    <Link href={href} className="block h-full">
       {inner}
     </Link>
   )

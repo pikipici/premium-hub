@@ -32,7 +32,7 @@ export function PromoSavingCard({ href, title, categoryLabel, originalPriceLabel
     : 'opacity-50 cursor-not-allowed'
 
   const inner = (
-    <div className={`relative rounded-2xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-black/5 transition-all duration-200 sm:p-4 ${containerClass}`}>
+    <div className={`relative flex h-full flex-col rounded-2xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-black/5 transition-all duration-200 sm:p-4 ${containerClass}`}>
       {discountLabel ? (
         <span className="absolute -right-2 -top-2 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
           {discountLabel}
@@ -57,7 +57,7 @@ export function PromoSavingCard({ href, title, categoryLabel, originalPriceLabel
         <p className="text-base font-black leading-tight text-rose-600 sm:text-lg">{priceLabel}</p>
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5">
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5">
         {savingLabel ? (
           <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 sm:text-[11px]">
             {savingLabel}
@@ -76,7 +76,7 @@ export function PromoSavingCard({ href, title, categoryLabel, originalPriceLabel
 
   if (!inStock) return inner
   return (
-    <Link href={href} className="block">
+    <Link href={href} className="block h-full">
       {inner}
     </Link>
   )

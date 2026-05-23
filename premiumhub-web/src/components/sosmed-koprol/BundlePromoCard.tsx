@@ -29,7 +29,7 @@ export type BundlePromoCardProps = {
  * Preserves Premium Hub recommended/promo treatment but flatter.
  */
 export function BundlePromoCard({ href, title, subtitle, platformLabel, Icon, toneClass, priceLabel, originalPriceLabel, packageLabel, isRecommended, hasPromo, promoDiscountLabel, canCheckout = true }: BundlePromoCardProps) {
-  const containerBase = 'relative flex flex-col rounded-2xl p-3 sm:p-4 shadow-[0_10px_40px_rgba(0,0,0,0.06)] ring-1 transition-all duration-200'
+  const containerBase = 'relative flex h-full flex-col rounded-2xl p-3 sm:p-4 shadow-[0_10px_40px_rgba(0,0,0,0.06)] ring-1 transition-all duration-200'
   const containerVariant = !canCheckout
     ? 'opacity-60 cursor-not-allowed bg-white ring-black/5'
     : hasPromo
@@ -90,7 +90,7 @@ export function BundlePromoCard({ href, title, subtitle, platformLabel, Icon, to
 
   if (!canCheckout) return inner
   return (
-    <Link href={href} className="block">
+    <Link href={href} className="block h-full">
       {inner}
     </Link>
   )

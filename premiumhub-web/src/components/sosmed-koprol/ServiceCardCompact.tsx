@@ -35,7 +35,7 @@ export function ServiceCardCompact({ href, title, categoryLabel, isHighlight = f
     : 'bg-gray-100 text-gray-600'
 
   const inner = (
-    <div className={`flex items-center gap-2 rounded-2xl bg-white px-2.5 py-2.5 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-black/5 transition-all duration-200 sm:gap-3 sm:px-3 sm:py-3 ${containerClass}`}>
+    <div className={`flex h-full items-center gap-2 rounded-2xl bg-white px-2.5 py-2.5 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-black/5 transition-all duration-200 sm:gap-3 sm:px-3 sm:py-3 ${containerClass}`}>
       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ring-1 ring-gray-100 sm:h-11 sm:w-11 ${toneClass ?? 'from-[#F5F5F5] to-[#EBEBEB]'}`}>
         <Icon className="h-4 w-4 text-[#141414] sm:h-5 sm:w-5" />
       </div>
@@ -57,7 +57,7 @@ export function ServiceCardCompact({ href, title, categoryLabel, isHighlight = f
 
   if (!inStock) return inner
   return (
-    <Link href={href} className="block">
+    <Link href={href} className="block h-full">
       {inner}
     </Link>
   )
