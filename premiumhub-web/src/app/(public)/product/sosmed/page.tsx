@@ -1,16 +1,15 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState, type ComponentType, type SVGProps } from 'react'
-import { animate, createScope, stagger } from 'animejs'
+import { useEffect, useMemo, useState, type ComponentType, type SVGProps } from 'react'
 import {
   ArrowRight,
-  CheckCircle2,
   Clock3,
-  ChevronLeft,
-  ChevronRight,
-  ShieldCheck,
+  Flame,
+  Megaphone,
   Sparkles,
+  ShieldCheck,
+  Tag,
   Users,
   PackageCheck,
 } from 'lucide-react'
@@ -18,13 +17,18 @@ import {
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
+import HeroStripPanel from '@/components/sosmed-koprol/HeroStripPanel'
+import SectionHeader from '@/components/sosmed-koprol/SectionHeader'
+import ServiceCardCompact from '@/components/sosmed-koprol/ServiceCardCompact'
+import HotPickCard from '@/components/sosmed-koprol/HotPickCard'
+import PromoSavingCard from '@/components/sosmed-koprol/PromoSavingCard'
+import BundlePromoCard from '@/components/sosmed-koprol/BundlePromoCard'
 import { buildSosmedBundleProductCards, type SosmedBundleProductCard } from '@/lib/sosmedBundlingCards'
-import { buildSosmedServiceCards, type SosmedPlatformIconKey } from '@/lib/sosmedProductCards'
-import type { SosmedPromotionPrice } from '@/types/sosmedService'
+import { buildSosmedServiceCards, type SosmedPlatformIconKey, type SosmedProductCard } from '@/lib/sosmedProductCards'
 import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
 import type { SosmedBundlePackage } from '@/types/sosmedBundle'
-import type { SosmedService } from '@/types/sosmedService'
+import type { SosmedService, SosmedPromotionPrice } from '@/types/sosmedService'
 
 type BrandIconProps = SVGProps<SVGSVGElement>
 
@@ -125,34 +129,55 @@ const PLATFORM_ICON_COMPONENTS: Record<SosmedPlatformIconKey, ComponentType<Bran
   generic: Users,
 }
 
-function iconForPlatform(platformIcon: SosmedPlatformIconKey) {
-  return PLATFORM_ICON_COMPONENTS[platformIcon] || PLATFORM_ICON_COMPONENTS.generic
+function iconForPlatform(key: SosmedPlatformIconKey) {
+  return PLATFORM_ICON_COMPONENTS[key] ?? PLATFORM_ICON_COMPONENTS.generic
 }
 
-function PlatformBrandIcon({ platformIcon, className }: { platformIcon: SosmedPlatformIconKey; className?: string }) {
-  const props = { className }
-  switch (platformIcon) {
-    case 'instagram':
-      return <InstagramBrandIcon {...props} />
-    case 'facebook':
-      return <FacebookBrandIcon {...props} />
-    case 'shopee':
-      return <ShopeeBrandIcon {...props} />
-    case 'spotify':
-      return <SpotifyBrandIcon {...props} />
-    case 'telegram':
-      return <TelegramBrandIcon {...props} />
-    case 'tiktok':
-      return <TikTokBrandIcon {...props} />
-    case 'twitter-x':
-      return <TwitterXBrandIcon {...props} />
-    case 'youtube':
-      return <YouTubeBrandIcon {...props} />
-    case 'website':
-      return <WebsiteBrandIcon {...props} />
-    default:
-      return <Users {...props} />
+const PLATFORM_BADGE_COLOR: Record<SosmedPlatformIconKey, string> = {
+  instagram: '#E1306C',
+  facebook: '#1877F2',
+  shopee: '#EE4D2D',
+  spotify: '#1DB954',
+  telegram: '#0088CC',
+  tiktok: '#111111',
+  'twitter-x': '#111111',
+  youtube: '#FF0000',
+  website: '#6475F2',
+  generic: '#FF5733',
+}
+
+function platformBadgeColor(key: SosmedPlatformIconKey) {
+  return PLATFORM_BADGE_COLOR[key] ?? '#FF5733'
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
+}
+
+function discountLabelFor(promotion?: SosmedPromotionPrice, original?: number, final?: number) {
+  if (promotion?.discount_type === 'percent' && promotion.discount_value > 0) {
+    return `-${promotion.discount_value}%`
   }
+  if (original && final && original > final && original > 0) {
+    const pct = Math.round(((original - final) / original) * 100)
+    if (pct > 0) return `-${pct}%`
+  }
+  return undefined
+}
+
+function savingLabelFor(promotion?: SosmedPromotionPrice, original?: number, final?: number) {
+  if (promotion) {
+    const amount = promotion.discount_amount && promotion.discount_amount > 0
+      ? promotion.discount_amount
+      : original && final && original > final
+        ? original - final
+        : 0
+    if (amount > 0) return `Hemat ${formatCurrency(amount)}`
+  }
+  if (original && final && original > final) {
+    return `Hemat ${formatCurrency(original - final)}`
+  }
+  return undefined
 }
 
 function sortPromoAndRecommendedFirst<T extends { isRecommended: boolean; promotion?: SosmedPromotionPrice }>(items: T[]) {
@@ -162,227 +187,29 @@ function sortPromoAndRecommendedFirst<T extends { isRecommended: boolean; promot
     if (item.isRecommended) return 1
     return 0
   }
-
   return [...items].sort((a, b) => score(b) - score(a))
 }
 
-function formatPromoRemaining(endsAt: string) {
-  const diff = new Date(endsAt).getTime() - Date.now()
-  if (!Number.isFinite(diff) || diff <= 0) return 'Promo berakhir'
-  const totalSeconds = Math.floor(diff / 1000)
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  if (hours >= 24) return `${Math.floor(hours / 24)}h ${hours % 24}j lagi`
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+function isHotService(card: SosmedProductCard) {
+  // Hot = explicitly recommended or has discount
+  if (card.isRecommended) return true
+  if (card.originalPrice && card.checkoutPrice && card.originalPrice > card.checkoutPrice) return true
+  if (card.promotion) return true
+  return false
 }
 
-function formatPromoValue(promotion?: SosmedPromotionPrice) {
-  if (!promotion) return null
-  if (promotion.discount_type === 'percent') return `${promotion.discount_value}% OFF`
-  return `Hemat ${formatCurrency(promotion.discount_amount || promotion.discount_value)}`
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
-}
-
-function PromoRibbon({ promotion }: { promotion?: SosmedPromotionPrice }) {
-  const [, setTick] = useState(0)
-
-  useEffect(() => {
-    if (!promotion?.ends_at) return
-    const timer = window.setInterval(() => setTick((value) => value + 1), 1000)
-    return () => window.clearInterval(timer)
-  }, [promotion?.ends_at])
-
-  if (!promotion?.ends_at) return null
-
-  const promoValue = formatPromoValue(promotion)
-
-  return (
-    <div className="absolute left-0 top-0 z-20 w-full bg-[linear-gradient(110deg,#B4161B_0%,#FF3F1F_48%,#FF9B31_100%)] px-2.5 py-1 text-white shadow-[0_10px_26px_rgba(216,58,29,0.28)] sm:px-5 sm:py-2">
-      <div className="flex items-center justify-between gap-1.5 text-[11px] font-black uppercase tracking-[0.08em] sm:gap-2 sm:text-[11px] sm:tracking-[0.16em]">
-        <span>{promoValue || 'Promo Aktif'}</span>
-        <span className="inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 tracking-normal backdrop-blur sm:gap-1 sm:px-2 sm:tracking-wide">
-          <Clock3 className="h-3 w-3 sm:h-3 sm:w-3" />
-          {formatPromoRemaining(promotion.ends_at)}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function RecommendedSash() {
-  return (
-    <div className="pointer-events-none absolute -right-9 top-4 z-20 w-32 rotate-45 bg-[linear-gradient(110deg,#E63B22,#FF5733_55%,#FF8C66)] py-1 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_8px_18px_rgba(255,87,51,0.26)] sm:-right-10 sm:top-5 sm:w-36 sm:text-[11px]">
-      <span className="sm:hidden">Best</span>
-      <span className="hidden sm:inline">Best Pick</span>
-    </div>
-  )
-}
-
-function PromoUrgencyBar({ promotion }: { promotion?: SosmedPromotionPrice }) {
-  const [, setTick] = useState(0)
-
-  useEffect(() => {
-    if (!promotion?.ends_at) return
-    const timer = window.setInterval(() => setTick((value) => value + 1), 1000)
-    return () => window.clearInterval(timer)
-  }, [promotion?.ends_at])
-
-  if (!promotion?.ends_at) return null
-
-  return (
-    <div className="mt-2 hidden items-center justify-between gap-2 rounded-2xl border border-[#FFC7B7] bg-[#FFF0EA] px-2.5 py-2 text-[11px] font-black uppercase tracking-wide text-[#B4161B] shadow-inner sm:flex sm:px-3 sm:text-[11px]">
-      <span className="inline-flex items-center gap-1">
-        <Clock3 className="h-3.5 w-3.5" />
-        Berakhir dalam
-      </span>
-      <span className="rounded-full bg-white px-2 py-0.5 text-[#D83A1D] shadow-sm">{formatPromoRemaining(promotion.ends_at)}</span>
-    </div>
-  )
-}
-
-function PromoPrice({ priceLabel, originalPriceLabel, promotion }: { priceLabel: string; originalPriceLabel?: string; promotion?: SosmedPromotionPrice }) {
-  const promoValue = formatPromoValue(promotion)
-
-  return (
-    <div className="flex flex-col gap-1">
-      {promotion ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="rounded-full bg-[#141414] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-white sm:text-[11px]">Promo</span>
-          {promoValue ? <span className="hidden rounded-full bg-[#FFE0D5] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#B4161B] sm:inline-flex sm:text-[11px]">{promoValue}</span> : null}
-        </div>
-      ) : null}
-      {originalPriceLabel ? <span className="text-[11px] font-bold text-gray-400 line-through sm:text-sm">{originalPriceLabel}</span> : null}
-      <span className={`text-[18px] font-black tracking-tight sm:text-3xl ${promotion ? 'text-[#B4161B]' : 'text-[#141414]'}`}>{priceLabel}</span>
-    </div>
-  )
-}
-
-function BundleCard({ bundle }: { bundle: SosmedBundleProductCard }) {
-  const checkoutHref = bundle.variantKey
-    ? `/product/sosmed/checkout?bundle=${encodeURIComponent(bundle.bundleKey)}&variant=${encodeURIComponent(bundle.variantKey)}`
-    : '/product/sosmed'
-  const canCheckoutBundle = Boolean(bundle.variantKey)
-  const mobileTitleMatch = bundle.buyerTitle.match(/^(.*?)\s*\(([^)]+)\)$/)
-  const mobileTitle = mobileTitleMatch?.[1] ?? bundle.buyerTitle
-  const mobileLevel = mobileTitleMatch?.[2]
-  const hasPromo = Boolean(bundle.promotion)
-
-  return (
-    <article
-      data-anime="sosmed-card"
-      className={`group relative flex h-full flex-col overflow-hidden rounded-3xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-        hasPromo
-          ? 'border-[#D83A1D] bg-[radial-gradient(circle_at_top_left,#FFE0D5_0%,#FFF7F1_34%,#FFFFFF_72%)] shadow-[0_18px_44px_rgba(216,58,29,0.18)] ring-2 ring-[#FFB199]/45 sm:ring-4 sm:ring-[#FFB199]/35'
-          : bundle.isRecommended
-            ? 'border-[#FF9B80] bg-gradient-to-b from-[#FFF8F5] to-white ring-2 ring-[#FFD5C8]/20 sm:ring-4 sm:ring-[#FFD5C8]/25'
-            : 'border-[#EAEAEA] bg-white hover:border-[#FF9B80]/50'
-      }`}
-    >
-      <PromoRibbon promotion={bundle.promotion} />
-
-      {!hasPromo && bundle.isRecommended ? <RecommendedSash /> : null}
-
-      <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : ''}`}>
-        <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
-          <div className="flex min-w-0 items-start gap-2 sm:gap-3">
-            <div className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${bundle.tone}`}>
-              <PlatformBrandIcon platformIcon={bundle.platformIcon} className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
-            </div>
-            <span className={`mt-0.5 max-w-[88px] truncate rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider sm:mt-1 sm:max-w-[130px] sm:px-3 sm:py-1 sm:text-[11px] ${
-              bundle.isRecommended ? 'bg-[#FF5733] text-white shadow-sm' : 'border border-[#EBEBEB] bg-gray-50 text-gray-500'
-            }`}>
-              {bundle.platform}
-            </span>
-          </div>
-          {!bundle.isRecommended && (
-            <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[11px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[11px]">
-              {bundle.badge}
-            </span>
-          )}
-        </div>
-
-        <div>
-          <h2 className="line-clamp-2 text-[13px] font-extrabold leading-tight text-[#141414] transition-colors group-hover:text-[#FF5733] sm:text-[19px]">
-            <span className="sm:hidden">{mobileTitle}</span>
-            <span className="hidden sm:inline">{bundle.buyerTitle}</span>
-          </h2>
-          {mobileLevel && (
-            <span className="mt-1 inline-flex rounded-full bg-[#FFF3EF] px-2 py-0.5 text-[11px] font-bold text-[#FF5733] sm:hidden">
-              {mobileLevel}
-            </span>
-          )}
-          <p className="mt-1 line-clamp-1 text-[12px] leading-snug text-[#666] sm:mt-2.5 sm:line-clamp-2 sm:text-[13px] sm:leading-relaxed">
-            {bundle.bestFor}
-          </p>
-        </div>
-
-        <div className="mb-2 mt-2 sm:mb-7 sm:mt-6">
-          <PromoPrice priceLabel={bundle.priceLabel} originalPriceLabel={bundle.originalPriceLabel} promotion={bundle.promotion} />
-          <span className="line-clamp-1 text-[11px] font-semibold text-[#888] sm:text-[11px]">{bundle.packageLabel}</span>
-          <PromoUrgencyBar promotion={bundle.promotion} />
-        </div>
-
-        <div className="hidden flex-grow space-y-3.5 sm:block">
-          {bundle.benefits.map((benefit) => (
-            <div key={`${bundle.key}-${benefit}`} className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E8F8EC]">
-                <CheckCircle2 className="h-3 w-3 text-[#22A447]" />
-              </div>
-              <span className="text-[13px] font-medium text-[#444] leading-snug">{benefit}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-3 hidden flex-wrap gap-1 border-t border-dashed border-gray-200 pt-3 sm:mt-6 sm:flex sm:gap-1.5 sm:pt-5">
-          {bundle.trustBadges.map((item) => (
-            <span
-              key={`${bundle.key}-${item}`}
-              className="rounded-md bg-[#F8F8F8] px-1.5 py-0.5 text-[11px] font-bold text-[#777] sm:rounded-lg sm:px-2.5 sm:py-1 sm:text-[11px]"
-            >
-              {item}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div className="border-t border-gray-100 bg-[#FAFAFA]">
-        <Link
-          href={checkoutHref}
-          aria-disabled={!canCheckoutBundle}
-          className={`inline-flex h-11 w-full items-center justify-center gap-1.5 px-2 text-center text-[12px] font-extrabold leading-tight transition sm:h-14 sm:text-[13px] ${
-            !canCheckoutBundle
-              ? 'pointer-events-none bg-gray-200 text-gray-500'
-              : hasPromo
-                ? 'bg-[linear-gradient(110deg,#B4161B,#FF5733_58%,#FF9B31)] text-white hover:brightness-105'
-                : bundle.isRecommended
-                  ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]'
-                  : 'bg-[#141414] text-white hover:bg-[#333]'
-          }`}
-        >
-          {canCheckoutBundle ? (
-            hasPromo ? 'Ambil Promo' : 'Pilih Paket'
-          ) : 'Segera Hadir'} <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      </div>
-    </article>
-  )
+function isPromoService(card: SosmedProductCard) {
+  if (card.promotion) return true
+  if (card.originalPrice && card.checkoutPrice && card.originalPrice > card.checkoutPrice) return true
+  return false
 }
 
 export default function ProductSosmedLandingPage() {
-  const animationRootRef = useRef<HTMLElement | null>(null)
   const [services, setServices] = useState<SosmedService[]>([])
   const [servicesLoading, setServicesLoading] = useState(true)
   const [bundlePackages, setBundlePackages] = useState<SosmedBundlePackage[]>([])
   const [bundleCatalogState, setBundleCatalogState] = useState<'loading' | 'ready' | 'fallback'>('loading')
-  const [activeTab, setActiveTab] = useState<'satuan' | 'bundling'>('satuan')
-  const [currentPage, setCurrentPage] = useState(1)
   const [activePlatform, setActivePlatform] = useState('Semua')
-
-  const CARDS_PER_PAGE = 6
 
   useEffect(() => {
     let alive = true
@@ -421,329 +248,268 @@ export default function ProductSosmedLandingPage() {
     }
   }, [])
 
-  const cards = useMemo(() => sortPromoAndRecommendedFirst(buildSosmedServiceCards(services)), [services])
+  const allCards = useMemo(() => sortPromoAndRecommendedFirst(buildSosmedServiceCards(services)), [services])
   const bundleCards = useMemo(() => sortPromoAndRecommendedFirst(buildSosmedBundleProductCards(bundlePackages)), [bundlePackages])
+
   const platforms = useMemo(() => {
-    const unique = Array.from(new Set(cards.map(c => c.platform)))
+    const unique = Array.from(new Set(allCards.map((c) => c.platform)))
     return ['Semua', ...unique.sort()]
-  }, [cards])
+  }, [allCards])
 
   const filteredCards = useMemo(() => {
-    if (activePlatform === 'Semua') return cards
-    return cards.filter(c => c.platform === activePlatform)
-  }, [cards, activePlatform])
+    if (activePlatform === 'Semua') return allCards
+    return allCards.filter((c) => c.platform === activePlatform)
+  }, [allCards, activePlatform])
 
-  const totalPages = Math.ceil(filteredCards.length / CARDS_PER_PAGE)
-  const paginatedCards = filteredCards.slice((currentPage - 1) * CARDS_PER_PAGE, currentPage * CARDS_PER_PAGE)
+  const hotCards = useMemo(() => filteredCards.filter(isHotService).slice(0, 9), [filteredCards])
+  const promoCards = useMemo(() => filteredCards.filter(isPromoService).slice(0, 12), [filteredCards])
 
-  useEffect(() => {
-    if (!animationRootRef.current) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-    const scope = { current: createScope({ root: animationRootRef }).add(() => {
-      animate('[data-anime="sosmed-hero"]', {
-        opacity: [0, 1],
-        translateY: [18, 0],
-        duration: 650,
-        ease: 'out(3)',
-      })
-
-      animate('[data-anime="sosmed-trust-badge"]', {
-        opacity: [0, 1],
-        translateY: [10, 0],
-        delay: stagger(70),
-        duration: 500,
-        ease: 'out(3)',
-      })
-
-      animate('[data-anime="sosmed-card"]', {
-        opacity: [0, 1],
-        translateY: [24, 0],
-        delay: stagger(85, { start: 120 }),
-        duration: 700,
-        ease: 'out(3)',
-      })
-    }) }
-
-    return () => scope.current.revert()
-  }, [paginatedCards.length, currentPage, activeTab, activePlatform])
+  const heroFeatured = useMemo(() => {
+    const top = allCards.slice(0, 2)
+    return top.map((card) => {
+      const Icon = iconForPlatform(card.platformIcon)
+      return {
+        key: card.key,
+        href: `/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`,
+        title: card.buyerTitle,
+        priceLabel: card.priceLabel,
+        Icon,
+      }
+    })
+  }, [allCards])
 
   return (
     <>
       <Navbar />
 
-      <main ref={animationRootRef} className="bg-[#F7F7F5]">
-        <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <header data-anime="sosmed-hero" className="mb-6 max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#FF5733]">DigiSosmed</p>
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#141414] md:text-4xl">
-              Naikin akun sosial lewat DigiSosmed
-            </h1>
-            <p className="mt-3 text-sm leading-relaxed text-[#666] md:text-base">
-              Layanan SMM untuk followers, views, dan engagement. Aman, cepat, tanpa password.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] font-semibold sm:text-[13px]">
-              <span data-anime="sosmed-trust-badge" className="inline-flex items-center gap-1.5 text-[#2F6B1A]">
-                <ShieldCheck className="h-3.5 w-3.5" /> Tanpa password
-              </span>
-              <span data-anime="sosmed-trust-badge" className="inline-flex items-center gap-1.5 text-[#1E4F9B]">
-                <Clock3 className="h-3.5 w-3.5" /> Proses cepat
-              </span>
-              <span data-anime="sosmed-trust-badge" className="inline-flex items-center gap-1.5 text-[#9A4B16]">
-                <Sparkles className="h-3.5 w-3.5" /> Garansi tersedia
-              </span>
-            </div>
-          </header>
+      <main className="bg-[#F4F5F8]">
+        <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          {/* Hero strip — koprol layout: 3+2 columns */}
+          <HeroStripPanel
+            slide={{
+              key: 'sosmed-hero',
+              title: 'Sosmed Murah, Aman, Cepat',
+              subtitle: 'Followers, Likes, Views, dan engagement asli buat akun lo. Tanpa password, langsung masuk wallet.',
+              ctaLabel: 'Mulai Order',
+              ctaHref: '#layanan',
+              Icon: Sparkles,
+              bgClass: 'bg-gradient-to-br from-[#FF5733] via-[#FF7A50] to-[#B4161B]',
+            }}
+            featured={heroFeatured}
+          />
 
-          <div className="mb-8 flex justify-center">
-            <div className="inline-flex rounded-full bg-white p-1.5 shadow-sm ring-1 ring-inset ring-gray-200">
-              <button
-                onClick={() => {
-                  setActiveTab('satuan')
-                  setCurrentPage(1)
-                  setActivePlatform('Semua')
-                }}
-                className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
-                  activeTab === 'satuan'
-                    ? 'bg-[#FF5733] text-white shadow-md'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                <Users className="h-4 w-4" />
-                Layanan Satuan
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('bundling')
-                  setCurrentPage(1)
-                }}
-                className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
-                  activeTab === 'bundling'
-                    ? 'bg-[#FF5733] text-white shadow-md'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                <PackageCheck className="h-4 w-4" />
-                Paket Spesial
-              </button>
-            </div>
+          {/* Trust badges row */}
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] font-semibold sm:mt-5 sm:text-[13px]">
+            <span className="inline-flex items-center gap-1.5 text-[#2F6B1A]">
+              <ShieldCheck className="h-3.5 w-3.5" /> Tanpa password
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[#1E4F9B]">
+              <Clock3 className="h-3.5 w-3.5" /> Proses cepat
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[#9A4B16]">
+              <Sparkles className="h-3.5 w-3.5" /> Garansi tersedia
+            </span>
           </div>
 
-          {activeTab === 'satuan' && (
-            <div className="space-y-8">
-              <div className="flex w-full overflow-x-auto pb-2 scrollbar-hide">
-                <div className="flex gap-2 mx-auto px-4">
-                  {platforms.map(p => (
-                    <button
-                      key={p}
-                      onClick={() => {
-                        setActivePlatform(p)
-                        setCurrentPage(1)
-                      }}
-                      className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-all ${
-                        activePlatform === p
-                          ? 'bg-[#141414] text-white shadow-md'
-                          : 'bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 ring-1 ring-inset ring-gray-200'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {servicesLoading ? (
-                <DigiLoadingCardGrid count={6} />
-              ) : (
-              <div className="grid grid-cols-2 gap-3 md:gap-5 xl:grid-cols-3">
-              {paginatedCards.map((service) => {
-              const checkoutHref = `/product/sosmed/checkout?service=${encodeURIComponent(service.code)}`
-              const ServiceIcon = iconForPlatform(service.platformIcon)
-              const isRecommended = service.isRecommended
-              const hasPromo = Boolean(service.promotion)
-
-              return (
-                <article
-                  key={service.key}
-                  data-anime="sosmed-card"
-                  className={`group relative flex h-full flex-col overflow-hidden rounded-3xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                    hasPromo
-                      ? 'border-[#D83A1D] bg-[radial-gradient(circle_at_top_left,#FFE0D5_0%,#FFF7F1_34%,#FFFFFF_72%)] shadow-[0_18px_44px_rgba(216,58,29,0.18)] ring-4 ring-[#FFB199]/35'
-                      : isRecommended
-                        ? 'border-[#FF9B80] bg-gradient-to-b from-[#FFF8F5] to-white ring-4 ring-[#FFD5C8]/25'
-                        : 'border-[#EAEAEA] bg-white hover:border-[#FF9B80]/50'
-                  }`}
-                >
-                  <PromoRibbon promotion={service.promotion} />
-
-                  {!hasPromo && isRecommended ? <RecommendedSash /> : null}
-
-                  <div className={`flex flex-col flex-grow p-3 sm:p-6 ${hasPromo ? 'pt-8 sm:pt-14' : ''}`}>
-                    <div className="mb-3 flex items-start justify-between gap-2 sm:mb-5 sm:gap-3">
-                      <div className="flex min-w-0 items-start gap-2 sm:gap-3">
-                        <div className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl bg-gradient-to-br transition-transform duration-300 group-hover:scale-110 ${service.tone}`}>
-                          <ServiceIcon className="h-[18px] w-[18px] text-[#141414] sm:h-6 sm:w-6" />
-                        </div>
-                        <span className={`mt-0.5 max-w-[88px] truncate rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider sm:mt-1 sm:max-w-[130px] sm:px-3 sm:py-1 sm:text-[11px] ${
-                          isRecommended ? 'bg-[#FF5733] text-white shadow-sm' : 'border border-[#EBEBEB] bg-gray-50 text-gray-500'
-                        }`}>
-                          {service.platform}
-                        </span>
-                      </div>
-                      {!isRecommended && (
-                        <span className="max-w-[72px] truncate rounded-full bg-[#FFF3EF] px-1.5 py-0.5 text-[11px] font-bold text-[#FF5733] sm:max-w-none sm:px-2 sm:text-[11px]">
-                          {service.badge}
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <h2 className="line-clamp-2 text-[13px] font-extrabold leading-tight text-[#141414] transition-colors group-hover:text-[#FF5733] sm:text-[19px]">{service.buyerTitle}</h2>
-                      <p className="mt-1 line-clamp-1 text-[12px] leading-snug text-[#666] sm:mt-2.5 sm:line-clamp-2 sm:text-[13px] sm:leading-relaxed">
-                        {service.bestFor}
-                      </p>
-                    </div>
-
-                    <div className="mb-2 mt-2 sm:mb-7 sm:mt-6">
-                      <PromoPrice priceLabel={service.priceLabel} originalPriceLabel={service.originalPrice ? formatCurrency(service.originalPrice) : undefined} promotion={service.promotion} />
-                      <span className="line-clamp-1 text-[11px] font-semibold text-[#888] sm:text-[11px]">{service.packageLabel}</span>
-                      <PromoUrgencyBar promotion={service.promotion} />
-                    </div>
-
-                    <div className="hidden flex-grow space-y-3.5 sm:block">
-                      {service.benefits.map((benefit) => (
-                        <div key={`${service.key}-${benefit}`} className="flex items-start gap-3">
-                          <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E8F8EC]">
-                            <CheckCircle2 className="h-3 w-3 text-[#22A447]" />
-                          </div>
-                          <span className="text-[13px] font-medium text-[#444] leading-snug">{benefit}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-3 hidden flex-wrap gap-1 border-t border-dashed border-gray-200 pt-3 sm:mt-6 sm:flex sm:gap-1.5 sm:pt-5">
-                      {service.trustBadges.map((item) => (
-                        <span
-                          key={`${service.key}-${item}`}
-                          className="rounded-md bg-[#F8F8F8] px-1.5 py-0.5 text-[11px] font-bold text-[#777] sm:rounded-lg sm:px-2.5 sm:py-1 sm:text-[11px]"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gray-100 bg-[#FAFAFA]">
-                    <Link
-                      href={checkoutHref}
-                      className={`inline-flex h-11 w-full items-center justify-center gap-1.5 px-2 text-center text-[12px] font-extrabold leading-tight transition sm:h-14 sm:text-[13px] ${
-                        hasPromo
-                          ? 'bg-[linear-gradient(110deg,#B4161B,#FF5733_58%,#FF9B31)] text-white hover:brightness-105'
-                          : isRecommended
-                            ? 'bg-[#FF5733] text-white hover:bg-[#E64A2E]'
-                            : 'bg-[#141414] text-white hover:bg-[#333]'
-                      }`}
-                    >
-                      {hasPromo ? <><span className="sm:hidden">Ambil Promo</span><span className="hidden sm:inline">Ambil Promo</span></> : 'Pilih Paket'} <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </div>
-                                </article>
-              )
-            })}
-              </div>
-              )}
-
-              {totalPages > 1 && !servicesLoading && (
-                <div className="mt-4">
-                  <div className="flex items-center justify-center gap-2 sm:hidden">
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      aria-label="Halaman sebelumnya"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <div className="inline-flex h-9 min-w-24 items-center justify-center rounded-full border border-[#FFD5C8] bg-[#FFF8F5] px-4 text-xs font-extrabold text-[#FF5733] shadow-sm">
-                      {currentPage} / {totalPages}
-                    </div>
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      aria-label="Halaman berikutnya"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="hidden items-center justify-center gap-2 sm:flex">
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <div className="flex flex-wrap items-center gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-all ${
-                            currentPage === pageNum
-                              ? 'bg-[#FF5733] text-white shadow-md'
-                              : 'text-gray-500 hover:bg-gray-100'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-all hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'bundling' && (
-            <div className="space-y-4">
-              {bundleCatalogState === 'loading' && (
-                <div className="rounded-2xl border border-[#FFE2CF] bg-white px-4 py-3 text-center text-xs font-semibold text-[#9A4B16] shadow-sm">
-                  Memuat katalog Paket Spesial...
-                </div>
-              )}
-              {bundleCatalogState === 'fallback' && (
-                <div className="rounded-2xl border border-[#FFE2CF] bg-[#FFF8F5] px-4 py-3 text-center text-xs font-semibold text-[#9A4B16] shadow-sm">
-                  Katalog belum siap, ini tampilan preview. Cek total harga di checkout.
-                </div>
-              )}
-              {bundleCatalogState === 'ready' && !bundleCards.length && (
-                <div className="rounded-2xl border border-dashed border-[#FFD5C8] bg-white px-4 py-8 text-center text-sm font-semibold text-[#666]">
-                  Paket Spesial belum tersedia. Cek lagi nanti.
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-3 md:gap-5 xl:grid-cols-3">
-                {bundleCards.map((bundle) => (
-                  <BundleCard key={bundle.key} bundle={bundle} />
+          {/* Platform filter chip strip */}
+          {platforms.length > 1 ? (
+            <div className="mt-5 flex w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mx-auto flex gap-2 px-1">
+                {platforms.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setActivePlatform(p)}
+                    className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+                      activePlatform === p
+                        ? 'bg-[#141414] text-white shadow-md'
+                        : 'bg-white text-gray-500 ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    {p}
+                  </button>
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
 
-          <section className="mt-8 rounded-2xl border border-[#FFD5C8] bg-[#FFF3EF] p-6">
-            <h2 className="text-xl font-extrabold text-[#141414]">Bingung pilih paket?</h2>
-            <p className="mt-2 text-sm leading-relaxed text-[#666]">
-              Paket hemat untuk coba dulu. Paket prioritas kalau butuh proses lebih cepat. Cek total harga di checkout.
-            </p>
+          {/* Layanan section (Produk koprol) */}
+          <section id="layanan" className="mt-6 sm:mt-8">
+            <SectionHeader
+              title="Layanan"
+              countLabel={`${filteredCards.length} produk`}
+              countTone="default"
+            />
+            {servicesLoading ? (
+              <DigiLoadingCardGrid count={6} />
+            ) : filteredCards.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[#FFD5C8] bg-white px-4 py-8 text-center text-sm font-semibold text-[#666]">
+                Belum ada layanan untuk platform ini.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {filteredCards.map((card) => {
+                  const Icon = iconForPlatform(card.platformIcon)
+                  return (
+                    <ServiceCardCompact
+                      key={card.key}
+                      href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
+                      title={card.buyerTitle}
+                      categoryLabel={card.badge || card.platform}
+                      categoryColor={platformBadgeColor(card.platformIcon)}
+                      Icon={Icon}
+                      toneClass={card.tone}
+                    />
+                  )
+                })}
+              </div>
+            )}
+          </section>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
+          {/* Hot Pilihan section (Hot Produk koprol) */}
+          {hotCards.length > 0 ? (
+            <section className="mt-7 sm:mt-10">
+              <SectionHeader
+                icon={<Flame className="h-4 w-4 text-orange-500" />}
+                title="Hot Pilihan"
+                countLabel={`${hotCards.length} produk`}
+                countTone="orange"
+              />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {hotCards.map((card) => {
+                  const Icon = iconForPlatform(card.platformIcon)
+                  const original = card.originalPrice
+                  const final = card.checkoutPrice
+                  const discount = discountLabelFor(card.promotion, original, final)
+                  return (
+                    <HotPickCard
+                      key={`hot-${card.key}`}
+                      href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
+                      title={card.buyerTitle}
+                      categoryLabel={card.badge || card.platform}
+                      categoryColor={platformBadgeColor(card.platformIcon)}
+                      originalPriceLabel={original ? formatCurrency(original) : undefined}
+                      priceLabel={card.priceLabel}
+                      discountLabel={discount}
+                      Icon={Icon}
+                      toneClass={card.tone}
+                    />
+                  )
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Paket Spesial section (Bundling) */}
+          <section className="mt-7 sm:mt-10">
+            <SectionHeader
+              icon={
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#FF5733] text-white">
+                  <PackageCheck className="h-4 w-4" />
+                </span>
+              }
+              title="Paket Spesial"
+              countLabel={bundleCards.length ? `${bundleCards.length} paket` : undefined}
+              countTone="orange"
+            />
+            {bundleCatalogState === 'loading' ? (
+              <div className="rounded-2xl border border-[#FFE2CF] bg-white px-4 py-3 text-center text-xs font-semibold text-[#9A4B16] shadow-sm">
+                Memuat katalog Paket Spesial...
+              </div>
+            ) : bundleCatalogState === 'fallback' ? (
+              <div className="rounded-2xl border border-[#FFE2CF] bg-[#FFF8F5] px-4 py-3 text-center text-xs font-semibold text-[#9A4B16] shadow-sm">
+                Katalog belum siap, ini tampilan preview. Cek total harga di checkout.
+              </div>
+            ) : !bundleCards.length ? (
+              <div className="rounded-2xl border border-dashed border-[#FFD5C8] bg-white px-4 py-8 text-center text-sm font-semibold text-[#666]">
+                Paket Spesial belum tersedia. Cek lagi nanti.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {bundleCards.map((bundle: SosmedBundleProductCard) => {
+                  const Icon = iconForPlatform(bundle.platformIcon)
+                  const checkoutHref = bundle.variantKey
+                    ? `/product/sosmed/checkout?bundle=${encodeURIComponent(bundle.bundleKey)}&variant=${encodeURIComponent(bundle.variantKey)}`
+                    : '/product/sosmed'
+                  const promoDiscount = bundle.promotion?.discount_type === 'percent' && bundle.promotion.discount_value > 0
+                    ? `-${bundle.promotion.discount_value}%`
+                    : undefined
+                  return (
+                    <BundlePromoCard
+                      key={bundle.key}
+                      href={checkoutHref}
+                      title={bundle.buyerTitle}
+                      subtitle={bundle.bestFor}
+                      platformLabel={bundle.platform}
+                      Icon={Icon}
+                      toneClass={bundle.tone}
+                      priceLabel={bundle.priceLabel}
+                      originalPriceLabel={bundle.originalPriceLabel}
+                      packageLabel={bundle.packageLabel}
+                      isRecommended={bundle.isRecommended}
+                      hasPromo={Boolean(bundle.promotion)}
+                      promoDiscountLabel={promoDiscount}
+                      canCheckout={Boolean(bundle.variantKey)}
+                    />
+                  )
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* Promo Diskon section */}
+          {promoCards.length > 0 ? (
+            <section className="mt-7 sm:mt-10">
+              <SectionHeader
+                icon={
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500 text-white">
+                    <Tag className="h-4 w-4" />
+                  </span>
+                }
+                title="Promo Diskon"
+                countLabel={`${promoCards.length} produk`}
+                countTone="rose"
+              />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {promoCards.map((card) => {
+                  const Icon = iconForPlatform(card.platformIcon)
+                  const original = card.originalPrice
+                  const final = card.checkoutPrice
+                  const discount = discountLabelFor(card.promotion, original, final)
+                  const saving = savingLabelFor(card.promotion, original, final)
+                  return (
+                    <PromoSavingCard
+                      key={`promo-${card.key}`}
+                      href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
+                      title={card.buyerTitle}
+                      categoryLabel={card.badge || card.platform}
+                      categoryColor={platformBadgeColor(card.platformIcon)}
+                      originalPriceLabel={original ? formatCurrency(original) : undefined}
+                      priceLabel={card.priceLabel}
+                      discountLabel={discount}
+                      savingLabel={saving}
+                      Icon={Icon}
+                      toneClass={card.tone}
+                    />
+                  )
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Help / CTA footer block */}
+          <section className="mt-8 rounded-3xl border border-[#FFD5C8] bg-[#FFF3EF] p-5 sm:p-6">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FF5733] text-white">
+                <Megaphone className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-lg font-extrabold text-[#141414] sm:text-xl">Bingung pilih paket?</h2>
+                <p className="mt-1 text-sm leading-relaxed text-[#666]">
+                  Paket hemat untuk coba dulu. Paket prioritas kalau butuh proses lebih cepat. Cek total harga di checkout.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <Link
                 href="/register?next=%2Fproduct%2Fsosmed"
                 className="inline-flex items-center gap-1 rounded-full bg-[#FF5733] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#e64d2e]"
