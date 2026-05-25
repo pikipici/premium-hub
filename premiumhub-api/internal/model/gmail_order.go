@@ -63,7 +63,12 @@ type GmailOrder struct {
 	UpdatedAt time.Time `json:"updated_at"`
 
 	// Items hydrated on detail fetch — gmail rows tied to this order.
-	Items []GmailAccount `gorm:"foreignKey:SoldOrderID" json:"items,omitempty"`
+	// gorm:"-" because the FK belongs on gmail_accounts.sold_order_id,
+	// and AutoMigrate processes gmail_accounts BEFORE gmail_orders
+	// (alphabetical order), causing "relation gmail_orders does not
+	// exist" on first deployment. Items are populated by the repository
+	// layer, not by GORM preloading.
+	Items []GmailAccount `gorm:"-" json:"items,omitempty"`
 }
 
 func (g *GmailOrder) BeforeCreate(_ *gorm.DB) error {
