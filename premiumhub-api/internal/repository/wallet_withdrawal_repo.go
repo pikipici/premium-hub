@@ -158,7 +158,11 @@ func (r *WalletWithdrawalRepo) ListAdmin(filters AdminListFilters, page, limit i
 // `since` is typically the local-time start-of-day in Asia/Jakarta —
 // the service layer is responsible for computing that correctly.
 func (r *WalletWithdrawalRepo) CountTodayByUser(userID uuid.UUID, since time.Time) (count int64, totalAmount int64, err error) {
-	q := r.db.Model(&model.WalletWithdrawal{}).
+	return r.CountTodayByUserTx(r.db, userID, since)
+}
+
+func (r *WalletWithdrawalRepo) CountTodayByUserTx(tx *gorm.DB, userID uuid.UUID, since time.Time) (count int64, totalAmount int64, err error) {
+	q := tx.Model(&model.WalletWithdrawal{}).
 		Where("user_id = ? AND created_at >= ?", userID, since).
 		Where("status NOT IN (?)", []string{
 			model.WithdrawalStatusCancelled,

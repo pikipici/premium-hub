@@ -179,18 +179,6 @@ func (s *WalletWithdrawalService) CreateRequest(ctx context.Context, userID uuid
 	now := time.Now()
 	dayStart := jakartaStartOfDay(now)
 
-	// Daily-limit pre-check (cheap, runs outside tx).
-	count, totalToday, err := s.repo.CountTodayByUser(userID, dayStart)
-	if err != nil {
-		return nil, errors.New("gagal cek limit harian withdraw")
-	}
-	if count >= s.maxRequestsPerDay() {
-		return nil, fmt.Errorf("limit harian tercapai (max %d permintaan/hari)", s.maxRequestsPerDay())
-	}
-	if totalToday+input.Amount > s.maxAmountPerDay() {
-		return nil, fmt.Errorf("total nominal harian tidak boleh melebihi Rp %s", formatRupiahPlain(s.maxAmountPerDay()))
-	}
-
 	withdrawal := &model.WalletWithdrawal{
 		ID:                 uuid.New(),
 		UserID:             userID,
@@ -207,7 +195,7 @@ func (s *WalletWithdrawalService) CreateRequest(ctx context.Context, userID uuid
 
 	autoApproved := input.Amount < s.autoApproveThreshold()
 
-	err = s.walletRepo.Transaction(func(tx *gorm.DB) error {
+	err := s.walletRepo.Transaction(func(tx *gorm.DB) error {
 		if ctx != nil {
 			select {
 			case <-ctx.Done():
@@ -216,7 +204,8 @@ func (s *WalletWithdrawalService) CreateRequest(ctx context.Context, userID uuid
 			}
 		}
 
-		// Lock user row, re-check earn balance, debit.
+		// Lock user row before daily limit and balance checks so concurrent
+		// withdrawal creates for the same user cannot bypass the quota.
 		user := &model.User{}
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			First(user, "id = ?", userID).Error; err != nil {
@@ -227,6 +216,17 @@ func (s *WalletWithdrawalService) CreateRequest(ctx context.Context, userID uuid
 		}
 		if !user.IsActive {
 			return errors.New("akun diblokir")
+		}
+
+		count, totalToday, err := s.repo.CountTodayByUserTx(tx, userID, dayStart)
+		if err != nil {
+			return errors.New("gagal cek limit harian withdraw")
+		}
+		if count >= s.maxRequestsPerDay() {
+			return fmt.Errorf("limit harian tercapai (max %d permintaan/hari)", s.maxRequestsPerDay())
+		}
+		if totalToday+input.Amount > s.maxAmountPerDay() {
+			return fmt.Errorf("total nominal harian tidak boleh melebihi Rp %s", formatRupiahPlain(s.maxAmountPerDay()))
 		}
 		if user.WalletBalanceEarn < input.Amount {
 			return errors.New("saldo pendapatan tidak cukup")

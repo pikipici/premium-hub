@@ -104,8 +104,8 @@ func (s *GmailService) strikeThreshold() int {
 // SlotResponse is what RequestSlot returns to the user — the plain
 // password is shown ONCE and never persisted unencrypted.
 type SlotResponse struct {
-	GmailAccount *model.GmailAccount `json:"gmail_account"`
-	PlainPassword string             `json:"plain_password"`
+	GmailAccount  *model.GmailAccount `json:"gmail_account"`
+	PlainPassword string              `json:"plain_password"`
 }
 
 // ----- user-side methods -----
@@ -288,15 +288,6 @@ func (s *GmailService) AdminVerify(adminID, gmailID uuid.UUID, newPlainPassword 
 		return nil, errors.New("password baru minimal 10 karakter")
 	}
 
-	pricing, err := s.pricingRepo.Get()
-	if err != nil {
-		return nil, errors.New("config harga gmail belum diset")
-	}
-	payoutAmount := pricing.BuyPrice
-	if payoutAmount <= 0 {
-		return nil, errors.New("harga beli gmail tidak valid")
-	}
-
 	newEnc, err := s.cipher.Encrypt(newPlainPassword)
 	if err != nil {
 		return nil, errors.New("gagal enkripsi password baru")
@@ -310,6 +301,14 @@ func (s *GmailService) AdminVerify(adminID, gmailID uuid.UUID, newPlainPassword 
 		}
 		if g.Status != model.GmailStatusPendingVerify {
 			return fmt.Errorf("gmail tidak bisa di-verify (status %s)", g.Status)
+		}
+		pricing, err := s.pricingRepo.GetTx(tx)
+		if err != nil {
+			return errors.New("config harga gmail belum diset")
+		}
+		payoutAmount := pricing.BuyPrice
+		if payoutAmount <= 0 {
+			return errors.New("harga beli gmail tidak valid")
 		}
 		seller, err := s.walletRepo.LockUserEarnByIDTx(tx, g.CreatedByUserID)
 		if err != nil {

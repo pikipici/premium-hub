@@ -95,6 +95,8 @@ export default function NewWithdrawalPage() {
   const fee = policy?.flat_fee ?? 2500
   const minAmount = policy?.min_amount ?? 50_000
   const maxAmount = policy?.max_amount ?? 500_000
+  const maxRequestsPerDay = policy?.max_requests_per_day ?? 5
+  const maxAmountPerDay = policy?.max_amount_per_day ?? 2_500_000
   const netAmount = useMemo(() => Math.max(0, amount - fee), [amount, fee])
   const autoApproveThreshold = policy?.auto_approve_threshold ?? 100_000
 
@@ -102,12 +104,13 @@ export default function NewWithdrawalPage() {
     if (amount <= 0) return { ok: false, msg: '' }
     if (amount < minAmount) return { ok: false, msg: `Nominal minimal ${formatRupiah(minAmount)}` }
     if (amount > maxAmount) return { ok: false, msg: `Nominal maksimal ${formatRupiah(maxAmount)} per request` }
+    if (amount > maxAmountPerDay) return { ok: false, msg: `Nominal melebihi limit harian ${formatRupiah(maxAmountPerDay)}` }
     if (amount > earnBalance) return { ok: false, msg: 'Nominal melebihi Saldo Pendapatan kamu' }
     if (!destCode) return { ok: false, msg: 'Pilih tujuan penarikan dulu' }
     if (destAccount.length < 6) return { ok: false, msg: 'Nomor rekening/akun minimal 6 digit' }
     if (!destName.trim()) return { ok: false, msg: 'Nama pemilik rekening wajib diisi' }
     return { ok: true, msg: '' }
-  }, [amount, minAmount, maxAmount, earnBalance, destCode, destAccount, destName])
+  }, [amount, minAmount, maxAmount, maxAmountPerDay, earnBalance, destCode, destAccount, destName])
 
   const selectedDestLabel = useMemo(
     () => filteredDestinations.find((d) => d.code === destCode)?.label ?? destCode.toUpperCase(),
@@ -267,6 +270,9 @@ export default function NewWithdrawalPage() {
             <span className="text-[10px] text-[#A6A6A1]">
               {formatRupiah(minAmount)} - {formatRupiah(maxAmount)} / request
             </span>
+          </div>
+          <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+            Limit harian: maksimal {maxRequestsPerDay} request atau total {formatRupiah(maxAmountPerDay)} per hari.
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
             {QUICK_AMOUNTS.map((quick) => {
