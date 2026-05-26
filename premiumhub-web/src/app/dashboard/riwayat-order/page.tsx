@@ -62,7 +62,7 @@ function activitySuccessHref(item: ActivityHistoryItem) {
   if (!sourceID) return ''
 
   if (item.kind === 'premium_order') {
-    return `/product/prem-apps/checkout/success?id=${encodeURIComponent(sourceID)}`
+    return `/product/digiproduct/checkout/success?id=${encodeURIComponent(sourceID)}`
   }
 
   if (item.source === 'sosmed') {

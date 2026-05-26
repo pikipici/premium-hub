@@ -778,7 +778,7 @@ export default function ProdukPage() {
 
   const validatePriceDrafts = () => {
     if (priceDrafts.length === 0) {
-      return 'Minimal harus ada 1 paket harga aktif untuk produk prem-apps.'
+      return 'Minimal harus ada 1 paket harga aktif untuk produk DigiProduct.'
     }
 
     const seen = new Set<string>()
@@ -1223,7 +1223,7 @@ export default function ProdukPage() {
         <div className="mobile-page-head">
           <div>
             <div className="mobile-page-title">Produk</div>
-            <div className="mobile-page-subtitle">Kontrol produk + paket harga prem-apps</div>
+            <div className="mobile-page-subtitle">Kontrol produk + paket harga DigiProduct</div>
           </div>
           <button className="mobile-chip-btn primary" onClick={openCreate}>
             + Baru
@@ -1388,7 +1388,7 @@ export default function ProdukPage() {
                     placeholder="contoh: netflix-premium"
                   />
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                    URL publik: /product/prem-apps/{form.slug || 'slug-produk'}
+                    URL publik: /product/digiproduct/{form.slug || 'slug-produk'}
                   </div>
                 </div>
 

@@ -27,6 +27,16 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  async redirects() {
+    return [
+      {
+        source: "/product/prem-apps/:path*",
+        destination: "/product/digiproduct/:path*",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -54,7 +54,7 @@ const trustStrip = [
   { icon: ShieldCheck, title: 'Billing transparan', body: 'Cuma request berhasil yang dipotong. Sisanya refund.' },
   { icon: Sparkles, title: 'OpenAI-compatible', body: 'Request shape standar. Plug ke bot, dashboard, atau workflow.' },
   { icon: Network, title: 'Routing tersembunyi', body: 'Provider & model di-handle gateway.' },
-  { icon: Wallet, title: 'Satu wallet', body: 'Dipakai DigiSosmed, prem-apps, DigiConnect.' },
+  { icon: Wallet, title: 'Satu wallet', body: 'Dipakai DigiSosmed, DigiProduct, DigiConnect.' },
 ]
 
 export default function DigiConnectProductPage() {

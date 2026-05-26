@@ -32,7 +32,7 @@ const SCOPE_OPTIONS: Array<{ value: ProductCategoryScope; label: string; desc: s
   {
     value: 'prem_apps',
     label: 'Product Apps',
-    desc: 'Kategori untuk katalog /product/prem-apps',
+    desc: 'Kategori untuk katalog /product/digiproduct',
   },
   {
     value: 'sosmed',
@@ -344,7 +344,7 @@ export default function ProductCategorySettingsCard() {
           <div>
             <h2>Master Kategori Product & Sosmed</h2>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Kategori bisa lu tambah/edit/nonaktifkan untuk prem-apps dan sosmed dari satu tempat.
+              Kategori bisa lu tambah/edit/nonaktifkan untuk DigiProduct dan sosmed dari satu tempat.
             </div>
           </div>
 

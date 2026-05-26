@@ -36,6 +36,7 @@ describe('auth helpers', () => {
   it('marks protected paths only for guarded surfaces', () => {
     expect(isProtectedPath('/dashboard/orders')).toBe(true)
     expect(isProtectedPath('/admin/users')).toBe(true)
+    expect(isProtectedPath('/product/digiproduct/checkout')).toBe(true)
     expect(isProtectedPath('/product/prem-apps/checkout')).toBe(true)
     expect(isProtectedPath('/product/sosmed/checkout')).toBe(true)
     expect(isProtectedPath('/product/nokos')).toBe(false)

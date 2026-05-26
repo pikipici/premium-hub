@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { ArrowRight, BarChart3, CheckCircle2, Code2, Network, Rocket, ShieldCheck, WalletCards } from 'lucide-react'
+import { ArrowRight, BarChart3, CheckCircle2, Code2, Network, PackageCheck, Rocket, ShieldCheck, WalletCards } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
@@ -101,12 +101,13 @@ export default function HomePage() {
     : 'Memuat layanan'
   const showDigiConnectCard = visibleProductCards.includes('/product/digiconnect')
   const showSosmedCard = visibleProductCards.includes('/product/sosmed')
-  const visibleCardsCount = Number(showDigiConnectCard) + Number(showSosmedCard)
+  const showDigiProductCard = visibleProductCards.includes('/product/digiproduct')
+  const visibleCardsCount = Number(showDigiConnectCard) + Number(showSosmedCard) + Number(showDigiProductCard)
   const isSingleVisibleCard = visibleCardsCount === 1
-  const hasVisibleCards = showDigiConnectCard || showSosmedCard
+  const hasVisibleCards = showDigiConnectCard || showSosmedCard || showDigiProductCard
   const cardsGridClass = isSingleVisibleCard
     ? 'grid gap-5 md:grid-cols-1 md:justify-items-center lg:gap-7'
-    : 'grid gap-5 md:grid-cols-2 lg:gap-7'
+    : 'grid gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-7'
   const productCardClass = isSingleVisibleCard
     ? 'relative w-full overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white p-5 shadow-[0_16px_38px_rgba(20,20,20,0.06)] md:max-w-[640px] sm:p-6 lg:p-7'
     : 'relative overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white p-5 shadow-[0_16px_38px_rgba(20,20,20,0.06)] sm:p-6 lg:p-7'
@@ -220,6 +221,47 @@ Gateway AI dan growth sosial.
                 <Link
                   href="/product/sosmed"
                   className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-[#2853A6] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#204486]"
+                >
+                  Lihat detail
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </article>
+            ) : null}
+
+            {showDigiProductCard ? (
+              <article className={productCardClass}>
+                <div className="absolute -right-9 -top-9 h-24 w-24 rounded-full bg-[#EAF8EF]" />
+                <p className="relative inline-flex rounded-full border border-[#CFEFDB] bg-[#EAF8EF] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#237A44]">
+                  DigiProduct
+                </p>
+                <h2 className="relative mt-3 text-2xl font-extrabold tracking-tight text-[#141414]">
+                  Produk digital siap pakai
+                </h2>
+                <p className="relative mt-2 text-sm leading-relaxed text-[#6B7280] md:text-[15px]">
+                  Akun premium, lisensi, dan tools digital.
+                </p>
+
+                <ul className="relative mt-4 space-y-2 text-sm text-[#2E2E2E]">
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#237A44]" />
+                    Streaming, musik, gaming, desain, produktivitas
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#237A44]" />
+                    Checkout cepat dari satu wallet
+                  </li>
+                </ul>
+
+                <div className="relative mt-5 rounded-2xl border border-[#D9F1E2] bg-[#F3FBF6] px-4 py-3">
+                  <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-bold text-[#141414]">
+                    <PackageCheck className="h-4 w-4 text-[#237A44]" />
+                    Katalog produk digital
+                  </p>
+                </div>
+
+                <Link
+                  href="/product/digiproduct"
+                  className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-[#237A44] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#1D6638]"
                 >
                   Lihat detail
                   <ArrowRight className="h-4 w-4" />

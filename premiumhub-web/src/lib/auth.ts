@@ -38,6 +38,8 @@ export function isProtectedPath(pathname?: string | null) {
     current.startsWith('/dashboard/') ||
     current === '/admin' ||
     current.startsWith('/admin/') ||
+    current === '/product/digiproduct/checkout' ||
+    current.startsWith('/product/digiproduct/checkout/') ||
     current === '/product/prem-apps/checkout' ||
     current.startsWith('/product/prem-apps/checkout/') ||
     current === '/product/sosmed/checkout' ||

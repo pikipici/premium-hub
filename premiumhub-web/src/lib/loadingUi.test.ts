@@ -17,7 +17,7 @@ describe('loadingUi', () => {
     expect(pageLoadingCopy.global).toEqual('DigiMarket lagi siapin halaman...')
     expect(pageLoadingCopy.sosmedCatalog).toEqual('Lagi ambil katalog sosmed terbaru...')
     expect(pageLoadingCopy.sosmedCheckout).toEqual('Memuat checkout sosmed...')
-    expect(pageLoadingCopy.premiumApps).toEqual('Memuat katalog apps premium...')
+    expect(pageLoadingCopy.premiumApps).toEqual('Memuat katalog DigiProduct...')
   })
 
   it('generates stable skeleton item keys for grids', () => {

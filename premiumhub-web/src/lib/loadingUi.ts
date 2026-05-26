@@ -2,7 +2,7 @@ export const pageLoadingCopy = {
   global: 'DigiMarket lagi siapin halaman...',
   sosmedCatalog: 'Lagi ambil katalog sosmed terbaru...',
   sosmedCheckout: 'Memuat checkout sosmed...',
-  premiumApps: 'Memuat katalog apps premium...',
+  premiumApps: 'Memuat katalog DigiProduct...',
 } as const
 
 export function buildLoadingMessage(message?: string) {

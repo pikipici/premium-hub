@@ -16,7 +16,8 @@ import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
 
 const FOOTER_PRODUCT_LABEL_BY_HREF: Record<string, string> = {
   '/product/digiconnect': 'DigiConnect',
-  '/product/prem-apps': 'Apps Premium',
+  '/product/digiproduct': 'DigiProduct',
+  '/product/prem-apps': 'DigiProduct',
   '/product/sosmed': 'DigiSosmed',
   '/product/convert': 'Convert Aset',
 }

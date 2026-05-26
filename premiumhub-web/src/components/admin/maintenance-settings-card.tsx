@@ -58,7 +58,7 @@ const MAINTENANCE_PRESETS: MaintenancePreset[] = [
     buttonLabel: 'Maintenance Produk',
     name: 'Preset • Maintenance Produk',
     target_type: 'prefix',
-    target_path: '/product/prem-apps',
+    target_path: '/product/digiproduct',
     title: 'Halaman Produk Sedang Maintenance',
     message: 'Halaman produk lagi kami update sebentar. Coba lagi beberapa saat ya.',
   },
@@ -672,7 +672,7 @@ export default function MaintenanceSettingsCard() {
                   value={form.target_type === 'global' ? '/' : form.target_path}
                   disabled={form.target_type === 'global'}
                   onChange={(event) => setForm((prev) => ({ ...prev, target_path: event.target.value }))}
-                  placeholder="Contoh: /product/prem-apps"
+                  placeholder="Contoh: /product/digiproduct"
                 />
               </div>
 

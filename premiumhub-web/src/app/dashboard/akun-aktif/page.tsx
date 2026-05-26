@@ -257,7 +257,7 @@ export default function AkunAktifPage() {
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             <Link
-              href="/product/prem-apps"
+              href="/product/digiproduct"
               className="inline-flex items-center gap-2 rounded-full bg-[#FF5733] px-4 py-2 text-xs font-bold text-white hover:bg-[#e64d2e]"
             >
               <ShoppingBag className="h-3.5 w-3.5" /> Belanja Produk

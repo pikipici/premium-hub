@@ -171,7 +171,7 @@ export default function DashboardPage() {
             <p className="text-sm font-semibold text-[#141414]">Belum ada aktivitas</p>
             <p className="mt-1 text-xs text-[#6B7280]">Mulai belanja produk digital, transaksi lu bakal muncul di sini.</p>
             <Link
-              href="/product/prem-apps"
+              href="/product/digiproduct"
               className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#141414] px-4 py-2 text-xs font-extrabold text-white transition-colors hover:bg-[#2A2A2A]"
             >
               Belanja Sekarang →

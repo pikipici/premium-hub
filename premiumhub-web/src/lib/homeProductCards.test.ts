@@ -10,12 +10,12 @@ describe('home product cards visibility', () => {
   it('keeps only home-supported product cards from navbar visibility data', () => {
     expect(
       selectVisibleHomeProductCards([
-        { href: '/product/prem-apps' },
+        { href: '/product/digiproduct' },
         { href: '/product/digiconnect' },
         { href: '/product/sosmed' },
         { href: '/product/convert' },
       ])
-    ).toEqual(['/product/digiconnect', '/product/sosmed'])
+    ).toEqual(['/product/digiconnect', '/product/sosmed', '/product/digiproduct'])
   })
 
   it('keeps card order stable and de-duplicates', () => {
