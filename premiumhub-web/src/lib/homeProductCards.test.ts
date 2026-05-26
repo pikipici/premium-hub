@@ -25,7 +25,20 @@ describe('home product cards visibility', () => {
         { href: '/product/digiconnect' },
         { href: '/product/sosmed' },
       ])
-    ).toEqual(['/product/digiconnect', '/product/sosmed'])
+    ).toEqual(['/product/digiconnect', '/product/sosmed', '/product/digiproduct'])
+  })
+
+  it('keeps DigiProduct visible for legacy navbar data', () => {
+    expect(
+      selectVisibleHomeProductCards([
+        { href: '/product/nokos' },
+        { href: '/product/sosmed' },
+      ])
+    ).toEqual(['/product/sosmed', '/product/digiproduct'])
+
+    expect(selectVisibleHomeProductCards([{ href: '/product/prem-apps' }])).toEqual([
+      '/product/digiproduct',
+    ])
   })
 
   it('falls back to default home cards when default menu has no supported routes', () => {

@@ -10,13 +10,25 @@ type NavbarLikeItem = {
   href?: string | null
 }
 
+function normalizeHomeProductCardHref(href: string): HomeProductCardHref | null {
+  if (href === '/product/prem-apps') return '/product/digiproduct'
+  if ((HOME_PRODUCT_CARD_HREFS as readonly string[]).includes(href)) return href as HomeProductCardHref
+  return null
+}
+
 export function selectVisibleHomeProductCards(items: NavbarLikeItem[]): HomeProductCardHref[] {
-  const visibleSet = new Set<string>()
+  const visibleSet = new Set<HomeProductCardHref>()
   for (const item of items) {
     const href = String(item.href || '').trim()
     if (!href) continue
-    visibleSet.add(href)
+
+    const normalizedHref = normalizeHomeProductCardHref(href)
+    if (normalizedHref) visibleSet.add(normalizedHref)
   }
+
+  // Older workspace menu rows may not contain the new DigiProduct route yet.
+  // Keep the card visible so the rebranded catalog is discoverable after deploy.
+  visibleSet.add('/product/digiproduct')
 
   return HOME_PRODUCT_CARD_HREFS.filter((href) => visibleSet.has(href))
 }
