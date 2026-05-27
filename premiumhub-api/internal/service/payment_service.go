@@ -146,16 +146,37 @@ func (s *PaymentService) CreateTransaction(userID uuid.UUID, input CreatePayment
 	if order.UserID != userID {
 		return nil, fmt.Errorf("akses ditolak")
 	}
+	return s.createTransactionForOrder(order, input, true)
+}
 
+func (s *PaymentService) CreateGuestTransaction(input CreatePaymentInput, token string) (*PaymentResponse, error) {
+	orderID, err := uuid.Parse(strings.TrimSpace(input.OrderID))
+	if err != nil {
+		return nil, fmt.Errorf("order tidak ditemukan")
+	}
+	order, err := s.orderRepo.FindByID(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("order tidak ditemukan")
+	}
+	if order.User.Role != "guest" || strings.TrimSpace(token) == "" || token != order.GuestAccessToken || order.GuestAccessExpiresAt == nil || time.Now().After(*order.GuestAccessExpiresAt) {
+		return nil, fmt.Errorf("order tidak ditemukan")
+	}
+	return s.createTransactionForOrder(order, input, false)
+}
+
+func (s *PaymentService) createTransactionForOrder(order *model.Order, input CreatePaymentInput, allowWallet bool) (*PaymentResponse, error) {
 	requestedMethod := strings.ToLower(strings.TrimSpace(input.PaymentMethod))
 	if requestedMethod == "wallet" {
+		if !allowWallet {
+			return nil, fmt.Errorf("wallet hanya tersedia untuk user login")
+		}
 		if s.walletSvc == nil {
 			return nil, fmt.Errorf("wallet checkout belum tersedia")
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		walletRes, err := s.walletSvc.PayOrderWithWallet(ctx, userID, orderID)
+		walletRes, err := s.walletSvc.PayOrderWithWallet(ctx, order.UserID, order.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -319,6 +340,17 @@ func (s *PaymentService) handleGatewayWebhook(input WebhookInput) error {
 	}
 	log.Printf("[payment-webhook][order] confirmed order_id=%s method=%s", orderID, method)
 	return s.orderSvc.ConfirmPayment(order.ID)
+}
+
+func (s *PaymentService) GetGuestStatus(orderID uuid.UUID, token string) (*model.Order, error) {
+	order, err := s.orderRepo.FindByID(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("order tidak ditemukan")
+	}
+	if order.User.Role != "guest" || strings.TrimSpace(token) == "" || token != order.GuestAccessToken || order.GuestAccessExpiresAt == nil || time.Now().After(*order.GuestAccessExpiresAt) {
+		return nil, fmt.Errorf("order tidak ditemukan")
+	}
+	return order, nil
 }
 
 func (s *PaymentService) GetStatus(orderID, userID uuid.UUID) (*model.Order, error) {

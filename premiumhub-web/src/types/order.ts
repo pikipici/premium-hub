@@ -51,6 +51,8 @@ export interface Order {
   stock?: OrderStock
   gateway_order_id?: string
   payment_payload?: string
+  guest_access_token?: string
+  guest_access_expires_at?: string | null
   paid_at: string | null
   expires_at?: string | null
   created_at: string

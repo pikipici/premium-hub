@@ -35,6 +35,20 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 	response.Success(c, "Transaksi dibuat", res)
 }
 
+func (h *PaymentHandler) CreateGuest(c *gin.Context) {
+	var input service.CreatePaymentInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	res, err := h.paymentSvc.CreateGuestTransaction(input, c.Query("token"))
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "Transaksi guest dibuat", res)
+}
+
 func (h *PaymentHandler) ListMethods(c *gin.Context) {
 	amount := int64(10000)
 	if raw := strings.TrimSpace(c.Query("amount")); raw != "" {
@@ -112,6 +126,25 @@ func parsePaymentWebhookAmount(raw string) (int64, error) {
 		value = value[:dot]
 	}
 	return strconv.ParseInt(value, 10, 64)
+}
+
+func (h *PaymentHandler) GetGuestStatus(c *gin.Context) {
+	orderID, err := uuid.Parse(c.Param("orderId"))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+	order, err := h.paymentSvc.GetGuestStatus(orderID, c.Query("token"))
+	if err != nil {
+		response.NotFound(c, err.Error())
+		return
+	}
+	response.Success(c, "OK", gin.H{
+		"order_id":       order.ID,
+		"payment_status": order.PaymentStatus,
+		"order_status":   order.OrderStatus,
+		"total_price":    order.TotalPrice,
+	})
 }
 
 func (h *PaymentHandler) GetStatus(c *gin.Context) {

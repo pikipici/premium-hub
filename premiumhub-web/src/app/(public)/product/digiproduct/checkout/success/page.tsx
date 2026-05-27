@@ -68,6 +68,7 @@ export default function OrderSuksesPage() {
 function OrderSuksesContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('id')
+  const token = searchParams.get('token') || ''
 
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(() => Boolean(orderId))
@@ -84,6 +85,7 @@ function OrderSuksesContent() {
 
     orderService
       .getByID(orderId)
+      .catch(() => orderService.getGuestByID(orderId, token))
       .then((res) => {
         if (cancelled) return
         if (res.success) {
@@ -104,7 +106,7 @@ function OrderSuksesContent() {
     return () => {
       cancelled = true
     }
-  }, [orderId])
+  }, [orderId, token])
 
   useEffect(() => {
     if (!toast) return

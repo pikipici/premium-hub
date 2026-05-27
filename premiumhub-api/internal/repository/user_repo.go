@@ -27,6 +27,35 @@ func (r *UserRepo) FindByEmail(email string) (*model.User, error) {
 	return &user, err
 }
 
+func (r *UserRepo) FindOrCreateGuest(email, phone string) (*model.User, error) {
+	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
+	var user model.User
+	err := r.db.Where("email = ?", normalizedEmail).First(&user).Error
+	if err == nil {
+		return &user, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+
+	name := normalizedEmail
+	if at := strings.Index(name, "@"); at > 0 {
+		name = name[:at]
+	}
+	user = model.User{
+		Name:     name,
+		Email:    normalizedEmail,
+		Phone:    strings.TrimSpace(phone),
+		Password: uuid.NewString(),
+		Role:     "guest",
+		IsActive: true,
+	}
+	if err := r.db.Create(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *UserRepo) FindByID(id uuid.UUID) (*model.User, error) {
 	var user model.User
 	err := r.db.First(&user, "id = ?", id).Error

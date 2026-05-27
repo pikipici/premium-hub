@@ -3,10 +3,9 @@
 import axios from 'axios'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { CreditCard, Landmark, QrCode, ShieldCheck, Wallet, Zap } from 'lucide-react'
 
-import { buildLoginHref } from '@/lib/auth'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatRupiah } from '@/lib/utils'
@@ -28,7 +27,6 @@ const DUITKU_METHOD_OPTIONS: Array<{ key: DuitkuMethod; label: string; hint: str
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const pathname = usePathname()
   const { item, clearCart } = useCartStore()
   const { isAuthenticated, hasHydrated, isBootstrapped, walletBalance, setWalletBalance } = useAuthStore()
   const authReady = hasHydrated && isBootstrapped
@@ -36,6 +34,8 @@ export default function CheckoutPage() {
   const [checkoutMethod, setCheckoutMethod] = useState<CheckoutMethod>('duitku')
   const [duitkuMethod, setDuitkuMethod] = useState<DuitkuMethod>('SP')
   const [walletLoading, setWalletLoading] = useState(false)
+  const [guestEmail, setGuestEmail] = useState('')
+  const [guestPhone, setGuestPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [redirectingAfterCheckout, setRedirectingAfterCheckout] = useState(false)
   const [error, setError] = useState('')
@@ -43,15 +43,14 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!authReady) return
 
-    if (!isAuthenticated) {
-      router.replace(buildLoginHref(pathname))
-      return
+    if (!isAuthenticated && checkoutMethod === 'wallet') {
+      setCheckoutMethod('duitku')
     }
 
     if (!item && !redirectingAfterCheckout) {
       router.replace('/product/prem-apps')
     }
-  }, [authReady, isAuthenticated, item, pathname, redirectingAfterCheckout, router])
+  }, [authReady, checkoutMethod, isAuthenticated, item, redirectingAfterCheckout, router])
 
   useEffect(() => {
     if (!authReady || !isAuthenticated) return
@@ -91,23 +90,39 @@ export default function CheckoutPage() {
       return
     }
 
+    const email = guestEmail.trim()
+    if (!isAuthenticated && (!email || !email.includes('@'))) {
+      setError('Isi email aktif dulu buat menerima detail order.')
+      return
+    }
+
     setLoading(true)
     setError('')
 
     try {
-      const orderRes = await orderService.create({
-        price_id: item.priceId,
-        payment_method: checkoutMethod,
-      })
+      const orderRes = isAuthenticated
+        ? await orderService.create({
+            price_id: item.priceId,
+            payment_method: checkoutMethod,
+          })
+        : await orderService.createGuest({
+            price_id: item.priceId,
+            payment_method: 'duitku',
+            email,
+            phone: guestPhone.trim(),
+          })
       if (!orderRes.success) {
         setError(orderRes.message)
         return
       }
 
-      const payRes = await paymentService.create({
+      const paymentPayload = {
         order_id: orderRes.data.id,
         payment_method: checkoutMethod === 'wallet' ? 'wallet' : duitkuMethod,
-      })
+      }
+      const payRes = isAuthenticated
+        ? await paymentService.create(paymentPayload)
+        : await paymentService.createGuest({ ...paymentPayload, payment_method: duitkuMethod, token: orderRes.data.guest_access_token || '' })
       if (!payRes.success) {
         setError(payRes.message)
         return
@@ -134,6 +149,7 @@ export default function CheckoutPage() {
         gatewayOrderId: payment.gateway_order_id || '',
         amount: String(payment.total_payment || payment.amount || item.price),
         expiresAt: payment.expires_at || '',
+        token: orderRes.data.guest_access_token || '',
         paymentUrl: payment.payment_url || '',
         appUrl: payment.app_url || '',
       })
@@ -181,6 +197,37 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {!isAuthenticated && (
+            <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6 space-y-4">
+              <div>
+                <h3 className="text-sm font-bold">Kontak Pembeli</h3>
+                <p className="mt-1 text-xs text-[#888]">Bisa checkout tanpa login. Link invoice akan dikirim ke email ini dan dipakai untuk akses ulang order guest.</p>
+              </div>
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-[#555]">
+                  Email aktif
+                  <input
+                    type="email"
+                    value={guestEmail}
+                    onChange={(event) => setGuestEmail(event.target.value)}
+                    placeholder="nama@email.com"
+                    className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]"
+                  />
+                </label>
+                <label className="block text-xs font-bold text-[#555]">
+                  WhatsApp opsional
+                  <input
+                    type="tel"
+                    value={guestPhone}
+                    onChange={(event) => setGuestPhone(event.target.value)}
+                    placeholder="08xxxxxxxxxx"
+                    className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6 space-y-3">
             <h3 className="text-sm font-bold mb-1">Metode Pembayaran</h3>
 
@@ -205,8 +252,11 @@ export default function CheckoutPage() {
 
               <button
                 type="button"
-                onClick={() => setCheckoutMethod('wallet')}
-                className={`w-full rounded-xl border p-4 text-left transition-colors ${
+                onClick={() => {
+                  if (isAuthenticated) setCheckoutMethod('wallet')
+                }}
+                disabled={!isAuthenticated}
+                className={`w-full rounded-xl border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                   checkoutMethod === 'wallet' ? 'border-[#FF5733] bg-[#FFF3EF]' : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D8]'
                 }`}
               >
@@ -217,7 +267,7 @@ export default function CheckoutPage() {
                   <div>
                     <div className="text-sm font-semibold">Wallet Balance</div>
                     <div className="text-xs text-[#888]">
-                      {walletLoading ? 'Memuat saldo wallet...' : `Saldo: ${formatRupiah(walletBalance)}`}
+                      {!isAuthenticated ? 'Login dulu untuk bayar via wallet' : walletLoading ? 'Memuat saldo wallet...' : `Saldo: ${formatRupiah(walletBalance)}`}
                     </div>
                   </div>
                 </div>

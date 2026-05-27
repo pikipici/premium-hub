@@ -93,6 +93,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	sosmedBundleAdminSvc := service.NewSosmedBundleAdminService(sosmedBundleRepo, sosmedServiceRepo)
 	sosmedPaymentSvc := service.NewSosmedPaymentServiceWithGateway(cfg, sosmedOrderRepo, sosmedOrderSvc, nil)
 	orderSvc := service.NewOrderService(orderRepo, stockRepo, productRepo, notifRepo).
+		SetConfig(cfg).
+		SetUserRepo(userRepo).
 		SetStockCredentialCipher(stockCredentialCipher)
 	stockSvc := service.NewStockService(stockRepo, productRepo).
 		SetAccountTypeRepo(accountTypeRepo).
@@ -259,6 +261,31 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.GET("/public/digiconnect/plans", digiConnectHandler.PublicPlans)
 	api.GET("/public/gmail/pricing", gmailBuyHandler.PublicPricing)
 	api.GET("/public/gmail/availability", gmailBuyHandler.PublicAvailability)
+	api.POST(
+		"/public/orders",
+		middleware.NewIPRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request checkout. Coba lagi sebentar."),
+		orderHandler.CreateGuest,
+	)
+	api.POST(
+		"/public/orders/resend-invoice",
+		middleware.NewIPRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request invoice. Coba lagi sebentar."),
+		orderHandler.ResendGuestInvoice,
+	)
+	api.GET(
+		"/public/orders/:id",
+		middleware.NewIPRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request order. Coba lagi sebentar."),
+		orderHandler.GetGuestByID,
+	)
+	api.POST(
+		"/public/payment/create",
+		middleware.NewIPRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request pembayaran. Coba lagi sebentar."),
+		paymentHandler.CreateGuest,
+	)
+	api.GET(
+		"/public/payment/status/:orderId",
+		middleware.NewIPRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak cek status pembayaran. Coba lagi sebentar."),
+		paymentHandler.GetGuestStatus,
+	)
 	api.GET(
 		"/models",
 		middleware.NewIPRateLimiter(cfg.ProviderRateLimitMax, cfg.ProviderRateLimitWindow, "Jaringan sedang ramai, coba lagi sebentar lagi."),

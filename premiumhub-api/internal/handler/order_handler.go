@@ -33,6 +33,20 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	response.Created(c, "Order berhasil dibuat", order)
 }
 
+func (h *OrderHandler) CreateGuest(c *gin.Context) {
+	var input service.CreateGuestOrderInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	order, err := h.orderSvc.CreateGuest(input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Created(c, "Order guest berhasil dibuat", order)
+}
+
 func (h *OrderHandler) List(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	page, limit := parsePageLimit(c, DefaultCustomerPageLimit, MaxPageLimit)
@@ -46,6 +60,33 @@ func (h *OrderHandler) List(c *gin.Context) {
 		Page: page, Limit: limit, Total: total,
 		TotalPages: int(math.Ceil(float64(total) / float64(limit))),
 	})
+}
+
+func (h *OrderHandler) ResendGuestInvoice(c *gin.Context) {
+	var input service.ResendGuestInvoiceInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.orderSvc.ResendGuestInvoice(input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "Jika data cocok, link invoice sudah dikirim", nil)
+}
+
+func (h *OrderHandler) GetGuestByID(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+	order, err := h.orderSvc.GetGuestByID(id, c.Query("token"))
+	if err != nil {
+		response.NotFound(c, err.Error())
+		return
+	}
+	response.Success(c, "OK", order)
 }
 
 func (h *OrderHandler) GetByID(c *gin.Context) {

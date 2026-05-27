@@ -1,11 +1,16 @@
 package service
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/smtp"
+	"net/url"
 	"strings"
 	"time"
 
+	"premiumhub-api/config"
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/repository"
 	"premiumhub-api/pkg/credential"
@@ -18,11 +23,23 @@ type OrderService struct {
 	stockRepo             *repository.StockRepo
 	priceRepo             *repository.ProductRepo
 	notifRepo             *repository.NotificationRepo
+	userRepo              *repository.UserRepo
 	stockCredentialCipher *credential.StockCipher
+	cfg                   *config.Config
 }
 
 func NewOrderService(orderRepo *repository.OrderRepo, stockRepo *repository.StockRepo, priceRepo *repository.ProductRepo, notifRepo *repository.NotificationRepo) *OrderService {
 	return &OrderService{orderRepo: orderRepo, stockRepo: stockRepo, priceRepo: priceRepo, notifRepo: notifRepo}
+}
+
+func (s *OrderService) SetConfig(cfg *config.Config) *OrderService {
+	s.cfg = cfg
+	return s
+}
+
+func (s *OrderService) SetUserRepo(userRepo *repository.UserRepo) *OrderService {
+	s.userRepo = userRepo
+	return s
 }
 
 func (s *OrderService) SetStockCredentialCipher(cipher *credential.StockCipher) *OrderService {
@@ -53,6 +70,18 @@ func (s *OrderService) exposeStockPassword(stock *model.Stock) {
 type CreateOrderInput struct {
 	PriceID       string `json:"price_id" binding:"required"`
 	PaymentMethod string `json:"payment_method"`
+}
+
+type CreateGuestOrderInput struct {
+	PriceID       string `json:"price_id" binding:"required"`
+	PaymentMethod string `json:"payment_method"`
+	Email         string `json:"email" binding:"required"`
+	Phone         string `json:"phone"`
+}
+
+type ResendGuestInvoiceInput struct {
+	OrderID string `json:"order_id" binding:"required"`
+	Email   string `json:"email" binding:"required"`
 }
 
 func (s *OrderService) Create(userID uuid.UUID, input CreateOrderInput) (*model.Order, error) {
@@ -90,6 +119,130 @@ func (s *OrderService) Create(userID uuid.UUID, input CreateOrderInput) (*model.
 	order.TotalPrice = order.Price.Price
 	s.orderRepo.Update(order)
 
+	return order, nil
+}
+
+func newGuestAccessToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+func guestAccessExpiry() time.Time {
+	return time.Now().Add(30 * 24 * time.Hour)
+}
+
+func (s *OrderService) CreateGuest(input CreateGuestOrderInput) (*model.Order, error) {
+	if s.userRepo == nil {
+		return nil, errors.New("guest checkout belum tersedia")
+	}
+
+	email := strings.ToLower(strings.TrimSpace(input.Email))
+	if email == "" || !strings.Contains(email, "@") {
+		return nil, errors.New("email tidak valid")
+	}
+	paymentMethod := strings.ToLower(strings.TrimSpace(input.PaymentMethod))
+	if paymentMethod == "wallet" {
+		return nil, errors.New("wallet hanya tersedia untuk user login")
+	}
+	if paymentMethod == "" {
+		paymentMethod = "duitku"
+	}
+
+	guest, err := s.userRepo.FindOrCreateGuest(email, input.Phone)
+	if err != nil {
+		return nil, errors.New("gagal menyiapkan buyer guest")
+	}
+
+	order, err := s.Create(guest.ID, CreateOrderInput{
+		PriceID:       input.PriceID,
+		PaymentMethod: paymentMethod,
+	})
+	if err != nil {
+		return nil, err
+	}
+	token, err := newGuestAccessToken()
+	if err != nil {
+		return nil, errors.New("gagal membuat token guest")
+	}
+	order.GuestAccessToken = token
+	expiresAt := guestAccessExpiry()
+	order.GuestAccessExpiresAt = &expiresAt
+	if err := s.orderRepo.Update(order); err != nil {
+		return nil, errors.New("gagal menyimpan token guest")
+	}
+	_ = s.SendGuestInvoiceLink(order)
+	return order, nil
+}
+
+func (s *OrderService) guestInvoiceURL(order *model.Order) string {
+	base := "http://localhost:3000"
+	if s.cfg != nil && strings.TrimSpace(s.cfg.FrontendURL) != "" {
+		base = strings.TrimRight(strings.TrimSpace(s.cfg.FrontendURL), "/")
+	}
+	path := "/product/prem-apps/checkout/invoice"
+	if order != nil && s.priceRepo != nil {
+		if product, err := s.priceRepo.FindByID(order.Price.ProductID); err == nil && strings.Contains(strings.ToLower(product.Slug), "digi") {
+			path = "/product/digiproduct/checkout/invoice"
+		}
+	}
+	q := url.Values{}
+	q.Set("order_id", order.ID.String())
+	q.Set("token", order.GuestAccessToken)
+	return base + path + "?" + q.Encode()
+}
+
+func (s *OrderService) SendGuestInvoiceLink(order *model.Order) error {
+	if s.cfg == nil || strings.TrimSpace(s.cfg.SMTPHost) == "" || strings.TrimSpace(s.cfg.SMTPUser) == "" || strings.TrimSpace(s.cfg.SMTPPass) == "" {
+		return nil
+	}
+	if order == nil || order.User.Role != "guest" || strings.TrimSpace(order.User.Email) == "" || strings.TrimSpace(order.GuestAccessToken) == "" || order.GuestAccessExpiresAt == nil {
+		return nil
+	}
+	addr := strings.TrimSpace(s.cfg.SMTPHost) + ":" + strings.TrimSpace(s.cfg.SMTPPort)
+	auth := smtp.PlainAuth("", strings.TrimSpace(s.cfg.SMTPUser), strings.TrimSpace(s.cfg.SMTPPass), strings.TrimSpace(s.cfg.SMTPHost))
+	body := fmt.Sprintf("Halo,\n\nIni link invoice order kamu:\n%s\n\nLink ini berlaku sampai %s. Jangan bagikan link ini ke orang lain.\n\nDigiMarket", s.guestInvoiceURL(order), order.GuestAccessExpiresAt.Format(time.RFC1123))
+	msg := []byte("To: " + order.User.Email + "\r\n" + "Subject: Link invoice DigiMarket\r\n" + "Content-Type: text/plain; charset=UTF-8\r\n\r\n" + body)
+	return smtp.SendMail(addr, auth, strings.TrimSpace(s.cfg.SMTPUser), []string{order.User.Email}, msg)
+}
+
+func (s *OrderService) ResendGuestInvoice(input ResendGuestInvoiceInput) error {
+	orderID, err := uuid.Parse(strings.TrimSpace(input.OrderID))
+	if err != nil {
+		return nil
+	}
+	order, err := s.orderRepo.FindByID(orderID)
+	if err != nil || order.User.Role != "guest" || !strings.EqualFold(strings.TrimSpace(input.Email), strings.TrimSpace(order.User.Email)) {
+		return nil
+	}
+	if strings.TrimSpace(order.GuestAccessToken) == "" || order.GuestAccessExpiresAt == nil || time.Now().After(*order.GuestAccessExpiresAt) {
+		token, err := newGuestAccessToken()
+		if err != nil {
+			return nil
+		}
+		expiresAt := guestAccessExpiry()
+		order.GuestAccessToken = token
+		order.GuestAccessExpiresAt = &expiresAt
+		if err := s.orderRepo.Update(order); err != nil {
+			return nil
+		}
+	}
+	_ = s.SendGuestInvoiceLink(order)
+	return nil
+}
+
+func (s *OrderService) GetGuestByID(id uuid.UUID, token string) (*model.Order, error) {
+	order, err := s.orderRepo.FindByID(id)
+	if err != nil {
+		return nil, errors.New("order tidak ditemukan")
+	}
+	if order.User.Role != "guest" || strings.TrimSpace(token) == "" || token != order.GuestAccessToken || order.GuestAccessExpiresAt == nil || time.Now().After(*order.GuestAccessExpiresAt) {
+		return nil, errors.New("order tidak ditemukan")
+	}
+
+	s.exposeStockPassword(order.Stock)
 	return order, nil
 }
 

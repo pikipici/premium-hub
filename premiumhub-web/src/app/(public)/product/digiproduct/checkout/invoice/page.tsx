@@ -31,6 +31,7 @@ function CheckoutInvoiceContent() {
   const gatewayOrderId = search.get('gatewayOrderId') || '-'
   const expiresAt = search.get('expiresAt') || ''
   const amount = Number(search.get('amount') || 0)
+  const token = search.get('token') || ''
 
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
@@ -45,14 +46,19 @@ function CheckoutInvoiceContent() {
     setChecking(true)
     setError('')
     try {
-      const res = await paymentService.getStatus(orderId)
+      let res
+      try {
+        res = await paymentService.getStatus(orderId)
+      } catch {
+        res = await paymentService.getGuestStatus(orderId, token)
+      }
       if (!res.success) {
         setError(res.message || 'Gagal cek status pembayaran')
         return
       }
 
       if (res.data.payment_status === 'paid' || res.data.order_status === 'active') {
-        router.push(`/product/digiproduct/checkout/success?id=${orderId}`)
+        router.push(`/product/digiproduct/checkout/success?id=${orderId}&token=${encodeURIComponent(token)}`)
         return
       }
 

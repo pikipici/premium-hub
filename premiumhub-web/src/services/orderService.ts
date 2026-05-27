@@ -10,6 +10,11 @@ export const orderService = {
     return res.data
   },
 
+  createGuest: async (data: { price_id: string; payment_method?: string; email: string; phone?: string }) => {
+    const res = await api.post<ApiResponse<Order>>('/public/orders', data)
+    return res.data
+  },
+
   list: async (params?: { page?: number; limit?: number }) => {
     const res = await api.get<ApiResponse<Order[]>>('/orders', { params })
     return res.data
@@ -17,6 +22,16 @@ export const orderService = {
 
   getByID: async (id: string) => {
     const res = await api.get<ApiResponse<Order>>(`/orders/${id}`)
+    return res.data
+  },
+
+  getGuestByID: async (id: string, token: string) => {
+    const res = await api.get<ApiResponse<Order>>(`/public/orders/${id}`, { params: { token } })
+    return res.data
+  },
+
+  resendGuestInvoice: async (data: { order_id: string; email: string }) => {
+    const res = await api.post<ApiResponse<null>>(`/public/orders/resend-invoice`, data)
     return res.data
   },
 
