@@ -3,6 +3,7 @@
 import { ADMIN_DENSE_PAGE_LIMIT, LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { accountTypeService } from '@/services/accountTypeService'
 import { productService } from '@/services/productService'
 import {
@@ -292,6 +293,7 @@ export default function StokPage() {
 
   const [modalMode, setModalMode] = useState<StockModalMode>('closed')
   const [editingStock, setEditingStock] = useState<Stock | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Stock | null>(null)
   const [form, setForm] = useState<StockFormState>(EMPTY_FORM)
   const [bulkForm, setBulkForm] = useState<BulkFormState>(EMPTY_BULK_FORM)
 
@@ -731,12 +733,6 @@ export default function StokPage() {
   }
 
   const removeStock = async (stock: Stock) => {
-    const product = resolveProduct(stock)
-    const confirmed = window.confirm(
-      `Hapus akun ${stock.email} dari ${product.name}?\nAksi ini tidak bisa dibatalkan.`
-    )
-    if (!confirmed) return
-
     setDeletingID(stock.id)
     setError('')
 
@@ -748,6 +744,7 @@ export default function StokPage() {
       }
 
       setNotice(`Akun ${stock.email} berhasil dihapus dari stok.`)
+      setDeleteTarget(null)
       await refreshStocks()
     } catch (err) {
       setError(mapErrorMessage(err, 'Gagal menghapus stok'))
@@ -1107,7 +1104,7 @@ export default function StokPage() {
                             <button
                               className="action-btn"
                               style={{ color: 'var(--red)', borderColor: '#FECACA' }}
-                              onClick={() => removeStock(stock)}
+                              onClick={() => setDeleteTarget(stock)}
                               disabled={isUsed || saving || isDeleting}
                               title={isUsed ? 'Stok terpakai tidak bisa dihapus' : 'Hapus akun stok'}
                             >
@@ -1353,7 +1350,7 @@ export default function StokPage() {
                       <button
                         className="action-btn"
                         style={{ color: 'var(--red)', borderColor: '#FECACA' }}
-                        onClick={() => removeStock(stock)}
+                        onClick={() => setDeleteTarget(stock)}
                         disabled={isUsed || saving || isDeleting}
                       >
                         {isDeleting ? 'Hapus...' : 'Hapus'}
@@ -1735,6 +1732,32 @@ export default function StokPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Hapus Akun Stok"
+        destructive
+        loading={!!deletingID}
+        confirmLabel="Hapus"
+        cancelLabel="Batal"
+        onCancel={() => {
+          if (!deletingID) setDeleteTarget(null)
+        }}
+        onConfirm={() => {
+          if (deleteTarget) void removeStock(deleteTarget)
+        }}
+        description={
+          deleteTarget ? (
+            <div className="space-y-2">
+              <p>Akun ini akan dihapus dari stok dan aksi ini tidak bisa dibatalkan.</p>
+              <div className="rounded-2xl bg-[#F7F7F5] p-3 text-xs text-[#4B4743]">
+                <div><strong>Email:</strong> {deleteTarget.email}</div>
+                <div><strong>Produk:</strong> {resolveProduct(deleteTarget).name}</div>
+              </div>
+            </div>
+          ) : null
+        }
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import { AUDIT_REPORT_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useState } from 'react'
 
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
   type WalletReconciliationFilters,
   type WalletReconciliationIssue,
@@ -33,6 +34,8 @@ export default function WalletReconciliationPage() {
   const [repairingKey, setRepairingKey] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [repairTarget, setRepairTarget] = useState<WalletReconciliationIssue | null>(null)
 
   const loadReport = useCallback(async (nextFilters = filters) => {
     setLoading(true)
@@ -81,13 +84,13 @@ export default function WalletReconciliationPage() {
 
   const repairIssue = async (issue: WalletReconciliationIssue) => {
     if (!issue.repairable || !issue.repair_action) return
-    const ok = window.confirm(`Repair aman untuk ${issueLabel(issue.type)}? Sistem akan cek ulang guard dan buat refund hanya kalau belum ada.`)
-    if (!ok) return
     setRepairingKey(issue.key)
     setError('')
+    setNotice('')
     try {
       const result = await walletReconciliationService.repair(issue.key, issue.repair_action)
-      window.alert(result.message)
+      setNotice(result.message)
+      setRepairTarget(null)
       await loadReport(filters)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Repair gagal')
@@ -144,6 +147,7 @@ export default function WalletReconciliationPage() {
       </div>
 
       {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div> : null}
+      {notice ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{notice}</div> : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {statCards.map((stat) => (
@@ -186,7 +190,7 @@ export default function WalletReconciliationPage() {
                   <td className="px-5 py-4"><small className="text-xs text-[#77716C]">{issue.expected_ref || issue.ledger_refs?.join(', ') || '-'}</small></td>
                   <td className="px-5 py-4">
                     {issue.repairable ? (
-                      <button type="button" className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white disabled:opacity-60" disabled={repairingKey === issue.key} onClick={() => void repairIssue(issue)}>
+                      <button type="button" className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white disabled:opacity-60" disabled={repairingKey === issue.key} onClick={() => setRepairTarget(issue)}>
                         {repairingKey === issue.key ? 'Repairing...' : 'Repair Guarded'}
                       </button>
                     ) : <span className="text-xs font-bold text-[#88817C]">Audit manual</span>}
@@ -200,6 +204,33 @@ export default function WalletReconciliationPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!repairTarget}
+        title={repairTarget ? `Repair ${issueLabel(repairTarget.type)}` : 'Repair issue'}
+        destructive
+        loading={!!repairingKey}
+        confirmLabel="Repair Guarded"
+        cancelLabel="Batal"
+        onCancel={() => {
+          if (!repairingKey) setRepairTarget(null)
+        }}
+        onConfirm={() => {
+          if (repairTarget) void repairIssue(repairTarget)
+        }}
+        description={
+          repairTarget ? (
+            <div className="space-y-2">
+              <p>Sistem akan cek ulang guard dan hanya membuat refund kalau belum ada.</p>
+              <div className="rounded-2xl bg-[#F7F7F5] p-3 text-xs text-[#4B4743]">
+                <div><strong>Order:</strong> {repairTarget.order_id}</div>
+                <div><strong>User:</strong> {repairTarget.user_id}</div>
+                <div><strong>Amount:</strong> {formatCurrency(repairTarget.amount)}</div>
+              </div>
+            </div>
+          ) : null
+        }
+      />
     </div>
   )
 }
