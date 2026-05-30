@@ -105,9 +105,9 @@ export default function HomePage() {
   const visibleCardsCount = Number(showDigiConnectCard) + Number(showSosmedCard) + Number(showDigiProductCard)
   const isSingleVisibleCard = visibleCardsCount === 1
   const hasVisibleCards = showDigiConnectCard || showSosmedCard || showDigiProductCard
-  const cardsGridClass = isSingleVisibleCard
-    ? 'grid gap-3 md:grid-cols-1 md:justify-items-center lg:gap-7'
-    : 'grid gap-3 md:grid-cols-2 md:gap-5 lg:grid-cols-3 lg:gap-7'
+  const desktopCardsGridClass = isSingleVisibleCard
+    ? 'hidden gap-3 sm:grid md:grid-cols-1 md:justify-items-center lg:gap-7'
+    : 'hidden gap-3 sm:grid md:grid-cols-2 md:gap-5 lg:grid-cols-3 lg:gap-7'
   const productCardClass = isSingleVisibleCard
     ? 'relative w-full overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-[0_12px_28px_rgba(20,20,20,0.05)] md:max-w-[640px] sm:rounded-3xl sm:p-6 sm:shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7'
     : 'relative overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-[0_12px_28px_rgba(20,20,20,0.05)] sm:rounded-3xl sm:p-6 sm:shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7'
@@ -145,7 +145,86 @@ Gateway AI dan growth sosial.
             </div>
           </header>
 
-          <div className={cardsGridClass}>
+          <div className="sm:hidden">
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <div className="text-left">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#FF5733]">Pilih kebutuhan</p>
+                <h2 className="mt-1 text-lg font-black tracking-tight text-[#141414]">Mau pakai apa hari ini?</h2>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[#6B7280] shadow-[0_8px_18px_rgba(20,20,20,0.04)]">
+                {visibleCardsCount} opsi
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {showSosmedCard ? (
+                <Link
+                  href="/product/sosmed"
+                  className="group relative overflow-hidden rounded-3xl bg-[#2853A6] p-4 text-white shadow-[0_16px_30px_rgba(40,83,166,0.22)]"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/12" />
+                  <BarChart3 className="relative h-6 w-6" />
+                  <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiSosmed</p>
+                  <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Naikin sosial</h3>
+                  <p className="relative mt-2 text-xs font-semibold text-white/78">{smmMiniStatLabel}</p>
+                  <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold">
+                    Buka <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              ) : null}
+
+              {showDigiProductCard ? (
+                <Link
+                  href="/product/digiproduct"
+                  className="group relative overflow-hidden rounded-3xl bg-[#237A44] p-4 text-white shadow-[0_16px_30px_rgba(35,122,68,0.18)]"
+                >
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/12" />
+                  <PackageCheck className="relative h-6 w-6" />
+                  <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiProduct</p>
+                  <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Produk digital</h3>
+                  <p className="relative mt-2 text-xs font-semibold text-white/78">Akun, lisensi, tools</p>
+                  <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold">
+                    Buka <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              ) : null}
+
+              {showDigiConnectCard ? (
+                <Link
+                  href="/product/digiconnect"
+                  className="group relative col-span-2 overflow-hidden rounded-3xl border border-[#2A2A2A] bg-[#141414] p-4 text-white shadow-[0_16px_34px_rgba(20,20,20,0.2)]"
+                >
+                  <div className="absolute -right-10 -top-12 h-28 w-28 rounded-full bg-[#F7D45B]/20" />
+                  <div className="relative flex items-start justify-between gap-4">
+                    <div>
+                      <Code2 className="h-6 w-6 text-[#F7D45B]" />
+                      <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.12em] text-white/55">DigiConnect</p>
+                      <h3 className="mt-1 text-xl font-black leading-tight tracking-tight">Gateway AI dari wallet</h3>
+                      <p className="mt-2 text-xs font-semibold text-white/68">API key, entitlement, usage billing.</p>
+                    </div>
+                    <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#141414]">
+                      <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                    </span>
+                  </div>
+                </Link>
+              ) : null}
+
+              {!hasVisibleCards ? (
+                <article className="col-span-2 rounded-3xl border border-[#EBEBEB] bg-white p-5 text-center shadow-[0_12px_28px_rgba(20,20,20,0.05)]">
+                  <h2 className="text-lg font-extrabold tracking-tight text-[#141414]">Produk belum tersedia</h2>
+                  <p className="mt-2 text-sm text-[#6B7280]">Coba lagi nanti atau hubungi admin.</p>
+                </article>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2 text-[11px] font-bold text-[#3A3A3A]">
+              <span className="rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 text-center">Aman</span>
+              <span className="rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 text-center">Refund</span>
+              <span className="rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 text-center">API ready</span>
+            </div>
+          </div>
+
+          <div className={desktopCardsGridClass}>
             {showDigiConnectCard ? (
               <article className={productCardClass}>
                 <div className="absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[#FFF3CC] sm:h-28 sm:w-28" />
