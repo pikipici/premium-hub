@@ -86,19 +86,19 @@ export default function AdminDigiConnectPage() {
   const routerConfigured = Boolean(overview?.router?.router_configured)
 
   return (
-    <main className="space-y-6 p-4 sm:p-6 lg:p-8">
-      <section className="overflow-hidden rounded-[30px] bg-[linear-gradient(135deg,#18130F,#7F2B18_52%,#FF623C)] p-6 text-white shadow-xl shadow-orange-950/10">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+    <main className="space-y-3 p-3 sm:space-y-6 sm:p-6 lg:p-8">
+      <section className="overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#18130F,#7F2B18_52%,#FF623C)] p-4 text-white shadow-xl shadow-orange-950/10 sm:rounded-[30px] sm:p-6">
+        <div className="flex flex-col gap-4 sm:gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/14 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] ring-1 ring-white/18">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/14 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ring-1 ring-white/18 sm:mb-4 sm:text-xs">
               <Cpu className="h-4 w-4" /> Operator Console
             </div>
-            <h1 className="text-3xl font-black tracking-tight sm:text-4xl">DigiConnect Control Room</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-orange-50/85">
+            <h1 className="text-2xl font-black tracking-tight sm:text-4xl">DigiConnect</h1>
+            <p className="mt-2 max-w-2xl text-xs leading-5 text-orange-50/85 sm:mt-3 sm:text-sm sm:leading-6">
               Pantau trafik API, billing wallet, request pending verification, dan entitlement pelanggan dari satu layar admin.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-4 xl:min-w-[640px]">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 xl:min-w-[640px]">
             <Stat label="Total request" value={String(totalRequests)} />
             <Stat label="Hari ini" value={String(Object.values(overview?.today_counts || {}).reduce((sum, item) => sum + item, 0))} />
             <Stat label="Tertagih" value={currency.format(overview?.charged_amount || 0)} />
@@ -114,16 +114,16 @@ export default function AdminDigiConnectPage() {
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-          <section className="rounded-[28px] border border-[#EFE8DF] bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2 text-lg font-black text-[#171411]">
+        <div className="grid gap-3 sm:gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+          <section className="rounded-2xl border border-[#EFE8DF] bg-white p-3 shadow-sm sm:rounded-[28px] sm:p-5">
+            <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-base font-black text-[#171411] sm:text-lg">
                 <ActivitySquare className="h-5 w-5 text-[#FF5733]" /> Request terbaru
               </div>
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="rounded-xl border border-[#E7DDD1] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#FF5733]"
+                className="w-full rounded-xl border border-[#E7DDD1] bg-white px-3 py-3 text-sm font-semibold outline-none focus:border-[#FF5733] sm:w-auto sm:py-2"
               >
                 <option value="">Semua status</option>
                 <option value="completed">Completed</option>
@@ -132,7 +132,7 @@ export default function AdminDigiConnectPage() {
                 <option value="failed">Failed</option>
               </select>
             </div>
-            <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-left text-sm">
                 <thead className="text-xs uppercase tracking-[0.12em] text-[#9A9289]">
                   <tr>
@@ -164,9 +164,15 @@ export default function AdminDigiConnectPage() {
               </table>
               {requests.length === 0 ? <Empty text="Belum ada request sesuai filter." /> : null}
             </div>
+            <div className="space-y-2 md:hidden">
+              {requests.map((request) => (
+                <RequestCard key={request.id} request={request} />
+              ))}
+              {requests.length === 0 ? <Empty text="Belum ada request sesuai filter." /> : null}
+            </div>
           </section>
 
-          <aside className="space-y-6">
+          <aside className="space-y-3 sm:space-y-6">
             <Panel title="Router" icon={<Router className="h-5 w-5" />}>
               <div className="rounded-2xl bg-[#171411] p-4 text-white">
                 <div className="text-xs font-bold uppercase tracking-[0.14em] text-orange-100/70">Status</div>
@@ -177,22 +183,37 @@ export default function AdminDigiConnectPage() {
 
             <Panel title="Provision entitlement" icon={<WalletCards className="h-5 w-5" />}>
               <div className="space-y-3">
-                <input
-                  value={provisionForm.userId}
-                  onChange={(event) => setProvisionForm((prev) => ({ ...prev, userId: event.target.value }))}
-                  className="w-full rounded-xl border border-[#E7DDD1] px-3 py-2 text-sm font-semibold outline-none focus:border-[#FF5733]"
-                  placeholder="User UUID"
-                />
-                <input
-                  value={provisionForm.planCode}
-                  onChange={(event) => setProvisionForm((prev) => ({ ...prev, planCode: event.target.value }))}
-                  className="w-full rounded-xl border border-[#E7DDD1] px-3 py-2 text-sm font-semibold outline-none focus:border-[#FF5733]"
-                  placeholder="Plan code"
-                />
-                <div className="grid grid-cols-3 gap-2">
-                  <input value={provisionForm.price} onChange={(event) => setProvisionForm((prev) => ({ ...prev, price: event.target.value }))} className="rounded-xl border border-[#E7DDD1] px-3 py-2 text-sm font-semibold outline-none focus:border-[#FF5733]" placeholder="Harga" />
-                  <input value={provisionForm.durationDays} onChange={(event) => setProvisionForm((prev) => ({ ...prev, durationDays: event.target.value }))} className="rounded-xl border border-[#E7DDD1] px-3 py-2 text-sm font-semibold outline-none focus:border-[#FF5733]" placeholder="Hari" />
-                  <input value={provisionForm.dailyFairUseLimit} onChange={(event) => setProvisionForm((prev) => ({ ...prev, dailyFairUseLimit: event.target.value }))} className="rounded-xl border border-[#E7DDD1] px-3 py-2 text-sm font-semibold outline-none focus:border-[#FF5733]" placeholder="Fair use" />
+                <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.08em] text-[#8A8178]">
+                  User UUID
+                  <input
+                    value={provisionForm.userId}
+                    onChange={(event) => setProvisionForm((prev) => ({ ...prev, userId: event.target.value }))}
+                    className="w-full rounded-xl border border-[#E7DDD1] px-3 py-3 text-sm font-semibold normal-case tracking-normal outline-none focus:border-[#FF5733] sm:py-2"
+                    placeholder="User UUID"
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.08em] text-[#8A8178]">
+                  Plan code
+                  <input
+                    value={provisionForm.planCode}
+                    onChange={(event) => setProvisionForm((prev) => ({ ...prev, planCode: event.target.value }))}
+                    className="w-full rounded-xl border border-[#E7DDD1] px-3 py-3 text-sm font-semibold normal-case tracking-normal outline-none focus:border-[#FF5733] sm:py-2"
+                    placeholder="Plan code"
+                  />
+                </label>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.08em] text-[#8A8178]">
+                    Harga
+                    <input value={provisionForm.price} onChange={(event) => setProvisionForm((prev) => ({ ...prev, price: event.target.value }))} className="rounded-xl border border-[#E7DDD1] px-3 py-3 text-sm font-semibold normal-case tracking-normal outline-none focus:border-[#FF5733] sm:py-2" placeholder="Harga" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.08em] text-[#8A8178]">
+                    Hari
+                    <input value={provisionForm.durationDays} onChange={(event) => setProvisionForm((prev) => ({ ...prev, durationDays: event.target.value }))} className="rounded-xl border border-[#E7DDD1] px-3 py-3 text-sm font-semibold normal-case tracking-normal outline-none focus:border-[#FF5733] sm:py-2" placeholder="Hari" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.08em] text-[#8A8178]">
+                    Fair use
+                    <input value={provisionForm.dailyFairUseLimit} onChange={(event) => setProvisionForm((prev) => ({ ...prev, dailyFairUseLimit: event.target.value }))} className="rounded-xl border border-[#E7DDD1] px-3 py-3 text-sm font-semibold normal-case tracking-normal outline-none focus:border-[#FF5733] sm:py-2" placeholder="Fair use" />
+                  </label>
                 </div>
                 <div className="grid gap-2 text-xs font-bold text-[#6F675F]">
                   <label className="flex items-center gap-2"><input type="checkbox" checked={provisionForm.payPerRequestEnabled} onChange={(event) => setProvisionForm((prev) => ({ ...prev, payPerRequestEnabled: event.target.checked }))} /> Pay per request</label>
@@ -213,10 +234,10 @@ export default function AdminDigiConnectPage() {
                       <div className="font-black text-[#171411]">{item.plan_code}</div>
                       <span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusClass(item.status)}`}>{item.status}</span>
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-[#6F675F]">
-                      <span>{currency.format(item.price)}</span>
-                      <span>{item.pay_per_request_enabled ? 'PPR aktif' : 'PPR off'}</span>
-                      <span className="col-span-2">Expire: {formatDate(item.expires_at)}</span>
+                    <div className="mt-3 grid gap-1.5 text-xs text-[#6F675F]">
+                      <span className="flex justify-between gap-3"><span>Harga</span><strong className="text-[#171411]">{currency.format(item.price)}</strong></span>
+                      <span className="flex justify-between gap-3"><span>PPR</span><strong className="text-[#171411]">{item.pay_per_request_enabled ? 'Aktif' : 'Off'}</strong></span>
+                      <span className="flex justify-between gap-3"><span>Expire</span><strong className="text-right text-[#171411]">{formatDate(item.expires_at)}</strong></span>
                     </div>
                   </div>
                 ))}
@@ -239,17 +260,37 @@ export default function AdminDigiConnectPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white/14 p-4 ring-1 ring-white/18 backdrop-blur">
-      <div className="text-xs font-bold uppercase tracking-[0.14em] text-orange-50/70">{label}</div>
-      <div className="mt-1 truncate text-lg font-black">{value}</div>
+    <div className="rounded-xl bg-white/14 p-3 ring-1 ring-white/18 backdrop-blur sm:rounded-2xl sm:p-4">
+      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-orange-50/70 sm:text-xs">{label}</div>
+      <div className="mt-1 truncate text-sm font-black sm:text-lg">{value}</div>
     </div>
+  )
+}
+
+function RequestCard({ request }: { request: DigiConnectRequest }) {
+  return (
+    <article className="rounded-2xl border border-[#EFE8DF] bg-[#FFFCF8] p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-mono text-[11px] font-bold text-[#8A8178]">{request.request_id}</div>
+          <div className="mt-1 line-clamp-2 text-sm font-black text-[#171411]">{request.input_preview || request.service_alias || '-'}</div>
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${statusClass(request.status)}`}>{request.status}</span>
+      </div>
+      <div className="mt-3 grid gap-1.5 text-xs text-[#665D54]">
+        <div className="flex justify-between gap-3"><span>Billing</span><strong className="text-right text-[#171411]">{request.billing_source || '-'} · {request.amount ? currency.format(request.amount) : '-'}</strong></div>
+        <div className="flex justify-between gap-3"><span>Router</span><strong className="text-right text-[#171411]">{request.router_provider || '-'} / {request.router_model || '-'}</strong></div>
+        <div className="flex justify-between gap-3"><span>Latency</span><strong className="text-right text-[#171411]">{request.router_status || '-'} · {request.router_latency_ms} ms</strong></div>
+        <div className="flex justify-between gap-3"><span>Dibuat</span><strong className="text-right text-[#171411]">{formatDate(request.created_at)}</strong></div>
+      </div>
+    </article>
   )
 }
 
 function Panel({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-[28px] border border-[#EFE8DF] bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-2 text-lg font-black text-[#171411]">
+    <section className="rounded-2xl border border-[#EFE8DF] bg-white p-4 shadow-sm sm:rounded-[28px] sm:p-5">
+      <div className="mb-3 flex items-center gap-2 text-base font-black text-[#171411] sm:mb-4 sm:text-lg">
         <span className="text-[#FF5733]">{icon}</span>
         {title}
       </div>
