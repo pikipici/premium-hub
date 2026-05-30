@@ -121,7 +121,7 @@ export default function HomePage() {
           <header className="mx-auto mb-4 max-w-3xl text-center sm:mb-6 lg:mb-10">
             <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-4 py-1.5 text-xs font-bold text-[#FF5733]">
               <Rocket className="h-3.5 w-3.5" />
-              DigiConnect + DigiSosmed
+              DigiMarket
             </p>
             <h1 className="mt-3 text-3xl font-black leading-[0.96] tracking-[-0.04em] text-[#141414] sm:mt-4 sm:text-5xl sm:leading-tight">
 Semua kebutuhan ada disini
