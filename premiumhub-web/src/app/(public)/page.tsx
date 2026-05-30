@@ -106,30 +106,30 @@ export default function HomePage() {
   const isSingleVisibleCard = visibleCardsCount === 1
   const hasVisibleCards = showDigiConnectCard || showSosmedCard || showDigiProductCard
   const cardsGridClass = isSingleVisibleCard
-    ? 'grid gap-5 md:grid-cols-1 md:justify-items-center lg:gap-7'
-    : 'grid gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-7'
+    ? 'grid gap-3 md:grid-cols-1 md:justify-items-center lg:gap-7'
+    : 'grid gap-3 md:grid-cols-2 md:gap-5 lg:grid-cols-3 lg:gap-7'
   const productCardClass = isSingleVisibleCard
-    ? 'relative w-full overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white p-5 shadow-[0_16px_38px_rgba(20,20,20,0.06)] md:max-w-[640px] sm:p-6 lg:p-7'
-    : 'relative overflow-hidden rounded-3xl border border-[#EBEBEB] bg-white p-5 shadow-[0_16px_38px_rgba(20,20,20,0.06)] sm:p-6 lg:p-7'
+    ? 'relative w-full overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-[0_12px_28px_rgba(20,20,20,0.05)] md:max-w-[640px] sm:rounded-3xl sm:p-6 sm:shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7'
+    : 'relative overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-[0_12px_28px_rgba(20,20,20,0.05)] sm:rounded-3xl sm:p-6 sm:shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7'
 
   return (
     <>
       <Navbar />
 
       <main className="bg-[#F7F7F5]">
-        <section className="mx-auto w-full max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8 lg:pb-20 lg:pt-12">
-          <header className="mx-auto mb-6 max-w-3xl text-center lg:mb-10">
+        <section className="mx-auto w-full max-w-7xl px-4 pb-10 pt-5 sm:px-6 sm:pb-16 sm:pt-8 lg:px-8 lg:pb-20 lg:pt-12">
+          <header className="mx-auto mb-4 max-w-3xl text-center sm:mb-6 lg:mb-10">
             <p className="inline-flex items-center gap-2 rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-4 py-1.5 text-xs font-bold text-[#FF5733]">
               <Rocket className="h-3.5 w-3.5" />
               DigiConnect + DigiSosmed
             </p>
-            <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] text-[#141414] sm:text-5xl">
+            <h1 className="mt-3 text-3xl font-black leading-[0.96] tracking-[-0.04em] text-[#141414] sm:mt-4 sm:text-5xl sm:leading-tight">
 Gateway AI dan growth sosial.
             </h1>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[#6B7280] sm:text-base">
+            <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-[#6B7280] sm:mt-3 sm:text-base">
               DigiConnect untuk akses API. DigiSosmed untuk followers, views, engagement.
             </p>
-            <div className="mt-5 grid grid-cols-3 gap-2 text-[11px] font-bold text-[#3A3A3A] sm:mx-auto sm:max-w-xl sm:text-xs">
+            <div className="mx-auto mt-4 flex max-w-full gap-2 overflow-x-auto pb-1 text-[11px] font-bold text-[#3A3A3A] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:max-w-xl sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:text-xs">
               <span className="inline-flex items-center justify-center gap-1 rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 shadow-[0_8px_18px_rgba(20,20,20,0.04)]">
                 <ShieldCheck className="h-3.5 w-3.5 text-[#FF5733]" />
                 Aman
@@ -148,18 +148,18 @@ Gateway AI dan growth sosial.
           <div className={cardsGridClass}>
             {showDigiConnectCard ? (
               <article className={productCardClass}>
-                <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#FFF3CC]" />
+                <div className="absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[#FFF3CC] sm:h-28 sm:w-28" />
                 <p className="relative inline-flex rounded-full border border-[#F7D45B] bg-[#FFF8DC] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#7A5200]">
                   DigiConnect
                 </p>
-                <h2 className="relative mt-3 text-2xl font-extrabold tracking-tight text-[#141414]">
+                <h2 className="relative mt-2 text-lg font-extrabold leading-tight tracking-tight text-[#141414] sm:mt-3 sm:text-2xl">
                   Gateway AI dari wallet
                 </h2>
-                <p className="relative mt-2 text-sm leading-relaxed text-[#6B7280] md:text-[15px]">
+                <p className="relative mt-1.5 text-sm leading-relaxed text-[#6B7280] sm:mt-2 md:text-[15px]">
                   Beli paket, buat API key, kirim request.
                 </p>
 
-                <ul className="relative mt-4 space-y-2 text-sm text-[#2E2E2E]">
+                <ul className="relative mt-4 hidden space-y-2 text-sm text-[#2E2E2E] sm:block">
                   <li className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#A36A00]" />
                     OpenAI-compatible. Untuk bot dan workflow.
@@ -170,8 +170,8 @@ Gateway AI dan growth sosial.
                   </li>
                 </ul>
 
-                <div className="relative mt-5 rounded-2xl border border-[#F4DE8D] bg-[#FFFBEA] px-4 py-3">
-                  <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-bold text-[#141414]">
+                <div className="relative mt-3 inline-flex rounded-full border border-[#F4DE8D] bg-[#FFFBEA] px-3 py-1.5 sm:mt-5 sm:block sm:rounded-2xl sm:px-4 sm:py-3">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-bold text-[#141414] sm:mt-1 sm:text-sm">
                     <Code2 className="h-4 w-4 text-[#A36A00]" />
                     Wallet billing aktif
                   </p>
@@ -179,7 +179,7 @@ Gateway AI dan growth sosial.
 
                 <Link
                   href="/product/digiconnect"
-                  className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-[#141414] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#2A2A2A]"
+                  className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-[#141414] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#2A2A2A] sm:mt-5 sm:px-5 sm:py-3"
                 >
                   Lihat detail
                   <ArrowRight className="h-4 w-4" />
@@ -189,18 +189,18 @@ Gateway AI dan growth sosial.
 
             {showSosmedCard ? (
               <article className={productCardClass}>
-                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#EEF4FF]" />
+                <div className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-[#EEF4FF] sm:h-24 sm:w-24" />
                 <p className="relative inline-flex rounded-full border border-[#DCE9FF] bg-[#EEF4FF] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#2853A6]">
                   DigiSosmed
                 </p>
-                <h2 className="relative mt-3 text-2xl font-extrabold tracking-tight text-[#141414]">
+                <h2 className="relative mt-2 text-lg font-extrabold leading-tight tracking-tight text-[#141414] sm:mt-3 sm:text-2xl">
                   Naikin follower, view, engagement
                 </h2>
-                <p className="relative mt-2 text-sm leading-relaxed text-[#6B7280] md:text-[15px]">
+                <p className="relative mt-1.5 text-sm leading-relaxed text-[#6B7280] sm:mt-2 md:text-[15px]">
                   Order langsung jalan.
                 </p>
 
-                <ul className="relative mt-4 space-y-2 text-sm text-[#2E2E2E]">
+                <ul className="relative mt-4 hidden space-y-2 text-sm text-[#2E2E2E] sm:block">
                   <li className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#2853A6]" />
                     Instagram, TikTok, YouTube, Telegram, dan lainnya
@@ -211,8 +211,8 @@ Gateway AI dan growth sosial.
                   </li>
                 </ul>
 
-                <div className="relative mt-5 rounded-2xl border border-[#DEE8FA] bg-[#F5F8FF] px-4 py-3">
-                  <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-bold text-[#141414]">
+                <div className="relative mt-3 inline-flex rounded-full border border-[#DEE8FA] bg-[#F5F8FF] px-3 py-1.5 sm:mt-5 sm:block sm:rounded-2xl sm:px-4 sm:py-3">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-bold text-[#141414] sm:mt-1 sm:text-sm">
                     <BarChart3 className="h-4 w-4 text-[#2853A6]" />
                     {smmMiniStatLabel}
                   </p>
@@ -220,7 +220,7 @@ Gateway AI dan growth sosial.
 
                 <Link
                   href="/product/sosmed"
-                  className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-[#2853A6] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#204486]"
+                  className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-[#2853A6] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#204486] sm:mt-5 sm:px-5 sm:py-3"
                 >
                   Lihat detail
                   <ArrowRight className="h-4 w-4" />
@@ -230,18 +230,18 @@ Gateway AI dan growth sosial.
 
             {showDigiProductCard ? (
               <article className={productCardClass}>
-                <div className="absolute -right-9 -top-9 h-24 w-24 rounded-full bg-[#EAF8EF]" />
+                <div className="absolute -right-9 -top-9 h-20 w-20 rounded-full bg-[#EAF8EF] sm:h-24 sm:w-24" />
                 <p className="relative inline-flex rounded-full border border-[#CFEFDB] bg-[#EAF8EF] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[#237A44]">
                   DigiProduct
                 </p>
-                <h2 className="relative mt-3 text-2xl font-extrabold tracking-tight text-[#141414]">
+                <h2 className="relative mt-2 text-lg font-extrabold leading-tight tracking-tight text-[#141414] sm:mt-3 sm:text-2xl">
                   Produk digital siap pakai
                 </h2>
-                <p className="relative mt-2 text-sm leading-relaxed text-[#6B7280] md:text-[15px]">
+                <p className="relative mt-1.5 text-sm leading-relaxed text-[#6B7280] sm:mt-2 md:text-[15px]">
                   Akun premium, lisensi, dan tools digital.
                 </p>
 
-                <ul className="relative mt-4 space-y-2 text-sm text-[#2E2E2E]">
+                <ul className="relative mt-4 hidden space-y-2 text-sm text-[#2E2E2E] sm:block">
                   <li className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#237A44]" />
                     Streaming, musik, gaming, desain, produktivitas
@@ -252,8 +252,8 @@ Gateway AI dan growth sosial.
                   </li>
                 </ul>
 
-                <div className="relative mt-5 rounded-2xl border border-[#D9F1E2] bg-[#F3FBF6] px-4 py-3">
-                  <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-bold text-[#141414]">
+                <div className="relative mt-3 inline-flex rounded-full border border-[#D9F1E2] bg-[#F3FBF6] px-3 py-1.5 sm:mt-5 sm:block sm:rounded-2xl sm:px-4 sm:py-3">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-bold text-[#141414] sm:mt-1 sm:text-sm">
                     <PackageCheck className="h-4 w-4 text-[#237A44]" />
                     Katalog produk digital
                   </p>
@@ -261,7 +261,7 @@ Gateway AI dan growth sosial.
 
                 <Link
                   href="/product/digiproduct"
-                  className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-[#237A44] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#1D6638]"
+                  className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-[#237A44] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#1D6638] sm:mt-5 sm:px-5 sm:py-3"
                 >
                   Lihat detail
                   <ArrowRight className="h-4 w-4" />
