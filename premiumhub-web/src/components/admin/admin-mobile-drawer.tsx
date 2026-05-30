@@ -10,6 +10,7 @@ type DrawerItem = {
   href: string
   label: string
   icon: string
+  hint?: string
 }
 
 type DrawerSection = {
@@ -21,17 +22,17 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   {
     label: 'Overview',
     items: [
-      { href: '/admin', label: 'Dashboard', icon: '▦' },
+      { href: '/admin', label: 'Dashboard', icon: 'DB', hint: 'Ringkasan' },
     ],
   },
   {
     label: 'Transaksi',
     items: [
-      { href: '/admin/order', label: 'Order', icon: '◉' },
-      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: '◎' },
-      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: '◬' },
-      { href: '/admin/convert', label: 'Control Convert', icon: '⇄' },
-      { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌' },
+      { href: '/admin/order', label: 'Order', icon: 'OR', hint: 'DigiProduct' },
+      { href: '/admin/sosmed/orders', label: 'Order Sosmed', icon: 'OS', hint: 'JAP/provider' },
+      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: 'RW', hint: 'Saldo & mutasi' },
+      { href: '/admin/convert', label: 'Convert', icon: 'CV', hint: 'Queue & pricing' },
+      { href: '/admin/garansi', label: 'Klaim Garansi', icon: 'KG', hint: 'Refund/reissue' },
     ],
   },
   {
@@ -43,16 +44,16 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   {
     label: 'Katalog',
     items: [
-      { href: '/admin/produk', label: 'Produk', icon: '◈' },
-      { href: '/admin/sosmed', label: 'DigiSosmed', icon: '◍' },
-      { href: '/admin/stok', label: 'Stok Akun', icon: '◧' },
+      { href: '/admin/produk', label: 'Produk', icon: 'PR', hint: 'DigiProduct' },
+      { href: '/admin/sosmed', label: 'DigiSosmed', icon: 'SM', hint: 'Layanan sosial' },
+      { href: '/admin/stok', label: 'Stok Akun', icon: 'ST', hint: 'Inventory' },
     ],
   },
   {
     label: 'Akun',
     items: [
-      { href: '/admin/pengguna', label: 'Pengguna', icon: '◎' },
-      { href: '/admin/pengaturan', label: 'Pengaturan', icon: '◫' },
+      { href: '/admin/pengguna', label: 'Pengguna', icon: 'US', hint: 'User account' },
+      { href: '/admin/pengaturan', label: 'Pengaturan', icon: 'PG', hint: 'Konfigurasi' },
     ],
   },
 ]
@@ -167,7 +168,10 @@ export default function AdminMobileDrawer({
                       onClick={onClose}
                     >
                       <span className="admin-mobile-drawer-icon">{item.icon}</span>
-                      <span>{item.label}</span>
+                      <span className="admin-mobile-drawer-copy">
+                        <span>{item.label}</span>
+                        {item.hint ? <span>{item.hint}</span> : null}
+                      </span>
                       {showBadge ? (
                         <span className={`admin-mobile-drawer-item-badge${badgeClassNameForHref(item.href)}`}>
                           {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
