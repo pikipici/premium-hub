@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useMemo, useState } from 'react'
 
 type NavItem = {
   href: string
@@ -12,8 +13,11 @@ type NavItem = {
 
 type NavSection = {
   label: string
+  collapsible?: boolean
   items: NavItem[]
 }
+
+const SIDEBAR_OPEN_STORAGE_KEY = 'premiumhub-admin-sidebar-open-sections'
 
 const NAV_SECTIONS: NavSection[] = [
   {
@@ -32,6 +36,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: 'Transaksi',
+    collapsible: true,
     items: [
       { href: '/admin/order', label: 'Order', icon: 'OR', hint: 'DigiProduct' },
       { href: '/admin/sosmed/orders', label: 'Order Sosmed', icon: 'OS', hint: 'JAP/provider' },
@@ -43,6 +48,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: 'Convert',
+    collapsible: true,
     items: [
       { href: '/admin/convert', label: 'Dashboard', icon: 'CV', hint: 'Ringkasan' },
       { href: '/admin/convert/orders', label: 'Order Convert', icon: 'CO', hint: 'Queue order' },
@@ -52,6 +58,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: 'Gmail',
+    collapsible: true,
     items: [
       { href: '/admin/gmail', label: 'Dashboard', icon: 'GM', hint: 'Ringkasan' },
       { href: '/admin/gmail/verifikasi', label: 'Verifikasi', icon: 'GV', hint: 'Setoran Gmail' },
@@ -111,6 +118,46 @@ function badgeClassNameForHref(href: string) {
 
 export default function AdminSidebar({ collapsed = false, badges, loadingBadges = false }: AdminSidebarProps) {
   const pathname = usePathname()
+  const activeSectionLabels = useMemo(
+    () => NAV_SECTIONS
+      .filter((section) => section.items.some((item) => isNavActive(pathname, item.href)))
+      .map((section) => section.label),
+    [pathname],
+  )
+  const [openSections, setOpenSections] = useState<Set<string>>(() => {
+    const initialOpenSections = new Set(activeSectionLabels)
+    if (typeof window === 'undefined') return initialOpenSections
+
+    try {
+      const saved = window.localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY)
+      if (!saved) return initialOpenSections
+
+      const parsed = JSON.parse(saved)
+      if (!Array.isArray(parsed)) return initialOpenSections
+
+      parsed
+        .filter((value) => typeof value === 'string')
+        .forEach((label) => initialOpenSections.add(label))
+    } catch {
+      // Ignore malformed local sidebar preferences.
+    }
+
+    return initialOpenSections
+  })
+
+  const toggleSection = (label: string) => {
+    setOpenSections((current) => {
+      const next = new Set(current)
+      if (next.has(label)) {
+        next.delete(label)
+      } else {
+        next.add(label)
+      }
+
+      window.localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }
 
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
@@ -128,40 +175,59 @@ export default function AdminSidebar({ collapsed = false, badges, loadingBadges 
       </div>
 
       <nav className="sidebar-nav" aria-label="Menu admin">
-        {NAV_SECTIONS.map((section) => (
-          <div className="nav-section" key={section.label}>
-            <span className="nav-section-label">{section.label}</span>
+        {NAV_SECTIONS.map((section) => {
+          const sectionActive = section.items.some((item) => isNavActive(pathname, item.href))
+          const sectionOpen = !section.collapsible || collapsed || openSections.has(section.label) || sectionActive
 
-            {section.items.map((item) => {
-              const active = isNavActive(pathname, item.href)
-              const badgeValue = badgeValueForHref(item.href, badges)
-              const showBadge = loadingBadges
-                ? ['/admin/order', '/admin/stok', '/admin/garansi'].includes(item.href)
-                : badgeValue > 0
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`nav-item${active ? ' active' : ''}`}
-                  title={collapsed ? item.label : undefined}
-                  aria-label={item.label}
+          return (
+            <div className="nav-section" key={section.label}>
+              {section.collapsible && !collapsed ? (
+                <button
+                  type="button"
+                  className={`nav-section-toggle${sectionOpen ? ' open' : ''}`}
+                  aria-expanded={sectionOpen}
+                  onClick={() => toggleSection(section.label)}
                 >
-                  <span className="nav-icon">{item.icon}</span>
-                  <span className="nav-text-wrap">
-                    <span className="nav-text">{item.label}</span>
-                    {item.hint ? <span className="nav-hint">{item.hint}</span> : null}
-                  </span>
-                  {showBadge ? (
-                    <span className={`nav-badge${badgeClassNameForHref(item.href)}`}>
-                      {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
-                    </span>
-                  ) : null}
-                </Link>
-              )
-            })}
-          </div>
-        ))}
+                  <span>{section.label}</span>
+                  <span className="nav-section-chevron">▾</span>
+                </button>
+              ) : (
+                <span className="nav-section-label">{section.label}</span>
+              )}
+
+              <div className={`nav-section-items${sectionOpen ? ' open' : ''}`}>
+                {section.items.map((item) => {
+                  const active = isNavActive(pathname, item.href)
+                  const badgeValue = badgeValueForHref(item.href, badges)
+                  const showBadge = loadingBadges
+                    ? ['/admin/order', '/admin/stok', '/admin/garansi'].includes(item.href)
+                    : badgeValue > 0
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`nav-item${active ? ' active' : ''}`}
+                      title={collapsed ? item.label : undefined}
+                      aria-label={item.label}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      <span className="nav-text-wrap">
+                        <span className="nav-text">{item.label}</span>
+                        {item.hint ? <span className="nav-hint">{item.hint}</span> : null}
+                      </span>
+                      {showBadge ? (
+                        <span className={`nav-badge${badgeClassNameForHref(item.href)}`}>
+                          {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
+                        </span>
+                      ) : null}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
       </nav>
 
       <div className="sidebar-bottom">

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type { AdminSidebarBadgeCounts } from '@/components/admin/admin-sidebar'
 
@@ -15,8 +15,11 @@ type DrawerItem = {
 
 type DrawerSection = {
   label: string
+  collapsible?: boolean
   items: DrawerItem[]
 }
+
+const DRAWER_OPEN_STORAGE_KEY = 'premiumhub-admin-mobile-drawer-open-sections'
 
 const DRAWER_SECTIONS: DrawerSection[] = [
   {
@@ -27,6 +30,7 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   },
   {
     label: 'Transaksi',
+    collapsible: true,
     items: [
       { href: '/admin/order', label: 'Order', icon: 'OR', hint: 'DigiProduct' },
       { href: '/admin/sosmed/orders', label: 'Order Sosmed', icon: 'OS', hint: 'JAP/provider' },
@@ -38,6 +42,7 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   },
   {
     label: 'Convert',
+    collapsible: true,
     items: [
       { href: '/admin/convert', label: 'Dashboard', icon: 'CV', hint: 'Ringkasan' },
       { href: '/admin/convert/orders', label: 'Order Convert', icon: 'CO', hint: 'Queue order' },
@@ -53,6 +58,7 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   },
   {
     label: 'Gmail',
+    collapsible: true,
     items: [
       { href: '/admin/gmail', label: 'Dashboard', icon: 'GM', hint: 'Ringkasan' },
       { href: '/admin/gmail/verifikasi', label: 'Verifikasi', icon: 'GV', hint: 'Setoran Gmail' },
@@ -114,6 +120,46 @@ export default function AdminMobileDrawer({
   loadingBadges = false,
 }: AdminMobileDrawerProps) {
   const pathname = usePathname()
+  const activeSectionLabels = useMemo(
+    () => DRAWER_SECTIONS
+      .filter((section) => section.items.some((item) => isActive(pathname, item.href)))
+      .map((section) => section.label),
+    [pathname],
+  )
+  const [openSections, setOpenSections] = useState<Set<string>>(() => {
+    const initialOpenSections = new Set(activeSectionLabels)
+    if (typeof window === 'undefined') return initialOpenSections
+
+    try {
+      const saved = window.localStorage.getItem(DRAWER_OPEN_STORAGE_KEY)
+      if (!saved) return initialOpenSections
+
+      const parsed = JSON.parse(saved)
+      if (!Array.isArray(parsed)) return initialOpenSections
+
+      parsed
+        .filter((value) => typeof value === 'string')
+        .forEach((label) => initialOpenSections.add(label))
+    } catch {
+      // Ignore malformed local drawer preferences.
+    }
+
+    return initialOpenSections
+  })
+
+  const toggleSection = (label: string) => {
+    setOpenSections((current) => {
+      const next = new Set(current)
+      if (next.has(label)) {
+        next.delete(label)
+      } else {
+        next.add(label)
+      }
+
+      window.localStorage.setItem(DRAWER_OPEN_STORAGE_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!open) return
@@ -170,40 +216,57 @@ export default function AdminMobileDrawer({
         </div>
 
         <div className="admin-mobile-drawer-scroll">
-          {DRAWER_SECTIONS.map((section) => (
-            <div className="admin-mobile-drawer-section" key={section.label}>
-              <div className="admin-mobile-drawer-label">{section.label}</div>
+          {DRAWER_SECTIONS.map((section) => {
+            const sectionActive = section.items.some((item) => isActive(pathname, item.href))
+            const sectionOpen = !section.collapsible || openSections.has(section.label) || sectionActive
 
-              <div className="admin-mobile-drawer-items">
-                {section.items.map((item) => {
-                  const badgeValue = badgeValueForHref(item.href, badges)
-                  const showBadge = loadingBadges
-                    ? ['/admin/order', '/admin/stok', '/admin/garansi'].includes(item.href)
-                    : badgeValue > 0
+            return (
+              <div className="admin-mobile-drawer-section" key={section.label}>
+                {section.collapsible ? (
+                  <button
+                    type="button"
+                    className={`admin-mobile-drawer-section-toggle${sectionOpen ? ' open' : ''}`}
+                    aria-expanded={sectionOpen}
+                    onClick={() => toggleSection(section.label)}
+                  >
+                    <span>{section.label}</span>
+                    <span className="admin-mobile-drawer-chevron">▾</span>
+                  </button>
+                ) : (
+                  <div className="admin-mobile-drawer-label">{section.label}</div>
+                )}
 
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`admin-mobile-drawer-item${isActive(pathname, item.href) ? ' active' : ''}`}
-                      onClick={onClose}
-                    >
-                      <span className="admin-mobile-drawer-icon">{item.icon}</span>
-                      <span className="admin-mobile-drawer-copy">
-                        <span>{item.label}</span>
-                        {item.hint ? <span>{item.hint}</span> : null}
-                      </span>
-                      {showBadge ? (
-                        <span className={`admin-mobile-drawer-item-badge${badgeClassNameForHref(item.href)}`}>
-                          {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
+                <div className={`admin-mobile-drawer-items${sectionOpen ? ' open' : ''}`}>
+                  {section.items.map((item) => {
+                    const badgeValue = badgeValueForHref(item.href, badges)
+                    const showBadge = loadingBadges
+                      ? ['/admin/order', '/admin/stok', '/admin/garansi'].includes(item.href)
+                      : badgeValue > 0
+
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`admin-mobile-drawer-item${isActive(pathname, item.href) ? ' active' : ''}`}
+                        onClick={onClose}
+                      >
+                        <span className="admin-mobile-drawer-icon">{item.icon}</span>
+                        <span className="admin-mobile-drawer-copy">
+                          <span>{item.label}</span>
+                          {item.hint ? <span>{item.hint}</span> : null}
                         </span>
-                      ) : null}
-                    </Link>
-                  )
-                })}
+                        {showBadge ? (
+                          <span className={`admin-mobile-drawer-item-badge${badgeClassNameForHref(item.href)}`}>
+                            {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
+                          </span>
+                        ) : null}
+                      </Link>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="admin-mobile-drawer-actions">

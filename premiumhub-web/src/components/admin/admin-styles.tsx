@@ -48,6 +48,12 @@ export default function AdminStyles() {
       .nav-section { padding: 9px 10px 5px; }
       .nav-section + .nav-section { border-top: 1px solid rgba(255,255,255,.055); }
       .nav-section-label { font-size: 9px; font-weight: 800; letter-spacing: 1.15px; text-transform: uppercase; color: rgba(255,255,255,.34); padding: 0 9px; margin-bottom: 6px; display: block; }
+      .nav-section-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 6px; padding: 0 8px; border: 0; background: transparent; color: rgba(255,255,255,.42); font: inherit; font-size: 9px; font-weight: 850; letter-spacing: 1.15px; text-transform: uppercase; cursor: pointer; }
+      .nav-section-toggle:hover { color: rgba(255,255,255,.7); }
+      .nav-section-chevron { font-size: 10px; line-height: 1; color: rgba(255,255,255,.34); transition: transform .16s ease; }
+      .nav-section-toggle.open .nav-section-chevron { transform: rotate(180deg); }
+      .nav-section-items { display: none; }
+      .nav-section-items.open { display: block; }
       .nav-item { position: relative; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 8px 9px; border-radius: 12px; font-size: 13px; font-weight: 700; color: rgba(255,255,255,.62); cursor: pointer; transition: background .15s, color .15s, transform .15s; margin-bottom: 3px; text-decoration: none; }
       .nav-item:hover { background: rgba(255,255,255,.075); color: rgba(255,255,255,.92); }
       .nav-item.active { background: #fff; color: var(--dark); box-shadow: 0 10px 22px rgba(0,0,0,.22); }
@@ -83,6 +89,9 @@ export default function AdminStyles() {
       }
       .admin-page-wrapper.sidebar-collapsed .nav-section-label {
         display: none;
+      }
+      .admin-page-wrapper.sidebar-collapsed .nav-section-items {
+        display: block;
       }
       .admin-page-wrapper.sidebar-collapsed .nav-item {
         justify-content: center;
@@ -332,10 +341,32 @@ export default function AdminStyles() {
         letter-spacing: 1px;
         margin: 0 8px 6px;
       }
+      .admin-mobile-drawer-section-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 0 0 6px;
+        padding: 0 8px;
+        border: 0;
+        background: transparent;
+        color: rgba(255,255,255,.48);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 10px;
+        font-weight: 850;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        cursor: pointer;
+      }
+      .admin-mobile-drawer-section-toggle.open { color: rgba(255,255,255,.72); }
+      .admin-mobile-drawer-chevron { font-size: 10px; line-height: 1; color: rgba(255,255,255,.36); transition: transform .16s ease; }
+      .admin-mobile-drawer-section-toggle.open .admin-mobile-drawer-chevron { transform: rotate(180deg); }
       .admin-mobile-drawer-items {
-        display: grid;
+        display: none;
         gap: 5px;
       }
+      .admin-mobile-drawer-items.open { display: grid; }
       .admin-mobile-drawer-item {
         position: relative;
         display: flex;
