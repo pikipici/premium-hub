@@ -694,7 +694,7 @@ export default function AdminStyles() {
       .form-label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .3px; text-transform: uppercase; }
       .form-input, .form-textarea, .form-select {
         font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px;
-        padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px;
+        min-height: 40px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px;
         background: var(--white); color: var(--dark); outline: none;
         transition: border-color .15s; width: 100%; box-sizing: border-box;
       }
@@ -775,9 +775,76 @@ export default function AdminStyles() {
 
         .page { padding: 12px; }
         .admin-page-head { display: none; }
-        .admin-filter-bar { flex-direction: column; align-items: stretch; padding: 8px; border-radius: 12px; }
-        .admin-filter-group, .admin-page-actions { width: 100%; }
-        .admin-input, .admin-select { width: 100%; min-width: 0; }
+        .admin-page-actions { justify-content: stretch; }
+        .admin-page-actions > *,
+        .card-header-right > * { min-width: 0; }
+        .admin-filter-bar { flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 10px; padding: 8px; border-radius: 12px; box-shadow: none; }
+        .admin-filter-group, .admin-page-actions { width: 100%; display: grid; grid-template-columns: 1fr; gap: 8px; }
+        .admin-filter-group > *,
+        .admin-page-actions > *,
+        .admin-input, .admin-select { width: 100%; min-width: 0; max-width: none; }
+        .admin-input, .admin-select, .form-input, .form-select, .form-textarea { font-size: 16px; min-height: 44px; border-radius: 11px; }
+        .form-label { display: block; margin-bottom: 5px; font-size: 10px; line-height: 1.35; }
+        .form-field { gap: 5px; }
+        input[type="file"] { max-width: 100%; font-size: 12px; }
+        .admin-summary-chip { width: 100%; justify-content: center; border-radius: 11px; white-space: normal; text-align: center; }
+
+        .modal-overlay {
+          align-items: flex-end !important;
+          justify-content: center !important;
+          padding: 10px !important;
+          overscroll-behavior: contain;
+        }
+        .modal-card,
+        .modal-overlay > .card {
+          width: 100% !important;
+          max-width: none !important;
+          max-height: calc(100dvh - 20px) !important;
+          border-radius: 16px 16px 12px 12px !important;
+        }
+        .modal-head,
+        .modal-card .card-header,
+        .modal-overlay > .card .card-header {
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          align-items: flex-start;
+          padding: 12px !important;
+          background: #fff;
+        }
+        .modal-head h3,
+        .modal-card .card-header h2,
+        .modal-overlay > .card .card-header h2 { font-size: 14px; line-height: 1.3; }
+        .modal-body,
+        .modal-card > div[style*="display: grid"],
+        .modal-overlay > .card > div[style*="display: grid"] { padding: 12px !important; gap: 10px !important; }
+        .modal-body > div[style*="grid-template-columns"],
+        .modal-card div[style*="grid-template-columns"],
+        .modal-overlay > .card div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+        .modal-actions,
+        .modal-card div[style*="justify-content: flex-end"],
+        .modal-overlay > .card div[style*="justify-content: flex-end"] {
+          position: sticky;
+          bottom: 0;
+          z-index: 2;
+          display: grid !important;
+          grid-template-columns: 1fr;
+          justify-content: stretch !important;
+          padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) !important;
+          background: #fff;
+          border-top: 1px solid var(--border);
+        }
+        .modal-actions .action-btn,
+        .modal-actions .topbar-btn,
+        .modal-card div[style*="justify-content: flex-end"] .action-btn,
+        .modal-card div[style*="justify-content: flex-end"] .topbar-btn,
+        .modal-overlay > .card div[style*="justify-content: flex-end"] .action-btn,
+        .modal-overlay > .card div[style*="justify-content: flex-end"] .topbar-btn {
+          width: 100%;
+          min-height: 42px;
+          justify-content: center;
+          text-align: center;
+        }
 
         .metrics {
           grid-template-columns: 1fr;
@@ -811,8 +878,9 @@ export default function AdminStyles() {
         }
 
         .card { border-radius: 12px; }
-        .card-header { padding: 10px 12px; }
+        .card-header { align-items: flex-start; padding: 10px 12px; flex-wrap: wrap; }
         .card-header h2 { font-size: 13px; }
+        .card-header-right { width: 100%; flex-wrap: wrap; }
         .link-btn { font-size: 11px; }
 
         .chart-wrap { padding: 12px; }

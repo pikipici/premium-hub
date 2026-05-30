@@ -1387,6 +1387,7 @@ export default function StokPage() {
 
       {(modalMode === 'create' || modalMode === 'edit') && (
         <div
+          className="modal-overlay"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1399,7 +1400,7 @@ export default function StokPage() {
           }}
         >
           <div
-            className="card"
+            className="card modal-card"
             style={{
               width: '100%',
               maxWidth: 560,
@@ -1566,6 +1567,7 @@ export default function StokPage() {
 
       {modalMode === 'bulk' && (
         <div
+          className="modal-overlay"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1578,7 +1580,7 @@ export default function StokPage() {
           }}
         >
           <div
-            className="card"
+            className="card modal-card"
             style={{
               width: '100%',
               maxWidth: 620,
