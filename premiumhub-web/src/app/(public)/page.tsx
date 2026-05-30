@@ -119,15 +119,15 @@ export default function HomePage() {
       <main className="bg-[#F7F7F5]">
         <section className="mx-auto w-full max-w-7xl px-4 pb-10 pt-5 sm:px-6 sm:pb-16 sm:pt-8 lg:px-8 lg:pb-20 lg:pt-12">
           <header className="mx-auto mb-4 max-w-3xl text-center sm:mb-6 lg:mb-10">
-            <p className="inline-flex items-center gap-2 rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-4 py-1.5 text-xs font-bold text-[#FF5733]">
+            <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#FFD9CF] bg-[#FFF0ED] px-4 py-1.5 text-xs font-bold text-[#FF5733]">
               <Rocket className="h-3.5 w-3.5" />
               DigiConnect + DigiSosmed
             </p>
             <h1 className="mt-3 text-3xl font-black leading-[0.96] tracking-[-0.04em] text-[#141414] sm:mt-4 sm:text-5xl sm:leading-tight">
-Gateway AI dan growth sosial.
+Semua kebutuhan ada disini
             </h1>
             <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-[#6B7280] sm:mt-3 sm:text-base">
-              DigiConnect untuk akses API. DigiSosmed untuk followers, views, engagement.
+              Pilih layanan, bayar pakai wallet, langsung jalan.
             </p>
             <div className="mx-auto mt-4 flex max-w-full gap-2 overflow-x-auto pb-1 text-[11px] font-bold text-[#3A3A3A] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:max-w-xl sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:text-xs">
               <span className="inline-flex items-center justify-center gap-1 rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 shadow-[0_8px_18px_rgba(20,20,20,0.04)]">
