@@ -16,7 +16,7 @@ type NavSection = {
   items: NavItem[]
 }
 
-const SIDEBAR_OPEN_STORAGE_KEY = 'premiumhub-admin-sidebar-open-sections'
+const SIDEBAR_OPEN_STORAGE_KEY = 'premiumhub-admin-sidebar-open-sections-v2'
 
 const NAV_SECTIONS: NavSection[] = [
   {
