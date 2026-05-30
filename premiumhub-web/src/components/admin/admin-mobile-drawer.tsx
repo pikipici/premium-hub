@@ -15,7 +15,6 @@ type DrawerItem = {
 
 type DrawerSection = {
   label: string
-  collapsible?: boolean
   items: DrawerItem[]
 }
 
@@ -30,7 +29,6 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   },
   {
     label: 'Transaksi',
-    collapsible: true,
     items: [
       { href: '/admin/order', label: 'Order', icon: 'OR', hint: 'DigiProduct' },
       { href: '/admin/sosmed/orders', label: 'Order Sosmed', icon: 'OS', hint: 'JAP/provider' },
@@ -42,7 +40,6 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   },
   {
     label: 'Convert',
-    collapsible: true,
     items: [
       { href: '/admin/convert', label: 'Dashboard', icon: 'CV', hint: 'Ringkasan' },
       { href: '/admin/convert/orders', label: 'Order Convert', icon: 'CO', hint: 'Queue order' },
@@ -58,7 +55,6 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   },
   {
     label: 'Gmail',
-    collapsible: true,
     items: [
       { href: '/admin/gmail', label: 'Dashboard', icon: 'GM', hint: 'Ringkasan' },
       { href: '/admin/gmail/verifikasi', label: 'Verifikasi', icon: 'GV', hint: 'Setoran Gmail' },
@@ -218,23 +214,19 @@ export default function AdminMobileDrawer({
         <div className="admin-mobile-drawer-scroll">
           {DRAWER_SECTIONS.map((section) => {
             const sectionActive = section.items.some((item) => isActive(pathname, item.href))
-            const sectionOpen = !section.collapsible || openSections.has(section.label) || sectionActive
+            const sectionOpen = openSections.has(section.label) || sectionActive
 
             return (
               <div className="admin-mobile-drawer-section" key={section.label}>
-                {section.collapsible ? (
-                  <button
-                    type="button"
-                    className={`admin-mobile-drawer-section-toggle${sectionOpen ? ' open' : ''}`}
-                    aria-expanded={sectionOpen}
-                    onClick={() => toggleSection(section.label)}
-                  >
-                    <span>{section.label}</span>
-                    <span className="admin-mobile-drawer-chevron">▾</span>
-                  </button>
-                ) : (
-                  <div className="admin-mobile-drawer-label">{section.label}</div>
-                )}
+                <button
+                  type="button"
+                  className={`admin-mobile-drawer-section-toggle${sectionOpen ? ' open' : ''}`}
+                  aria-expanded={sectionOpen}
+                  onClick={() => toggleSection(section.label)}
+                >
+                  <span>{section.label}</span>
+                  <span className="admin-mobile-drawer-chevron">▾</span>
+                </button>
 
                 <div className={`admin-mobile-drawer-items${sectionOpen ? ' open' : ''}`}>
                   {section.items.map((item) => {
