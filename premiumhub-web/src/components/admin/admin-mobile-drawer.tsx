@@ -31,35 +31,14 @@ const DRAWER_SECTIONS: DrawerSection[] = [
       { href: '/admin/order', label: 'Order', icon: 'OR', hint: 'DigiProduct' },
       { href: '/admin/sosmed/orders', label: 'Order Sosmed', icon: 'OS', hint: 'JAP/provider' },
       { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: 'RW', hint: 'Saldo & mutasi' },
-      { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: 'WD', hint: 'Withdraw' },
-      { href: '/admin/digiconnect', label: 'DigiConnect', icon: 'DC', hint: 'API usage' },
+      { href: '/admin/convert', label: 'Convert', icon: 'CV', hint: 'Queue & pricing' },
       { href: '/admin/garansi', label: 'Klaim Garansi', icon: 'KG', hint: 'Refund/reissue' },
-    ],
-  },
-  {
-    label: 'Convert',
-    items: [
-      { href: '/admin/convert', label: 'Dashboard', icon: 'CV', hint: 'Ringkasan' },
-      { href: '/admin/convert/orders', label: 'Order Convert', icon: 'CO', hint: 'Queue order' },
-      { href: '/admin/convert/pricing', label: 'Pricing', icon: 'CP', hint: 'Rate & margin' },
-      { href: '/admin/convert/limits', label: 'Limit', icon: 'CL', hint: 'Batas transaksi' },
     ],
   },
   {
     label: 'Support',
     items: [
-      { href: '/admin/chat', label: 'Chat Support', icon: 'CS', hint: 'Inbox bantuan' },
-    ],
-  },
-  {
-    label: 'Gmail',
-    items: [
-      { href: '/admin/gmail', label: 'Dashboard', icon: 'GM', hint: 'Ringkasan' },
-      { href: '/admin/gmail/verifikasi', label: 'Verifikasi', icon: 'GV', hint: 'Setoran Gmail' },
-      { href: '/admin/gmail/inventory', label: 'Inventory', icon: 'GI', hint: 'Stok Gmail' },
-      { href: '/admin/gmail/pricing', label: 'Pricing', icon: 'GP', hint: 'Harga Gmail' },
-      { href: '/admin/gmail/strikes', label: 'Strike Users', icon: 'GS', hint: 'Fraud control' },
-      { href: '/admin/gmail/analytics', label: 'Analytics', icon: 'GA', hint: 'Performa Gmail' },
+      { href: '/admin/chat', label: 'Chat Support', icon: '◴' },
     ],
   },
   {

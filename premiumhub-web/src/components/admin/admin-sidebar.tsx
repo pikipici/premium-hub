@@ -38,22 +38,13 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: 'RW', hint: 'Saldo & mutasi' },
       { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: 'WD', hint: 'Withdraw' },
       { href: '/admin/digiconnect', label: 'DigiConnect', icon: 'DC', hint: 'API usage' },
+      { href: '/admin/convert', label: 'Convert', icon: 'CV', hint: 'Queue & pricing' },
       { href: '/admin/garansi', label: 'Klaim Garansi', icon: 'KG', hint: 'Refund/reissue' },
-    ],
-  },
-  {
-    label: 'Convert',
-    items: [
-      { href: '/admin/convert', label: 'Dashboard', icon: 'CV', hint: 'Ringkasan' },
-      { href: '/admin/convert/orders', label: 'Order Convert', icon: 'CO', hint: 'Queue order' },
-      { href: '/admin/convert/pricing', label: 'Pricing', icon: 'CP', hint: 'Rate & margin' },
-      { href: '/admin/convert/limits', label: 'Limit', icon: 'CL', hint: 'Batas transaksi' },
     ],
   },
   {
     label: 'Gmail',
     items: [
-      { href: '/admin/gmail', label: 'Dashboard', icon: 'GM', hint: 'Ringkasan' },
       { href: '/admin/gmail/verifikasi', label: 'Verifikasi', icon: 'GV', hint: 'Setoran Gmail' },
       { href: '/admin/gmail/inventory', label: 'Inventory', icon: 'GI', hint: 'Stok Gmail' },
       { href: '/admin/gmail/pricing', label: 'Pricing', icon: 'GP', hint: 'Harga Gmail' },
@@ -127,42 +118,40 @@ export default function AdminSidebar({ collapsed = false, badges, loadingBadges 
         {!collapsed ? <div className="admin-tag">Admin Panel</div> : null}
       </div>
 
-      <nav className="sidebar-nav" aria-label="Menu admin">
-        {NAV_SECTIONS.map((section) => (
-          <div className="nav-section" key={section.label}>
-            <span className="nav-section-label">{section.label}</span>
+      {NAV_SECTIONS.map((section) => (
+        <div className="nav-section" key={section.label}>
+          <span className="nav-section-label">{section.label}</span>
 
-            {section.items.map((item) => {
-              const active = isNavActive(pathname, item.href)
-              const badgeValue = badgeValueForHref(item.href, badges)
-              const showBadge = loadingBadges
-                ? ['/admin/order', '/admin/stok', '/admin/garansi'].includes(item.href)
-                : badgeValue > 0
+          {section.items.map((item) => {
+            const active = isNavActive(pathname, item.href)
+            const badgeValue = badgeValueForHref(item.href, badges)
+            const showBadge = loadingBadges
+              ? ['/admin/order', '/admin/stok', '/admin/garansi'].includes(item.href)
+              : badgeValue > 0
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`nav-item${active ? ' active' : ''}`}
-                  title={collapsed ? item.label : undefined}
-                  aria-label={item.label}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  <span className="nav-text-wrap">
-                    <span className="nav-text">{item.label}</span>
-                    {item.hint ? <span className="nav-hint">{item.hint}</span> : null}
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-item${active ? ' active' : ''}`}
+                title={collapsed ? item.label : undefined}
+                aria-label={item.label}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-text-wrap">
+                  <span className="nav-text">{item.label}</span>
+                  {item.hint ? <span className="nav-hint">{item.hint}</span> : null}
+                </span>
+                {showBadge ? (
+                  <span className={`nav-badge${badgeClassNameForHref(item.href)}`}>
+                    {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
                   </span>
-                  {showBadge ? (
-                    <span className={`nav-badge${badgeClassNameForHref(item.href)}`}>
-                      {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
-                    </span>
-                  ) : null}
-                </Link>
-              )
-            })}
-          </div>
-        ))}
-      </nav>
+                ) : null}
+              </Link>
+            )
+          })}
+        </div>
+      ))}
 
       <div className="sidebar-bottom">
         <div className="admin-profile" title={collapsed ? 'Admin - Super Admin' : undefined}>

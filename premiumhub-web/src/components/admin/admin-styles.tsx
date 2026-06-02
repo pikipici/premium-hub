@@ -42,9 +42,6 @@ export default function AdminStyles() {
       .sidebar-logo .logo-text { font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -0.5px; line-height: 1.1; }
       .sidebar-logo .logo-text span { color: var(--orange); }
       .sidebar-logo .admin-tag { display: inline-flex; margin-top: 7px; font-size: 10px; font-weight: 800; color: rgba(255,255,255,.62); letter-spacing: 1.2px; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
-      .sidebar-nav { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 0 8px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
-      .sidebar-nav::-webkit-scrollbar { width: 8px; }
-      .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
       .nav-section { padding: 9px 10px 5px; }
       .nav-section + .nav-section { border-top: 1px solid rgba(255,255,255,.055); }
       .nav-section-label { font-size: 9px; font-weight: 800; letter-spacing: 1.15px; text-transform: uppercase; color: rgba(255,255,255,.34); padding: 0 9px; margin-bottom: 6px; display: block; }
