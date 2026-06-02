@@ -4,7 +4,6 @@ import { ListPagination } from '@/components/shared/list-pagination'
 import { ADMIN_PAGE_LIMIT, BATCH_ACTION_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
   buildMissingProviderOrderIdRecoveryPayload,
   canRetrySosmedProvider,
@@ -17,12 +16,6 @@ import type { SosmedOrder, SosmedOrderDetail } from '@/types/sosmedOrder'
 
 
 type StatusFilter = 'all' | 'pending_payment' | 'processing' | 'success' | 'failed' | 'canceled' | 'expired'
-
-type PendingDialogAction =
-  | { type: 'status'; order: SosmedOrder; toStatus: string }
-  | { type: 'missing-provider-recovery'; order: SosmedOrder }
-  | { type: 'retry-provider'; order: SosmedOrder }
-  | { type: 'trigger-refill'; order: SosmedOrder }
 
 const FILTERS: Array<{ key: StatusFilter; label: string }> = [
   { key: 'all', label: 'Semua' },
@@ -98,8 +91,6 @@ export default function SosmedOrderPage() {
   const [detail, setDetail] = useState<SosmedOrderDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [opsSummary, setOpsSummary] = useState<AdminSosmedOpsSummary | null>(null)
-  const [pendingAction, setPendingAction] = useState<PendingDialogAction | null>(null)
-  const [actionReason, setActionReason] = useState('')
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
@@ -165,13 +156,15 @@ export default function SosmedOrderPage() {
   const updateStatus = async (order: SosmedOrder, toStatus: string) => {
     if (!toStatus) return
 
+    const reason = window.prompt(`Alasan ubah status ke ${toStatus}`, '') || ''
+
     setSaving(true)
     setError('')
 
     try {
       const res = await sosmedOrderService.adminUpdateStatus(order.id, {
         to_status: toStatus,
-        reason: actionReason.trim(),
+        reason,
       })
       if (!res.success) {
         setError(res.message || 'Gagal update status order sosmed')
@@ -179,8 +172,6 @@ export default function SosmedOrderPage() {
       }
 
       setNotice(`Status order ${order.id} diubah ke ${toStatus}`)
-      setPendingAction(null)
-      setActionReason('')
       await loadData()
     } catch {
       setError('Gagal update status order sosmed')
@@ -190,6 +181,11 @@ export default function SosmedOrderPage() {
   }
 
   const prepareMissingProviderRecovery = async (order: SosmedOrder) => {
+    const confirmed = window.confirm(
+      `${getMissingProviderOrderIdNotice(order)}\n\nLanjut tandai gagal agar tombol Retry Provider muncul?`
+    )
+    if (!confirmed) return
+
     setSaving(true)
     setError('')
 
@@ -201,7 +197,6 @@ export default function SosmedOrderPage() {
       }
 
       setNotice(`Order ${order.id.slice(0, 8)} siap diretry manual setelah cek supplier`)
-      setPendingAction(null)
       if (detail?.order.id === order.id && res.data) {
         setDetail(res.data)
       }
@@ -281,19 +276,18 @@ export default function SosmedOrderPage() {
   }
 
   const retryProvider = async (order: SosmedOrder) => {
+    const reason = window.prompt('Alasan retry provider', order.provider_error || '') || ''
     setSaving(true)
     setError('')
 
     try {
-      const res = await sosmedOrderService.adminRetryProvider(order.id, { reason: actionReason.trim() })
+      const res = await sosmedOrderService.adminRetryProvider(order.id, { reason })
       if (!res.success) {
         setError(res.message || 'Gagal retry provider order sosmed')
         return
       }
 
       setNotice(`Retry provider order ${order.id.slice(0, 8)} berhasil dikirim`)
-      setPendingAction(null)
-      setActionReason('')
       if (detail?.order.id === order.id && res.data) {
         setDetail(res.data)
       }
@@ -306,6 +300,9 @@ export default function SosmedOrderPage() {
   }
 
   const triggerRefill = async (order: SosmedOrder) => {
+    const confirmed = window.confirm(`Trigger refill untuk order ${order.id.slice(0, 8)}?`)
+    if (!confirmed) return
+
     setSaving(true)
     setError('')
 
@@ -317,7 +314,6 @@ export default function SosmedOrderPage() {
       }
 
       setNotice(`Refill order ${order.id.slice(0, 8)} berhasil dikirim ke supplier`)
-      setPendingAction(null)
       if (detail?.order.id === order.id && res.data) {
         setDetail(res.data)
       }
@@ -328,64 +324,6 @@ export default function SosmedOrderPage() {
       setSaving(false)
     }
   }
-
-  const openActionDialog = (action: PendingDialogAction) => {
-    setPendingAction(action)
-    setActionReason(action.type === 'retry-provider' ? action.order.provider_error || '' : '')
-    setError('')
-  }
-
-  const runPendingAction = () => {
-    if (!pendingAction) return
-    if (pendingAction.type === 'status') {
-      void updateStatus(pendingAction.order, pendingAction.toStatus)
-      return
-    }
-    if (pendingAction.type === 'missing-provider-recovery') {
-      void prepareMissingProviderRecovery(pendingAction.order)
-      return
-    }
-    if (pendingAction.type === 'retry-provider') {
-      void retryProvider(pendingAction.order)
-      return
-    }
-    void triggerRefill(pendingAction.order)
-  }
-
-  const pendingActionCopy = (() => {
-    if (!pendingAction) return null
-    const shortId = pendingAction.order.id.slice(0, 8)
-    if (pendingAction.type === 'status') {
-      return {
-        title: `Ubah status ke ${pendingAction.toStatus}`,
-        confirmLabel: 'Ubah Status',
-        destructive: ['failed', 'canceled'].includes(pendingAction.toStatus),
-        body: `Order ${shortId} akan dipindahkan dari ${pendingAction.order.order_status} ke ${pendingAction.toStatus}.`,
-      }
-    }
-    if (pendingAction.type === 'missing-provider-recovery') {
-      return {
-        title: 'Siapkan Retry Aman',
-        confirmLabel: 'Siapkan Retry',
-        destructive: true,
-        body: `${getMissingProviderOrderIdNotice(pendingAction.order)} Lanjut tandai gagal agar tombol Retry Provider muncul.`,
-      }
-    }
-    if (pendingAction.type === 'retry-provider') {
-      return {
-        title: 'Retry Provider',
-        confirmLabel: 'Retry Provider',
-        destructive: false,
-        body: `Order ${shortId} akan dikirim ulang ke supplier/provider.`,
-      }
-    }
-    return {
-      title: 'Trigger Refill',
-      confirmLabel: isJAPRefillCooldown(pendingAction.order) ? 'Retry Refill' : 'Trigger Refill',
-      destructive: false,
-      body: `Order ${shortId} akan dikirim ke supplier untuk proses refill.`,
-    }
-  })()
 
   return (
     <div className="page">
@@ -579,7 +517,7 @@ export default function SosmedOrderPage() {
                                 className="action-btn"
                                 type="button"
                                 disabled={saving}
-                                onClick={() => openActionDialog({ type: 'missing-provider-recovery', order })}
+                                onClick={() => void prepareMissingProviderRecovery(order)}
                               >
                                 Siapkan Retry Aman
                               </button>
@@ -589,7 +527,7 @@ export default function SosmedOrderPage() {
                                 className="action-btn"
                                 type="button"
                                 disabled={saving}
-                                onClick={() => openActionDialog({ type: 'trigger-refill', order })}
+                                onClick={() => void triggerRefill(order)}
                               >
                                 {isJAPRefillCooldown(order) ? 'Retry Refill Cooldown' : 'Trigger Refill'}
                               </button>
@@ -599,7 +537,7 @@ export default function SosmedOrderPage() {
                                 className="action-btn"
                                 type="button"
                                 disabled={saving}
-                                onClick={() => openActionDialog({ type: 'retry-provider', order })}
+                                onClick={() => void retryProvider(order)}
                               >
                                 Retry Provider
                               </button>
@@ -611,7 +549,7 @@ export default function SosmedOrderPage() {
                                   className="action-btn"
                                   type="button"
                                   disabled={saving}
-                                  onClick={() => openActionDialog({ type: 'status', order, toStatus: action.status })}
+                                  onClick={() => void updateStatus(order, action.status)}
                                 >
                                   {action.label}
                                 </button>
@@ -753,7 +691,7 @@ export default function SosmedOrderPage() {
                   ) : null}
                   {canTriggerRefill(detail.order) ? (
                     <div style={{ marginTop: 10 }}>
-                      <button className="action-btn" type="button" disabled={saving} onClick={() => openActionDialog({ type: 'trigger-refill', order: detail.order })}>
+                      <button className="action-btn" type="button" disabled={saving} onClick={() => void triggerRefill(detail.order)}>
                         {isJAPRefillCooldown(detail.order) ? 'Retry Refill Cooldown' : 'Trigger Refill'}
                       </button>
                     </div>
@@ -780,12 +718,12 @@ export default function SosmedOrderPage() {
                   </button>
                 ) : null}
                 {isMissingProviderOrderIdRecoveryCandidate(detail.order) ? (
-                  <button className="action-btn" type="button" disabled={saving} onClick={() => openActionDialog({ type: 'missing-provider-recovery', order: detail.order })}>
+                  <button className="action-btn" type="button" disabled={saving} onClick={() => void prepareMissingProviderRecovery(detail.order)}>
                     Siapkan Retry Aman
                   </button>
                 ) : null}
                 {canRetryProvider(detail.order) ? (
-                  <button className="action-btn" type="button" disabled={saving} onClick={() => openActionDialog({ type: 'retry-provider', order: detail.order })}>
+                  <button className="action-btn" type="button" disabled={saving} onClick={() => void retryProvider(detail.order)}>
                     Retry Provider
                   </button>
                 ) : null}
@@ -814,44 +752,6 @@ export default function SosmedOrderPage() {
           </div>
         </div>
       ) : null}
-
-      <ConfirmDialog
-        open={!!pendingAction && !!pendingActionCopy}
-        title={pendingActionCopy?.title || 'Konfirmasi aksi'}
-        confirmLabel={pendingActionCopy?.confirmLabel || 'Konfirmasi'}
-        destructive={pendingActionCopy?.destructive}
-        loading={saving}
-        cancelLabel="Batal"
-        onCancel={() => {
-          if (!saving) {
-            setPendingAction(null)
-            setActionReason('')
-          }
-        }}
-        onConfirm={runPendingAction}
-        description={
-          pendingActionCopy ? (
-            <div className="space-y-3">
-              <p>{pendingActionCopy.body}</p>
-              {(pendingAction?.type === 'status' || pendingAction?.type === 'retry-provider') ? (
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#888]">
-                    Alasan / catatan
-                  </label>
-                  <textarea
-                    value={actionReason}
-                    onChange={(event) => setActionReason(event.target.value)}
-                    rows={3}
-                    maxLength={500}
-                    placeholder="Opsional"
-                    className="w-full rounded-xl border border-[#EBEBEB] px-3 py-2 text-sm focus:border-[#141414] focus:outline-none"
-                  />
-                </div>
-              ) : null}
-            </div>
-          ) : null
-        }
-      />
     </div>
   )
 }

@@ -7,7 +7,6 @@ import MaintenanceSettingsCard from '@/components/admin/maintenance-settings-car
 import NavbarMenuSettingsCard from '@/components/admin/navbar-menu-settings-card'
 import ProductCategorySettingsCard from '@/components/admin/product-category-settings-card'
 import UserSidebarMenuSettingsCard from '@/components/admin/user-sidebar-menu-settings-card'
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
   accountTypeService,
   type AdminAccountTypePayload,
@@ -132,6 +131,7 @@ export default function PengaturanPage() {
   const [editingItem, setEditingItem] = useState<AccountType | null>(null)
   const [form, setForm] = useState<AccountTypeFormState>(EMPTY_FORM)
 
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<AccountType | null>(null)
 
   const sortedItems = useMemo(
@@ -168,7 +168,7 @@ export default function PengaturanPage() {
   }, [])
 
   useEffect(() => {
-    if (!formOpen && !confirmTarget) return
+    if (!formOpen && !confirmOpen) return
 
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -176,7 +176,7 @@ export default function PengaturanPage() {
     return () => {
       document.body.style.overflow = previousOverflow
     }
-  }, [confirmTarget, formOpen])
+  }, [confirmOpen, formOpen])
 
   const openCreateForm = () => {
     setFormMode('create')
@@ -298,6 +298,7 @@ export default function PengaturanPage() {
 
   const requestDelete = (item: AccountType) => {
     setConfirmTarget(item)
+    setConfirmOpen(true)
   }
 
   const confirmDelete = async () => {
@@ -305,6 +306,7 @@ export default function PengaturanPage() {
 
     setSaving(true)
     setError('')
+    setConfirmOpen(false)
 
     try {
       const res = await accountTypeService.adminDelete(confirmTarget.id)
@@ -549,29 +551,31 @@ export default function PengaturanPage() {
         </div>
       )}
 
-      <ConfirmDialog
-        open={!!confirmTarget}
-        title="Nonaktifkan Tipe Akun"
-        destructive
-        loading={saving}
-        confirmLabel="Nonaktifkan"
-        cancelLabel="Batal"
-        onCancel={() => {
-          if (!saving) setConfirmTarget(null)
-        }}
-        onConfirm={confirmDelete}
-        description={
-          confirmTarget ? (
-            <div className="space-y-2">
-              <p>Tipe akun ini akan dinonaktifkan dari input admin.</p>
-              <div className="rounded-2xl bg-[#F7F7F5] p-3 text-xs text-[#4B4743]">
-                <div><strong>Kode:</strong> {confirmTarget.code}</div>
-                <div><strong>Label:</strong> {confirmTarget.label}</div>
-              </div>
+      {confirmOpen && confirmTarget && (
+        <div className="modal-overlay" style={MODAL_OVERLAY_STYLE} onClick={() => setConfirmOpen(false)}>
+          <div
+            className="modal-card"
+            style={{ ...MODAL_CARD_BASE_STYLE, width: 'min(460px, 94vw)' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head" style={MODAL_HEAD_STYLE}>
+              <h3>Nonaktifkan Tipe Akun</h3>
+              <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={() => setConfirmOpen(false)}>×</button>
             </div>
-          ) : null
-        }
-      />
+            <div className="modal-body" style={{ ...MODAL_BODY_STYLE, fontSize: 13, color: 'var(--text)' }}>
+              Tipe akun <strong>{confirmTarget.label}</strong> akan dinonaktifkan dari input admin.
+            </div>
+            <div className="modal-actions" style={MODAL_ACTIONS_STYLE}>
+              <button className="action-btn" type="button" onClick={() => setConfirmOpen(false)}>
+                Batal
+              </button>
+              <button className="topbar-btn primary" type="button" onClick={confirmDelete}>
+                Ya, Nonaktifkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

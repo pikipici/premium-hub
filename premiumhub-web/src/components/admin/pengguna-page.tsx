@@ -4,7 +4,6 @@ import { ADMIN_PAGE_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { adminUserService, type AdminUserStatusFilter } from '@/services/adminUserService'
 import type { AdminUser } from '@/types/adminUser'
 
@@ -344,8 +343,8 @@ export default function PenggunaPage() {
   return (
     <div className="page">
       {!!notice && (
-        <div className="alert-bar" style={{ marginBottom: 12, background: '#ECFDF3', borderColor: '#BBF7D0', color: '#166534' }}>
-          <strong>{notice}</strong>
+        <div className="alert-bar" style={{ marginBottom: 12 }}>
+          ✅ <strong>{notice}</strong>
           <button
             className="link-btn"
             style={{ marginLeft: 'auto', color: 'inherit' }}
@@ -366,7 +365,7 @@ export default function PenggunaPage() {
             color: '#991B1B',
           }}
         >
-          <strong>{error}</strong>
+          ⚠️ <strong>{error}</strong>
         </div>
       )}
 
@@ -792,33 +791,35 @@ export default function PenggunaPage() {
         </div>
       )}
 
-      <ConfirmDialog
-        open={!!confirmTarget}
-        title={confirmTarget?.is_active ? `Nonaktifkan User ${shortUserCode(confirmTarget.id)}` : `Aktifkan User ${shortUserCode(confirmTarget?.id)}`}
-        destructive={confirmTarget?.is_active}
-        loading={!!actionUserID}
-        confirmLabel={confirmTarget?.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-        cancelLabel="Batal"
-        onCancel={() => {
-          if (!actionUserID) setConfirmTarget(null)
-        }}
-        onConfirm={toggleUserBlock}
-        description={
-          confirmTarget ? (
-            <div className="space-y-2">
-              <p>
+      {confirmTarget && (
+        <div style={MODAL_OVERLAY_STYLE} onClick={() => setConfirmTarget(null)}>
+          <div className="card" style={{ ...MODAL_CARD_STYLE, maxWidth: 520 }} onClick={(event) => event.stopPropagation()}>
+            <div className="card-header">
+              <h2>{confirmTarget.is_active ? 'Nonaktifkan User' : 'Aktifkan User'} {shortUserCode(confirmTarget.id)}</h2>
+              <button className="action-btn" onClick={() => setConfirmTarget(null)} disabled={!!actionUserID}>
+                Tutup
+              </button>
+            </div>
+
+            <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>
                 {confirmTarget.is_active
-                  ? 'User tidak bisa login sampai status diaktifkan lagi.'
-                  : 'User akan diaktifkan kembali dan bisa login normal.'}
-              </p>
-              <div className="rounded-2xl bg-[#F7F7F5] p-3 text-xs text-[#4B4743]">
-                <div><strong>Nama:</strong> {confirmTarget.name || '-'}</div>
-                <div><strong>Email:</strong> {confirmTarget.email || '-'}</div>
+                  ? `User ${confirmTarget.name || '-'} akan dinonaktifkan. User tidak bisa login sampai status diaktifkan lagi.`
+                  : `User ${confirmTarget.name || '-'} akan diaktifkan kembali dan bisa login normal.`}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="action-btn" onClick={() => setConfirmTarget(null)} disabled={!!actionUserID}>
+                  Batal
+                </button>
+                <button className="topbar-btn primary" onClick={toggleUserBlock} disabled={!!actionUserID}>
+                  {actionUserID ? 'Memproses...' : confirmTarget.is_active ? 'Ya, Nonaktifkan' : 'Ya, Aktifkan'}
+                </button>
               </div>
             </div>
-          ) : null
-        }
-      />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
