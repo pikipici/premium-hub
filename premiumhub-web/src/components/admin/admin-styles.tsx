@@ -38,6 +38,10 @@ export default function AdminStyles() {
       .sidebar-logo .logo-text { font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
       .sidebar-logo .logo-text span { color: var(--orange); }
       .sidebar-logo .admin-tag { font-size: 10px; font-weight: 600; color: rgba(255,255,255,.3); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 2px; }
+      .sidebar-nav { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.22) transparent; }
+      .sidebar-nav::-webkit-scrollbar { width: 6px; }
+      .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 999px; }
+      .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
       .nav-section { padding: 8px 12px 4px; }
       .nav-section-label { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.25); padding: 0 8px; margin-bottom: 4px; display: block; }
       .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,.5); cursor: pointer; transition: all .15s; margin-bottom: 1px; text-decoration: none; }
@@ -64,6 +68,9 @@ export default function AdminStyles() {
       .admin-page-wrapper.sidebar-collapsed .sidebar-logo .logo-text {
         font-size: 15px;
         text-align: center;
+      }
+      .admin-page-wrapper.sidebar-collapsed .sidebar-nav {
+        padding-bottom: 6px;
       }
       .admin-page-wrapper.sidebar-collapsed .nav-section {
         padding: 8px 8px 4px;

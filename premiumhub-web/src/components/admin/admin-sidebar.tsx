@@ -117,37 +117,39 @@ export default function AdminSidebar({ collapsed = false, badges, loadingBadges 
         {!collapsed ? <div className="admin-tag">Admin Panel</div> : null}
       </div>
 
-      {NAV_SECTIONS.map((section) => (
-        <div className="nav-section" key={section.label}>
-          <span className="nav-section-label">{section.label}</span>
+      <nav className="sidebar-nav" aria-label="Navigasi admin">
+        {NAV_SECTIONS.map((section) => (
+          <div className="nav-section" key={section.label}>
+            <span className="nav-section-label">{section.label}</span>
 
-          {section.items.map((item) => {
-            const active = isNavActive(pathname, item.href)
-            const badgeValue = badgeValueForHref(item.href, badges)
-            const showBadge = loadingBadges
-              ? ['/admin/order', '/admin/stok', '/admin/garansi'].includes(item.href)
-              : badgeValue > 0
+            {section.items.map((item) => {
+              const active = isNavActive(pathname, item.href)
+              const badgeValue = badgeValueForHref(item.href, badges)
+              const showBadge = loadingBadges
+                ? ['/admin/order', '/admin/stok', '/admin/garansi'].includes(item.href)
+                : badgeValue > 0
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`nav-item${active ? ' active' : ''}`}
-                title={collapsed ? item.label : undefined}
-                aria-label={item.label}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                <span className="nav-text">{item.label}</span>
-                {showBadge ? (
-                  <span className={`nav-badge${badgeClassNameForHref(item.href)}`}>
-                    {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
-                  </span>
-                ) : null}
-              </Link>
-            )
-          })}
-        </div>
-      ))}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`nav-item${active ? ' active' : ''}`}
+                  title={collapsed ? item.label : undefined}
+                  aria-label={item.label}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-text">{item.label}</span>
+                  {showBadge ? (
+                    <span className={`nav-badge${badgeClassNameForHref(item.href)}`}>
+                      {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
+                    </span>
+                  ) : null}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
+      </nav>
 
       <div className="sidebar-bottom">
         <div className="admin-profile" title={collapsed ? 'Admin - Super Admin' : undefined}>
