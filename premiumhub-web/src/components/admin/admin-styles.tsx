@@ -23,6 +23,8 @@ export default function AdminStyles() {
       /* SIDEBAR */
       .sidebar {
         width: var(--sidebar-w);
+        height: 100vh;
+        height: 100dvh;
         min-height: 100vh;
         background: var(--dark);
         display: flex;
@@ -32,6 +34,7 @@ export default function AdminStyles() {
         left: 0;
         z-index: 100;
         padding: 0 0 24px;
+        overflow: hidden;
         transition: width .18s ease;
       }
       .sidebar-logo { padding: 22px 20px 18px; border-bottom: 1px solid rgba(255,255,255,.07); margin-bottom: 8px; }
