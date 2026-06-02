@@ -25,6 +25,14 @@ const DRAWER_SECTIONS: DrawerSection[] = [
     ],
   },
   {
+    label: 'Layanan',
+    items: [
+      { href: '/admin/produk', label: 'DigiProduct', icon: 'DP' },
+      { href: '/admin/digiconnect', label: 'DigiConnect', icon: 'DC' },
+      { href: '/admin/sosmed', label: 'DigiSosmed', icon: 'DS' },
+    ],
+  },
+  {
     label: 'Transaksi',
     items: [
       { href: '/admin/order', label: 'Order', icon: '◉' },
@@ -41,10 +49,8 @@ const DRAWER_SECTIONS: DrawerSection[] = [
     ],
   },
   {
-    label: 'Katalog',
+    label: 'Operasional',
     items: [
-      { href: '/admin/produk', label: 'Produk', icon: '◈' },
-      { href: '/admin/sosmed', label: 'DigiSosmed', icon: '◍' },
       { href: '/admin/stok', label: 'Stok Akun', icon: '◧' },
     ],
   },
