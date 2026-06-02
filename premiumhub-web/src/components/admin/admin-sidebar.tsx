@@ -22,16 +22,10 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: 'Layanan',
+    label: 'Katalog',
     items: [
-      { href: '/admin/produk', label: 'DigiProduct', icon: 'DP' },
-      { href: '/admin/digiconnect', label: 'DigiConnect', icon: 'DC' },
-      { href: '/admin/sosmed', label: 'DigiSosmed', icon: 'DS' },
-    ],
-  },
-  {
-    label: 'Operasional',
-    items: [
+      { href: '/admin/produk', label: 'Produk', icon: '◈' },
+      { href: '/admin/sosmed', label: 'DigiSosmed', icon: '◍' },
       { href: '/admin/stok', label: 'Stok Akun', icon: '◧' },
     ],
   },
@@ -42,6 +36,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: '◎' },
       { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: '◬' },
       { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: '↓' },
+      { href: '/admin/digiconnect', label: 'DigiConnect', icon: '⌁' },
       { href: '/admin/convert', label: 'Control Convert', icon: '⇄' },
       { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌' },
     ],
