@@ -13,6 +13,7 @@ type NavItem = {
 
 type NavSection = {
   label: string
+  collapsible?: boolean
   items: NavItem[]
 }
 
@@ -35,6 +36,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: 'Transaksi',
+    collapsible: true,
     items: [
       { href: '/admin/order', label: 'Order', icon: 'OR', hint: 'DigiProduct' },
       { href: '/admin/sosmed/orders', label: 'Order Sosmed', icon: 'OS', hint: 'JAP/provider' },
@@ -46,6 +48,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: 'Convert',
+    collapsible: true,
     items: [
       { href: '/admin/convert', label: 'Dashboard', icon: 'CV', hint: 'Ringkasan' },
       { href: '/admin/convert/orders', label: 'Order Convert', icon: 'CO', hint: 'Queue order' },
@@ -55,6 +58,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: 'Gmail',
+    collapsible: true,
     items: [
       { href: '/admin/gmail', label: 'Dashboard', icon: 'GM', hint: 'Ringkasan' },
       { href: '/admin/gmail/verifikasi', label: 'Verifikasi', icon: 'GV', hint: 'Setoran Gmail' },
@@ -173,11 +177,11 @@ export default function AdminSidebar({ collapsed = false, badges, loadingBadges 
       <nav className="sidebar-nav" aria-label="Menu admin">
         {NAV_SECTIONS.map((section) => {
           const sectionActive = section.items.some((item) => isNavActive(pathname, item.href))
-          const sectionOpen = collapsed || openSections.has(section.label) || sectionActive
+          const sectionOpen = !section.collapsible || collapsed || openSections.has(section.label) || sectionActive
 
           return (
             <div className="nav-section" key={section.label}>
-              {!collapsed ? (
+              {section.collapsible && !collapsed ? (
                 <button
                   type="button"
                   className={`nav-section-toggle${sectionOpen ? ' open' : ''}`}
