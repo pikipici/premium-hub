@@ -436,7 +436,7 @@ export default function OrderPage() {
     <div className="page">
       {!!notice && (
         <div className="alert-bar" style={{ marginBottom: 12 }}>
-          <strong>{notice}</strong>
+          ✅ <strong>{notice}</strong>
           <button
             className="link-btn"
             style={{ marginLeft: 'auto', color: 'inherit' }}
@@ -457,44 +457,51 @@ export default function OrderPage() {
             color: '#991B1B',
           }}
         >
-          <strong>{error}</strong>
+          ⚠️ <strong>{error}</strong>
         </div>
       )}
 
       <div className="admin-desktop-only">
-        <div className="admin-page-head">
-          <div>
-            <div className="admin-page-eyebrow">Operasional</div>
-            <h1 className="admin-page-title">Order Masuk</h1>
-            <p className="admin-page-subtitle">
-              Pantau pembayaran, status order, dan aksi pengiriman akun dari satu tampilan yang lebih ringkas.
-            </p>
-          </div>
-
-          <div className="admin-page-actions">
-            <button className="topbar-btn" onClick={refreshOrders} disabled={loading || syncing}>
-              {syncing ? 'Menyegarkan...' : 'Refresh'}
-            </button>
-            <button className="topbar-btn" onClick={exportCurrentRows} disabled={loading || syncing}>
-              Export CSV
-            </button>
-          </div>
-        </div>
-
-        <div className="admin-filter-bar">
-          <div className="admin-filter-group">
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 14,
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
               type="text"
-              className="admin-input"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari order, pembeli, atau produk"
+              placeholder="🔍 Cari order / pembeli / produk..."
+              style={{
+                fontFamily: 'inherit',
+                fontSize: 13,
+                padding: '8px 14px',
+                border: '1px solid var(--border)',
+                borderRadius: 9,
+                background: 'var(--white)',
+                outline: 'none',
+                width: 280,
+              }}
             />
 
             <select
-              className="admin-select"
               value={statusFilter}
               onChange={(event) => handleFilterChange(event.target.value as OrderFilter)}
+              style={{
+                fontFamily: 'inherit',
+                fontSize: 13,
+                padding: '8px 12px',
+                border: '1px solid var(--border)',
+                borderRadius: 9,
+                background: 'var(--white)',
+                outline: 'none',
+              }}
             >
               {STATUS_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -504,15 +511,22 @@ export default function OrderPage() {
             </select>
           </div>
 
-          <div className="admin-summary-chip">
-            {filteredOrders.length} tampil dari {total} order
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="topbar-btn" onClick={refreshOrders} disabled={loading || syncing}>
+              {syncing ? 'Menyegarkan...' : 'Refresh'}
+            </button>
+            <button className="topbar-btn" onClick={exportCurrentRows} disabled={loading || syncing}>
+              Export CSV
+            </button>
           </div>
         </div>
 
         <div className="card">
           <div className="card-header">
             <h2>Semua Order</h2>
-            <span className="admin-summary-chip">Total {total} order</span>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              Total: <strong style={{ color: 'var(--dark)' }}>{total}</strong> order
+            </div>
           </div>
 
           <div className="table-wrap">
