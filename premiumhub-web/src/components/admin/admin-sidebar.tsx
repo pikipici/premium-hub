@@ -7,7 +7,6 @@ type NavItem = {
   href: string
   label: string
   icon: string
-  hint?: string
 }
 
 type NavSection = {
@@ -19,50 +18,50 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Overview',
     items: [
-      { href: '/admin', label: 'Dashboard', icon: 'DB', hint: 'Ringkasan' },
+      { href: '/admin', label: 'Dashboard', icon: '▦' },
     ],
   },
   {
     label: 'Katalog',
     items: [
-      { href: '/admin/produk', label: 'Produk', icon: 'PR', hint: 'DigiProduct' },
-      { href: '/admin/sosmed', label: 'DigiSosmed', icon: 'SM', hint: 'Layanan sosial' },
-      { href: '/admin/stok', label: 'Stok Akun', icon: 'ST', hint: 'Inventory' },
+      { href: '/admin/produk', label: 'Produk', icon: '◈' },
+      { href: '/admin/sosmed', label: 'DigiSosmed', icon: '◍' },
+      { href: '/admin/stok', label: 'Stok Akun', icon: '◧' },
     ],
   },
   {
     label: 'Transaksi',
     items: [
-      { href: '/admin/order', label: 'Order', icon: 'OR', hint: 'DigiProduct' },
-      { href: '/admin/sosmed/orders', label: 'Order Sosmed', icon: 'OS', hint: 'JAP/provider' },
-      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: 'RW', hint: 'Saldo & mutasi' },
-      { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: 'WD', hint: 'Withdraw' },
-      { href: '/admin/digiconnect', label: 'DigiConnect', icon: 'DC', hint: 'API usage' },
-      { href: '/admin/convert', label: 'Convert', icon: 'CV', hint: 'Queue & pricing' },
-      { href: '/admin/garansi', label: 'Klaim Garansi', icon: 'KG', hint: 'Refund/reissue' },
+      { href: '/admin/order', label: 'Order', icon: '◉' },
+      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: '◎' },
+      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: '◬' },
+      { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: '↓' },
+      { href: '/admin/digiconnect', label: 'DigiConnect', icon: '⌁' },
+      { href: '/admin/convert', label: 'Control Convert', icon: '⇄' },
+      { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌' },
     ],
   },
   {
     label: 'Gmail',
     items: [
-      { href: '/admin/gmail/verifikasi', label: 'Verifikasi', icon: 'GV', hint: 'Setoran Gmail' },
-      { href: '/admin/gmail/inventory', label: 'Inventory', icon: 'GI', hint: 'Stok Gmail' },
-      { href: '/admin/gmail/pricing', label: 'Pricing', icon: 'GP', hint: 'Harga Gmail' },
-      { href: '/admin/gmail/strikes', label: 'Strike Users', icon: 'GS', hint: 'Fraud control' },
-      { href: '/admin/gmail/analytics', label: 'Analytics', icon: 'GA', hint: 'Performa Gmail' },
+      { href: '/admin/gmail/verifikasi', label: 'Verifikasi Setoran', icon: '✓' },
+      { href: '/admin/gmail/inventory', label: 'Inventory', icon: '◳' },
+      { href: '/admin/gmail/pricing', label: 'Pricing', icon: '$' },
+      { href: '/admin/gmail/strikes', label: 'Strike Users', icon: '!' },
+      { href: '/admin/gmail/analytics', label: 'Analytics', icon: '📊' },
     ],
   },
   {
     label: 'Support',
     items: [
-      { href: '/admin/chat', label: 'Chat Support', icon: 'CS', hint: 'Inbox bantuan' },
+      { href: '/admin/chat', label: 'Chat Support', icon: '◴' },
     ],
   },
   {
     label: 'Akun',
     items: [
-      { href: '/admin/pengguna', label: 'Pengguna', icon: 'US', hint: 'User account' },
-      { href: '/admin/pengaturan', label: 'Pengaturan', icon: 'PG', hint: 'Konfigurasi' },
+      { href: '/admin/pengguna', label: 'Pengguna', icon: '◎' },
+      { href: '/admin/pengaturan', label: 'Pengaturan', icon: '◫' },
     ],
   },
 ]
@@ -138,10 +137,7 @@ export default function AdminSidebar({ collapsed = false, badges, loadingBadges 
                 aria-label={item.label}
               >
                 <span className="nav-icon">{item.icon}</span>
-                <span className="nav-text-wrap">
-                  <span className="nav-text">{item.label}</span>
-                  {item.hint ? <span className="nav-hint">{item.hint}</span> : null}
-                </span>
+                <span className="nav-text">{item.label}</span>
                 {showBadge ? (
                   <span className={`nav-badge${badgeClassNameForHref(item.href)}`}>
                     {loadingBadges ? '…' : badgeValue > 99 ? '99+' : badgeValue}
