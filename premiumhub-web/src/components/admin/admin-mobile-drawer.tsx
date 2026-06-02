@@ -18,7 +18,7 @@ type DrawerSection = {
   items: DrawerItem[]
 }
 
-const DRAWER_OPEN_STORAGE_KEY = 'premiumhub-admin-mobile-drawer-open-sections-v2'
+const DRAWER_OPEN_STORAGE_KEY = 'premiumhub-admin-mobile-drawer-open-sections'
 
 const DRAWER_SECTIONS: DrawerSection[] = [
   {
