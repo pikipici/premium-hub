@@ -1,0 +1,18 @@
+[Unit]
+Description=workspace-PremiumHub Web (Next.js)
+After=network-online.target workspace-premiumhub-api.service
+Wants=network-online.target workspace-premiumhub-api.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/premium-hub-workspace/premium-hub/premiumhub-web
+Environment=NODE_ENV=production
+Environment=PORT=3005
+Environment=NEXT_PUBLIC_API_URL=/api/v1
+Environment=NEXT_INTERNAL_API_BASE_URL=http://127.0.0.1:18082
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

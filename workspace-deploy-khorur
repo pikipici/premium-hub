@@ -263,7 +263,7 @@ PULL_LATEST="${PULL_LATEST:-1}"
 
 REMOTE_DEPLOY_ENABLED="${REMOTE_DEPLOY_ENABLED:-auto}"
 REMOTE_DEPLOY_HOST="${REMOTE_DEPLOY_HOST:-$(default_remote_deploy_host)}"
-REMOTE_PROJECT_ROOT="${REMOTE_PROJECT_ROOT:-/home/ubuntu/openclaw-vcp/profiles/openai-codex/shared/workspace/khorur-premium-hub}"
+REMOTE_PROJECT_ROOT="${REMOTE_PROJECT_ROOT:-/home/ubuntu/premium-hub-workspace/khorur-premium-hub}"
 REMOTE_SCRIPT_PATH="${REMOTE_SCRIPT_PATH:-${REMOTE_PROJECT_ROOT}/workspace-deploy-khorur}"
 
 FRONTEND_DIR="${PROJECT_ROOT}/premiumhub-web"
@@ -288,7 +288,7 @@ NPM_FLAGS="${NPM_FLAGS:---include=dev --no-audit --no-fund}"
 
 ENV_FILE="${ENV_FILE:-${HOME}/.config/workspace-khorur-premiumhub-api.env}"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
-SOURCE_NODE_MODULES="${SOURCE_NODE_MODULES:-/home/ubuntu/openclaw-vcp/profiles/openai-codex/shared/workspace/premium-hub/premiumhub-web/node_modules}"
+SOURCE_NODE_MODULES="${SOURCE_NODE_MODULES:-/home/ubuntu/premium-hub-workspace/premium-hub/premiumhub-web/node_modules}"
 
 API_SERVICE_FILE="${SYSTEMD_USER_DIR}/${API_SERVICE_NAME}"
 WEB_SERVICE_FILE="${SYSTEMD_USER_DIR}/${WEB_SERVICE_NAME}"

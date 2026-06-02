@@ -1,0 +1,13 @@
+[Unit]
+Description=workspace PremiumHub web localhost bridge 7005->3005
+After=network-online.target workspace-premiumhub-web.service
+Wants=network-online.target workspace-premiumhub-web.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/socat TCP-LISTEN:7005,bind=127.0.0.1,reuseaddr,fork TCP:127.0.0.1:3005
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

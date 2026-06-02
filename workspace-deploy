@@ -149,7 +149,7 @@ WORKSPACE_WEB_RUN_MODE="${WORKSPACE_WEB_RUN_MODE:-auto}"
 # - 0    : never delegate; run directly on current machine
 REMOTE_DEPLOY_ENABLED="${REMOTE_DEPLOY_ENABLED:-auto}"
 REMOTE_DEPLOY_HOST="${REMOTE_DEPLOY_HOST:-rdpkhorur}"
-REMOTE_PROJECT_ROOT="${REMOTE_PROJECT_ROOT:-/home/ubuntu/openclaw-vcp/profiles/openai-codex/shared/workspace/premium-hub}"
+REMOTE_PROJECT_ROOT="${REMOTE_PROJECT_ROOT:-/home/ubuntu/premium-hub-workspace/premium-hub}"
 REMOTE_SCRIPT_PATH="${REMOTE_SCRIPT_PATH:-${REMOTE_PROJECT_ROOT}/workspace-deploy}"
 
 EXPECT_BE_BINARY_ARTIFACT=1
