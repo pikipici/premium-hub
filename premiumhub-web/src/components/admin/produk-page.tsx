@@ -1344,10 +1344,9 @@ export default function ProdukPage() {
 
       {formOpen && (
         <div
-          className="modal-overlay"
           style={{ position: 'fixed', inset: 0, background: 'rgba(20,20,20,.35)', zIndex: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}
         >
-          <div className="card modal-card" style={{ width: '100%', maxWidth: 780, maxHeight: '90vh', overflow: 'auto' }}>
+          <div className="card" style={{ width: '100%', maxWidth: 780, maxHeight: '90vh', overflow: 'auto' }}>
             <div className="card-header">
               <h2>{formMode === 'create' ? 'Tambah Produk Baru' : 'Edit Produk + Konten + Harga'}</h2>
               <button className="action-btn" onClick={closeForm} disabled={saving}>
