@@ -4,6 +4,13 @@ import { LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 
+import {
+  AdminFilterBar,
+  AdminPageHeader,
+  AdminStatCard,
+  AdminSurface,
+} from '@/components/admin/admin-ui'
+import { Button } from '@/components/ui/button'
 import { accountTypeService } from '@/services/accountTypeService'
 import { productCategoryService } from '@/services/productCategoryService'
 import { productService } from '@/services/productService'
@@ -508,6 +515,22 @@ export default function ProdukPage() {
       return haystack.includes(keyword)
     })
   }, [categoryFilter, products, search, statusFilter])
+
+  const productStats = useMemo(() => {
+    const active = products.filter((product) => product.is_active).length
+    const popular = products.filter((product) => product.is_popular).length
+    const categories = new Set(products.map((product) => product.category).filter(Boolean)).size
+    const withPrices = products.filter((product) => product.prices?.some((price) => price.is_active)).length
+
+    return {
+      total: products.length,
+      active,
+      inactive: Math.max(products.length - active, 0),
+      popular,
+      categories,
+      withPrices,
+    }
+  }, [products])
 
   const openCreate = () => {
     setFormMode('create')
@@ -1102,21 +1125,40 @@ export default function ProdukPage() {
         </div>
       )}
 
-      <div className="admin-desktop-only">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="grid gap-4">
+        <AdminPageHeader
+          eyebrow="Admin Catalog"
+          title="Produk DigiProduct"
+          description="Kelola katalog, harga, fulfillment, dan status produk digital dari satu workspace yang lebih jelas."
+          actions={
+            <Button className="h-10 rounded-full bg-[#ff5733] px-5 text-sm font-black text-white hover:bg-[#e84b2b]" onClick={openCreate}>
+              + Tambah Produk
+            </Button>
+          }
+        />
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminStatCard label="Total Produk" value={productStats.total} detail={`${filteredProducts.length} tampil setelah filter`} tone="neutral" />
+          <AdminStatCard label="Produk Aktif" value={productStats.active} detail={`${productStats.inactive} nonaktif / arsip`} tone="green" />
+          <AdminStatCard label="Populer" value={productStats.popular} detail="Ditandai sebagai highlight katalog" tone="orange" />
+          <AdminStatCard label="Kategori" value={productStats.categories} detail={`${productStats.withPrices} produk punya harga aktif`} tone="neutral" />
+        </div>
+
+        <AdminFilterBar>
+          <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_180px_auto] lg:items-center">
+            <div className="contents">
             <input
               type="text"
+              className="form-input min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="🔍 Cari nama/slug produk..."
-              style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 14px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none', width: 260 }}
+              placeholder="Cari nama, slug, kategori, atau deskripsi..."
             />
 
             <select
+              className="form-select min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold"
               value={categoryFilter}
               onChange={(event) => setCategoryFilter(event.target.value)}
-              style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none' }}
             >
               <option value="all">Semua Kategori</option>
               {categoryOptions.map((option) => (
@@ -1127,22 +1169,25 @@ export default function ProdukPage() {
             </select>
 
             <select
+              className="form-select min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
-              style={{ fontFamily: 'inherit', fontSize: 13, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 9, background: 'var(--white)', outline: 'none' }}
             >
               <option value="all">Semua Status</option>
               <option value="active">Aktif</option>
               <option value="inactive">Nonaktif</option>
             </select>
+
+            <Button className="h-11 rounded-2xl bg-neutral-950 px-4 font-black text-white hover:bg-neutral-800" onClick={openCreate}>
+              Produk Baru
+            </Button>
+            </div>
           </div>
+        </AdminFilterBar>
 
-          <button className="topbar-btn primary" onClick={openCreate}>
-            + Tambah Produk Baru
-          </button>
-        </div>
+        <div className="admin-desktop-only">
 
-        <div className="card">
+        <AdminSurface className="overflow-hidden p-0">
           <div className="table-wrap">
             <table>
               <thead>
@@ -1232,11 +1277,11 @@ export default function ProdukPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </AdminSurface>
       </div>
 
       <div className="admin-mobile-only">
-        <div className="mobile-page-head">
+        <div className="hidden">
           <div>
             <div className="mobile-page-title">Produk</div>
             <div className="mobile-page-subtitle">Kontrol produk + paket harga DigiProduct</div>
@@ -1246,7 +1291,7 @@ export default function ProdukPage() {
           </button>
         </div>
 
-        <div className="mobile-card" style={{ marginBottom: 8 }}>
+        <div className="hidden">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <input
               type="text"
@@ -1356,6 +1401,8 @@ export default function ProdukPage() {
         <button className="mobile-fab" onClick={openCreate}>
           + Produk
         </button>
+      </div>
+
       </div>
 
       {formOpen && (
