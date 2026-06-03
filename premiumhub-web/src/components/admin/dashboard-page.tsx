@@ -3,6 +3,8 @@
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { AdminPageHeader, AdminStatCard, AdminSurface } from '@/components/admin/admin-ui'
+import { Button } from '@/components/ui/button'
 import { adminDashboardService } from '@/services/adminDashboardService'
 import { claimService } from '@/services/claimService'
 import type { Claim, Order } from '@/types/order'
@@ -613,8 +615,48 @@ export default function DashboardPage({ onNavigate }: DashboardProps) {
         </div>
       )}
 
+      <div className="mb-4 grid gap-4">
+        <AdminPageHeader
+          eyebrow="Admin Command Center"
+          title="Operasional Premium Hub"
+          description="Pantau order, revenue, stok kritis, dan klaim dari satu dashboard yang lebih tegas. Gunakan quick action buat lompat ke antrean yang perlu diproses."
+          actions={
+            <>
+              <Button className="h-10 rounded-full bg-white px-5 text-sm font-black text-neutral-950 hover:bg-white/90" onClick={() => onNavigate('order')}>
+                Cek Order
+              </Button>
+              <Button className="h-10 rounded-full bg-[#ff5733] px-5 text-sm font-black text-white hover:bg-[#e84b2b]" onClick={() => onNavigate('stok')}>
+                Stok Kritis
+              </Button>
+            </>
+          }
+        />
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminStatCard label="Revenue Hari Ini" value={formatRupiah(kpi.revenueToday)} detail={`${kpi.revenueChangeText} vs kemarin`} tone={kpi.revenueToday >= kpi.revenueYesterday ? 'green' : 'orange'} />
+          <AdminStatCard label="Order Baru" value={kpi.ordersToday} detail={`${Math.abs(kpi.ordersDelta)} ${kpi.ordersDelta >= 0 ? 'naik/flat' : 'turun'} dari kemarin`} tone="orange" />
+          <AdminStatCard label="Klaim Pending" value={pendingClaimsTotal} detail="Butuh keputusan admin" tone={pendingClaimsTotal > 0 ? 'red' : 'green'} />
+          <AdminStatCard label="User Aktif" value={activeUsersTotal.toLocaleString('id-ID')} detail="Akun aktif terverifikasi" tone="neutral" />
+        </div>
+
+        <AdminSurface className="p-3 shadow-none">
+          <div className="flex flex-col gap-3 text-sm font-bold text-neutral-700 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              {criticalStocks.length > 0 ? (
+                <span><strong className="text-rose-700">{criticalStocks.length} stok kritis</strong> perlu restock: {criticalStocks.map((item) => `${item.name} (${item.available})`).join(', ')}</span>
+              ) : (
+                <span><strong className="text-emerald-700">Stok aman.</strong> Belum ada produk yang masuk status kritis.</span>
+              )}
+            </div>
+            <button className="text-left text-sm font-black text-[#ff5733] lg:text-right" onClick={() => onNavigate('stok')}>
+              Kelola stok sekarang
+            </button>
+          </div>
+        </AdminSurface>
+      </div>
+
       <div className="admin-mobile-only">
-        <div className="mobile-page-head">
+        <div className="hidden">
           <div>
             <div className="mobile-page-title">Ringkasan Hari Ini</div>
             <div className="mobile-page-subtitle">Data real-time panel admin</div>
@@ -734,7 +776,7 @@ export default function DashboardPage({ onNavigate }: DashboardProps) {
       </div>
 
       <div className="admin-desktop-only">
-        <div className="alert-bar">
+        <div className="hidden">
           {criticalStocks.length > 0 ? (
             <>
               ⚠️ <strong>{criticalStocks.length} produk stok kritis</strong> —{' '}
@@ -749,7 +791,7 @@ export default function DashboardPage({ onNavigate }: DashboardProps) {
           )}
         </div>
 
-        <div className="metrics">
+        <div className="hidden">
           <div className="metric-card">
             <div className="metric-top"><span className="metric-label">Pendapatan Hari Ini</span><div className="metric-icon green">💰</div></div>
             <div className="metric-value">{formatRupiah(kpi.revenueToday)}</div>
