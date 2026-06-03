@@ -94,7 +94,7 @@ export default function Footer() {
               <span className="text-xl font-extrabold">Digi<span className="text-[#FF5733]">Market</span></span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
-              DigiSosmed dan DigiProduct dalam satu wallet. Untuk workflow, produk digital, dan growth sosial.
+              DigiSosmed dan DigiProduct dalam satu wallet. Untuk produk digital, social growth, dan checkout cepat.
             </p>
           </div>
 

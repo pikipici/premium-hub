@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { ArrowRight, BarChart3, CheckCircle2, Code2, Network, PackageCheck, Rocket, ShieldCheck, WalletCards } from 'lucide-react'
+import { ArrowRight, BarChart3, CheckCircle2, Code2, PackageCheck, Rocket, ShieldCheck, Sparkles, WalletCards } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
@@ -104,12 +104,17 @@ export default function HomePage() {
   const showDigiProductCard = visibleProductCards.includes('/product/digiproduct')
   const visibleCardsCount = Number(showDigiConnectCard) + Number(showSosmedCard) + Number(showDigiProductCard)
   const isSingleVisibleCard = visibleCardsCount === 1
+  const isTwoVisibleCards = visibleCardsCount === 2
   const hasVisibleCards = showDigiConnectCard || showSosmedCard || showDigiProductCard
   const desktopCardsGridClass = isSingleVisibleCard
     ? 'hidden gap-3 sm:grid md:grid-cols-1 md:justify-items-center lg:gap-7'
+    : isTwoVisibleCards
+      ? 'hidden gap-3 sm:grid md:grid-cols-2 md:gap-5 lg:mx-auto lg:max-w-5xl lg:grid-cols-2 lg:gap-7'
     : 'hidden gap-3 sm:grid md:grid-cols-2 md:gap-5 lg:grid-cols-3 lg:gap-7'
   const productCardClass = isSingleVisibleCard
     ? 'relative w-full overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-[0_12px_28px_rgba(20,20,20,0.05)] md:max-w-[640px] sm:rounded-3xl sm:p-6 sm:shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7'
+    : isTwoVisibleCards
+      ? 'relative overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-[0_12px_28px_rgba(20,20,20,0.05)] sm:rounded-3xl sm:p-6 sm:shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-8'
     : 'relative overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-4 shadow-[0_12px_28px_rgba(20,20,20,0.05)] sm:rounded-3xl sm:p-6 sm:shadow-[0_16px_38px_rgba(20,20,20,0.06)] lg:p-7'
 
   return (
@@ -139,8 +144,8 @@ Semua kebutuhan ada disini
                 Refund
               </span>
               <span className="inline-flex items-center justify-center gap-1 rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 shadow-[0_8px_18px_rgba(20,20,20,0.04)]">
-                <Network className="h-3.5 w-3.5 text-[#FF5733]" />
-                API ready
+                <Sparkles className="h-3.5 w-3.5 text-[#FF5733]" />
+                Instant
               </span>
             </div>
           </header>
@@ -166,7 +171,7 @@ Semua kebutuhan ada disini
                   <BarChart3 className="relative h-6 w-6" />
                   <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiSosmed</p>
                   <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Naikin sosial</h3>
-                  <p className="relative mt-2 text-xs font-semibold text-white/78">{smmMiniStatLabel}</p>
+                  <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/78">{smmMiniStatLabel}</p>
                   <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold">
                     Buka <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                   </span>
@@ -182,7 +187,7 @@ Semua kebutuhan ada disini
                   <PackageCheck className="relative h-6 w-6" />
                   <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiProduct</p>
                   <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Produk digital</h3>
-                  <p className="relative mt-2 text-xs font-semibold text-white/78">Akun, lisensi, tools</p>
+                  <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/78">Akun, lisensi, tools</p>
                   <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold">
                     Buka <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                   </span>
@@ -220,7 +225,7 @@ Semua kebutuhan ada disini
             <div className="mt-4 grid grid-cols-3 gap-2 text-[11px] font-bold text-[#3A3A3A]">
               <span className="rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 text-center">Aman</span>
               <span className="rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 text-center">Refund</span>
-              <span className="rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 text-center">API ready</span>
+              <span className="rounded-2xl border border-[#FFE0D7] bg-white px-2 py-2 text-center">Instan</span>
             </div>
           </div>
 
