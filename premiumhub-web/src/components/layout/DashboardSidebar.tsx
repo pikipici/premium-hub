@@ -46,7 +46,13 @@ const MENU = [
   { href: '/dashboard/sosmed/orders', icon: Megaphone, label: 'Order DigiSosmed' },
   { href: '/dashboard/digiconnect', icon: Network, label: 'DigiConnect' },
   { href: '/dashboard/gmail', icon: Mail, label: 'Gmail' },
-  { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Produk Aktif', settingKey: 'active_accounts' },
+  {
+    href: '/dashboard/produk-aktif',
+    icon: ShoppingBag,
+    label: 'Produk Aktif',
+    settingKey: 'active_accounts',
+    activeHrefs: ['/dashboard/akun-aktif'],
+  },
   { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order', settingKey: 'order_history' },
   { href: '/dashboard/klaim-garansi', icon: ShieldCheck, label: 'Klaim Garansi', settingKey: 'warranty_claim' },
   { href: '/dashboard/chat', icon: MessageCircle, label: 'Chat Support' },
@@ -56,7 +62,16 @@ const MENU = [
   icon: ComponentType<{ className?: string }>
   label: string
   settingKey?: UserSidebarMenuSettingKey
+  activeHrefs?: string[]
 }>
+
+function isMenuItemActive(pathname: string, item: (typeof MENU)[number]) {
+  const hrefs = [item.href, ...(item.activeHrefs || [])]
+  return hrefs.some((href) => {
+    if (href === '/dashboard') return pathname === href
+    return pathname === href || pathname.startsWith(`${href}/`)
+  })
+}
 
 function useMenuItems() {
   const [visibleByKey, setVisibleByKey] =
@@ -197,10 +212,7 @@ function SidebarMenu({
   return (
     <nav className="flex-1 space-y-1">
       {menuItems.map((item) => {
-        const active =
-          item.href === '/dashboard'
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(`${item.href}/`)
+        const active = isMenuItemActive(pathname, item)
 
         return (
           <Link
