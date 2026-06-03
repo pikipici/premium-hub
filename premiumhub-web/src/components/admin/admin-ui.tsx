@@ -1,14 +1,16 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 type DivProps = ComponentPropsWithoutRef<'div'>
 
 export function AdminSurface({ className, ...props }: DivProps) {
   return (
-    <div
+    <Card
       className={cn(
-        'relative overflow-hidden rounded-3xl border border-neutral-200/80 bg-white shadow-[0_24px_80px_rgba(20,20,20,0.07)]',
+        'relative overflow-hidden rounded-3xl border-neutral-200/80 bg-white py-0 shadow-[0_24px_80px_rgba(20,20,20,0.07)]',
         className
       )}
       {...props}
@@ -30,29 +32,29 @@ export function AdminPageHeader({
   className?: string
 }) {
   return (
-    <section
+    <Card
       className={cn(
-        'relative overflow-hidden rounded-[28px] border border-neutral-900 bg-[#141414] p-5 text-white shadow-[0_20px_70px_rgba(20,20,20,0.18)] md:p-6',
+        'relative overflow-hidden rounded-[28px] border-neutral-900 bg-[#141414] py-0 text-white shadow-[0_20px_70px_rgba(20,20,20,0.18)]',
         className
       )}
     >
       <div className="pointer-events-none absolute -right-16 -top-20 size-52 rounded-full bg-[#ff5733]/25 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 left-1/2 h-20 w-1/2 -translate-x-1/2 rounded-full bg-white/5 blur-2xl" />
-      <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <CardContent className="relative z-10 flex flex-col gap-5 p-5 md:p-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">
           {eyebrow ? (
-            <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.22em] text-white/65">
+            <Badge variant="outline" className="mb-3 border-white/10 bg-white/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.22em] text-white/65">
               {eyebrow}
-            </div>
+            </Badge>
           ) : null}
-          <h1 className="text-2xl font-black tracking-[-0.04em] text-white md:text-4xl">{title}</h1>
+          <CardTitle className="text-2xl font-black tracking-[-0.04em] text-white md:text-4xl">{title}</CardTitle>
           {description ? (
             <p className="mt-3 max-w-xl text-sm font-medium leading-6 text-white/62 md:text-[15px]">{description}</p>
           ) : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -78,13 +80,13 @@ export function AdminStatCard({
 
   return (
     <AdminSurface className={cn('p-4 shadow-[0_12px_40px_rgba(20,20,20,0.05)]', className)}>
-      <div className="flex items-start justify-between gap-3">
+      <CardHeader className="flex flex-row items-start justify-between gap-3 p-0">
         <div>
           <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-neutral-400">{label}</div>
           <div className="mt-2 text-2xl font-black tracking-[-0.04em] text-neutral-950">{value}</div>
         </div>
         <div className={cn('size-2.5 rounded-full ring-4', toneClass)} />
-      </div>
+      </CardHeader>
       {detail ? <div className="mt-2 text-xs font-semibold leading-5 text-neutral-500">{detail}</div> : null}
     </AdminSurface>
   )
@@ -129,14 +131,15 @@ export function AdminStatusPill({
   }[tone]
 
   return (
-    <span
+    <Badge
+      variant="outline"
       className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-extrabold leading-none',
+        'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold leading-none',
         toneClass,
         className
       )}
     >
       {children}
-    </span>
+    </Badge>
   )
 }

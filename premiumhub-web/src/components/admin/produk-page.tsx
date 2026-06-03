@@ -11,6 +11,15 @@ import {
   AdminSurface,
 } from '@/components/admin/admin-ui'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { accountTypeService } from '@/services/accountTypeService'
 import { productCategoryService } from '@/services/productCategoryService'
 import { productService } from '@/services/productService'
@@ -1147,9 +1156,9 @@ export default function ProdukPage() {
         <AdminFilterBar>
           <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_180px_auto] lg:items-center">
             <div className="contents">
-            <input
+            <Input
               type="text"
-              className="form-input min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Cari nama, slug, kategori, atau deskripsi..."
@@ -1189,39 +1198,39 @@ export default function ProdukPage() {
 
         <AdminSurface className="overflow-hidden p-0">
           <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Produk</th>
-                  <th>Kategori</th>
-                  <th>Harga Mulai</th>
-                  <th>Paket</th>
-                  <th>Priority</th>
-                  <th>Popular</th>
-                  <th>Status</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Produk</TableHead>
+                  <TableHead>Kategori</TableHead>
+                  <TableHead>Harga Mulai</TableHead>
+                  <TableHead>Paket</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Popular</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
+                  <TableRow>
+                    <TableCell colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
                       Memuat data produk...
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : filteredProducts.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
+                  <TableRow>
+                    <TableCell colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
                       Tidak ada produk yang cocok dengan filter.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   filteredProducts.map((product) => {
                     const minPrice = getLowestPrice(product)
 
                     return (
-                      <tr key={product.id}>
-                        <td>
+                      <TableRow key={product.id}>
+                        <TableCell>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <span style={{ fontSize: 22 }}>{product.icon || '📦'}</span>
                             <div>
@@ -1229,24 +1238,24 @@ export default function ProdukPage() {
                               <div style={{ fontSize: 11, color: 'var(--muted)' }}>/{product.slug}</div>
                             </div>
                           </div>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <span className="product-pill">{getCategoryLabel(product.category, categoryOptions)}</span>
-                        </td>
-                        <td style={{ fontWeight: 600 }}>{minPrice ? formatRupiah(minPrice) : '-'}</td>
-                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{summarizePrices(product.prices, accountTypeMap)}</td>
-                        <td style={{ fontWeight: 600, fontSize: 12 }}>{product.sort_priority || 0}</td>
-                        <td>
+                        </TableCell>
+                        <TableCell style={{ fontWeight: 600 }}>{minPrice ? formatRupiah(minPrice) : '-'}</TableCell>
+                        <TableCell style={{ fontSize: 12, color: 'var(--muted)' }}>{summarizePrices(product.prices, accountTypeMap)}</TableCell>
+                        <TableCell style={{ fontWeight: 600, fontSize: 12 }}>{product.sort_priority || 0}</TableCell>
+                        <TableCell>
                           <span className={`status-badge ${product.is_popular ? 's-lunas' : 's-pending'}`}>
                             {product.is_popular ? 'Populer' : 'Normal'}
                           </span>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <span className={`status-badge ${product.is_active ? 's-lunas' : 's-gagal'}`}>
                             {product.is_active ? 'Aktif' : 'Nonaktif'}
                           </span>
-                        </td>
-                        <td>
+                        </TableCell>
+                        <TableCell>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <button className="action-btn" onClick={() => openEdit(product)}>
                               ✏ Edit
@@ -1269,13 +1278,13 @@ export default function ProdukPage() {
                               Hapus Permanen
                             </button>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )
                   })
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </AdminSurface>
       </div>
