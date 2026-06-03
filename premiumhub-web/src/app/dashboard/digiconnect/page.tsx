@@ -2,6 +2,7 @@
 
 import type React from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -27,6 +28,7 @@ import {
 import { digiconnectService } from '@/services/digiconnectService'
 import { walletService } from '@/services/walletService'
 import { useAuthStore } from '@/store/authStore'
+import { isDigiConnectFrontendEnabled } from '@/lib/featureFlags'
 import { formatRupiah } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import type {
@@ -200,6 +202,7 @@ const PANELS: { key: PanelKey; label: string; icon: React.ReactNode }[] = [
 ]
 
 export default function DigiConnectDashboardPage() {
+  const router = useRouter()
   const [keys, setKeys] = useState<DigiConnectApiKey[]>([])
   const [planDashboards, setPlanDashboards] = useState<DigiConnectPlanDashboard[]>([])
   const [plans, setPlans] = useState<DigiConnectPlan[]>([])
@@ -222,6 +225,12 @@ export default function DigiConnectDashboardPage() {
 
   const { isAuthenticated, hasHydrated, isBootstrapped, walletBalance, setWalletBalance } = useAuthStore()
   const authReady = hasHydrated && isBootstrapped
+
+  useEffect(() => {
+    if (!isDigiConnectFrontendEnabled()) {
+      router.replace('/dashboard')
+    }
+  }, [router])
 
   const { data: walletData } = useQuery({
     queryKey: ['wallet-balance-digiconnect-dashboard'],
@@ -273,11 +282,15 @@ export default function DigiConnectDashboardPage() {
   }
 
   useEffect(() => {
+    if (!isDigiConnectFrontendEnabled()) return
+
     setBaseUrl(apiBaseUrl())
     void load()
   }, [])
 
   useEffect(() => { setShowAllRequests(false) }, [activeTab])
+
+  if (!isDigiConnectFrontendEnabled()) return null
 
   const createKey = async () => {
     setCreating(true)

@@ -27,6 +27,7 @@ import {
   userSidebarMenuSettingService,
   type UserSidebarMenuSettingKey,
 } from '@/services/userSidebarMenuSettingService'
+import { isDigiConnectFrontendEnabled, isDigiConnectHref } from '@/lib/featureFlags'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 
 type DashboardSidebarProps = {
@@ -86,6 +87,7 @@ function useMenuItems() {
   return useMemo(
     () =>
       MENU.filter((item) => {
+        if (!isDigiConnectFrontendEnabled() && isDigiConnectHref(item.href)) return false
         if (!item.settingKey) return true
         if (visibleByKey === undefined) return false
         if (visibleByKey === null) return true

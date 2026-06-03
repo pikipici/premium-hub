@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 
 import type { AdminSidebarBadgeCounts } from '@/components/admin/admin-sidebar'
+import { isDigiConnectFrontendEnabled, isDigiConnectHref } from '@/lib/featureFlags'
 
 type DrawerItem = {
   href: string
@@ -56,6 +57,11 @@ const DRAWER_SECTIONS: DrawerSection[] = [
     ],
   },
 ]
+
+const VISIBLE_DRAWER_SECTIONS: DrawerSection[] = DRAWER_SECTIONS.map((section) => ({
+  ...section,
+  items: section.items.filter((item) => isDigiConnectFrontendEnabled() || !isDigiConnectHref(item.href)),
+})).filter((section) => section.items.length > 0)
 
 type AdminMobileDrawerProps = {
   open: boolean
@@ -148,7 +154,7 @@ export default function AdminMobileDrawer({
         </div>
 
         <div className="admin-mobile-drawer-scroll">
-          {DRAWER_SECTIONS.map((section) => (
+          {VISIBLE_DRAWER_SECTIONS.map((section) => (
             <div className="admin-mobile-drawer-section" key={section.label}>
               <div className="admin-mobile-drawer-label">{section.label}</div>
 

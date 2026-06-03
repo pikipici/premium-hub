@@ -19,6 +19,7 @@ import {
 
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
+import { isDigiConnectFrontendEnabled } from '@/lib/featureFlags'
 import { digiconnectService } from '@/services/digiconnectService'
 import { useAuthStore } from '@/store/authStore'
 import type { DigiConnectPlan } from '@/types/digiconnect'
@@ -66,6 +67,11 @@ export default function DigiConnectProductPage() {
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!isDigiConnectFrontendEnabled()) {
+      router.replace('/')
+      return
+    }
+
     let alive = true
     digiconnectService
       .publicPlans()
@@ -81,7 +87,9 @@ export default function DigiConnectProductPage() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [router])
+
+  if (!isDigiConnectFrontendEnabled()) return null
 
   const checkout = async (plan: DigiConnectPlan) => {
     if (plan.available === false) {

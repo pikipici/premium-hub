@@ -10,7 +10,6 @@ describe('navbar menu normalization', () => {
         { href: '/product/sosmed', label: 'Paket Sosmed', is_visible: true },
       ])
     ).toEqual([
-      { href: '/product/digiconnect', label: 'DigiConnect' },
       { href: '/product/sosmed', label: 'DigiSosmed' },
       { href: '/product/digiproduct', label: 'DigiProduct' },
     ])
@@ -22,7 +21,6 @@ describe('navbar menu normalization', () => {
         { href: '/product/prem-apps', label: 'Apps Premium', is_visible: true },
       ])
     ).toEqual([
-      { href: '/product/digiconnect', label: 'DigiConnect' },
       { href: '/product/digiproduct', label: 'DigiProduct' },
     ])
   })

@@ -1,16 +1,20 @@
+import { isDigiConnectFrontendEnabled } from './featureFlags'
 import { DEFAULT_PUBLIC_NAV_ITEMS } from './publicNavItems'
 
 const HOME_PRODUCT_CARD_HREFS = ['/product/digiconnect', '/product/sosmed', '/product/digiproduct'] as const
 
 export type HomeProductCardHref = (typeof HOME_PRODUCT_CARD_HREFS)[number]
 
-export const DEFAULT_HOME_PRODUCT_CARD_HREFS: HomeProductCardHref[] = [...HOME_PRODUCT_CARD_HREFS]
+export const DEFAULT_HOME_PRODUCT_CARD_HREFS: HomeProductCardHref[] = HOME_PRODUCT_CARD_HREFS.filter(
+  (href) => isDigiConnectFrontendEnabled() || href !== '/product/digiconnect'
+)
 
 type NavbarLikeItem = {
   href?: string | null
 }
 
 function normalizeHomeProductCardHref(href: string): HomeProductCardHref | null {
+  if (!isDigiConnectFrontendEnabled() && href === '/product/digiconnect') return null
   if (href === '/product/prem-apps') return '/product/digiproduct'
   if ((HOME_PRODUCT_CARD_HREFS as readonly string[]).includes(href)) return href as HomeProductCardHref
   return null
@@ -30,7 +34,9 @@ export function selectVisibleHomeProductCards(items: NavbarLikeItem[]): HomeProd
   // Keep the card visible so the rebranded catalog is discoverable after deploy.
   visibleSet.add('/product/digiproduct')
 
-  return HOME_PRODUCT_CARD_HREFS.filter((href) => visibleSet.has(href))
+  return HOME_PRODUCT_CARD_HREFS.filter(
+    (href) => visibleSet.has(href) && (isDigiConnectFrontendEnabled() || href !== '/product/digiconnect')
+  )
 }
 
 export function fallbackHomeProductCardsFromDefaultMenu(): HomeProductCardHref[] {

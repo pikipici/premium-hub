@@ -1,3 +1,5 @@
+import { isDigiConnectFrontendEnabled } from './featureFlags'
+
 export type CachedNavbarMenuItem = {
   href: string
   label: string
@@ -11,7 +13,6 @@ type NavbarMenuSourceItem = {
 
 const NAVBAR_MENU_CACHE_KEY = 'digimarket:public-navbar-menu:v4'
 const ALWAYS_VISIBLE_NAV_ITEMS: CachedNavbarMenuItem[] = [
-  { href: '/product/digiconnect', label: 'DigiConnect' },
   { href: '/product/digiproduct', label: 'DigiProduct' },
 ]
 
@@ -31,6 +32,7 @@ function normalizeNavbarMenuLabel(href: string, label: string) {
 }
 
 function appendNavbarMenuItem(items: CachedNavbarMenuItem[], item: CachedNavbarMenuItem) {
+  if (!isDigiConnectFrontendEnabled() && item.href === '/product/digiconnect') return
   if (items.some((entry) => entry.href === item.href)) return
   items.push(item)
 }
@@ -49,7 +51,7 @@ export function normalizeNavbarMenuItems(
 
     appendNavbarMenuItem(acc, { href, label: normalizeNavbarMenuLabel(href, label) })
     return acc
-  }, [{ href: '/product/digiconnect', label: 'DigiConnect' }])
+  }, [])
 
   for (const item of ALWAYS_VISIBLE_NAV_ITEMS) {
     appendNavbarMenuItem(normalizedItems, item)

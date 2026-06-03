@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivitySquare, Cpu, Loader2, ReceiptText, Router, WalletCards } from 'lucide-react'
 
 import { ADMIN_PAGE_LIMIT } from '@/config/pagination'
+import { isDigiConnectFrontendEnabled } from '@/lib/featureFlags'
 import { digiconnectService } from '@/services/digiconnectService'
 import type { DigiConnectAdminOverview, DigiConnectEntitlement, DigiConnectRequest } from '@/types/digiconnect'
 
@@ -56,9 +57,23 @@ export default function AdminDigiConnectPage() {
   }, [statusFilter])
 
   useEffect(() => {
+    if (!isDigiConnectFrontendEnabled()) return
+
     setLoading(true)
     void load()
   }, [load])
+
+  if (!isDigiConnectFrontendEnabled()) {
+    return (
+      <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-sm">
+        <p className="text-sm font-bold uppercase tracking-[0.14em]">DigiConnect</p>
+        <h1 className="mt-2 text-2xl font-black tracking-tight">Frontend DigiConnect sementara dinonaktifkan</h1>
+        <p className="mt-2 text-sm leading-relaxed text-amber-800">
+          Modul backend/API tetap tersimpan, tetapi akses admin dari frontend sedang disembunyikan.
+        </p>
+      </div>
+    )
+  }
 
   const provisionEntitlement = async () => {
     setProvisioning(true)

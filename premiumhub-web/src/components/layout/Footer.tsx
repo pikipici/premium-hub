@@ -12,20 +12,24 @@ import {
   readNavbarMenuCache,
   writeNavbarMenuCache,
 } from '@/lib/navbarMenuCache'
+import { isDigiConnectFrontendEnabled, isDigiConnectHref } from '@/lib/featureFlags'
 import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
 
 const FOOTER_PRODUCT_LABEL_BY_HREF: Record<string, string> = {
-  '/product/digiconnect': 'DigiConnect',
   '/product/digiproduct': 'DigiProduct',
   '/product/prem-apps': 'DigiProduct',
   '/product/sosmed': 'DigiSosmed',
   '/product/convert': 'Convert Aset',
 }
 
+function visibleFooterProductItems(items: PublicNavItem[]) {
+  return items.filter((item) => isDigiConnectFrontendEnabled() || !isDigiConnectHref(item.href))
+}
+
 export default function Footer() {
   const currentYear = new Date().getFullYear()
   const [productNavItems, setProductNavItems] = useState<PublicNavItem[]>(
-    () => getNavbarMenuMemoryCache() || []
+    () => visibleFooterProductItems(getNavbarMenuMemoryCache() || [])
   )
 
   useEffect(() => {
@@ -34,7 +38,7 @@ export default function Footer() {
     const loadProductMenu = async () => {
       const cachedItems = readNavbarMenuCache()
       if (cachedItems !== null) {
-        setProductNavItems(cachedItems)
+        setProductNavItems(visibleFooterProductItems(cachedItems))
       }
 
       try {
@@ -42,17 +46,17 @@ export default function Footer() {
         if (cancelled) return
         if (!res.success) {
           if (readNavbarMenuCache() === null) {
-            setProductNavItems(DEFAULT_PUBLIC_NAV_ITEMS)
+            setProductNavItems(visibleFooterProductItems(DEFAULT_PUBLIC_NAV_ITEMS))
           }
           return
         }
 
         const visibleItems = normalizeNavbarMenuItems(res.data || [])
         writeNavbarMenuCache(visibleItems)
-        setProductNavItems(visibleItems)
+        setProductNavItems(visibleFooterProductItems(visibleItems))
       } catch {
         if (!cancelled && readNavbarMenuCache() === null) {
-          setProductNavItems(DEFAULT_PUBLIC_NAV_ITEMS)
+          setProductNavItems(visibleFooterProductItems(DEFAULT_PUBLIC_NAV_ITEMS))
         }
       }
     }
@@ -68,7 +72,7 @@ export default function Footer() {
     const handleNavbarMenuCacheUpdate = () => {
       const cachedItems = readNavbarMenuCache()
       if (cachedItems !== null) {
-        setProductNavItems(cachedItems)
+        setProductNavItems(visibleFooterProductItems(cachedItems))
       }
     }
 
@@ -90,7 +94,7 @@ export default function Footer() {
               <span className="text-xl font-extrabold">Digi<span className="text-[#FF5733]">Market</span></span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
-              DigiConnect dan DigiSosmed dalam satu wallet. Untuk workflow, otomasi, dan growth sosial.
+              DigiSosmed dan DigiProduct dalam satu wallet. Untuk workflow, produk digital, dan growth sosial.
             </p>
           </div>
 

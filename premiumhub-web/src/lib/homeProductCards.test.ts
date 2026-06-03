@@ -15,7 +15,7 @@ describe('home product cards visibility', () => {
         { href: '/product/sosmed' },
         { href: '/product/convert' },
       ])
-    ).toEqual(['/product/digiconnect', '/product/sosmed', '/product/digiproduct'])
+    ).toEqual(['/product/sosmed', '/product/digiproduct'])
   })
 
   it('keeps card order stable and de-duplicates', () => {
@@ -25,7 +25,7 @@ describe('home product cards visibility', () => {
         { href: '/product/digiconnect' },
         { href: '/product/sosmed' },
       ])
-    ).toEqual(['/product/digiconnect', '/product/sosmed', '/product/digiproduct'])
+    ).toEqual(['/product/sosmed', '/product/digiproduct'])
   })
 
   it('keeps DigiProduct visible for legacy navbar data', () => {

@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import { isDigiConnectFrontendEnabled, isDigiConnectHref } from '@/lib/featureFlags'
+
 type NavItem = {
   href: string
   label: string
@@ -66,6 +68,11 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ]
 
+const VISIBLE_NAV_SECTIONS: NavSection[] = NAV_SECTIONS.map((section) => ({
+  ...section,
+  items: section.items.filter((item) => isDigiConnectFrontendEnabled() || !isDigiConnectHref(item.href)),
+})).filter((section) => section.items.length > 0)
+
 function isNavActive(pathname: string, href: string) {
   if (href === '/admin') return pathname === '/admin'
   if (href === '/admin/sosmed') return pathname === '/admin/sosmed'
@@ -118,7 +125,7 @@ export default function AdminSidebar({ collapsed = false, badges, loadingBadges 
       </div>
 
       <nav className="sidebar-nav" aria-label="Navigasi admin">
-        {NAV_SECTIONS.map((section) => (
+        {VISIBLE_NAV_SECTIONS.map((section) => (
           <div className="nav-section" key={section.label}>
             <span className="nav-section-label">{section.label}</span>
 
