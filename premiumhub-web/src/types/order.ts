@@ -20,6 +20,11 @@ export interface OrderStock {
   account_type?: string
   email: string
   password?: string
+  fulfillment_type?: 'credential' | 'license_key' | 'voucher_code' | 'download_link' | 'manual' | string
+  delivery_label?: string
+  delivery_value?: string
+  delivery_secret?: string
+  delivery_note?: string
   profile_name?: string
   status?: string
   used_by?: string

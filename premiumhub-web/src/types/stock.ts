@@ -17,6 +17,11 @@ export interface Stock {
   account_type: string
   duration_month?: number
   email: string
+  fulfillment_type?: Product['fulfillment_type']
+  delivery_label?: string
+  delivery_value?: string
+  delivery_secret?: string
+  delivery_note?: string
   profile_name?: string
   status: StockStatus
   used_by?: string | null

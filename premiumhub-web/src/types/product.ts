@@ -46,6 +46,8 @@ export interface Product {
   whatsapp_number?: string
   whatsapp_button_text?: string
   seo_description?: string
+  fulfillment_type?: FulfillmentType
+  fulfillment_guide?: string
   sort_priority?: number
   is_popular: boolean
   is_active: boolean
@@ -53,6 +55,8 @@ export interface Product {
   account_type_stocks?: ProductAccountTypeStock[]
   prices: ProductPrice[]
 }
+
+export type FulfillmentType = 'credential' | 'license_key' | 'voucher_code' | 'download_link' | 'manual'
 
 export interface ProductPrice {
   id: string

@@ -26,6 +26,11 @@ type StockFormState = {
   email: string
   password: string
   profile_name: string
+  fulfillment_type: Product['fulfillment_type']
+  delivery_label: string
+  delivery_value: string
+  delivery_secret: string
+  delivery_note: string
 }
 
 type BulkFormState = {
@@ -60,6 +65,11 @@ const EMPTY_FORM: StockFormState = {
   email: '',
   password: '',
   profile_name: '',
+  fulfillment_type: 'credential',
+  delivery_label: '',
+  delivery_value: '',
+  delivery_secret: '',
+  delivery_note: '',
 }
 
 const EMPTY_BULK_FORM: BulkFormState = {
@@ -465,6 +475,13 @@ export default function StokPage() {
     [form.account_type, form.product_id, getProductDurations]
   )
 
+  const selectedFormProduct = useMemo(
+    () => products.find((product) => product.id === form.product_id) || null,
+    [form.product_id, products]
+  )
+
+  const activeFulfillmentType = form.fulfillment_type || selectedFormProduct?.fulfillment_type || 'credential'
+
   const bulkDurationOptions = useMemo(
     () => getProductDurations(bulkForm.product_id, bulkForm.account_type),
     [bulkForm.account_type, bulkForm.product_id, getProductDurations]
@@ -556,6 +573,7 @@ export default function StokPage() {
       product_id: fallbackProductID,
       account_type: accountType,
       duration_month: durations[0] || 0,
+      fulfillment_type: products.find((product) => product.id === fallbackProductID)?.fulfillment_type || 'credential',
     })
     setEditingStock(null)
     setModalMode('create')
@@ -580,6 +598,11 @@ export default function StokPage() {
       email: stock.email,
       password: '',
       profile_name: stock.profile_name || '',
+      fulfillment_type: stock.fulfillment_type || products.find((product) => product.id === stock.product_id)?.fulfillment_type || 'credential',
+      delivery_label: stock.delivery_label || '',
+      delivery_value: stock.delivery_value || '',
+      delivery_secret: '',
+      delivery_note: stock.delivery_note || '',
     })
     setModalMode('edit')
   }
@@ -617,6 +640,11 @@ export default function StokPage() {
       email: form.email.trim(),
       password: form.password,
       profile_name: form.profile_name.trim() || undefined,
+      fulfillment_type: activeFulfillmentType,
+      delivery_label: form.delivery_label.trim() || undefined,
+      delivery_value: form.delivery_value.trim() || undefined,
+      delivery_secret: form.delivery_secret || undefined,
+      delivery_note: form.delivery_note.trim() || undefined,
     }
 
     if (!payload.product_id) {
@@ -634,13 +662,23 @@ export default function StokPage() {
       return
     }
 
-    if (!EMAIL_REGEX.test(payload.email)) {
+    if (activeFulfillmentType === 'credential' && !EMAIL_REGEX.test(payload.email)) {
       setError('Format email / identitas akses tidak valid')
       return
     }
 
-    if (!payload.password.trim()) {
+    if (activeFulfillmentType === 'credential' && !payload.password.trim() && modalMode !== 'edit') {
       setError('Password / kode akses wajib diisi')
+      return
+    }
+
+    if (
+      activeFulfillmentType !== 'credential' &&
+      !payload.delivery_value?.trim() &&
+      !payload.delivery_secret?.trim() &&
+      !payload.delivery_note?.trim()
+    ) {
+      setError('Detail delivery wajib diisi untuk tipe fulfillment non-credential')
       return
     }
 
@@ -662,8 +700,8 @@ export default function StokPage() {
 
       setNotice(
         modalMode === 'edit'
-          ? `Stok produk ${payload.email} untuk ${productName} berhasil diperbarui.`
-          : `Stok produk baru ${payload.email} untuk ${productName} berhasil ditambahkan.`
+          ? `Stok produk ${payload.delivery_value || payload.email || payload.delivery_label || productName} berhasil diperbarui.`
+          : `Stok produk baru ${payload.delivery_value || payload.email || payload.delivery_label || productName} berhasil ditambahkan.`
       )
 
       resetModalState()
@@ -1438,6 +1476,8 @@ export default function StokPage() {
                         account_type: nextAccountType,
                         duration_month:
                           durationOptions.find((item) => item === prev.duration_month) || durationOptions[0] || 0,
+                        fulfillment_type:
+                          products.find((product) => product.id === nextProductID)?.fulfillment_type || 'credential',
                       }
                     })
                   }}
@@ -1517,42 +1557,107 @@ export default function StokPage() {
               </div>
 
               <div>
-                <label className="form-label">Email / Identitas Akses</label>
-                <input
-                  className="form-input"
-                  value={form.email}
-                  onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-                  placeholder="akses@domain.com"
-                />
-              </div>
-
-              <div>
-                <label className="form-label">
-                  Password / Kode Akses {modalMode === 'edit' ? '(wajib diisi ulang)' : ''}
-                </label>
-                <input
-                  type="password"
-                  className="form-input"
-                  value={form.password}
-                  onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                  placeholder="Password atau kode akses"
-                />
-                {modalMode === 'edit' && (
+                <label className="form-label">Tipe Fulfillment</label>
+                <select
+                  className="form-select"
+                  value={activeFulfillmentType}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      fulfillment_type: event.target.value as Product['fulfillment_type'],
+                    }))
+                  }
+                >
+                  <option value="credential">Credential</option>
+                  <option value="license_key">License Key</option>
+                  <option value="voucher_code">Voucher Code</option>
+                  <option value="download_link">Download Link</option>
+                  <option value="manual">Manual</option>
+                </select>
+                {selectedFormProduct?.fulfillment_guide && (
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                    Kontrak backend saat ini mewajibkan field password saat update stok.
+                    {selectedFormProduct.fulfillment_guide}
                   </div>
                 )}
               </div>
 
-              <div>
-                <label className="form-label">Nama Profil (opsional)</label>
-                <input
-                  className="form-input"
-                  value={form.profile_name}
-                  onChange={(event) => setForm((prev) => ({ ...prev, profile_name: event.target.value }))}
-                  placeholder="Contoh: Profile 1"
-                />
-              </div>
+              {activeFulfillmentType === 'credential' ? (
+                <>
+                  <div>
+                    <label className="form-label">Email / Identitas Akses</label>
+                    <input
+                      className="form-input"
+                      value={form.email}
+                      onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+                      placeholder="akses@domain.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="form-label">
+                      Password / Kode Akses {modalMode === 'edit' ? '(kosongkan jika tidak diganti)' : ''}
+                    </label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      value={form.password}
+                      onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+                      placeholder="Password atau kode akses"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="form-label">Nama Profil (opsional)</label>
+                    <input
+                      className="form-input"
+                      value={form.profile_name}
+                      onChange={(event) => setForm((prev) => ({ ...prev, profile_name: event.target.value }))}
+                      placeholder="Contoh: Profile 1"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="form-label">Label Delivery</label>
+                    <input
+                      className="form-input"
+                      value={form.delivery_label}
+                      onChange={(event) => setForm((prev) => ({ ...prev, delivery_label: event.target.value }))}
+                      placeholder="Contoh: License Key / Kode Voucher / Link Download"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Delivery Value</label>
+                    <input
+                      className="form-input"
+                      value={form.delivery_value}
+                      onChange={(event) => setForm((prev) => ({ ...prev, delivery_value: event.target.value }))}
+                      placeholder="Kode, link, atau identitas item yang boleh terlihat"
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Secret / Redeem Code (opsional)</label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      value={form.delivery_secret}
+                      onChange={(event) => setForm((prev) => ({ ...prev, delivery_secret: event.target.value }))}
+                      placeholder={modalMode === 'edit' ? 'Kosongkan jika tidak diganti' : 'Kode rahasia jika ada'}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Catatan Delivery</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={3}
+                      value={form.delivery_note}
+                      onChange={(event) => setForm((prev) => ({ ...prev, delivery_note: event.target.value }))}
+                      placeholder="Instruksi redeem, masa berlaku, atau catatan manual delivery"
+                    />
+                  </div>
+                </>
+              )}
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
                 <button className="topbar-btn" onClick={closeModal} disabled={saving}>

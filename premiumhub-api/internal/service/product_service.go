@@ -213,6 +213,8 @@ type CreateProductInput struct {
 	WhatsAppNumber     string                    `json:"whatsapp_number"`
 	WhatsAppButtonText string                    `json:"whatsapp_button_text"`
 	SeoDescription     string                    `json:"seo_description"`
+	FulfillmentType    string                    `json:"fulfillment_type"`
+	FulfillmentGuide   string                    `json:"fulfillment_guide"`
 	SortPriority       *int                      `json:"sort_priority"`
 	IsPopular          bool                      `json:"is_popular"`
 	IsActive           *bool                     `json:"is_active"`
@@ -289,6 +291,8 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 		WhatsAppNumber:     sanitizeWhatsAppNumber(input.WhatsAppNumber),
 		WhatsAppButtonText: defaultString(strings.TrimSpace(input.WhatsAppButtonText), "Tanya via WhatsApp"),
 		SeoDescription:     strings.TrimSpace(input.SeoDescription),
+		FulfillmentType:    normalizeFulfillmentType(input.FulfillmentType),
+		FulfillmentGuide:   strings.TrimSpace(input.FulfillmentGuide),
 		SortPriority:       sortPriority,
 		IsPopular:          input.IsPopular,
 		IsActive:           isActive,
@@ -326,6 +330,8 @@ type UpdateProductInput struct {
 	WhatsAppNumber     *string                    `json:"whatsapp_number"`
 	WhatsAppButtonText *string                    `json:"whatsapp_button_text"`
 	SeoDescription     *string                    `json:"seo_description"`
+	FulfillmentType    *string                    `json:"fulfillment_type"`
+	FulfillmentGuide   *string                    `json:"fulfillment_guide"`
 	SortPriority       *int                       `json:"sort_priority"`
 	IsPopular          *bool                      `json:"is_popular"`
 	IsActive           *bool                      `json:"is_active"`
@@ -439,6 +445,12 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 	}
 	if input.SeoDescription != nil {
 		product.SeoDescription = strings.TrimSpace(*input.SeoDescription)
+	}
+	if input.FulfillmentType != nil {
+		product.FulfillmentType = normalizeFulfillmentType(*input.FulfillmentType)
+	}
+	if input.FulfillmentGuide != nil {
+		product.FulfillmentGuide = strings.TrimSpace(*input.FulfillmentGuide)
 	}
 	if input.SortPriority != nil {
 		product.SortPriority = *input.SortPriority
@@ -835,6 +847,21 @@ func normalizePriceLabel(label string, duration int) string {
 
 func normalizeAccountType(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func normalizeFulfillmentType(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case model.FulfillmentTypeLicenseKey:
+		return model.FulfillmentTypeLicenseKey
+	case model.FulfillmentTypeVoucherCode:
+		return model.FulfillmentTypeVoucherCode
+	case model.FulfillmentTypeDownloadLink:
+		return model.FulfillmentTypeDownloadLink
+	case model.FulfillmentTypeManual:
+		return model.FulfillmentTypeManual
+	default:
+		return model.FulfillmentTypeCredential
+	}
 }
 
 func sanitizeSlug(value, fallback string) string {

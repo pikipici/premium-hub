@@ -44,6 +44,8 @@ type FormState = {
   whatsapp_number: string
   whatsapp_button_text: string
   seo_description: string
+  fulfillment_type: Product['fulfillment_type']
+  fulfillment_guide: string
   sort_priority: number
   is_popular: boolean
   is_active: boolean
@@ -75,6 +77,14 @@ const DEFAULT_PREM_APPS_CATEGORY_OPTIONS: CategoryOption[] = [
 ]
 
 const FALLBACK_ACCOUNT_TYPE_CODES = ['shared', 'private']
+
+const FULFILLMENT_TYPE_OPTIONS: Array<{ value: NonNullable<Product['fulfillment_type']>; label: string; hint: string }> = [
+  { value: 'credential', label: 'Credential', hint: 'Email/password atau akses akun' },
+  { value: 'license_key', label: 'License Key', hint: 'Kode lisensi per pembelian' },
+  { value: 'voucher_code', label: 'Voucher Code', hint: 'Kode redeem/voucher' },
+  { value: 'download_link', label: 'Download Link', hint: 'Link file atau asset digital' },
+  { value: 'manual', label: 'Manual', hint: 'Instruksi dikirim manual/CS' },
+]
 
 const DEFAULT_TRUST_BADGES: ProductTrustBadge[] = [
   { icon: '🛡', text: 'Garansi 30 Hari' },
@@ -129,6 +139,8 @@ function createDefaultForm(): FormState {
     whatsapp_number: '',
     whatsapp_button_text: 'Tanya via WhatsApp',
     seo_description: '',
+    fulfillment_type: 'credential',
+    fulfillment_guide: '',
     sort_priority: 0,
     is_popular: false,
     is_active: true,
@@ -583,6 +595,8 @@ export default function ProdukPage() {
       whatsapp_number: product.whatsapp_number || '',
       whatsapp_button_text: product.whatsapp_button_text || 'Tanya via WhatsApp',
       seo_description: product.seo_description || '',
+      fulfillment_type: product.fulfillment_type || 'credential',
+      fulfillment_guide: product.fulfillment_guide || '',
       sort_priority: product.sort_priority || 0,
       is_popular: product.is_popular,
       is_active: product.is_active,
@@ -848,6 +862,8 @@ export default function ProdukPage() {
       whatsapp_number: sanitizeWhatsAppNumber(form.whatsapp_number),
       whatsapp_button_text: form.whatsapp_button_text.trim(),
       seo_description: form.seo_description.trim(),
+      fulfillment_type: form.fulfillment_type || 'credential',
+      fulfillment_guide: form.fulfillment_guide.trim(),
       sort_priority: Number(form.sort_priority) || 0,
       is_popular: form.is_popular,
       is_active: form.is_active,
@@ -1849,6 +1865,47 @@ export default function ProdukPage() {
                   }
                   placeholder="Deskripsi SEO untuk halaman produk"
                 />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 10 }}>
+                <div>
+                  <label className="form-label">Tipe Fulfillment</label>
+                  <select
+                    className="form-select"
+                    value={form.fulfillment_type || 'credential'}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        fulfillment_type: event.target.value as Product['fulfillment_type'],
+                      }))
+                    }
+                  >
+                    {FULFILLMENT_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
+                    {FULFILLMENT_TYPE_OPTIONS.find((option) => option.value === form.fulfillment_type)?.hint ||
+                      FULFILLMENT_TYPE_OPTIONS[0].hint}
+                  </div>
+                </div>
+                <div>
+                  <label className="form-label">Panduan Delivery</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    value={form.fulfillment_guide}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        fulfillment_guide: event.target.value,
+                      }))
+                    }
+                    placeholder="Contoh: Simpan kode lisensi unik di stok. Buyer akan melihat detail setelah pembayaran sukses."
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignItems: 'end' }}>

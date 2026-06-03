@@ -11,6 +11,11 @@ export interface AdminStockPayload {
   email: string
   password: string
   profile_name?: string
+  fulfillment_type?: Stock['fulfillment_type']
+  delivery_label?: string
+  delivery_value?: string
+  delivery_secret?: string
+  delivery_note?: string
 }
 
 export interface AdminBulkStockAccount {

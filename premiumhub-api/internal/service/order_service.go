@@ -48,13 +48,29 @@ func (s *OrderService) SetStockCredentialCipher(cipher *credential.StockCipher) 
 }
 
 func (s *OrderService) exposeStockPassword(stock *model.Stock) {
-	if stock == nil || strings.TrimSpace(stock.Password) == "" {
+	if stock == nil {
+		return
+	}
+	if strings.TrimSpace(stock.FulfillmentType) == "" {
+		stock.FulfillmentType = model.FulfillmentTypeCredential
+	}
+	if strings.TrimSpace(stock.DeliveryLabel) == "" {
+		stock.DeliveryLabel = "Email / Password"
+	}
+	if strings.TrimSpace(stock.DeliveryValue) == "" {
+		stock.DeliveryValue = stock.Email
+	}
+
+	if strings.TrimSpace(stock.Password) == "" {
 		return
 	}
 
 	if s.stockCredentialCipher == nil {
 		if !credential.IsEncryptedStockCredential(stock.Password) && !credential.IsBcryptHash(stock.Password) {
 			stock.PlainPassword = stock.Password
+		}
+		if !credential.IsEncryptedStockCredential(stock.DeliverySecret) && !credential.IsBcryptHash(stock.DeliverySecret) {
+			stock.PlainDeliverySecret = stock.DeliverySecret
 		}
 		return
 	}
@@ -65,6 +81,11 @@ func (s *OrderService) exposeStockPassword(stock *model.Stock) {
 	}
 
 	stock.PlainPassword = plain
+	if strings.TrimSpace(stock.DeliverySecret) != "" {
+		if secret, err := s.stockCredentialCipher.Decrypt(stock.DeliverySecret); err == nil {
+			stock.PlainDeliverySecret = secret
+		}
+	}
 }
 
 type CreateOrderInput struct {

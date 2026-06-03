@@ -117,12 +117,19 @@ function OrderSuksesContent() {
   const orderCode = order?.id ? `#${(order.id.split('-')[0] || order.id).toUpperCase()}` : '-'
 
   const maskedPassword = '••••••••••••'
-  const passwordValue = (order?.stock?.password || '').trim()
+  const fulfillmentType = (order?.stock?.fulfillment_type || 'credential').trim()
+  const isCredentialFulfillment = fulfillmentType === 'credential'
+  const primaryLabel = isCredentialFulfillment ? 'Email' : order?.stock?.delivery_label || 'Detail Delivery'
+  const primaryValue = isCredentialFulfillment ? order?.stock?.email || '-' : order?.stock?.delivery_value || order?.stock?.email || '-'
+  const secretLabel = isCredentialFulfillment ? 'Password' : 'Secret / Kode'
+  const passwordValue = ((isCredentialFulfillment ? order?.stock?.password : order?.stock?.delivery_secret) || '').trim()
   const passwordText = passwordValue
     ? showPassword
       ? passwordValue
       : maskedPassword
-    : 'Belum tersedia, hubungi admin'
+    : isCredentialFulfillment
+      ? 'Belum tersedia, hubungi admin'
+      : order?.stock?.delivery_note || 'Instruksi tersedia di catatan delivery'
 
   const copyToClip = async (value: string | undefined, field: string, message: string) => {
     const text = (value || '').trim()
@@ -191,13 +198,13 @@ function OrderSuksesContent() {
                       <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[10px] font-semibold text-[#888] sm:text-[11px]">Email</div>
-                      <div className="truncate text-[13px] font-semibold text-[#141414] sm:text-sm">{order.stock?.email || '-'}</div>
+                      <div className="text-[10px] font-semibold text-[#888] sm:text-[11px]">{primaryLabel}</div>
+                      <div className="truncate text-[13px] font-semibold text-[#141414] sm:text-sm">{primaryValue}</div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => copyToClip(order.stock?.email, 'email', 'Email disalin!')}
-                      disabled={!order.stock?.email}
+                      onClick={() => copyToClip(primaryValue, 'email', 'Detail disalin!')}
+                      disabled={!primaryValue || primaryValue === '-'}
                       className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#DDDDD8] bg-white text-[#777] hover:bg-[#F4F4F1] disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8"
                       aria-label="Copy email"
                     >
@@ -210,7 +217,7 @@ function OrderSuksesContent() {
                       <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[10px] font-semibold text-[#888] sm:text-[11px]">Password</div>
+                      <div className="text-[10px] font-semibold text-[#888] sm:text-[11px]">{secretLabel}</div>
                       <div className={`truncate text-[13px] font-semibold sm:text-sm ${passwordValue && !showPassword ? 'tracking-[0.16em] text-[#6B6A66]' : 'text-[#141414]'}`}>
                         {passwordText}
                       </div>
@@ -226,7 +233,7 @@ function OrderSuksesContent() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => copyToClip(passwordValue, 'password', 'Password disalin!')}
+                      onClick={() => copyToClip(passwordValue, 'password', 'Secret disalin!')}
                       disabled={!passwordValue}
                       className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#DDDDD8] bg-white text-[#777] hover:bg-[#F4F4F1] disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8"
                       aria-label="Copy password"
@@ -240,13 +247,13 @@ function OrderSuksesContent() {
                       <UserRound className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[10px] font-semibold text-[#888] sm:text-[11px]">Profil</div>
-                      <div className="text-[13px] font-semibold text-[#141414] sm:text-sm">{order.stock?.profile_name || '-'}</div>
+                      <div className="text-[10px] font-semibold text-[#888] sm:text-[11px]">{isCredentialFulfillment ? 'Profil' : 'Catatan'}</div>
+                      <div className="text-[13px] font-semibold text-[#141414] sm:text-sm">{isCredentialFulfillment ? order.stock?.profile_name || '-' : order.stock?.delivery_note || '-'}</div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => copyToClip(order.stock?.profile_name, 'profile', 'Profil disalin!')}
-                      disabled={!order.stock?.profile_name}
+                      onClick={() => copyToClip(isCredentialFulfillment ? order.stock?.profile_name : order.stock?.delivery_note, 'profile', 'Catatan disalin!')}
+                      disabled={isCredentialFulfillment ? !order.stock?.profile_name : !order.stock?.delivery_note}
                       className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#DDDDD8] bg-white text-[#777] hover:bg-[#F4F4F1] disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8"
                       aria-label="Copy profile"
                     >

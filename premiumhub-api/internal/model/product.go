@@ -27,6 +27,14 @@ type ProductAccountTypeStock struct {
 	AvailableStock int64  `json:"available_stock"`
 }
 
+const (
+	FulfillmentTypeCredential   = "credential"
+	FulfillmentTypeLicenseKey   = "license_key"
+	FulfillmentTypeVoucherCode  = "voucher_code"
+	FulfillmentTypeDownloadLink = "download_link"
+	FulfillmentTypeManual       = "manual"
+)
+
 type Product struct {
 	ID                 uuid.UUID                 `gorm:"type:uuid;primaryKey" json:"id"`
 	Name               string                    `gorm:"size:100;not null" json:"name"`
@@ -55,6 +63,8 @@ type Product struct {
 	WhatsAppNumber     string                    `gorm:"size:30" json:"whatsapp_number"`
 	WhatsAppButtonText string                    `gorm:"size:100" json:"whatsapp_button_text"`
 	SeoDescription     string                    `gorm:"type:text" json:"seo_description"`
+	FulfillmentType    string                    `gorm:"size:40;default:credential" json:"fulfillment_type"`
+	FulfillmentGuide   string                    `gorm:"type:text" json:"fulfillment_guide"`
 	SortPriority       int                       `gorm:"default:0" json:"sort_priority"`
 	IsPopular          bool                      `gorm:"default:false" json:"is_popular"`
 	IsActive           bool                      `gorm:"default:true" json:"is_active"`

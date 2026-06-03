@@ -35,6 +35,8 @@ export interface AdminProductPayload {
   whatsapp_number?: string
   whatsapp_button_text?: string
   seo_description?: string
+  fulfillment_type?: Product['fulfillment_type']
+  fulfillment_guide?: string
   sort_priority?: number
   is_popular?: boolean
   is_active?: boolean

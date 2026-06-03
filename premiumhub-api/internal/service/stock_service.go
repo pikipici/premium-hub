@@ -57,12 +57,17 @@ func (s *StockService) encryptStockPassword(password string) (string, error) {
 }
 
 type CreateStockInput struct {
-	ProductID     string `json:"product_id" binding:"required"`
-	AccountType   string `json:"account_type" binding:"required"`
-	DurationMonth int    `json:"duration_month"`
-	Email         string `json:"email" binding:"required,email"`
-	Password      string `json:"password" binding:"required"`
-	ProfileName   string `json:"profile_name"`
+	ProductID       string `json:"product_id" binding:"required"`
+	AccountType     string `json:"account_type" binding:"required"`
+	DurationMonth   int    `json:"duration_month"`
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	ProfileName     string `json:"profile_name"`
+	FulfillmentType string `json:"fulfillment_type"`
+	DeliveryLabel   string `json:"delivery_label"`
+	DeliveryValue   string `json:"delivery_value"`
+	DeliverySecret  string `json:"delivery_secret"`
+	DeliveryNote    string `json:"delivery_note"`
 }
 
 func (s *StockService) validateAccountType(productID uuid.UUID, accountType string) (string, error) {
@@ -186,6 +191,71 @@ func (s *StockService) resolveDurationMonth(productID uuid.UUID, accountType str
 	return 0, fmt.Errorf("paket %d bulan tidak valid untuk jenis akses ini. Opsi: %s", durationInput, strings.Join(labels, ", "))
 }
 
+func defaultDeliveryLabel(fulfillmentType string) string {
+	switch fulfillmentType {
+	case model.FulfillmentTypeLicenseKey:
+		return "License Key"
+	case model.FulfillmentTypeVoucherCode:
+		return "Kode Voucher"
+	case model.FulfillmentTypeDownloadLink:
+		return "Link Download"
+	case model.FulfillmentTypeManual:
+		return "Instruksi Delivery"
+	default:
+		return "Email / Password"
+	}
+}
+
+func (s *StockService) prepareStockDelivery(fulfillmentType, emailInput, passwordInput, labelInput, valueInput, secretInput, noteInput string) (string, string, string, string, string, string, error) {
+	label := strings.TrimSpace(labelInput)
+	if label == "" {
+		label = defaultDeliveryLabel(fulfillmentType)
+	}
+	note := strings.TrimSpace(noteInput)
+
+	if fulfillmentType == model.FulfillmentTypeCredential {
+		email := strings.TrimSpace(emailInput)
+		if email == "" {
+			return "", "", "", "", "", "", errors.New("email wajib diisi")
+		}
+		password := strings.TrimSpace(passwordInput)
+		if password == "" {
+			return "", "", "", "", "", "", errors.New("password wajib diisi")
+		}
+		encryptedPw, err := s.encryptStockPassword(password)
+		if err != nil {
+			return "", "", "", "", "", "", err
+		}
+		return email, encryptedPw, label, email, "", note, nil
+	}
+
+	value := strings.TrimSpace(valueInput)
+	secret := strings.TrimSpace(secretInput)
+	if value == "" && secret == "" && note == "" {
+		return "", "", "", "", "", "", errors.New("detail delivery wajib diisi")
+	}
+
+	storedSecret := ""
+	if secret != "" {
+		encryptedSecret, err := s.encryptStockPassword(secret)
+		if err != nil {
+			return "", "", "", "", "", "", err
+		}
+		storedSecret = encryptedSecret
+	}
+
+	legacyEmail := value
+	if legacyEmail == "" {
+		legacyEmail = label
+	}
+	legacyPassword := storedSecret
+	if legacyPassword == "" {
+		legacyPassword = "manual"
+	}
+
+	return legacyEmail, legacyPassword, label, value, storedSecret, note, nil
+}
+
 func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {
 	productID, err := uuid.Parse(input.ProductID)
 	if err != nil {
@@ -202,29 +272,25 @@ func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {
 		return nil, err
 	}
 
-	email := strings.TrimSpace(input.Email)
-	if email == "" {
-		return nil, errors.New("email wajib diisi")
-	}
-
-	password := strings.TrimSpace(input.Password)
-	if password == "" {
-		return nil, errors.New("password wajib diisi")
-	}
-
-	encryptedPw, err := s.encryptStockPassword(password)
+	fulfillmentType := normalizeFulfillmentType(input.FulfillmentType)
+	email, encryptedPw, deliveryLabel, deliveryValue, deliverySecret, deliveryNote, err := s.prepareStockDelivery(fulfillmentType, input.Email, input.Password, input.DeliveryLabel, input.DeliveryValue, input.DeliverySecret, input.DeliveryNote)
 	if err != nil {
 		return nil, err
 	}
 
 	stock := &model.Stock{
-		ProductID:     productID,
-		AccountType:   accountType,
-		DurationMonth: durationMonth,
-		Email:         email,
-		Password:      encryptedPw,
-		ProfileName:   strings.TrimSpace(input.ProfileName),
-		Status:        "available",
+		ProductID:       productID,
+		AccountType:     accountType,
+		DurationMonth:   durationMonth,
+		Email:           email,
+		Password:        encryptedPw,
+		FulfillmentType: fulfillmentType,
+		DeliveryLabel:   deliveryLabel,
+		DeliveryValue:   deliveryValue,
+		DeliverySecret:  deliverySecret,
+		DeliveryNote:    deliveryNote,
+		ProfileName:     strings.TrimSpace(input.ProfileName),
+		Status:          "available",
 	}
 
 	if err := s.stockRepo.Create(stock); err != nil {
@@ -334,19 +400,60 @@ func (s *StockService) Update(id uuid.UUID, input CreateStockInput) (*model.Stoc
 		return nil, err
 	}
 
-	email := strings.TrimSpace(input.Email)
-	if email == "" {
-		return nil, errors.New("email wajib diisi")
+	fulfillmentType := normalizeFulfillmentType(input.FulfillmentType)
+	if strings.TrimSpace(input.FulfillmentType) == "" {
+		fulfillmentType = normalizeFulfillmentType(stock.FulfillmentType)
+	}
+
+	var email, encryptedPw, deliveryLabel, deliveryValue, deliverySecret, deliveryNote string
+	if fulfillmentType == model.FulfillmentTypeCredential && strings.TrimSpace(input.Password) == "" {
+		email = strings.TrimSpace(input.Email)
+		if email == "" {
+			return nil, errors.New("email wajib diisi")
+		}
+		encryptedPw = stock.Password
+		deliveryLabel = strings.TrimSpace(input.DeliveryLabel)
+		if deliveryLabel == "" {
+			deliveryLabel = defaultDeliveryLabel(fulfillmentType)
+		}
+		deliveryValue = email
+		deliveryNote = strings.TrimSpace(input.DeliveryNote)
+	} else if fulfillmentType != model.FulfillmentTypeCredential && strings.TrimSpace(input.DeliverySecret) == "" {
+		email, encryptedPw, deliveryLabel, deliveryValue, deliverySecret, deliveryNote, err = s.prepareStockDelivery(
+			fulfillmentType,
+			input.Email,
+			input.Password,
+			input.DeliveryLabel,
+			input.DeliveryValue,
+			"",
+			input.DeliveryNote,
+		)
+		deliverySecret = stock.DeliverySecret
+		if strings.TrimSpace(deliverySecret) != "" {
+			encryptedPw = stock.Password
+		}
+	} else {
+		email, encryptedPw, deliveryLabel, deliveryValue, deliverySecret, deliveryNote, err = s.prepareStockDelivery(
+			fulfillmentType,
+			input.Email,
+			input.Password,
+			input.DeliveryLabel,
+			input.DeliveryValue,
+			input.DeliverySecret,
+			input.DeliveryNote,
+		)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	stock.Email = email
-	if strings.TrimSpace(input.Password) != "" {
-		encPw, err := s.encryptStockPassword(strings.TrimSpace(input.Password))
-		if err != nil {
-			return nil, err
-		}
-		stock.Password = encPw
-	}
+	stock.Password = encryptedPw
+	stock.FulfillmentType = fulfillmentType
+	stock.DeliveryLabel = deliveryLabel
+	stock.DeliveryValue = deliveryValue
+	stock.DeliverySecret = deliverySecret
+	stock.DeliveryNote = deliveryNote
 	stock.ProfileName = strings.TrimSpace(input.ProfileName)
 	stock.AccountType = accountType
 	stock.DurationMonth = durationMonth

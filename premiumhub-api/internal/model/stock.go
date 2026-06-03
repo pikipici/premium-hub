@@ -8,20 +8,26 @@ import (
 )
 
 type Stock struct {
-	ID            uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
-	ProductID     uuid.UUID  `gorm:"type:uuid;not null" json:"product_id"`
-	AccountType   string     `gorm:"size:20;not null" json:"account_type"`
-	DurationMonth int        `gorm:"default:0" json:"duration_month"`
-	Email         string     `gorm:"size:150;not null" json:"email"`
-	Password      string     `gorm:"size:255;not null" json:"-"`
-	PlainPassword string     `gorm:"-" json:"password,omitempty"`
-	ProfileName   string     `gorm:"size:100" json:"profile_name"`
-	Status        string     `gorm:"size:20;default:available" json:"status"`
-	UsedBy        *uuid.UUID `gorm:"type:uuid" json:"used_by"`
-	UsedAt        *time.Time `json:"used_at"`
-	ExpiresAt     *time.Time `json:"expires_at"`
-	Product       Product    `gorm:"foreignKey:ProductID" json:"product,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID                  uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	ProductID           uuid.UUID  `gorm:"type:uuid;not null" json:"product_id"`
+	AccountType         string     `gorm:"size:20;not null" json:"account_type"`
+	DurationMonth       int        `gorm:"default:0" json:"duration_month"`
+	Email               string     `gorm:"size:150;not null" json:"email"`
+	Password            string     `gorm:"size:255;not null" json:"-"`
+	PlainPassword       string     `gorm:"-" json:"password,omitempty"`
+	FulfillmentType     string     `gorm:"size:40;default:credential" json:"fulfillment_type"`
+	DeliveryLabel       string     `gorm:"size:120" json:"delivery_label"`
+	DeliveryValue       string     `gorm:"type:text" json:"delivery_value,omitempty"`
+	DeliverySecret      string     `gorm:"type:text" json:"-"`
+	PlainDeliverySecret string     `gorm:"-" json:"delivery_secret,omitempty"`
+	DeliveryNote        string     `gorm:"type:text" json:"delivery_note"`
+	ProfileName         string     `gorm:"size:100" json:"profile_name"`
+	Status              string     `gorm:"size:20;default:available" json:"status"`
+	UsedBy              *uuid.UUID `gorm:"type:uuid" json:"used_by"`
+	UsedAt              *time.Time `json:"used_at"`
+	ExpiresAt           *time.Time `json:"expires_at"`
+	Product             Product    `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
 }
 
 func (s *Stock) BeforeCreate(_ *gorm.DB) error {

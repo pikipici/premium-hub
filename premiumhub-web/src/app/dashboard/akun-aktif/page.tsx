@@ -72,6 +72,20 @@ function accountTypeLabel(value?: string | null) {
     .join(' ')
 }
 
+function fulfillmentTypeLabel(value?: string | null) {
+  const normalized = (value || '').trim().toLowerCase()
+  if (normalized === 'license_key') return 'License Key'
+  if (normalized === 'voucher_code') return 'Voucher Code'
+  if (normalized === 'download_link') return 'Download Link'
+  if (normalized === 'manual') return 'Manual Delivery'
+  return 'Credential'
+}
+
+function isCredentialFulfillment(value?: string | null) {
+  const normalized = (value || '').trim().toLowerCase()
+  return !normalized || normalized === 'credential'
+}
+
 export default function AkunAktifPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -344,17 +358,28 @@ export default function AkunAktifPage() {
                       ? 'Sudah expired'
                       : `Sisa ${expiryDays} hari`
 
-                const accountType = accountTypeLabel(order.price?.account_type)
-                const stockEmail = order.stock?.email || '-'
-                const passwordRaw = (order.stock?.password || '').trim()
-                const passwordKey = `${order.id}:password`
-                const showPassword = Boolean(revealedPasswordKeys[passwordKey])
-                const passwordText = passwordRaw
-                  ? showPassword
-                    ? passwordRaw
+                const fulfillmentType = order.stock?.fulfillment_type || 'credential'
+                const credentialFulfillment = isCredentialFulfillment(fulfillmentType)
+                const fulfillmentLabel = fulfillmentTypeLabel(fulfillmentType)
+                const packageLabel = credentialFulfillment
+                  ? `${accountTypeLabel(order.price?.account_type)} • ${order.price?.duration || '-'} Bulan`
+                  : fulfillmentLabel
+                const primaryLabel = credentialFulfillment ? 'Email / Identitas' : order.stock?.delivery_label || 'Detail Delivery'
+                const primaryValue = credentialFulfillment ? order.stock?.email || '-' : order.stock?.delivery_value || order.stock?.email || '-'
+                const secretValue = credentialFulfillment
+                  ? order.stock?.password
+                  : order.stock?.delivery_secret || order.stock?.password
+                const secretRaw = (secretValue || '').trim()
+                const secretKey = `${order.id}:secret`
+                const showSecret = Boolean(revealedPasswordKeys[secretKey])
+                const secretText = secretRaw
+                  ? showSecret
+                    ? secretRaw
                     : '••••••••••••'
                   : 'Belum tersedia, hubungi admin'
+                const secretLabel = credentialFulfillment ? 'Password / Kode Akses' : 'Kode / Secret'
                 const profileName = order.stock?.profile_name || '-'
+                const deliveryNote = order.stock?.delivery_note || '-'
                 const startedAt = order.paid_at || order.created_at
 
             return (
@@ -364,7 +389,7 @@ export default function AkunAktifPage() {
                     <div className="text-3xl leading-none">{product.icon || '📦'}</div>
                     <div className="min-w-0">
                       <div className="truncate text-sm font-bold text-[#141414]">{product.name}</div>
-                      <div className="mt-1 break-words text-xs text-[#888]">{shortOrderCode(order.id)} • {accountType} • {order.price?.duration || '-'} Bulan</div>
+                      <div className="mt-1 break-words text-xs text-[#888]">{shortOrderCode(order.id)} • {packageLabel}</div>
                       <div className="mt-1 text-xs text-[#888]">{expiredNow ? 'Dibeli' : 'Aktif sejak'} {formatDateTime(startedAt)}</div>
                     </div>
                   </div>
@@ -383,26 +408,26 @@ export default function AkunAktifPage() {
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-[#F7F7F5] p-3">
-                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Email / Identitas</div>
+                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">{primaryLabel}</div>
                     <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <span className="min-w-0 break-all text-sm font-semibold text-[#141414]">{stockEmail}</span>
+                      <span className="min-w-0 break-all text-sm font-semibold text-[#141414]">{primaryValue}</span>
                       <button
                         type="button"
-                        onClick={() => void copyText(stockEmail, `${order.id}:email`)}
-                        disabled={stockEmail === '-'}
+                        onClick={() => void copyText(primaryValue, `${order.id}:primary`)}
+                        disabled={primaryValue === '-'}
                         className="relative inline-flex h-9 w-9 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40 sm:self-auto"
-                        aria-label="Copy email atau identitas akses"
+                        aria-label="Copy detail delivery"
                       >
-                        {copiedKey === `${order.id}:email` ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                        {copiedKey === `${order.id}:primary` ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>
 
                   <div className="rounded-xl bg-[#F7F7F5] p-3">
-                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Password / Kode Akses</div>
+                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">{secretLabel}</div>
                     <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <span className={`min-w-0 break-all text-sm font-semibold ${passwordRaw && !showPassword ? 'tracking-[0.16em] text-[#6B6A66]' : 'text-[#141414]'}`}>
-                        {passwordText}
+                      <span className={`min-w-0 break-all text-sm font-semibold ${secretRaw && !showSecret ? 'tracking-[0.16em] text-[#6B6A66]' : 'text-[#141414]'}`}>
+                        {secretText}
                       </span>
 
                       <div className="flex items-center gap-2 self-end sm:self-auto">
@@ -411,32 +436,39 @@ export default function AkunAktifPage() {
                           onClick={() =>
                             setRevealedPasswordKeys((prev) => ({
                               ...prev,
-                              [passwordKey]: !prev[passwordKey],
+                              [secretKey]: !prev[secretKey],
                             }))
                           }
-                          disabled={!passwordRaw}
+                          disabled={!secretRaw}
                           className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
-                          aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                          aria-label={showSecret ? 'Sembunyikan secret' : 'Tampilkan secret'}
                         >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                         <button
                           type="button"
-                          onClick={() => void copyText(passwordRaw, passwordKey)}
-                          disabled={!passwordRaw}
+                          onClick={() => void copyText(secretRaw, secretKey)}
+                          disabled={!secretRaw}
                           className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
-                          aria-label="Copy password atau kode akses"
+                          aria-label="Copy secret delivery"
                         >
-                          {copiedKey === passwordKey ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                          {copiedKey === secretKey ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-xl bg-[#F7F7F5] p-3">
-                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Profile</div>
-                    <div className="truncate text-sm font-semibold text-[#141414]">{profileName}</div>
-                  </div>
+                  {credentialFulfillment ? (
+                    <div className="rounded-xl bg-[#F7F7F5] p-3">
+                      <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Profile</div>
+                      <div className="truncate text-sm font-semibold text-[#141414]">{profileName}</div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-[#F7F7F5] p-3">
+                      <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Catatan Delivery</div>
+                      <div className="break-words text-sm font-semibold text-[#141414]">{deliveryNote}</div>
+                    </div>
+                  )}
 
                   <div className="rounded-xl bg-[#F7F7F5] p-3">
                     <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Expired</div>
