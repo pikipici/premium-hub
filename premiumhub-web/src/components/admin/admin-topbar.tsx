@@ -273,7 +273,13 @@ export default function AdminTopbar({
         </button>
 
         <div className={`notif-wrap${notifOpen ? ' open' : ''}`} ref={notifWrapRef}>
-          <button className="notif-btn" onClick={toggleNotifOpen}>
+          <button
+            type="button"
+            className="notif-btn"
+            aria-label={unreadCount > 0 ? `Buka notifikasi, ${unreadCount} belum dibaca` : 'Buka notifikasi'}
+            aria-expanded={notifOpen}
+            onClick={toggleNotifOpen}
+          >
             🔔
             {unreadCount > 0 ? <span className="notif-dot" /> : null}
             {unreadCount > 0 ? (

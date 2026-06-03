@@ -20,50 +20,50 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Overview',
     items: [
-      { href: '/admin', label: 'Dashboard', icon: '▦' },
+      { href: '/admin', label: 'Dashboard', icon: 'DB' },
     ],
   },
   {
     label: 'Katalog',
     items: [
-      { href: '/admin/produk', label: 'Produk', icon: '◈' },
-      { href: '/admin/sosmed', label: 'DigiSosmed', icon: '◍' },
-      { href: '/admin/stok', label: 'Stok Produk', icon: '◧' },
+      { href: '/admin/produk', label: 'Produk', icon: 'PR' },
+      { href: '/admin/sosmed', label: 'DigiSosmed', icon: 'DS' },
+      { href: '/admin/stok', label: 'Stok Produk', icon: 'ST' },
     ],
   },
   {
     label: 'Transaksi',
     items: [
-      { href: '/admin/order', label: 'Order', icon: '◉' },
-      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: '◎' },
-      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: '◬' },
-      { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: '↓' },
-      { href: '/admin/digiconnect', label: 'DigiConnect', icon: '⌁' },
-      { href: '/admin/convert', label: 'Control Convert', icon: '⇄' },
-      { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌' },
+      { href: '/admin/order', label: 'Order', icon: 'OR' },
+      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: 'SO' },
+      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: 'WR' },
+      { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: 'WD' },
+      { href: '/admin/digiconnect', label: 'DigiConnect', icon: 'DC' },
+      { href: '/admin/convert', label: 'Control Convert', icon: 'CV' },
+      { href: '/admin/garansi', label: 'Klaim Garansi', icon: 'KG' },
     ],
   },
   {
     label: 'Gmail',
     items: [
-      { href: '/admin/gmail/verifikasi', label: 'Verifikasi Setoran', icon: '✓' },
-      { href: '/admin/gmail/inventory', label: 'Inventory', icon: '◳' },
-      { href: '/admin/gmail/pricing', label: 'Pricing', icon: '$' },
-      { href: '/admin/gmail/strikes', label: 'Strike Users', icon: '!' },
-      { href: '/admin/gmail/analytics', label: 'Analytics', icon: '📊' },
+      { href: '/admin/gmail/verifikasi', label: 'Verifikasi Setoran', icon: 'GV' },
+      { href: '/admin/gmail/inventory', label: 'Inventory', icon: 'GI' },
+      { href: '/admin/gmail/pricing', label: 'Pricing', icon: 'GP' },
+      { href: '/admin/gmail/strikes', label: 'Strike Users', icon: 'GS' },
+      { href: '/admin/gmail/analytics', label: 'Analytics', icon: 'GA' },
     ],
   },
   {
     label: 'Support',
     items: [
-      { href: '/admin/chat', label: 'Chat Support', icon: '◴' },
+      { href: '/admin/chat', label: 'Chat Support', icon: 'CS' },
     ],
   },
   {
     label: 'Akun',
     items: [
-      { href: '/admin/pengguna', label: 'Pengguna', icon: '◎' },
-      { href: '/admin/pengaturan', label: 'Pengaturan', icon: '◫' },
+      { href: '/admin/pengguna', label: 'Pengguna', icon: 'US' },
+      { href: '/admin/pengaturan', label: 'Pengaturan', icon: 'PG' },
     ],
   },
 ]

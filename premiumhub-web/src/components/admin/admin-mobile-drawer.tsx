@@ -22,38 +22,38 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   {
     label: 'Overview',
     items: [
-      { href: '/admin', label: 'Dashboard', icon: '▦' },
+      { href: '/admin', label: 'Dashboard', icon: 'DB' },
     ],
   },
   {
     label: 'Transaksi',
     items: [
-      { href: '/admin/order', label: 'Order', icon: '◉' },
-      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: '◎' },
-      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: '◬' },
-      { href: '/admin/convert', label: 'Control Convert', icon: '⇄' },
-      { href: '/admin/garansi', label: 'Klaim Garansi', icon: '◌' },
+      { href: '/admin/order', label: 'Order', icon: 'OR' },
+      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: 'SO' },
+      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: 'WR' },
+      { href: '/admin/convert', label: 'Control Convert', icon: 'CV' },
+      { href: '/admin/garansi', label: 'Klaim Garansi', icon: 'KG' },
     ],
   },
   {
     label: 'Support',
     items: [
-      { href: '/admin/chat', label: 'Chat Support', icon: '◴' },
+      { href: '/admin/chat', label: 'Chat Support', icon: 'CS' },
     ],
   },
   {
     label: 'Katalog',
     items: [
-      { href: '/admin/produk', label: 'Produk', icon: '◈' },
-      { href: '/admin/sosmed', label: 'DigiSosmed', icon: '◍' },
-      { href: '/admin/stok', label: 'Stok Produk', icon: '◧' },
+      { href: '/admin/produk', label: 'Produk', icon: 'PR' },
+      { href: '/admin/sosmed', label: 'DigiSosmed', icon: 'DS' },
+      { href: '/admin/stok', label: 'Stok Produk', icon: 'ST' },
     ],
   },
   {
     label: 'Akun',
     items: [
-      { href: '/admin/pengguna', label: 'Pengguna', icon: '◎' },
-      { href: '/admin/pengaturan', label: 'Pengaturan', icon: '◫' },
+      { href: '/admin/pengguna', label: 'Pengguna', icon: 'US' },
+      { href: '/admin/pengaturan', label: 'Pengaturan', icon: 'PG' },
     ],
   },
 ]
