@@ -187,7 +187,7 @@ Semua kebutuhan ada disini
                   <PackageCheck className="relative h-6 w-6" />
                   <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiProduct</p>
                   <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Produk digital</h3>
-                  <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/78">Akun, lisensi, tools</p>
+                  <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/78">Lisensi, tools, akses</p>
                   <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold">
                     Buka <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                   </span>
@@ -322,7 +322,7 @@ Semua kebutuhan ada disini
                   Produk digital siap pakai
                 </h2>
                 <p className="relative mt-1.5 text-sm leading-relaxed text-[#6B7280] sm:mt-2 md:text-[15px]">
-                  Akun premium, lisensi, dan tools digital.
+                    Produk digital, lisensi, tools, dan akses siap pakai.
                 </p>
 
                 <ul className="relative mt-4 hidden space-y-2 text-sm text-[#2E2E2E] sm:block">

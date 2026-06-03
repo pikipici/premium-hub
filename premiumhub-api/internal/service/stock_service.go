@@ -110,7 +110,7 @@ func (s *StockService) validateAccountType(productID uuid.UUID, accountType stri
 	}
 
 	if len(allowed) == 0 {
-		return "", errors.New("produk belum punya tipe akun aktif")
+		return "", errors.New("produk belum punya jenis akses aktif")
 	}
 
 	if _, exists := allowed[normalized]; !exists {
@@ -151,7 +151,7 @@ func (s *StockService) availableDurationsForAccountType(productID uuid.UUID, acc
 	}
 
 	if len(durationsSet) == 0 {
-		return nil, errors.New("produk belum punya durasi aktif untuk tipe akun ini")
+		return nil, errors.New("produk belum punya paket aktif untuk jenis akses ini")
 	}
 
 	durations := make([]int, 0, len(durationsSet))
@@ -183,7 +183,7 @@ func (s *StockService) resolveDurationMonth(productID uuid.UUID, accountType str
 		labels = append(labels, strconv.Itoa(duration))
 	}
 
-	return 0, fmt.Errorf("durasi %d bulan tidak valid untuk tipe akun ini. Opsi: %s", durationInput, strings.Join(labels, ", "))
+	return 0, fmt.Errorf("paket %d bulan tidak valid untuk jenis akses ini. Opsi: %s", durationInput, strings.Join(labels, ", "))
 }
 
 func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {

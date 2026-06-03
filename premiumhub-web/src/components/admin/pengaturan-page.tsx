@@ -152,12 +152,12 @@ export default function PengaturanPage() {
     try {
       const res = await accountTypeService.adminList({ include_inactive: true })
       if (!res.success) {
-        setError(res.message || 'Gagal memuat master tipe akun')
+        setError(res.message || 'Gagal memuat master jenis akses')
         return
       }
       setItems(res.data || [])
     } catch (err) {
-      setError(mapErrorMessage(err, 'Gagal memuat master tipe akun'))
+      setError(mapErrorMessage(err, 'Gagal memuat master jenis akses'))
     } finally {
       setLoading(false)
     }
@@ -212,12 +212,12 @@ export default function PengaturanPage() {
   const submitForm = async () => {
     const normalizedCode = normalizeCode(form.code)
     if (!normalizedCode) {
-      setError('Kode tipe akun wajib diisi')
+      setError('Kode jenis akses wajib diisi')
       return
     }
 
     if (!form.label.trim()) {
-      setError('Label tipe akun wajib diisi')
+      setError('Label jenis akses wajib diisi')
       return
     }
 
@@ -240,10 +240,10 @@ export default function PengaturanPage() {
       if (formMode === 'create') {
         const res = await accountTypeService.adminCreate(payloadBase)
         if (!res.success) {
-          setError(res.message || 'Gagal membuat tipe akun')
+          setError(res.message || 'Gagal membuat jenis akses')
           return
         }
-        setNotice(`Tipe akun "${res.data.label}" berhasil dibuat.`)
+        setNotice(`Jenis akses "${res.data.label}" berhasil dibuat.`)
       } else if (editingItem) {
         const payload: AdminAccountTypeUpdatePayload = {
           code: normalizedCode,
@@ -257,16 +257,16 @@ export default function PengaturanPage() {
 
         const res = await accountTypeService.adminUpdate(editingItem.id, payload)
         if (!res.success) {
-          setError(res.message || 'Gagal memperbarui tipe akun')
+          setError(res.message || 'Gagal memperbarui jenis akses')
           return
         }
-        setNotice(`Tipe akun "${res.data.label}" berhasil diperbarui.`)
+        setNotice(`Jenis akses "${res.data.label}" berhasil diperbarui.`)
       }
 
       closeForm()
       await loadAccountTypes()
     } catch (err) {
-      setError(mapErrorMessage(err, 'Gagal menyimpan tipe akun'))
+      setError(mapErrorMessage(err, 'Gagal menyimpan jenis akses'))
     } finally {
       setSaving(false)
     }
@@ -279,18 +279,18 @@ export default function PengaturanPage() {
     try {
       const res = await accountTypeService.adminUpdate(item.id, { is_active: !item.is_active })
       if (!res.success) {
-        setError(res.message || 'Gagal mengubah status tipe akun')
+        setError(res.message || 'Gagal mengubah status jenis akses')
         return
       }
 
       setNotice(
         !item.is_active
-          ? `Tipe akun "${item.label}" diaktifkan.`
-          : `Tipe akun "${item.label}" dinonaktifkan.`
+          ? `Jenis akses "${item.label}" diaktifkan.`
+          : `Jenis akses "${item.label}" dinonaktifkan.`
       )
       await loadAccountTypes()
     } catch (err) {
-      setError(mapErrorMessage(err, 'Gagal mengubah status tipe akun'))
+      setError(mapErrorMessage(err, 'Gagal mengubah status jenis akses'))
     } finally {
       setSaving(false)
     }
@@ -311,14 +311,14 @@ export default function PengaturanPage() {
     try {
       const res = await accountTypeService.adminDelete(confirmTarget.id)
       if (!res.success) {
-        setError(res.message || 'Gagal menonaktifkan tipe akun')
+        setError(res.message || 'Gagal menonaktifkan jenis akses')
         return
       }
 
-      setNotice(`Tipe akun "${confirmTarget.label}" berhasil dinonaktifkan.`)
+      setNotice(`Jenis akses "${confirmTarget.label}" berhasil dinonaktifkan.`)
       await loadAccountTypes()
     } catch (err) {
-      setError(mapErrorMessage(err, 'Gagal menonaktifkan tipe akun'))
+      setError(mapErrorMessage(err, 'Gagal menonaktifkan jenis akses'))
     } finally {
       setSaving(false)
       setConfirmTarget(null)
@@ -330,14 +330,14 @@ export default function PengaturanPage() {
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div>
-            <h2>Master Tipe Akun</h2>
+            <h2>Master Jenis Akses</h2>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Semua paket harga dan stok akun wajib pakai tipe dari master ini.
+              Semua paket harga dan stok produk wajib pakai jenis akses dari master ini.
             </div>
           </div>
 
           <button className="topbar-btn primary" type="button" onClick={openCreateForm}>
-            + Tambah Tipe Akun
+            + Tambah Jenis Akses
           </button>
         </div>
 
@@ -354,9 +354,9 @@ export default function PengaturanPage() {
 
         <div style={{ padding: '0 18px 18px' }}>
           {loading ? (
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memuat master tipe akun...</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memuat master jenis akses...</div>
           ) : sortedItems.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada tipe akun.</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada jenis akses.</div>
           ) : (
             <div className="table-wrap" style={{ overflowX: 'auto' }}>
               <table>
@@ -452,7 +452,7 @@ export default function PengaturanPage() {
           >
             <div className="modal-head" style={MODAL_HEAD_STYLE}>
               <div>
-                <h3>{formMode === 'create' ? 'Tambah Tipe Akun' : 'Edit Tipe Akun'}</h3>
+                <h3>{formMode === 'create' ? 'Tambah Jenis Akses' : 'Edit Jenis Akses'}</h3>
                 <div className="modal-sub" style={MODAL_SUB_STYLE}>Kode bersifat permanen setelah dibuat.</div>
               </div>
               <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={closeForm}>×</button>
@@ -493,7 +493,7 @@ export default function PengaturanPage() {
                   className="form-input"
                   value={form.label}
                   onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))}
-                  placeholder="Shared · Akun Bersama"
+                  placeholder="Shared · Akses Bersama"
                 />
               </div>
 
@@ -544,7 +544,7 @@ export default function PengaturanPage() {
                 Batal
               </button>
               <button className="topbar-btn primary" type="button" onClick={submitForm} disabled={saving}>
-                {saving ? 'Menyimpan...' : formMode === 'create' ? 'Simpan Tipe Akun' : 'Update Tipe Akun'}
+                {saving ? 'Menyimpan...' : formMode === 'create' ? 'Simpan Jenis Akses' : 'Update Jenis Akses'}
               </button>
             </div>
           </div>
@@ -559,11 +559,11 @@ export default function PengaturanPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-head" style={MODAL_HEAD_STYLE}>
-              <h3>Nonaktifkan Tipe Akun</h3>
+              <h3>Nonaktifkan Jenis Akses</h3>
               <button className="modal-close" style={MODAL_CLOSE_STYLE} type="button" onClick={() => setConfirmOpen(false)}>×</button>
             </div>
             <div className="modal-body" style={{ ...MODAL_BODY_STYLE, fontSize: 13, color: 'var(--text)' }}>
-              Tipe akun <strong>{confirmTarget.label}</strong> akan dinonaktifkan dari input admin.
+              Jenis akses <strong>{confirmTarget.label}</strong> akan dinonaktifkan dari input admin.
             </div>
             <div className="modal-actions" style={MODAL_ACTIONS_STYLE}>
               <button className="action-btn" type="button" onClick={() => setConfirmOpen(false)}>

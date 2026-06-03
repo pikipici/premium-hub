@@ -266,7 +266,7 @@ function OrderSuksesContent() {
                       <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5" />
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate text-[13px] font-semibold text-[#141414] sm:text-sm">{order.product?.name || 'Premium Account'}</div>
+                      <div className="truncate text-[13px] font-semibold text-[#141414] sm:text-sm">{order.product?.name || 'DigiProduct Item'}</div>
                       <div className="text-[11px] text-[#888] sm:text-xs">
                         {accountTypeLabel(order.price?.account_type)} · {order.price?.duration || '-'} Bulan · {formatDateTime(order.paid_at || order.created_at)}
                       </div>

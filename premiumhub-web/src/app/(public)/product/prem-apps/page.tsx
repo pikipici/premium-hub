@@ -148,8 +148,8 @@ function PremAppsContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8 flex flex-col gap-4 md:mb-10 md:flex-row md:items-end md:justify-between">
             <div className="text-center md:text-left">
-              <h1 className="mb-3 text-3xl font-extrabold md:text-4xl">Apps Premium</h1>
-              <p className="text-sm text-[#888]">Pilih aplikasi premium sesuai kebutuhan lu</p>
+              <h1 className="mb-3 text-3xl font-extrabold md:text-4xl">DigiProduct</h1>
+              <p className="text-sm text-[#888]">Pilih produk digital sesuai kebutuhan lu</p>
             </div>
 
             <div ref={categoryFilterRef} className="relative flex items-center justify-center gap-2 md:justify-end">

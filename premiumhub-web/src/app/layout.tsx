@@ -11,8 +11,8 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "DigiMarket — Akun Premium Terpercaya",
-  description: "Marketplace akun premium Netflix, Spotify, Disney+, YouTube Premium, Canva Pro dengan harga terjangkau dan garansi 30 hari.",
+  title: "DigiMarket — Produk Digital & Social Growth",
+  description: "Marketplace produk digital, lisensi, tools, akses siap pakai, dan layanan social growth dengan checkout cepat dan wallet DigiMarket.",
   icons: {
     icon: [
       { url: "/favicon-light.svg", type: "image/svg+xml", media: "(prefers-color-scheme: light)" },

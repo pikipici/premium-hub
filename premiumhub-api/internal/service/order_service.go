@@ -335,7 +335,7 @@ func (s *OrderService) ConfirmPayment(orderID uuid.UUID) error {
 	s.notifRepo.Create(&model.Notification{
 		UserID:  order.UserID,
 		Title:   "Pembayaran Berhasil",
-		Message: fmt.Sprintf("Pembayaran untuk order %s berhasil. Akun kamu sudah aktif!", order.ID.String()[:8]),
+		Message: fmt.Sprintf("Pembayaran untuk order %s berhasil. Akses produk kamu sudah aktif!", order.ID.String()[:8]),
 		Type:    "order",
 	})
 

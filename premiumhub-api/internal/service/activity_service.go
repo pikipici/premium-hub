@@ -101,7 +101,7 @@ func normalizeActivitySource(source string) string {
 func activitySourceLabel(source string) string {
 	switch normalizeActivitySource(source) {
 	case "premium_apps":
-		return "Premium Apps"
+		return "DigiProduct"
 	case "nokos":
 		return "Nokos"
 	default:

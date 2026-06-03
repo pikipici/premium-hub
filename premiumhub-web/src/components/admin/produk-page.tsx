@@ -785,10 +785,10 @@ export default function ProdukPage() {
     for (const row of priceDrafts) {
       const accountTypeCode = normalizeAccountTypeCode(row.account_type)
       if (!accountTypeCode) {
-        return 'Tipe akun pada paket harga wajib diisi.'
+        return 'Jenis akses pada paket harga wajib diisi.'
       }
       if (!accountTypeOptionsByValue[accountTypeCode]) {
-        return `Tipe akun "${accountTypeCode}" belum aktif di master tipe akun.`
+        return `Jenis akses "${accountTypeCode}" belum aktif di master jenis akses.`
       }
 
       if (row.duration < 1) return 'Durasi paket harga minimal 1 bulan.'

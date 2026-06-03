@@ -226,8 +226,8 @@ func ensureDefaultAccountTypes(db *gorm.DB) error {
 	defaults := []model.AccountType{
 		{
 			Code:           "shared",
-			Label:          "Shared · Akun Bersama",
-			Description:    "Akun dipakai bersama beberapa user.",
+			Label:          "Shared · Akses Bersama",
+			Description:    "Akses dipakai bersama beberapa user.",
 			SortOrder:      10,
 			BadgeBgColor:   "#ECFDF5",
 			BadgeTextColor: "#047857",
@@ -236,8 +236,8 @@ func ensureDefaultAccountTypes(db *gorm.DB) error {
 		},
 		{
 			Code:           "private",
-			Label:          "Private · Akun Pribadi",
-			Description:    "Akun dedicated untuk satu user.",
+			Label:          "Private · Akses Pribadi",
+			Description:    "Akses dedicated untuk satu user.",
 			SortOrder:      20,
 			BadgeBgColor:   "#EFF6FF",
 			BadgeTextColor: "#1D4ED8",

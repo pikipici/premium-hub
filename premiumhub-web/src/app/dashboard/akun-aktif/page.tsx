@@ -117,7 +117,7 @@ export default function AkunAktifPage() {
       while (currentPage <= totalPages && currentPage <= MAX_ORDER_PAGES) {
         const res = await orderService.list({ page: currentPage, limit: CUSTOMER_LOOKUP_SCAN_LIMIT })
         if (!res.success) {
-          setError(res.message || 'Gagal memuat daftar akun aktif')
+          setError(res.message || 'Gagal memuat daftar produk aktif')
           return
         }
 
@@ -130,7 +130,7 @@ export default function AkunAktifPage() {
 
       setOrders(collected)
     } catch {
-      setError('Gagal memuat daftar akun aktif')
+      setError('Gagal memuat daftar produk aktif')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -221,8 +221,8 @@ export default function AkunAktifPage() {
     <div className="w-full max-w-full overflow-x-hidden">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-2 sm:gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold">Akun Aktif</h1>
-          <p className="mt-1 text-sm text-[#888]">Daftar akun premium yang sudah aktif dari pembelian lu.</p>
+          <h1 className="text-2xl font-extrabold">Produk Aktif</h1>
+          <p className="mt-1 text-sm text-[#888]">Daftar akses produk digital yang sudah aktif dari pembelian lu.</p>
         </div>
 
         <button
@@ -252,8 +252,8 @@ export default function AkunAktifPage() {
       ) : !hasAnyAccountOrder ? (
         <div className="rounded-3xl border border-[#EBEBEB] bg-white px-6 py-12 text-center">
           <PackageOpen className="mx-auto mb-3 h-10 w-10 text-[#D1D1CD]" />
-          <p className="text-sm font-semibold text-[#444]">Belum ada akun aktif.</p>
-          <p className="mt-1 text-xs text-[#888]">Kalau order lu sudah lunas, akun bakal muncul otomatis di sini.</p>
+          <p className="text-sm font-semibold text-[#444]">Belum ada produk aktif.</p>
+          <p className="mt-1 text-xs text-[#888]">Kalau order lu sudah lunas, akses produk bakal muncul otomatis di sini.</p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             <Link
@@ -275,7 +275,7 @@ export default function AkunAktifPage() {
           <div
             className="mb-4 inline-flex rounded-xl border border-[#E4E4DF] bg-white p-1"
             role="tablist"
-            aria-label="Filter status akun"
+            aria-label="Filter status produk"
           >
             <button
               type="button"
@@ -315,12 +315,12 @@ export default function AkunAktifPage() {
             >
               <PackageOpen className="mx-auto mb-3 h-8 w-8 text-[#D1D1CD]" />
               <p className="text-sm font-semibold text-[#444]">
-                {activeTab === 'active' ? 'Belum ada akun yang masih aktif.' : 'Belum ada akun yang expired.'}
+                {activeTab === 'active' ? 'Belum ada produk yang masih aktif.' : 'Belum ada produk yang expired.'}
               </p>
               <p className="mt-1 text-xs text-[#888]">
                 {activeTab === 'active'
-                  ? 'Akun yang aktif akan tampil di tab ini.'
-                  : 'Akun yang masa aktifnya habis akan pindah ke tab ini.'}
+                  ? 'Produk yang aktif akan tampil di tab ini.'
+                  : 'Produk yang masa aktifnya habis akan pindah ke tab ini.'}
               </p>
             </div>
           ) : (
@@ -383,7 +383,7 @@ export default function AkunAktifPage() {
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-[#F7F7F5] p-3">
-                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Email akun</div>
+                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Email / Identitas</div>
                     <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <span className="min-w-0 break-all text-sm font-semibold text-[#141414]">{stockEmail}</span>
                       <button
@@ -391,7 +391,7 @@ export default function AkunAktifPage() {
                         onClick={() => void copyText(stockEmail, `${order.id}:email`)}
                         disabled={stockEmail === '-'}
                         className="relative inline-flex h-9 w-9 shrink-0 self-end items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40 sm:self-auto"
-                        aria-label="Copy email akun"
+                        aria-label="Copy email atau identitas akses"
                       >
                         {copiedKey === `${order.id}:email` ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                       </button>
@@ -399,7 +399,7 @@ export default function AkunAktifPage() {
                   </div>
 
                   <div className="rounded-xl bg-[#F7F7F5] p-3">
-                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Password akun</div>
+                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#777]">Password / Kode Akses</div>
                     <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <span className={`min-w-0 break-all text-sm font-semibold ${passwordRaw && !showPassword ? 'tracking-[0.16em] text-[#6B6A66]' : 'text-[#141414]'}`}>
                         {passwordText}
@@ -425,7 +425,7 @@ export default function AkunAktifPage() {
                           onClick={() => void copyText(passwordRaw, passwordKey)}
                           disabled={!passwordRaw}
                           className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E1E1DE] bg-white text-[#666] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[#F1F1EE] disabled:cursor-not-allowed disabled:opacity-40"
-                          aria-label="Copy password akun"
+                          aria-label="Copy password atau kode akses"
                         >
                           {copiedKey === passwordKey ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                         </button>
@@ -462,7 +462,7 @@ export default function AkunAktifPage() {
                 {!order.stock ? (
                   <div className="mt-3 flex max-w-full items-start gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
                     <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0" />
-                    <span className="break-words">Akun belum ter-assign. Hubungi admin kalau status ini bertahan lama.</span>
+                    <span className="break-words">Akses produk belum ter-assign. Hubungi admin kalau status ini bertahan lama.</span>
                   </div>
                 ) : null}
               </div>

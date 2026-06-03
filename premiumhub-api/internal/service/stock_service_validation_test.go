@@ -103,7 +103,7 @@ func TestStockService_CreateRejectsProductWithoutActiveAccountType(t *testing.T)
 		AccountType: "shared",
 		Email:       "n/a@example.com",
 		Password:    "abc12345",
-	}); err == nil || !strings.Contains(err.Error(), "produk belum punya tipe akun aktif") {
+	}); err == nil || !strings.Contains(err.Error(), "produk belum punya jenis akses aktif") {
 		t.Fatalf("expected no active account type error, got: %v", err)
 	}
 }

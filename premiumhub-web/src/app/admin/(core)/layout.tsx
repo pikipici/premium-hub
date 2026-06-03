@@ -27,7 +27,7 @@ function resolveCorePageMeta(pathname: string): PageMeta {
   }
 
   if (pathname.startsWith('/admin/stok')) {
-    return { title: 'Stok Akun', sub: 'Monitor dan tambah stok' }
+    return { title: 'Stok Produk', sub: 'Monitor dan tambah stok produk digital' }
   }
 
   if (pathname.startsWith('/admin/sosmed/orders')) {

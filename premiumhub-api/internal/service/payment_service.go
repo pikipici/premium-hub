@@ -219,7 +219,7 @@ func (s *PaymentService) createTransactionForOrder(order *model.Order, input Cre
 		PaymentMethod:       method,
 		OrderID:             providerOrderID,
 		Amount:              order.TotalPrice,
-		ProductDetails:      "Pembayaran produk premium DigiMarket",
+		ProductDetails:      "Pembayaran produk digital DigiMarket",
 		CustomerName:        order.User.Name,
 		Email:               order.User.Email,
 		PhoneNumber:         order.User.Phone,

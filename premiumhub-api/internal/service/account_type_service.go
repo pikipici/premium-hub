@@ -55,7 +55,7 @@ func normalizeAccountTypeCode(value string) string {
 
 func validateAccountTypeCode(value string) error {
 	if !accountTypeCodePattern.MatchString(value) {
-		return errors.New("kode tipe akun tidak valid (pakai huruf kecil, angka, -, _)")
+		return errors.New("kode jenis akses tidak valid (pakai huruf kecil, angka, -, _)")
 	}
 	return nil
 }
@@ -81,7 +81,7 @@ func (s *AccountTypeService) List(includeInactive bool) ([]model.AccountType, er
 func (s *AccountTypeService) Create(input CreateAccountTypeInput) (*model.AccountType, error) {
 	code := normalizeAccountTypeCode(input.Code)
 	if code == "" {
-		return nil, errors.New("kode tipe akun wajib diisi")
+		return nil, errors.New("kode jenis akses wajib diisi")
 	}
 	if err := validateAccountTypeCode(code); err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (s *AccountTypeService) Create(input CreateAccountTypeInput) (*model.Accoun
 
 	label := strings.TrimSpace(input.Label)
 	if label == "" {
-		return nil, errors.New("label tipe akun wajib diisi")
+		return nil, errors.New("label jenis akses wajib diisi")
 	}
 
 	bgColor, err := normalizeColor(input.BadgeBgColor)
@@ -102,9 +102,9 @@ func (s *AccountTypeService) Create(input CreateAccountTypeInput) (*model.Accoun
 	}
 
 	if _, err := s.repo.FindByCode(code); err == nil {
-		return nil, errors.New("kode tipe akun sudah dipakai")
+		return nil, errors.New("kode jenis akses sudah dipakai")
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errors.New("gagal cek duplikasi tipe akun")
+		return nil, errors.New("gagal cek duplikasi jenis akses")
 	}
 
 	sortOrder := 100
@@ -129,7 +129,7 @@ func (s *AccountTypeService) Create(input CreateAccountTypeInput) (*model.Accoun
 	}
 
 	if err := s.repo.Create(item); err != nil {
-		return nil, errors.New("gagal membuat tipe akun")
+		return nil, errors.New("gagal membuat jenis akses")
 	}
 
 	return item, nil
@@ -138,20 +138,20 @@ func (s *AccountTypeService) Create(input CreateAccountTypeInput) (*model.Accoun
 func (s *AccountTypeService) Update(id uuid.UUID, input UpdateAccountTypeInput) (*model.AccountType, error) {
 	item, err := s.repo.FindByID(id)
 	if err != nil {
-		return nil, errors.New("tipe akun tidak ditemukan")
+		return nil, errors.New("jenis akses tidak ditemukan")
 	}
 
 	if input.Code != nil {
 		nextCode := normalizeAccountTypeCode(*input.Code)
 		if nextCode != item.Code {
-			return nil, errors.New("kode tipe akun tidak bisa diubah")
+			return nil, errors.New("kode jenis akses tidak bisa diubah")
 		}
 	}
 
 	if input.Label != nil {
 		label := strings.TrimSpace(*input.Label)
 		if label == "" {
-			return nil, errors.New("label tipe akun wajib diisi")
+			return nil, errors.New("label jenis akses wajib diisi")
 		}
 		item.Label = label
 	}
@@ -184,10 +184,10 @@ func (s *AccountTypeService) Update(id uuid.UUID, input UpdateAccountTypeInput) 
 		if !*input.IsActive {
 			priceUsage, stockUsage, err := s.repo.CountUsage(item.Code)
 			if err != nil {
-				return nil, errors.New("gagal cek penggunaan tipe akun")
+				return nil, errors.New("gagal cek penggunaan jenis akses")
 			}
 			if priceUsage > 0 || stockUsage > 0 {
-				return nil, fmt.Errorf("tipe akun masih dipakai (harga aktif: %d, stok tersedia: %d)", priceUsage, stockUsage)
+				return nil, fmt.Errorf("jenis akses masih dipakai (harga aktif: %d, stok tersedia: %d)", priceUsage, stockUsage)
 			}
 		}
 
@@ -195,7 +195,7 @@ func (s *AccountTypeService) Update(id uuid.UUID, input UpdateAccountTypeInput) 
 	}
 
 	if err := s.repo.Update(item); err != nil {
-		return nil, errors.New("gagal memperbarui tipe akun")
+		return nil, errors.New("gagal memperbarui jenis akses")
 	}
 	return item, nil
 }
@@ -203,11 +203,11 @@ func (s *AccountTypeService) Update(id uuid.UUID, input UpdateAccountTypeInput) 
 func (s *AccountTypeService) Delete(id uuid.UUID) error {
 	item, err := s.repo.FindByID(id)
 	if err != nil {
-		return errors.New("tipe akun tidak ditemukan")
+		return errors.New("jenis akses tidak ditemukan")
 	}
 
 	if item.IsSystem {
-		return errors.New("tipe akun sistem tidak bisa dihapus")
+		return errors.New("jenis akses sistem tidak bisa dihapus")
 	}
 
 	if !item.IsActive {
@@ -216,15 +216,15 @@ func (s *AccountTypeService) Delete(id uuid.UUID) error {
 
 	priceUsage, stockUsage, err := s.repo.CountUsage(item.Code)
 	if err != nil {
-		return errors.New("gagal cek penggunaan tipe akun")
+		return errors.New("gagal cek penggunaan jenis akses")
 	}
 	if priceUsage > 0 || stockUsage > 0 {
-		return fmt.Errorf("tipe akun masih dipakai (harga aktif: %d, stok tersedia: %d)", priceUsage, stockUsage)
+		return fmt.Errorf("jenis akses masih dipakai (harga aktif: %d, stok tersedia: %d)", priceUsage, stockUsage)
 	}
 
 	item.IsActive = false
 	if err := s.repo.Update(item); err != nil {
-		return errors.New("gagal menghapus tipe akun")
+		return errors.New("gagal menghapus jenis akses")
 	}
 
 	return nil
@@ -242,7 +242,7 @@ func (s *AccountTypeService) ValidateActiveCode(value string) (string, error) {
 	item, err := s.repo.FindByCode(code)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", errors.New("account_type belum terdaftar di master tipe akun")
+			return "", errors.New("account_type belum terdaftar di master jenis akses")
 		}
 		return "", errors.New("gagal validasi account_type")
 	}

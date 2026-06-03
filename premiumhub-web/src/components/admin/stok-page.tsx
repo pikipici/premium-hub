@@ -625,7 +625,7 @@ export default function StokPage() {
     }
 
     if (!payload.account_type) {
-      setError('Tipe akun wajib diisi')
+      setError('Jenis akses wajib diisi')
       return
     }
 
@@ -635,12 +635,12 @@ export default function StokPage() {
     }
 
     if (!EMAIL_REGEX.test(payload.email)) {
-      setError('Format email akun tidak valid')
+      setError('Format email / identitas akses tidak valid')
       return
     }
 
     if (!payload.password.trim()) {
-      setError('Password akun wajib diisi')
+      setError('Password / kode akses wajib diisi')
       return
     }
 
@@ -662,8 +662,8 @@ export default function StokPage() {
 
       setNotice(
         modalMode === 'edit'
-          ? `Akun stok ${payload.email} untuk ${productName} berhasil diperbarui.`
-          : `Akun stok baru ${payload.email} untuk ${productName} berhasil ditambahkan.`
+          ? `Stok produk ${payload.email} untuk ${productName} berhasil diperbarui.`
+          : `Stok produk baru ${payload.email} untuk ${productName} berhasil ditambahkan.`
       )
 
       resetModalState()
@@ -686,7 +686,7 @@ export default function StokPage() {
     }
 
     if (!accountType) {
-      setError('Tipe akun bulk wajib diisi')
+      setError('Jenis akses bulk wajib diisi')
       return
     }
 
@@ -720,7 +720,7 @@ export default function StokPage() {
       const count = res.data?.count ?? parsed.accounts.length
       const productName = products.find((item) => item.id === productID)?.name || 'Produk'
 
-      setNotice(`Bulk import berhasil: ${count} akun ditambahkan ke ${productName}.`)
+      setNotice(`Bulk import berhasil: ${count} item stok ditambahkan ke ${productName}.`)
       resetModalState()
       await refreshStocks()
     } catch (err) {
@@ -733,7 +733,7 @@ export default function StokPage() {
   const removeStock = async (stock: Stock) => {
     const product = resolveProduct(stock)
     const confirmed = window.confirm(
-      `Hapus akun ${stock.email} dari ${product.name}?\nAksi ini tidak bisa dibatalkan.`
+      `Hapus stok ${stock.email} dari ${product.name}?\nAksi ini tidak bisa dibatalkan.`
     )
     if (!confirmed) return
 
@@ -747,7 +747,7 @@ export default function StokPage() {
         return
       }
 
-      setNotice(`Akun ${stock.email} berhasil dihapus dari stok.`)
+      setNotice(`Stok ${stock.email} berhasil dihapus.`)
       await refreshStocks()
     } catch (err) {
       setError(mapErrorMessage(err, 'Gagal menghapus stok'))
@@ -862,7 +862,7 @@ export default function StokPage() {
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="🔍 Cari email / produk / tipe akun..."
+              placeholder="🔍 Cari email / produk / jenis akses..."
               style={{
                 fontFamily: 'inherit',
                 fontSize: 13,
@@ -1109,7 +1109,7 @@ export default function StokPage() {
                               style={{ color: 'var(--red)', borderColor: '#FECACA' }}
                               onClick={() => removeStock(stock)}
                               disabled={isUsed || saving || isDeleting}
-                              title={isUsed ? 'Stok terpakai tidak bisa dihapus' : 'Hapus akun stok'}
+                              title={isUsed ? 'Stok terpakai tidak bisa dihapus' : 'Hapus stok produk'}
                             >
                               {isDeleting ? 'Menghapus...' : 'Hapus'}
                             </button>
@@ -1164,7 +1164,7 @@ export default function StokPage() {
       <div className="admin-mobile-only">
         <div className="mobile-page-head">
           <div>
-            <div className="mobile-page-title">Stok Akun</div>
+            <div className="mobile-page-title">Stok Produk</div>
             <div className="mobile-page-subtitle">Monitor stok real-time per halaman</div>
           </div>
           <div className="mobile-inline-actions">
@@ -1452,7 +1452,7 @@ export default function StokPage() {
               </div>
 
               <div>
-                <label className="form-label">Tipe Akun</label>
+                <label className="form-label">Jenis Akses</label>
                 <select
                   className="form-select"
                   value={form.account_type}
@@ -1472,7 +1472,7 @@ export default function StokPage() {
                   disabled={formAccountTypeOptions.length === 0}
                 >
                   <option value="">
-                    {form.product_id ? 'Pilih tipe akun...' : 'Pilih produk dulu...'}
+                    {form.product_id ? 'Pilih jenis akses...' : 'Pilih produk dulu...'}
                   </option>
                   {formAccountTypeOptions.map((item) => (
                     <option key={item} value={item}>
@@ -1482,7 +1482,7 @@ export default function StokPage() {
                 </select>
                 {form.product_id && formAccountTypeOptions.length === 0 && (
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                    Produk ini belum punya tipe akun aktif.
+                    Produk ini belum punya jenis akses aktif.
                   </div>
                 )}
               </div>
@@ -1501,7 +1501,7 @@ export default function StokPage() {
                   disabled={formDurationOptions.length === 0}
                 >
                   <option value="">
-                    {form.account_type ? 'Pilih durasi...' : 'Pilih tipe akun dulu...'}
+                    {form.account_type ? 'Pilih durasi...' : 'Pilih jenis akses dulu...'}
                   </option>
                   {formDurationOptions.map((duration) => (
                     <option key={duration} value={duration}>
@@ -1511,31 +1511,31 @@ export default function StokPage() {
                 </select>
                 {form.account_type && formDurationOptions.length === 0 && (
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                    Tipe akun ini belum punya durasi aktif.
+                    Jenis akses ini belum punya durasi aktif.
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="form-label">Email Akun</label>
+                <label className="form-label">Email / Identitas Akses</label>
                 <input
                   className="form-input"
                   value={form.email}
                   onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-                  placeholder="akun@domain.com"
+                  placeholder="akses@domain.com"
                 />
               </div>
 
               <div>
                 <label className="form-label">
-                  Password Akun {modalMode === 'edit' ? '(wajib diisi ulang)' : ''}
+                  Password / Kode Akses {modalMode === 'edit' ? '(wajib diisi ulang)' : ''}
                 </label>
                 <input
                   type="password"
                   className="form-input"
                   value={form.password}
                   onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                  placeholder="Password akun"
+                  placeholder="Password atau kode akses"
                 />
                 {modalMode === 'edit' && (
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
@@ -1559,7 +1559,7 @@ export default function StokPage() {
                   Batal
                 </button>
                 <button className="topbar-btn primary" onClick={runSingleSave} disabled={saving}>
-                  {saving ? 'Menyimpan...' : modalMode === 'create' ? 'Simpan Akun' : 'Update Akun'}
+                  {saving ? 'Menyimpan...' : modalMode === 'create' ? 'Simpan Stok' : 'Update Stok'}
                 </button>
               </div>
             </div>
@@ -1632,7 +1632,7 @@ export default function StokPage() {
                 </div>
 
                 <div>
-                  <label className="form-label">Tipe Akun</label>
+                  <label className="form-label">Jenis Akses</label>
                   <select
                     className="form-select"
                     value={bulkForm.account_type}
@@ -1652,7 +1652,7 @@ export default function StokPage() {
                     disabled={bulkAccountTypeOptions.length === 0}
                   >
                     <option value="">
-                      {bulkForm.product_id ? 'Pilih tipe akun...' : 'Pilih produk dulu...'}
+                      {bulkForm.product_id ? 'Pilih jenis akses...' : 'Pilih produk dulu...'}
                     </option>
                     {bulkAccountTypeOptions.map((item) => (
                       <option key={item} value={item}>
@@ -1662,7 +1662,7 @@ export default function StokPage() {
                   </select>
                   {bulkForm.product_id && bulkAccountTypeOptions.length === 0 && (
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                      Produk ini belum punya tipe akun aktif.
+                      Produk ini belum punya jenis akses aktif.
                     </div>
                   )}
                 </div>
@@ -1681,7 +1681,7 @@ export default function StokPage() {
                     disabled={bulkDurationOptions.length === 0}
                   >
                     <option value="">
-                      {bulkForm.account_type ? 'Pilih durasi...' : 'Pilih tipe akun dulu...'}
+                      {bulkForm.account_type ? 'Pilih durasi...' : 'Pilih jenis akses dulu...'}
                     </option>
                     {bulkDurationOptions.map((duration) => (
                       <option key={duration} value={duration}>
@@ -1691,7 +1691,7 @@ export default function StokPage() {
                   </select>
                   {bulkForm.account_type && bulkDurationOptions.length === 0 && (
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                      Tipe akun ini belum punya durasi aktif.
+                      Jenis akses ini belum punya durasi aktif.
                     </div>
                   )}
                 </div>

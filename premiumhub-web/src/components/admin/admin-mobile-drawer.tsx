@@ -46,7 +46,7 @@ const DRAWER_SECTIONS: DrawerSection[] = [
     items: [
       { href: '/admin/produk', label: 'Produk', icon: '◈' },
       { href: '/admin/sosmed', label: 'DigiSosmed', icon: '◍' },
-      { href: '/admin/stok', label: 'Stok Akun', icon: '◧' },
+      { href: '/admin/stok', label: 'Stok Produk', icon: '◧' },
     ],
   },
   {

@@ -581,7 +581,7 @@ func (s *ProductService) UpdatePrice(productID, priceID uuid.UUID, input UpdateP
 	if nextDuration != price.Duration || nextAccountType != price.AccountType {
 		duplicate, err := s.productRepo.FindPriceBySignature(productID, nextDuration, nextAccountType)
 		if err == nil && duplicate.ID != priceID {
-			return nil, errors.New("kombinasi durasi dan tipe akun sudah ada")
+			return nil, errors.New("kombinasi paket dan jenis akses sudah ada")
 		}
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("gagal memeriksa duplikasi harga produk")

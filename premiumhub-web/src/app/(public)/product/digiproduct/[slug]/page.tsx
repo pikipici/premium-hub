@@ -22,19 +22,19 @@ const DEFAULT_TRUST_BADGES: ProductTrustBadge[] = [
 ]
 
 const DEFAULT_FEATURE_ITEMS = [
-  'Akun dari stok terverifikasi',
+  'Produk dari stok terverifikasi',
   'Proses kirim otomatis setelah pembayaran',
-  'Garansi aktif selama masa langganan',
+  'Garansi aktif selama masa akses',
 ]
 
 const DEFAULT_FAQ_ITEMS: ProductFAQItem[] = [
   {
-    question: 'Apakah akun ini aman digunakan?',
+    question: 'Apakah produk ini aman digunakan?',
     answer:
       'Aman. Produk dikirim dari stok terverifikasi dan ada support CS kalau ada kendala akses.',
   },
   {
-    question: 'Berapa lama proses pengiriman akun?',
+    question: 'Berapa lama proses pengiriman produk?',
     answer:
       'Pengiriman biasanya instan setelah pembayaran terkonfirmasi. Di jam sibuk tetap diproses secepat mungkin.',
   },
@@ -130,7 +130,7 @@ function getAccountTypeDescription(value: string, sharedNote: string, privateNot
   const normalized = normalizeAccountType(value)
   if (normalized === 'shared') return sharedNote
   if (normalized === 'private') return privateNote
-  return 'Tipe akun khusus sesuai paket yang dipilih.'
+  return 'Jenis akses khusus sesuai paket yang dipilih.'
 }
 
 function normalizeWaNumber(raw?: string) {
@@ -362,8 +362,8 @@ export default function PremAppsProductDetailPage() {
 
   const popularBadge = product.badge_popular_text?.trim() || '🔥 Terlaris'
   const guaranteeBadge = product.badge_guarantee_text?.trim() || '🛡 Garansi 30 Hari'
-  const sharedNote = product.shared_note?.trim() || 'Berbagi dengan pengguna lain'
-  const privateNote = product.private_note?.trim() || 'Akun pribadi, akses penuh'
+  const sharedNote = product.shared_note?.trim() || 'Akses bersama sesuai ketentuan produk'
+  const privateNote = product.private_note?.trim() || 'Akses pribadi dengan kontrol lebih penuh'
 
   const priceOriginalText = product.price_original_text?.trim() || ''
   const pricePerDayText = product.price_per_day_text?.trim() || ''
@@ -420,7 +420,7 @@ export default function PremAppsProductDetailPage() {
                       : 'text-[#B91C1C] bg-[#FEF2F2] border-[#FECACA]'
                   }`}
                 >
-                  {availableStock > 0 ? `Stok tersedia: ${availableStock} akun` : 'Stok saat ini habis'}
+                  {availableStock > 0 ? `Stok tersedia: ${availableStock} item` : 'Stok saat ini habis'}
                 </div>
               </div>
             )}
@@ -468,7 +468,7 @@ export default function PremAppsProductDetailPage() {
           )}
 
           <div className="mb-6">
-            <h3 className="text-sm font-bold mb-3">Tipe Akun</h3>
+            <h3 className="text-sm font-bold mb-3">Jenis Akses</h3>
             <div className="flex gap-3 flex-wrap">
               {accountTypeOptions.map((option) => {
                 const active = normalizeAccountType(activeAccountType) === option.code
@@ -490,10 +490,10 @@ export default function PremAppsProductDetailPage() {
                           : 'border-[#EBEBEB] bg-white hover:border-[#ccc]'
                     }`}
                   >
-                    <div className="text-sm font-bold mb-1">{formatAccountTypeLabel(option.code)} Account</div>
+                    <div className="text-sm font-bold mb-1">{formatAccountTypeLabel(option.code)} Access</div>
                     <div className="text-xs text-[#888]">{getAccountTypeDescription(option.code, sharedNote, privateNote)}</div>
                     <div className={`text-[11px] font-semibold mt-2 ${disabled ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>
-                      {disabled ? 'Stok habis' : `Stok tersedia: ${option.stock} akun`}
+                      {disabled ? 'Stok habis' : `Stok tersedia: ${option.stock} item`}
                     </div>
                   </button>
                 )
@@ -502,11 +502,11 @@ export default function PremAppsProductDetailPage() {
           </div>
 
           <div className="mb-8">
-            <h3 className="text-sm font-bold mb-3">Pilih Paket Durasi</h3>
+            <h3 className="text-sm font-bold mb-3">Pilih Paket</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {filteredPrices.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-[#D9D9D9] bg-white p-4 text-sm text-[#6B7280] col-span-full">
-                  Belum ada paket aktif untuk tipe akun ini.
+                  Belum ada paket aktif untuk jenis akses ini.
                 </div>
               ) : (
                 filteredPrices.map((price) => {
@@ -539,7 +539,7 @@ export default function PremAppsProductDetailPage() {
                         {formatRupiah(price.price)}
                       </div>
                       <div className={`text-[11px] mt-1 font-semibold ${disabled ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>
-                        {disabled ? 'Stok habis' : `Stok ${stockCount} akun`}
+                        {disabled ? 'Stok habis' : `Stok ${stockCount} item`}
                       </div>
                       {!!savingsText && !disabled && (
                         <div className="text-[11px] text-[#0F766E] mt-1 font-semibold">{savingsText}</div>
@@ -552,7 +552,7 @@ export default function PremAppsProductDetailPage() {
 
             {filteredPrices.length > 0 && inStockFilteredPrices.length === 0 && (
               <div className="mt-3 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-xs font-semibold text-[#B91C1C]">
-                Semua paket untuk tipe akun ini sedang habis. Pilih tipe akun lain atau tunggu restock.
+                Semua paket untuk jenis akses ini sedang habis. Pilih jenis akses lain atau tunggu restock.
               </div>
             )}
           </div>

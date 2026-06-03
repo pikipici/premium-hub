@@ -336,7 +336,7 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 			BalanceBefore: balanceBefore,
 			BalanceAfter:  balanceAfter,
 			Reference:     chargeReference,
-			Description:   fmt.Sprintf("Pembelian produk premium order %s via wallet", shortWalletLedgerRef(order.ID.String())),
+			Description:   fmt.Sprintf("Pembelian produk digital order %s via wallet", shortWalletLedgerRef(order.ID.String())),
 		}
 		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
 			return errors.New("gagal menulis ledger wallet")
@@ -364,7 +364,7 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 			notif := &model.Notification{
 				UserID:  order.UserID,
 				Title:   "Pembayaran Berhasil",
-				Message: fmt.Sprintf("Pembayaran wallet untuk order %s berhasil. Akun kamu sudah aktif!", shortWalletLedgerRef(order.ID.String())),
+				Message: fmt.Sprintf("Pembayaran wallet untuk order %s berhasil. Akses produk kamu sudah aktif!", shortWalletLedgerRef(order.ID.String())),
 				Type:    "order",
 			}
 			if err := tx.Create(notif).Error; err != nil {
@@ -584,7 +584,7 @@ func buildWalletLedgerPublicDescription(row model.WalletLedger) string {
 	case "sosmed_refund":
 		return "Refund layanan sosmed"
 	case "product_purchase":
-		return "Pembelian produk premium"
+		return "Pembelian produk digital"
 	case "manual_adjustment":
 		return "Penyesuaian saldo manual"
 	}
@@ -668,7 +668,7 @@ func buildWalletLedgerPublicReference(row model.WalletLedger) string {
 				}
 			}
 		}
-		return "Pembelian produk premium"
+					return "Pembelian produk digital"
 	}
 
 	if strings.HasPrefix(lowerRef, "manual_") {

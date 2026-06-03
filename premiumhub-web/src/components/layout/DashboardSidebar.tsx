@@ -46,7 +46,7 @@ const MENU = [
   { href: '/dashboard/sosmed/orders', icon: Megaphone, label: 'Order DigiSosmed' },
   { href: '/dashboard/digiconnect', icon: Network, label: 'DigiConnect' },
   { href: '/dashboard/gmail', icon: Mail, label: 'Gmail' },
-  { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Akun Aktif', settingKey: 'active_accounts' },
+  { href: '/dashboard/akun-aktif', icon: ShoppingBag, label: 'Produk Aktif', settingKey: 'active_accounts' },
   { href: '/dashboard/riwayat-order', icon: History, label: 'Riwayat Order', settingKey: 'order_history' },
   { href: '/dashboard/klaim-garansi', icon: ShieldCheck, label: 'Klaim Garansi', settingKey: 'warranty_claim' },
   { href: '/dashboard/chat', icon: MessageCircle, label: 'Chat Support' },

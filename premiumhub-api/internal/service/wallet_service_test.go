@@ -646,7 +646,7 @@ func TestWalletListLedgerSanitizesInternalCopy(t *testing.T) {
 			BalanceBefore: 100000,
 			BalanceAfter:  50000,
 			Reference:     "order_wallet:7f9057d5-5c33-4ad2-a454-331f65aa60c5:charge",
-			Description:   "Pembelian produk premium order 7f9057d5 via wallet",
+			Description:   "Pembelian produk digital order 7f9057d5 via wallet",
 		},
 		{
 			ID:            uuid.New(),
@@ -718,7 +718,7 @@ func TestWalletListLedgerSanitizesInternalCopy(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected product purchase ledger in response")
 	}
-	if productLedger.Description != "Pembelian produk premium" {
+	if productLedger.Description != "Pembelian produk digital" {
 		t.Fatalf("unexpected product purchase description: %s", productLedger.Description)
 	}
 	if !strings.HasPrefix(productLedger.Reference, "Pembelian order #") {

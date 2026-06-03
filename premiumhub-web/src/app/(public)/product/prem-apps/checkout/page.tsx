@@ -183,11 +183,11 @@ export default function CheckoutPage() {
                 <span className="font-semibold">{item.productName}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#888]">Tipe Akun</span>
+                <span className="text-[#888]">Jenis Akses</span>
                 <span className="font-semibold capitalize">{item.accountType}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#888]">Durasi</span>
+                <span className="text-[#888]">Paket</span>
                 <span className="font-semibold">{item.duration} Bulan</span>
               </div>
               <div className="border-t border-[#EBEBEB] pt-3 flex justify-between">
@@ -343,7 +343,7 @@ export default function CheckoutPage() {
           </button>
 
           <p className="text-xs text-center text-[#888] mt-4">
-            Dengan melanjutkan, kamu menyetujui syarat dan ketentuan PremiumHub.
+            Dengan melanjutkan, kamu menyetujui syarat dan ketentuan DigiMarket.
           </p>
         </div>
       </section>

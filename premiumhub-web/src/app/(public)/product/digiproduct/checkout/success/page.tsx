@@ -173,7 +173,7 @@ function OrderSuksesContent() {
                 <h1 className="text-[clamp(1.22rem,1rem+0.75vw,1.95rem)] font-extrabold leading-tight tracking-tight">
                   Pembayaran Berhasil! 🎉
                 </h1>
-                <p className="mt-1 text-xs text-white/80 sm:text-sm">Akun premium kamu sudah aktif dan siap digunakan.</p>
+                <p className="mt-1 text-xs text-white/80 sm:text-sm">Produk digital kamu sudah aktif dan siap digunakan.</p>
               </div>
 
               <div className="flex items-center justify-between px-5 pb-1 pt-4 sm:px-6 sm:pt-5">
@@ -184,7 +184,7 @@ function OrderSuksesContent() {
               </div>
 
               <div className="px-5 py-4 sm:px-6 sm:py-5">
-                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#888] sm:mb-3 sm:text-[11px]">Kredensial Akun</div>
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#888] sm:mb-3 sm:text-[11px]">Detail Akses Produk</div>
                 <div className="space-y-2 sm:space-y-2.5">
                   <div className="flex items-center gap-2.5 rounded-xl border border-[#E8E8E3] bg-[#FAFAF8] px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#E2E2DD] bg-[#F3F3EF] text-[#777] sm:h-8 sm:w-8">
@@ -266,7 +266,7 @@ function OrderSuksesContent() {
                       <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5" />
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate text-[13px] font-semibold text-[#141414] sm:text-sm">{order.product?.name || 'Premium Account'}</div>
+                      <div className="truncate text-[13px] font-semibold text-[#141414] sm:text-sm">{order.product?.name || 'DigiProduct Item'}</div>
                       <div className="text-[11px] text-[#888] sm:text-xs">
                         {accountTypeLabel(order.price?.account_type)} · {order.price?.duration || '-'} Bulan · {formatDateTime(order.paid_at || order.created_at)}
                       </div>
