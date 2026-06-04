@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { formatRupiah } from '@/lib/utils'
+import { fulfillmentTypeLabel, isCredentialFulfillment } from '@/lib/fulfillment'
 import type { Product } from '@/types/product'
 
 export default function ProductCard({ product }: { product: Product }) {
@@ -13,6 +14,10 @@ export default function ProductCard({ product }: { product: Product }) {
   const availableStock = typeof product.available_stock === 'number'
     ? Math.max(0, product.available_stock)
     : null
+
+  const hasMultiplePrices = (product.prices?.length || 0) > 1
+  const fulfillmentType = product.fulfillment_type || 'credential'
+  const showFulfillmentBadge = !isCredentialFulfillment(fulfillmentType)
 
   return (
     <Link href={`/product/digiproduct/${product.slug}`} className="group block">
@@ -27,6 +32,7 @@ export default function ProductCard({ product }: { product: Product }) {
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-white/92 via-white/88 to-white/94 pointer-events-none" />
+
         {product.is_popular && (
           <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 bg-[#FF5733] text-white text-[9px] sm:text-[10px] font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full uppercase tracking-wider">
             Popular
@@ -42,15 +48,17 @@ export default function ProductCard({ product }: { product: Product }) {
             <div className="text-2xl sm:text-4xl">{product.icon}</div>
           )}
         </div>
+
         <h3 className="relative z-10 text-sm sm:text-lg font-bold text-[#141414] mb-1 leading-tight">{product.name}</h3>
         <p className="relative z-10 text-[11px] sm:text-xs text-[#888] mb-2 sm:mb-4 capitalize">{product.category}</p>
 
         <div className="relative z-10 flex items-baseline gap-1">
-          <span className="text-[11px] sm:text-sm text-[#888]">Mulai dari</span>
+          {hasMultiplePrices && (
+            <span className="text-[11px] sm:text-sm text-[#888]">Mulai dari</span>
+          )}
         </div>
         <div className="relative z-10 flex items-baseline gap-1">
           <span className="text-lg sm:text-xl font-extrabold text-[#141414]">{formatRupiah(minPrice)}</span>
-          <span className="text-[10px] sm:text-xs text-[#888]">/bulan</span>
         </div>
 
         <div className="relative z-10 mt-2 sm:mt-4 flex gap-1.5 sm:gap-2 flex-wrap">
@@ -62,15 +70,14 @@ export default function ProductCard({ product }: { product: Product }) {
                   : 'bg-[#FEF2F2] text-[#B91C1C] border-[#FECACA]'
               }`}
             >
-              {availableStock > 0 ? `Stok ${availableStock} tersedia` : 'Stok habis'}
+              {availableStock > 0 ? `Stok ${availableStock}` : 'Stok habis'}
             </span>
           )}
 
-          {product.prices?.some((p) => p.account_type === 'shared') && (
-            <span className="text-[9px] sm:text-[10px] font-medium text-[#141414] bg-white/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">Shared</span>
-          )}
-          {product.prices?.some((p) => p.account_type === 'private') && (
-            <span className="text-[9px] sm:text-[10px] font-medium text-[#141414] bg-white/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">Private</span>
+          {showFulfillmentBadge && (
+            <span className="text-[9px] sm:text-[10px] font-medium text-[#FF5733] bg-[#FFF3EF] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
+              {fulfillmentTypeLabel(fulfillmentType)}
+            </span>
           )}
         </div>
       </div>
