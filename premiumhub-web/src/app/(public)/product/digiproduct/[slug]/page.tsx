@@ -2,17 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
-import { useParams, usePathname, useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Check, ChevronDown, ChevronUp, Clock, ShieldCheck, Zap } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import { DigiLoading } from '@/components/shared/DigiLoading'
 import Navbar from '@/components/layout/Navbar'
-import { buildLoginHref } from '@/lib/auth'
 import { formatRupiah } from '@/lib/utils'
 import { fulfillmentTypeLabel, isCredentialFulfillment } from '@/lib/fulfillment'
 import { productService } from '@/services/productService'
-import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import type { Product, ProductFAQItem, ProductPrice, ProductSpecItem, ProductTrustBadge } from '@/types/product'
 
@@ -123,9 +121,7 @@ function buildWaLink(product: Product, selectedPrice: ProductPrice | null) {
 
 export default function DigiProductDetailPage() {
   const params = useParams()
-  const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated, hasHydrated, isBootstrapped } = useAuthStore()
   const { setItem } = useCartStore()
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -277,10 +273,6 @@ export default function DigiProductDetailPage() {
 
   const handleBuy = () => {
     if (!effectiveSelectedPrice || !product) return
-    if (!(hasHydrated && isBootstrapped && isAuthenticated)) {
-      router.push(buildLoginHref(pathname))
-      return
-    }
     setItem({
       productId: product.id,
       productName: product.name,
