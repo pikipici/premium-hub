@@ -24,87 +24,93 @@ export default function ProductCard({ product }: { product: Product }) {
     ? Math.max(0, product.available_stock)
     : null
 
-  // Calculate total capacity from prices stock
+  // Total capacity from prices stock sum
   const maxCapacity = activePrices.length > 0
     ? activePrices.reduce((sum, p) => sum + (typeof p.available_stock === 'number' ? Math.max(0, p.available_stock) : 0), 0)
     : null
 
-  const usedCount = maxCapacity !== null && totalStock !== null
-    ? Math.max(0, maxCapacity - totalStock)
-    : null
-
   const fulfillmentType = product.fulfillment_type || 'credential'
   const showFulfillmentBadge = !isCredentialFulfillment(fulfillmentType)
+  const stockDepleted = totalStock === 0
 
   return (
     <Link href={`/product/digiproduct/${product.slug}`} className="group block">
-      <div className="relative overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white p-3 sm:p-4 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-[#D9D9D2]">
-        {/* Discount badge */}
+      <div className={`relative overflow-hidden rounded-2xl border bg-white p-3 sm:p-4 transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] hover:-translate-y-1 hover:border-[#D9D9D2] ${stockDepleted ? 'opacity-75' : ''}`}>
+        {/* Discount badge — top left */}
         {hasDiscount && discountPercent > 0 && (
-          <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 bg-[#FF5733] text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded">
+          <div className="absolute top-0 left-0 z-10 flex items-center gap-0.5 rounded-br-xl bg-[#FF5733] px-2.5 py-1 text-[10px] font-extrabold text-white leading-none shadow-sm">
             -{discountPercent}%
           </div>
         )}
 
-        {/* Popular badge */}
-        {product.is_popular && !hasDiscount && (
-          <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 bg-[#141414] text-white text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded">
+        {/* Popular badge — top left if no discount */}
+        {product.is_popular && !(hasDiscount && discountPercent > 0) && (
+          <div className="absolute top-0 left-0 z-10 rounded-br-lg bg-[#141414] px-2 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
             Popular
           </div>
         )}
 
-        {/* Icon */}
-        <div className="mb-2 sm:mb-3 flex items-center gap-3">
-          {product.icon_image_url ? (
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#F7F7F5] border border-[#E5E7EB] p-1 shrink-0">
-              <Image src={product.icon_image_url} alt={product.name} width={48} height={48} unoptimized className="w-full h-full rounded-lg object-contain" />
-            </div>
-          ) : (
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#F7F7F5] border border-[#E5E7EB] flex items-center justify-center text-2xl sm:text-3xl shrink-0">
-              {product.icon || '📦'}
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h3 className="text-sm sm:text-base font-bold text-[#141414] leading-tight truncate">{product.name}</h3>
-              {showFulfillmentBadge && (
-                <span className="text-[9px] font-semibold text-[#FF5733] bg-[#FFF3EF] px-1.5 py-0.5 rounded shrink-0">
-                  {fulfillmentTypeLabel(fulfillmentType)}
-                </span>
-              )}
-            </div>
-            <p className="text-[10px] sm:text-xs text-[#888] mt-0.5 capitalize">{product.category}</p>
+        {/* Stock depleted overlay */}
+        {stockDepleted && (
+          <div className="absolute top-0 left-0 z-10 rounded-br-lg bg-[#B91C1C] px-2 py-0.5 text-[9px] font-bold text-white">
+            Habis
           </div>
-        </div>
+        )}
 
-        {/* Price */}
-        <div className="flex items-baseline gap-2">
-          <span className="text-base sm:text-lg font-extrabold text-[#141414]">{formatRupiah(minPrice)}</span>
-          {hasDiscount && (
-            <span className="text-[11px] sm:text-xs text-[#AAA] line-through">{formatRupiah(maxPrice)}</span>
+        {/* Image / icon */}
+        <div className="relative aspect-[4/3] rounded-xl bg-[#F7F7F5] mb-3 overflow-hidden flex items-center justify-center">
+          {product.icon_image_url ? (
+            <Image src={product.icon_image_url} alt={product.name} fill unoptimized className="object-contain p-4" />
+          ) : (
+            <span className="text-5xl sm:text-6xl">{product.icon || '📦'}</span>
           )}
         </div>
 
-        {/* Stock counter or availability */}
-        <div className="mt-2 sm:mt-3 flex items-center gap-2 flex-wrap">
+        {/* Info */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {showFulfillmentBadge && (
+              <span className="text-[9px] font-semibold text-[#FF5733] bg-[#FFF3EF] px-1.5 py-0.5 rounded shrink-0">
+                {fulfillmentTypeLabel(fulfillmentType)}
+              </span>
+            )}
+          </div>
+
+          <h3 className="text-sm font-bold text-[#141414] leading-snug line-clamp-2 group-hover:text-[#FF5733] transition-colors">
+            {product.name}
+          </h3>
+
+          <p className="text-[11px] text-[#888] capitalize">{product.category}</p>
+
+          {/* Price */}
+          <div className="flex items-baseline gap-2 pt-0.5">
+            <span className="text-base font-extrabold text-[#141414]">{formatRupiah(minPrice)}</span>
+            {hasDiscount && (
+              <span className="text-[11px] text-[#AAA] line-through">{formatRupiah(maxPrice)}</span>
+            )}
+          </div>
+
+          {/* Stock bar + counter */}
           {totalStock !== null && totalStock > 0 ? (
-            <div className="flex items-center gap-1.5">
-              <div className="w-full max-w-[80px] sm:max-w-[100px] h-1.5 rounded-full bg-[#E5E7EB] overflow-hidden">
-                {maxCapacity !== null && maxCapacity > 0 && (
-                  <div
-                    className="h-full rounded-full bg-[#FF5733]"
-                    style={{ width: `${Math.min(100, Math.round((totalStock / maxCapacity) * 100))}%` }}
-                  />
-                )}
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex-1 h-1.5 rounded-full bg-[#E8E8E3] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[#FF5733] transition-all"
+                  style={{ width: `${Math.min(100, maxCapacity && maxCapacity > 0 ? Math.round((totalStock / maxCapacity) * 100) : 100)}%` }}
+                />
               </div>
-              <span className="text-[10px] sm:text-[11px] font-medium text-[#666] shrink-0">
-                {usedCount !== null ? `${totalStock} tersedia` : `Stok ${totalStock}`}
+              <span className="text-[10px] font-medium text-[#888] shrink-0">
+                {maxCapacity !== null && maxCapacity > 0
+                  ? `Stok ${totalStock}`
+                  : `${totalStock} tersedia`}
               </span>
             </div>
           ) : totalStock === 0 ? (
-            <span className="text-[10px] sm:text-[11px] font-semibold text-[#B91C1C] bg-[#FEF2F2] px-2 py-0.5 rounded-full">
-              Stok habis
-            </span>
+            <div className="pt-0.5">
+              <span className="text-[10px] font-semibold text-[#B91C1C] bg-[#FEF2F2] px-2 py-0.5 rounded-full">
+                Stok habis
+              </span>
+            </div>
           ) : null}
         </div>
       </div>
