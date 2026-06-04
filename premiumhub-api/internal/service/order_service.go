@@ -254,6 +254,48 @@ func (s *OrderService) ResendGuestInvoice(input ResendGuestInvoiceInput) error {
 	return nil
 }
 
+// GuestOrderStatusResponse is a minimal public response for order tracking
+// without exposing stock/credentials.
+type GuestOrderStatusResponse struct {
+	OrderID       string  `json:"order_id"`
+	OrderStatus   string  `json:"order_status"`
+	PaymentStatus string  `json:"payment_status"`
+	TotalPrice    int64   `json:"total_price"`
+	ProductName   string  `json:"product_name"`
+	CreatedAt     string  `json:"created_at"`
+	PaidAt        *string `json:"paid_at,omitempty"`
+}
+
+// GetGuestOrderStatus returns basic order status for a guest order
+// using only the order ID. No stock details are exposed.
+func (s *OrderService) GetGuestOrderStatus(id uuid.UUID) (*GuestOrderStatusResponse, error) {
+	order, err := s.orderRepo.FindByID(id)
+	if err != nil {
+		return nil, errors.New("order tidak ditemukan")
+	}
+
+	productName := ""
+	if s.priceRepo != nil {
+		if product, productErr := s.priceRepo.FindByID(order.Price.ProductID); productErr == nil {
+			productName = product.Name
+		}
+	}
+
+	res := &GuestOrderStatusResponse{
+		OrderID:       order.ID.String(),
+		OrderStatus:   order.OrderStatus,
+		PaymentStatus: order.PaymentStatus,
+		TotalPrice:    order.TotalPrice,
+		ProductName:   productName,
+		CreatedAt:     order.CreatedAt.Format(time.RFC3339),
+	}
+	if order.PaidAt != nil {
+		paid := order.PaidAt.Format(time.RFC3339)
+		res.PaidAt = &paid
+	}
+	return res, nil
+}
+
 func (s *OrderService) GetGuestByID(id uuid.UUID, token string) (*model.Order, error) {
 	order, err := s.orderRepo.FindByID(id)
 	if err != nil {

@@ -75,6 +75,20 @@ func (h *OrderHandler) ResendGuestInvoice(c *gin.Context) {
 	response.Success(c, "Jika data cocok, link invoice sudah dikirim", nil)
 }
 
+func (h *OrderHandler) GetGuestOrderStatus(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+	status, err := h.orderSvc.GetGuestOrderStatus(id)
+	if err != nil {
+		response.NotFound(c, err.Error())
+		return
+	}
+	response.Success(c, "OK", status)
+}
+
 func (h *OrderHandler) GetGuestByID(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {

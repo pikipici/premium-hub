@@ -276,6 +276,11 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		middleware.NewIPRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request order. Coba lagi sebentar."),
 		orderHandler.GetGuestByID,
 	)
+	api.GET(
+		"/public/orders/:id/status",
+		middleware.NewIPRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak cek status order. Coba lagi sebentar."),
+		orderHandler.GetGuestOrderStatus,
+	)
 	api.POST(
 		"/public/payment/create",
 		middleware.NewIPRateLimiter(cfg.PaymentRateLimitMax, cfg.PaymentRateLimitWindow, "Terlalu banyak request pembayaran. Coba lagi sebentar."),

@@ -4,6 +4,16 @@ import type { Order } from '@/types/order'
 
 export type AdminOrderStatus = 'pending' | 'active' | 'completed' | 'failed'
 
+export type GuestOrderStatus = {
+  order_id: string
+  order_status: string
+  payment_status: string
+  total_price: number
+  product_name: string
+  created_at: string
+  paid_at?: string | null
+}
+
 export const orderService = {
   create: async (data: { price_id: string; payment_method?: string }) => {
     const res = await api.post<ApiResponse<Order>>('/orders', data)
@@ -27,6 +37,11 @@ export const orderService = {
 
   getGuestByID: async (id: string, token: string) => {
     const res = await api.get<ApiResponse<Order>>(`/public/orders/${id}`, { params: { token } })
+    return res.data
+  },
+
+  getGuestOrderStatus: async (id: string) => {
+    const res = await api.get<ApiResponse<GuestOrderStatus>>(`/public/orders/${id}/status`)
     return res.data
   },
 
