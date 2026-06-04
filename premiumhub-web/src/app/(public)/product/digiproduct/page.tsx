@@ -10,6 +10,7 @@ import { productService } from '@/services/productService'
 import { productCategoryService } from '@/services/productCategoryService'
 import type { Product } from '@/types/product'
 import { CreditCard, Search, ShieldCheck, Zap } from 'lucide-react'
+import Link from 'next/link'
 
 type CategoryOption = {
   value: string
@@ -143,7 +144,7 @@ function DigiProductContent() {
               </p>
             </div>
 
-            <div className="flex gap-3 lg:gap-4 flex-wrap">
+            <div className="flex gap-3 lg:gap-4 flex-wrap items-center">
               {[
                 { icon: <Zap className="h-4 w-4" />, text: 'Pengiriman Instan' },
                 { icon: <ShieldCheck className="h-4 w-4" />, text: 'Garansi Aktif' },
@@ -154,6 +155,10 @@ function DigiProductContent() {
                   {item.text}
                 </div>
               ))}
+              <Link href="/lacak-pesanan" className="inline-flex items-center gap-1.5 rounded-full bg-[#141414] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#2A2A2A] transition-colors">
+                <Search className="h-3.5 w-3.5" />
+                Lacak Pesanan
+              </Link>
             </div>
           </div>
         </div>
