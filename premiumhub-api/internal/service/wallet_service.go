@@ -22,11 +22,12 @@ import (
 )
 
 type WalletService struct {
-	cfg        *config.Config
-	userRepo   *repository.UserRepo
-	walletRepo *repository.WalletRepo
-	notifRepo  *repository.NotificationRepo
-	gateway    PaymentGatewayClient
+	cfg         *config.Config
+	userRepo    *repository.UserRepo
+	walletRepo  *repository.WalletRepo
+	notifRepo   *repository.NotificationRepo
+	productRepo *repository.ProductRepo
+	gateway     PaymentGatewayClient
 }
 
 func NewWalletService(
@@ -34,6 +35,7 @@ func NewWalletService(
 	userRepo *repository.UserRepo,
 	walletRepo *repository.WalletRepo,
 	notifRepo *repository.NotificationRepo,
+	productRepo *repository.ProductRepo,
 	gateway PaymentGatewayClient,
 ) *WalletService {
 	if gateway == nil {
@@ -41,11 +43,12 @@ func NewWalletService(
 	}
 
 	return &WalletService{
-		cfg:        cfg,
-		userRepo:   userRepo,
-		walletRepo: walletRepo,
-		notifRepo:  notifRepo,
-		gateway:    gateway,
+		cfg:         cfg,
+		userRepo:    userRepo,
+		walletRepo:  walletRepo,
+		notifRepo:   notifRepo,
+		productRepo: productRepo,
+		gateway:     gateway,
 	}
 }
 
@@ -288,8 +291,22 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 		var stock model.Stock
 		const usableCredentialCondition = "(password LIKE 'enc:v1:%' OR (password NOT LIKE '$2a$%' AND password NOT LIKE '$2b$%' AND password NOT LIKE '$2y$%'))"
 
+		fulfillmentType := model.FulfillmentTypeCredential
+		if s.productRepo != nil {
+			if product, err := s.productRepo.FindByID(order.Price.ProductID); err == nil && product.FulfillmentType != "" {
+				fulfillmentType = product.FulfillmentType
+			}
+		}
+
+		fulfillmentFilter := "(fulfillment_type = ? OR fulfillment_type = '' OR fulfillment_type IS NULL)"
+		fulfillmentValue := model.FulfillmentTypeCredential
+		if fulfillmentType != model.FulfillmentTypeCredential {
+			fulfillmentFilter = "fulfillment_type = ?"
+			fulfillmentValue = fulfillmentType
+		}
+
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("product_id = ? AND account_type = ? AND status = ? AND duration_month = ? AND "+usableCredentialCondition, order.Price.ProductID, order.Price.AccountType, "available", order.Price.Duration).
+			Where("product_id = ? AND account_type = ? AND status = ? AND duration_month = ? AND "+usableCredentialCondition+" AND "+fulfillmentFilter, order.Price.ProductID, order.Price.AccountType, "available", order.Price.Duration, fulfillmentValue).
 			Order("created_at ASC").
 			First(&stock).Error; err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -297,7 +314,7 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 			}
 
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-				Where("product_id = ? AND account_type = ? AND status = ? AND (duration_month = 0 OR duration_month IS NULL) AND "+usableCredentialCondition, order.Price.ProductID, order.Price.AccountType, "available").
+				Where("product_id = ? AND account_type = ? AND status = ? AND (duration_month = 0 OR duration_month IS NULL) AND "+usableCredentialCondition+" AND "+fulfillmentFilter, order.Price.ProductID, order.Price.AccountType, "available", fulfillmentValue).
 				Order("created_at ASC").
 				First(&stock).Error; err != nil {
 				if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -305,7 +322,7 @@ func (s *WalletService) PayOrderWithWallet(ctx context.Context, userID, orderID 
 				}
 
 				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-					Where("product_id = ? AND account_type = ? AND status = ? AND "+usableCredentialCondition, order.Price.ProductID, order.Price.AccountType, "available").
+					Where("product_id = ? AND account_type = ? AND status = ? AND "+usableCredentialCondition+" AND "+fulfillmentFilter, order.Price.ProductID, order.Price.AccountType, "available", fulfillmentValue).
 					Order("created_at ASC").
 					First(&stock).Error; err != nil {
 					if errors.Is(err, gorm.ErrRecordNotFound) {

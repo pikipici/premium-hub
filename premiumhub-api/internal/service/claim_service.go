@@ -12,14 +12,15 @@ import (
 )
 
 type ClaimService struct {
-	claimRepo *repository.ClaimRepo
-	orderRepo *repository.OrderRepo
-	stockRepo *repository.StockRepo
-	notifRepo *repository.NotificationRepo
+	claimRepo   *repository.ClaimRepo
+	orderRepo   *repository.OrderRepo
+	stockRepo   *repository.StockRepo
+	notifRepo   *repository.NotificationRepo
+	productRepo *repository.ProductRepo
 }
 
-func NewClaimService(claimRepo *repository.ClaimRepo, orderRepo *repository.OrderRepo, stockRepo *repository.StockRepo, notifRepo *repository.NotificationRepo) *ClaimService {
-	return &ClaimService{claimRepo: claimRepo, orderRepo: orderRepo, stockRepo: stockRepo, notifRepo: notifRepo}
+func NewClaimService(claimRepo *repository.ClaimRepo, orderRepo *repository.OrderRepo, stockRepo *repository.StockRepo, notifRepo *repository.NotificationRepo, productRepo *repository.ProductRepo) *ClaimService {
+	return &ClaimService{claimRepo: claimRepo, orderRepo: orderRepo, stockRepo: stockRepo, notifRepo: notifRepo, productRepo: productRepo}
 }
 
 type CreateClaimInput struct {
@@ -94,10 +95,19 @@ func (s *ClaimService) Approve(id uuid.UUID, input AdminActionInput) error {
 		return errors.New("klaim tidak ditemukan")
 	}
 
-	order, _ := s.orderRepo.FindByID(claim.OrderID)
+	order, err := s.orderRepo.FindByID(claim.OrderID)
+	if err != nil {
+		return errors.New("order tidak ditemukan")
+	}
 
-	// Find new stock
-	newStock, err := s.stockRepo.FindAvailable(order.Price.ProductID, order.Price.AccountType, order.Price.Duration)
+	fulfillmentType := model.FulfillmentTypeCredential
+	if s.productRepo != nil {
+		if product, productErr := s.productRepo.FindByID(order.Price.ProductID); productErr == nil && product.FulfillmentType != "" {
+			fulfillmentType = product.FulfillmentType
+		}
+	}
+
+	newStock, err := s.stockRepo.FindAvailable(order.Price.ProductID, order.Price.AccountType, order.Price.Duration, fulfillmentType)
 	if err != nil {
 		return errors.New("stok pengganti tidak tersedia")
 	}
@@ -108,7 +118,6 @@ func (s *ClaimService) Approve(id uuid.UUID, input AdminActionInput) error {
 	claim.NewStockID = &newStock.ID
 	claim.ResolvedAt = &now
 
-	// Mark old stock as expired, assign new
 	if order.Stock != nil {
 		order.Stock.Status = "expired"
 		s.stockRepo.Update(order.Stock)

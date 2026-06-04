@@ -142,13 +142,7 @@ func setupWalletService(t *testing.T) (*WalletService, *gorm.DB, *fakeGatewayWal
 		FrontendURL:              "https://example.com",
 	}
 	fake := newFakeGatewayWalletClient()
-	walletSvc := NewWalletService(
-		cfg,
-		repository.NewUserRepo(db),
-		repository.NewWalletRepo(db),
-		repository.NewNotificationRepo(db),
-		fake,
-	)
+	walletSvc := NewWalletService(cfg, repository.NewUserRepo(db), repository.NewWalletRepo(db), repository.NewNotificationRepo(db), repository.NewProductRepo(db), fake)
 
 	return walletSvc, db, fake, user
 }

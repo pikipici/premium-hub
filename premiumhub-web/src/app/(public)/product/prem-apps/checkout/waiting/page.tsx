@@ -1,3 +1,2 @@
-export default function WaitingPaymentPage() {
-  return <div><h1>WaitingPayment — TODO</h1></div>
-}
+'use client'
+export { default } from '../../../digiproduct/checkout/waiting/page'

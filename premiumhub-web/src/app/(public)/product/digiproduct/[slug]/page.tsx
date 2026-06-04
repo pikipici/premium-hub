@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useParams, usePathname, useRouter } from 'next/navigation'
-import { Check, Clock, ShieldCheck, Zap } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Clock, ShieldCheck, Zap } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import { DigiLoading } from '@/components/shared/DigiLoading'
 import Navbar from '@/components/layout/Navbar'
 import { buildLoginHref } from '@/lib/auth'
 import { formatRupiah } from '@/lib/utils'
+import { fulfillmentTypeLabel, isCredentialFulfillment } from '@/lib/fulfillment'
 import { productService } from '@/services/productService'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
@@ -30,25 +31,19 @@ const DEFAULT_FEATURE_ITEMS = [
 const DEFAULT_FAQ_ITEMS: ProductFAQItem[] = [
   {
     question: 'Apakah produk ini aman digunakan?',
-    answer:
-      'Aman. Produk dikirim dari stok terverifikasi dan ada support CS kalau ada kendala akses.',
+    answer: 'Aman. Produk dikirim dari stok terverifikasi dan ada support CS kalau ada kendala akses.',
   },
   {
     question: 'Berapa lama proses pengiriman produk?',
-    answer:
-      'Pengiriman biasanya instan setelah pembayaran terkonfirmasi. Di jam sibuk tetap diproses secepat mungkin.',
+    answer: 'Pengiriman biasanya instan setelah pembayaran terkonfirmasi. Di jam sibuk tetap diproses secepat mungkin.',
   },
 ]
 
 function normalizeTrustBadges(product: Product): ProductTrustBadge[] {
   const fromBadges = (product.trust_badges || [])
-    .map((item) => ({
-      icon: item.icon?.trim() || '✨',
-      text: item.text?.trim() || '',
-    }))
+    .map((item) => ({ icon: item.icon?.trim() || '✨', text: item.text?.trim() || '' }))
     .filter((item) => item.text)
     .slice(0, 6)
-
   if (fromBadges.length > 0) return fromBadges
 
   const fromTrustItems = (product.trust_items || [])
@@ -58,41 +53,29 @@ function normalizeTrustBadges(product: Product): ProductTrustBadge[] {
     }))
     .filter((item) => item.text)
     .slice(0, 6)
-
   if (fromTrustItems.length > 0) return fromTrustItems
 
   return DEFAULT_TRUST_BADGES
 }
 
 function normalizeFeatureItems(product: Product): string[] {
-  const fromProduct = (product.feature_items || [])
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 12)
-
+  const fromProduct = (product.feature_items || []).map((item) => item.trim()).filter(Boolean).slice(0, 12)
   if (fromProduct.length > 0) return fromProduct
   return DEFAULT_FEATURE_ITEMS
 }
 
 function normalizeSpecItems(product: Product): ProductSpecItem[] {
   return (product.spec_items || [])
-    .map((item) => ({
-      label: item.label?.trim() || '',
-      value: item.value?.trim() || '',
-    }))
+    .map((item) => ({ label: item.label?.trim() || '', value: item.value?.trim() || '' }))
     .filter((item) => item.label && item.value)
     .slice(0, 16)
 }
 
 function normalizeFaqItems(product: Product): ProductFAQItem[] {
   const fromProduct = (product.faq_items || [])
-    .map((item) => ({
-      question: item.question?.trim() || '',
-      answer: item.answer?.trim() || '',
-    }))
+    .map((item) => ({ question: item.question?.trim() || '', answer: item.answer?.trim() || '' }))
     .filter((item) => item.question && item.answer)
     .slice(0, 10)
-
   if (fromProduct.length > 0) return fromProduct
   return DEFAULT_FAQ_ITEMS
 }
@@ -110,10 +93,8 @@ function normalizeAccountType(value?: string | null) {
 function formatAccountTypeLabel(value?: string | null) {
   const normalized = normalizeAccountType(value)
   if (!normalized) return '-'
-
   if (normalized === 'shared') return 'Shared'
   if (normalized === 'private') return 'Private'
-
   return normalized
     .split(/[-_\s]+/)
     .filter(Boolean)
@@ -126,13 +107,6 @@ function normalizePriceStock(value?: number | null) {
   return Math.max(0, Math.floor(value))
 }
 
-function getAccountTypeDescription(value: string, sharedNote: string, privateNote: string) {
-  const normalized = normalizeAccountType(value)
-  if (normalized === 'shared') return sharedNote
-  if (normalized === 'private') return privateNote
-  return 'Jenis akses khusus sesuai paket yang dipilih.'
-}
-
 function normalizeWaNumber(raw?: string) {
   if (!raw) return ''
   return raw.replace(/\D/g, '').slice(0, 20)
@@ -141,15 +115,13 @@ function normalizeWaNumber(raw?: string) {
 function buildWaLink(product: Product, selectedPrice: ProductPrice | null) {
   const waNumber = normalizeWaNumber(product.whatsapp_number)
   if (!waNumber) return ''
-
   const message = selectedPrice
     ? `Halo admin, saya mau tanya ${product.name} (${formatAccountTypeLabel(selectedPrice.account_type)} ${selectedPrice.duration} bulan - ${formatRupiah(selectedPrice.price)}).`
     : `Halo admin, saya mau tanya produk ${product.name}.`
-
   return `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`
 }
 
-export default function PremAppsProductDetailPage() {
+export default function DigiProductDetailPage() {
   const params = useParams()
   const pathname = usePathname()
   const router = useRouter()
@@ -161,27 +133,28 @@ export default function PremAppsProductDetailPage() {
   const [selectedPrice, setSelectedPrice] = useState<ProductPrice | null>(null)
   const [loading, setLoading] = useState(true)
   const [hideFloatingCta, setHideFloatingCta] = useState(false)
+  const [featuresExpanded, setFeaturesExpanded] = useState(false)
+  const [faqExpanded, setFaqExpanded] = useState(false)
+
+  const fulfillmentType = (product?.fulfillment_type || '').trim().toLowerCase()
+  const showAccountTypeSelector = isCredentialFulfillment(fulfillmentType)
+  const fulfillmentLabel = fulfillmentTypeLabel(fulfillmentType)
 
   useEffect(() => {
     if (!params.slug) return
-
     productService
       .getBySlug(params.slug as string)
       .then((res) => {
         if (!res.success) return
-
         setProduct(res.data)
-
         const selectablePrices = getSelectablePrices(res.data)
         const firstPrice =
           selectablePrices.find(
-            (item) =>
-              normalizeAccountType(item.account_type) === 'shared' && normalizePriceStock(item.available_stock) > 0
+            (item) => normalizeAccountType(item.account_type) === 'shared' && normalizePriceStock(item.available_stock) > 0
           ) ||
           selectablePrices.find((item) => normalizePriceStock(item.available_stock) > 0) ||
           selectablePrices.find((item) => normalizeAccountType(item.account_type) === 'shared') ||
           selectablePrices[0]
-
         if (firstPrice) {
           setAccountType(normalizeAccountType(firstPrice.account_type))
           setSelectedPrice(firstPrice)
@@ -193,17 +166,12 @@ export default function PremAppsProductDetailPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-
     const footer = document.querySelector('footer')
     if (!footer) return
-
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        setHideFloatingCta(entry.isIntersecting)
-      },
+      ([entry]) => { setHideFloatingCta(entry.isIntersecting) },
       { threshold: 0.01 }
     )
-
     observer.observe(footer)
     return () => observer.disconnect()
   }, [])
@@ -215,37 +183,28 @@ export default function PremAppsProductDetailPage() {
 
   const priceStockByID = useMemo(() => {
     const result = new Map<string, number>()
-
-    selectablePrices.forEach((price) => {
-      result.set(price.id, normalizePriceStock(price.available_stock))
-    })
-
+    selectablePrices.forEach((price) => { result.set(price.id, normalizePriceStock(price.available_stock)) })
     return result
   }, [selectablePrices])
 
   const accountTypeStockByCode = useMemo(() => {
     const result = new Map<string, number>()
-
     ;(product?.account_type_stocks || []).forEach((item) => {
       const code = normalizeAccountType(item.account_type)
       if (!code) return
       result.set(code, normalizePriceStock(item.available_stock))
     })
-
     return result
   }, [product])
 
   const accountTypeOptions = useMemo(() => {
     const fallbackByCode = new Map<string, number>()
-
     selectablePrices.forEach((price) => {
       const code = normalizeAccountType(price.account_type)
       if (!code) return
       fallbackByCode.set(code, (fallbackByCode.get(code) || 0) + (priceStockByID.get(price.id) || 0))
     })
-
     const allCodes = new Set<string>([...fallbackByCode.keys(), ...accountTypeStockByCode.keys()])
-
     return Array.from(allCodes)
       .map((code) => ({
         code,
@@ -264,23 +223,22 @@ export default function PremAppsProductDetailPage() {
   const activeAccountType = useMemo(() => {
     const normalizedCurrent = normalizeAccountType(accountType)
     const hasAnyInStockAccountType = accountTypeOptions.some((item) => item.stock > 0)
-
     if (normalizedCurrent) {
       const matched = accountTypeOptions.find((item) => item.code === normalizedCurrent)
-      if (matched && (matched.stock > 0 || !hasAnyInStockAccountType)) {
-        return normalizedCurrent
-      }
+      if (matched && (matched.stock > 0 || !hasAnyInStockAccountType)) return normalizedCurrent
     }
-
     return accountTypeOptions.find((item) => item.stock > 0)?.code || accountTypeOptions[0]?.code || ''
   }, [accountType, accountTypeOptions])
 
   const filteredPrices = useMemo(
-    () =>
-      selectablePrices.filter(
+    () => {
+      if (!showAccountTypeSelector) return selectablePrices
+      return selectablePrices.filter(
         (item) => normalizeAccountType(item.account_type) === normalizeAccountType(activeAccountType)
-      ),
-    [activeAccountType, selectablePrices]
+      )
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeAccountType, selectablePrices, product?.fulfillment_type]
   )
 
   const inStockFilteredPrices = useMemo(
@@ -310,12 +268,10 @@ export default function PremAppsProductDetailPage() {
 
   const effectiveSelectedPrice = useMemo(() => {
     if (!inStockFilteredPrices.length) return null
-
     if (selectedPrice) {
       const matched = inStockFilteredPrices.find((price) => price.id === selectedPrice.id)
       if (matched) return matched
     }
-
     return inStockFilteredPrices[0]
   }, [inStockFilteredPrices, selectedPrice])
 
@@ -325,7 +281,6 @@ export default function PremAppsProductDetailPage() {
       router.push(buildLoginHref(pathname))
       return
     }
-
     setItem({
       productId: product.id,
       productName: product.name,
@@ -333,8 +288,8 @@ export default function PremAppsProductDetailPage() {
       duration: effectiveSelectedPrice.duration,
       accountType: effectiveSelectedPrice.account_type,
       price: effectiveSelectedPrice.price,
+      fulfillmentType: product.fulfillment_type || 'credential',
     })
-
     router.push('/product/digiproduct/checkout')
   }
 
@@ -362,17 +317,18 @@ export default function PremAppsProductDetailPage() {
 
   const popularBadge = product.badge_popular_text?.trim() || '🔥 Terlaris'
   const guaranteeBadge = product.badge_guarantee_text?.trim() || '🛡 Garansi 30 Hari'
-  const sharedNote = product.shared_note?.trim() || 'Akses bersama sesuai ketentuan produk'
-  const privateNote = product.private_note?.trim() || 'Akses pribadi dengan kontrol lebih penuh'
-
-  const priceOriginalText = product.price_original_text?.trim() || ''
-  const pricePerDayText = product.price_per_day_text?.trim() || ''
-  const discountBadgeText = product.discount_badge_text?.trim() || ''
-
+  const availableStock = typeof product.available_stock === 'number' ? Math.max(0, product.available_stock) : null
+  const hasAnyStock = showAccountTypeSelector
+    ? accountTypeOptions.some((item) => item.stock > 0)
+    : inStockFilteredPrices.length > 0
   const showWaButton = product.show_whatsapp_button !== false
   const waLink = buildWaLink(product, effectiveSelectedPrice)
-  const availableStock = typeof product.available_stock === 'number' ? Math.max(0, product.available_stock) : null
-  const hasAnyStock = accountTypeOptions.some((item) => item.stock > 0)
+  const deliveryDescription = product.fulfillment_guide?.trim() || `Produk akan dikirim sebagai ${fulfillmentLabel.toLowerCase()} setelah pembayaran dikonfirmasi.`
+
+  const visibleFeatureItems = featuresExpanded ? featureItems : featureItems.slice(0, 4)
+  const hasMoreFeatures = featureItems.length > 4
+  const visibleFaqItems = faqExpanded ? faqItems : faqItems.slice(0, 3)
+  const hasMoreFaq = faqItems.length > 3
 
   return (
     <>
@@ -380,14 +336,15 @@ export default function PremAppsProductDetailPage() {
 
       <section className="py-12 md:py-16">
         <div className="max-w-4xl mx-auto px-4 pb-48 sm:px-6 sm:pb-44 lg:px-8 lg:pb-36">
+          {/* Hero Card */}
           <div className="rounded-3xl p-8 md:p-10 mb-8 border border-[#EBEBEB] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
             <div className="flex flex-col items-center text-center">
               {product.icon_image_url ? (
-                <div className="w-14 h-14 rounded-2xl bg-white border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.10)] p-1.5 mb-3">
-                  <Image src={product.icon_image_url} alt={`${product.name} icon`} width={56} height={56} unoptimized className="w-full h-full rounded-xl object-contain" />
+                <div className="w-16 h-16 rounded-2xl bg-white border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.10)] p-1.5 mb-3">
+                  <Image src={product.icon_image_url} alt={`${product.name} icon`} width={64} height={64} unoptimized className="w-full h-full rounded-xl object-contain" />
                 </div>
               ) : (
-                <div className="w-14 h-14 rounded-2xl bg-white border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.10)] flex items-center justify-center text-4xl mb-3">
+                <div className="w-16 h-16 rounded-2xl bg-white border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.10)] flex items-center justify-center text-4xl mb-3">
                   {product.icon || '📦'}
                 </div>
               )}
@@ -401,6 +358,11 @@ export default function PremAppsProductDetailPage() {
                 <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#F3F4F6] text-[#1F2937]">
                   {guaranteeBadge}
                 </span>
+                {!showAccountTypeSelector && (
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#FFF3EF] text-[#FF5733]">
+                    {fulfillmentLabel}
+                  </span>
+                )}
               </div>
 
               <h1 className="text-2xl md:text-3xl font-extrabold mb-1">{product.name}</h1>
@@ -409,38 +371,28 @@ export default function PremAppsProductDetailPage() {
               </p>
             </div>
 
-            <p className="mt-4 text-sm text-[#666] leading-relaxed text-center max-w-2xl mx-auto">{product.description}</p>
+            <p className="mt-4 text-sm text-[#666] leading-relaxed text-center max-w-2xl mx-auto">
+              {product.description}
+            </p>
 
             {availableStock !== null && (
               <div className="mt-4 flex justify-center">
-                <div
-                  className={`text-xs font-semibold border rounded-full inline-flex px-3 py-1.5 ${
-                    availableStock > 0
-                      ? 'text-[#166534] bg-[#ECFDF3] border-[#BBF7D0]'
-                      : 'text-[#B91C1C] bg-[#FEF2F2] border-[#FECACA]'
-                  }`}
-                >
+                <div className={`text-xs font-semibold border rounded-full inline-flex px-3 py-1.5 ${
+                  availableStock > 0
+                    ? 'text-[#166534] bg-[#ECFDF3] border-[#BBF7D0]'
+                    : 'text-[#B91C1C] bg-[#FEF2F2] border-[#FECACA]'
+                }`}>
                   {availableStock > 0 ? `Stok tersedia: ${availableStock} item` : 'Stok saat ini habis'}
                 </div>
               </div>
             )}
 
-            <div className="flex gap-3 mt-6 flex-wrap justify-center">
+            <div className="flex gap-2 mt-6 flex-wrap justify-center">
               {trustBadges.map((item, index) => {
-                const iconNode =
-                  index % 3 === 0 ? (
-                    <ShieldCheck className="w-4 h-4" />
-                  ) : index % 3 === 1 ? (
-                    <Zap className="w-4 h-4" />
-                  ) : (
-                    <Clock className="w-4 h-4" />
-                  )
-
+                const iconNode = index % 3 === 0 ? <ShieldCheck className="w-4 h-4" /> : index % 3 === 1 ? <Zap className="w-4 h-4" /> : <Clock className="w-4 h-4" />
                 return (
-                  <div
-                    key={`${item.text}-${index}`}
-                    className="flex items-center gap-1.5 text-xs font-medium text-[#141414] bg-[#F8FAFC] border border-[#E5E7EB] px-3 py-1.5 rounded-full"
-                  >
+                  <div key={`${item.text}-${index}`}
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#141414] bg-[#F8FAFC] border border-[#E5E7EB] px-3 py-1.5 rounded-full">
                     <span>{item.icon}</span>
                     {iconNode}
                     <span>{item.text}</span>
@@ -450,63 +402,84 @@ export default function PremAppsProductDetailPage() {
             </div>
           </div>
 
+          {/* Delivery Description (non-credential) */}
+          {!showAccountTypeSelector && (
+            <div className="mb-8 rounded-2xl border border-[#EBEBEB] bg-[#F7F7F5] p-4">
+              <p className="text-sm text-[#444]">{deliveryDescription}</p>
+            </div>
+          )}
+
+          {/* Features */}
           {featureItems.length > 0 && (
             <div className="mb-8">
               <h3 className="text-sm font-bold mb-3">Fitur Produk</h3>
               <div className="grid sm:grid-cols-2 gap-3">
-                {featureItems.map((item, index) => (
-                  <div
-                    key={`${item}-${index}`}
-                    className="rounded-2xl border border-[#EBEBEB] bg-white p-3 text-sm text-[#3B3B3B] flex items-start gap-2"
-                  >
+                {visibleFeatureItems.map((item, index) => (
+                  <div key={`${item}-${index}`}
+                    className="rounded-2xl border border-[#EBEBEB] bg-white p-3 text-sm text-[#3B3B3B] flex items-start gap-2">
                     <Check className="w-4 h-4 text-[#FF5733] mt-0.5 shrink-0" />
                     <span>{item}</span>
                   </div>
                 ))}
               </div>
+              {hasMoreFeatures && (
+                <button
+                  type="button"
+                  onClick={() => setFeaturesExpanded((prev) => !prev)}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl border border-[#E2E2E2] py-2 text-xs font-semibold text-[#555] hover:bg-[#F7F7F5]"
+                >
+                  {featuresExpanded ? (
+                    <>Tampilkan Ringkas <ChevronUp className="h-3.5 w-3.5" /></>
+                  ) : (
+                    <>Lihat Semua Fitur <ChevronDown className="h-3.5 w-3.5" /></>
+                  )}
+                </button>
+              )}
             </div>
           )}
 
-          <div className="mb-6">
-            <h3 className="text-sm font-bold mb-3">Jenis Akses</h3>
-            <div className="flex gap-3 flex-wrap">
-              {accountTypeOptions.map((option) => {
-                const active = normalizeAccountType(activeAccountType) === option.code
-                const disabled = option.stock <= 0
-
-                return (
-                  <button
-                    key={option.code}
-                    onClick={() => {
-                      if (disabled) return
-                      setAccountType(option.code)
-                    }}
-                    disabled={disabled}
-                    className={`flex-1 min-w-[180px] p-4 rounded-2xl border-2 transition-all text-left ${
-                      disabled
-                        ? 'border-[#E5E7EB] bg-[#F9FAFB] opacity-60 cursor-not-allowed'
-                        : active
-                          ? 'border-[#FF5733] bg-[#FFF3EF]'
-                          : 'border-[#EBEBEB] bg-white hover:border-[#ccc]'
-                    }`}
-                  >
-                    <div className="text-sm font-bold mb-1">{formatAccountTypeLabel(option.code)} Access</div>
-                    <div className="text-xs text-[#888]">{getAccountTypeDescription(option.code, sharedNote, privateNote)}</div>
-                    <div className={`text-[11px] font-semibold mt-2 ${disabled ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>
-                      {disabled ? 'Stok habis' : `Stok tersedia: ${option.stock} item`}
-                    </div>
-                  </button>
-                )
-              })}
+          {/* Account Type Selector (credential only) */}
+          {showAccountTypeSelector && (
+            <div className="mb-6">
+              <h3 className="text-sm font-bold mb-3">Jenis Akses</h3>
+              <div className="flex gap-3 flex-wrap">
+                {accountTypeOptions.map((option) => {
+                  const active = normalizeAccountType(activeAccountType) === option.code
+                  const disabled = option.stock <= 0
+                  const label = formatAccountTypeLabel(option.code)
+                  return (
+                    <button
+                      key={option.code}
+                      onClick={() => { if (disabled) return; setAccountType(option.code) }}
+                      disabled={disabled}
+                      className={`flex-1 min-w-[140px] p-3 rounded-2xl border-2 transition-all text-left ${
+                        disabled
+                          ? 'border-[#E5E7EB] bg-[#F9FAFB] opacity-60 cursor-not-allowed'
+                          : active
+                            ? 'border-[#FF5733] bg-[#FFF3EF]'
+                            : 'border-[#EBEBEB] bg-white hover:border-[#ccc]'
+                      }`}
+                    >
+                      <div className="text-sm font-bold mb-1">{label}</div>
+                      <div className={`text-[11px] font-semibold ${disabled ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>
+                        {disabled ? 'Stok habis' : `${option.stock} item`}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
+          {/* Price Grid */}
           <div className="mb-8">
             <h3 className="text-sm font-bold mb-3">Pilih Paket</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {filteredPrices.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-[#D9D9D9] bg-white p-4 text-sm text-[#6B7280] col-span-full">
-                  Belum ada paket aktif untuk jenis akses ini.
+                  {showAccountTypeSelector
+                    ? 'Belum ada paket aktif untuk jenis akses ini.'
+                    : 'Belum ada paket tersedia untuk produk ini.'}
                 </div>
               ) : (
                 filteredPrices.map((price) => {
@@ -514,14 +487,10 @@ export default function PremAppsProductDetailPage() {
                   const savingsText = price.savings_text?.trim() || ''
                   const stockCount = priceStockByID.get(price.id) || 0
                   const disabled = stockCount <= 0
-
                   return (
                     <button
                       key={price.id}
-                      onClick={() => {
-                        if (disabled) return
-                        setSelectedPrice(price)
-                      }}
+                      onClick={() => { if (disabled) return; setSelectedPrice(price) }}
                       disabled={disabled}
                       className={`p-4 rounded-2xl border-2 transition-all text-center ${
                         disabled
@@ -549,14 +518,14 @@ export default function PremAppsProductDetailPage() {
                 })
               )}
             </div>
-
             {filteredPrices.length > 0 && inStockFilteredPrices.length === 0 && (
               <div className="mt-3 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-xs font-semibold text-[#B91C1C]">
-                Semua paket untuk jenis akses ini sedang habis. Pilih jenis akses lain atau tunggu restock.
+                Semua paket sedang habis. Tunggu restock atau hubungi admin.
               </div>
             )}
           </div>
 
+          {/* Specs */}
           {specItems.length > 0 && (
             <div className="mb-8">
               <h3 className="text-sm font-bold mb-3">Spesifikasi</h3>
@@ -571,28 +540,39 @@ export default function PremAppsProductDetailPage() {
             </div>
           )}
 
+          {/* FAQ */}
           {faqItems.length > 0 && (
             <div className="mb-8">
               <h3 className="text-sm font-bold mb-3">FAQ</h3>
               <div className="space-y-3">
-                {faqItems.map((faq, index) => (
-                  <article
-                    key={`${faq.question}-${index}`}
-                    className="rounded-2xl border border-[#EBEBEB] bg-white p-4"
-                  >
+                {visibleFaqItems.map((faq, index) => (
+                  <article key={`${faq.question}-${index}`}
+                    className="rounded-2xl border border-[#EBEBEB] bg-white p-4">
                     <h4 className="text-sm font-bold text-[#141414] mb-1">{faq.question}</h4>
                     <p className="text-xs text-[#666] leading-relaxed">{faq.answer}</p>
                   </article>
                 ))}
               </div>
+              {hasMoreFaq && (
+                <button
+                  type="button"
+                  onClick={() => setFaqExpanded((prev) => !prev)}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl border border-[#E2E2E2] py-2 text-xs font-semibold text-[#555] hover:bg-[#F7F7F5]"
+                >
+                  {faqExpanded ? (
+                    <>Tampilkan Ringkas <ChevronUp className="h-3.5 w-3.5" /></>
+                  ) : (
+                    <>Lihat Semua FAQ <ChevronDown className="h-3.5 w-3.5" /></>
+                  )}
+                </button>
+              )}
             </div>
           )}
 
-          <div
-            className={`fixed inset-x-0 bottom-3 z-[60] pointer-events-none transition-all duration-200 md:bottom-20 ${
-              hideFloatingCta ? 'translate-y-[120%] opacity-0' : 'translate-y-0 opacity-100'
-            }`}
-          >
+          {/* Floating CTA */}
+          <div className={`fixed inset-x-0 bottom-3 z-[60] pointer-events-none transition-all duration-200 md:bottom-20 ${
+            hideFloatingCta ? 'translate-y-[120%] opacity-0' : 'translate-y-0 opacity-100'
+          }`}>
             <div className="mx-auto w-full max-w-4xl px-3 sm:px-6 lg:px-8">
               <div className="pointer-events-auto rounded-2xl border border-[#EBEBEB] bg-white p-3 shadow-[0_10px_28px_rgba(20,20,20,0.16)] sm:p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
@@ -601,27 +581,14 @@ export default function PremAppsProductDetailPage() {
                     <div className="text-xl font-extrabold">
                       {effectiveSelectedPrice ? formatRupiah(effectiveSelectedPrice.price) : '-'}
                     </div>
-                    {!!priceOriginalText && (
-                      <div className="hidden text-xs text-[#9CA3AF] line-through sm:block">{priceOriginalText}</div>
-                    )}
-                    {!!pricePerDayText && <div className="hidden text-xs text-[#4B5563] mt-1 sm:block">{pricePerDayText}</div>}
-                    {!!discountBadgeText && (
-                      <div className="hidden text-[11px] font-semibold text-[#0F766E] mt-1 sm:block">{discountBadgeText}</div>
-                    )}
                   </div>
-
                   <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
                     {showWaButton && waLink && (
-                      <a
-                        href={waLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="hidden rounded-full border border-[#D1D5DB] px-4 py-3 text-center text-sm font-semibold text-[#111827] sm:inline-flex"
-                      >
+                      <a href={waLink} target="_blank" rel="noreferrer"
+                        className="hidden rounded-full border border-[#D1D5DB] px-4 py-3 text-center text-sm font-semibold text-[#111827] sm:inline-flex">
                         {product.whatsapp_button_text?.trim() || 'Tanya via WhatsApp'}
                       </a>
                     )}
-
                     <button
                       onClick={handleBuy}
                       disabled={!effectiveSelectedPrice || !hasAnyStock}

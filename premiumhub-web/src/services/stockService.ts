@@ -22,12 +22,17 @@ export interface AdminBulkStockAccount {
   email: string
   password: string
   profile_name?: string
+  delivery_value?: string
+  delivery_secret?: string
 }
 
 export interface AdminBulkStockPayload {
   product_id: string
   account_type: string
   duration_month?: number
+  fulfillment_type?: string
+  delivery_label?: string
+  delivery_note?: string
   accounts: AdminBulkStockAccount[]
 }
 

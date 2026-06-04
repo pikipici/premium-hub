@@ -70,9 +70,11 @@ func TestStockService_AccountTypeValidationAgainstProductPrices(t *testing.T) {
 		ProductID:   product.ID.String(),
 		AccountType: "private",
 		Accounts: []struct {
-			Email       string `json:"email"`
-			Password    string `json:"password"`
-			ProfileName string `json:"profile_name"`
+			Email          string `json:"email"`
+		Password       string `json:"password"`
+		ProfileName    string `json:"profile_name"`
+		DeliveryValue  string `json:"delivery_value"`
+		DeliverySecret string `json:"delivery_secret"`
 		}{
 			{Email: "bulk-empty-pass@example.com", Password: ""},
 		},

@@ -99,9 +99,9 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	stockSvc := service.NewStockService(stockRepo, productRepo).
 		SetAccountTypeRepo(accountTypeRepo).
 		SetStockCredentialCipher(stockCredentialCipher)
-	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
+	claimSvc := service.NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo, productRepo)
 	paymentSvc := service.NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, nil)
-	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, nil)
+	walletSvc := service.NewWalletService(cfg, userRepo, walletRepo, notifRepo, productRepo, nil)
 	walletReconSvc := service.NewWalletReconciliationService(walletRepo)
 	walletWithdrawalRepo := repository.NewWalletWithdrawalRepo(db)
 	walletWithdrawalSvc := service.NewWalletWithdrawalService(cfg, walletWithdrawalRepo, walletRepo, notifRepo)

@@ -331,8 +331,16 @@ func (s *OrderService) ConfirmPayment(orderID uuid.UUID) error {
 	order.OrderStatus = "active"
 	order.PaidAt = &now
 
-	// Assign stock
-	stock, err := s.stockRepo.FindAvailable(order.Price.ProductID, order.Price.AccountType, order.Price.Duration)
+	fulfillmentType := model.FulfillmentTypeCredential
+	if s.priceRepo != nil {
+		if product, err := s.priceRepo.FindByID(order.Price.ProductID); err == nil {
+			if product.FulfillmentType != "" {
+				fulfillmentType = product.FulfillmentType
+			}
+		}
+	}
+
+	stock, err := s.stockRepo.FindAvailable(order.Price.ProductID, order.Price.AccountType, order.Price.Duration, fulfillmentType)
 	if err != nil {
 		return errors.New("stok tidak tersedia")
 	}

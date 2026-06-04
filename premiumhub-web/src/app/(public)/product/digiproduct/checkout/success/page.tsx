@@ -3,6 +3,7 @@
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { formatRupiah } from '@/lib/utils'
+import { isCredentialFulfillment as checkCredential } from '@/lib/fulfillment'
 import { orderService } from '@/services/orderService'
 import type { Order } from '@/types/order'
 import {
@@ -118,7 +119,7 @@ function OrderSuksesContent() {
 
   const maskedPassword = '••••••••••••'
   const fulfillmentType = (order?.stock?.fulfillment_type || 'credential').trim()
-  const isCredentialFulfillment = fulfillmentType === 'credential'
+  const isCredentialFulfillment = checkCredential(fulfillmentType)
   const primaryLabel = isCredentialFulfillment ? 'Email' : order?.stock?.delivery_label || 'Detail Delivery'
   const primaryValue = isCredentialFulfillment ? order?.stock?.email || '-' : order?.stock?.delivery_value || order?.stock?.email || '-'
   const secretLabel = isCredentialFulfillment ? 'Password' : 'Secret / Kode'
@@ -307,7 +308,7 @@ function OrderSuksesContent() {
 
               <div className="flex items-center justify-center gap-1.5 px-5 pb-4 text-[10px] text-[#B3B2AD] sm:gap-2 sm:px-6 sm:pb-5 sm:text-[11px]">
                 <ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                Kredensial bersifat rahasia. Jangan bagikan ke siapapun.
+                Detail akses bersifat rahasia. Jangan bagikan ke siapapun.
               </div>
             </div>
           )}

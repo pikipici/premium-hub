@@ -300,13 +300,18 @@ func (s *StockService) Create(input CreateStockInput) (*model.Stock, error) {
 }
 
 type BulkStockInput struct {
-	ProductID     string `json:"product_id" binding:"required"`
-	AccountType   string `json:"account_type" binding:"required"`
-	DurationMonth int    `json:"duration_month"`
-	Accounts      []struct {
-		Email       string `json:"email"`
-		Password    string `json:"password"`
-		ProfileName string `json:"profile_name"`
+	ProductID       string `json:"product_id" binding:"required"`
+	AccountType     string `json:"account_type" binding:"required"`
+	DurationMonth   int    `json:"duration_month"`
+	FulfillmentType string `json:"fulfillment_type"`
+	DeliveryLabel   string `json:"delivery_label"`
+	DeliveryNote    string `json:"delivery_note"`
+	Accounts        []struct {
+		Email          string `json:"email"`
+		Password       string `json:"password"`
+		ProfileName    string `json:"profile_name"`
+		DeliveryValue  string `json:"delivery_value"`
+		DeliverySecret string `json:"delivery_secret"`
 	} `json:"accounts" binding:"required,min=1"`
 }
 
@@ -326,31 +331,37 @@ func (s *StockService) CreateBulk(input BulkStockInput) (int, error) {
 		return 0, err
 	}
 
+	fulfillmentType := normalizeFulfillmentType(input.FulfillmentType)
+
 	var stocks []model.Stock
 	for index, acc := range input.Accounts {
-		email := strings.TrimSpace(acc.Email)
-		if email == "" {
-			return 0, fmt.Errorf("email akun bulk baris %d wajib diisi", index+1)
-		}
-
-		password := strings.TrimSpace(acc.Password)
-		if password == "" {
-			return 0, fmt.Errorf("password akun bulk baris %d wajib diisi", index+1)
-		}
-
-		encPw, err := s.encryptStockPassword(password)
+		var email, encryptedPw, deliveryLabel, deliveryValue, deliverySecret, deliveryNote string
+		email, encryptedPw, deliveryLabel, deliveryValue, deliverySecret, deliveryNote, err = s.prepareStockDelivery(
+			fulfillmentType,
+			acc.Email,
+			acc.Password,
+			input.DeliveryLabel,
+			acc.DeliveryValue,
+			acc.DeliverySecret,
+			input.DeliveryNote,
+		)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("akun bulk baris %d: %w", index+1, err)
 		}
 
 		stocks = append(stocks, model.Stock{
-			ProductID:     productID,
-			AccountType:   accountType,
-			DurationMonth: durationMonth,
-			Email:         email,
-			Password:      encPw,
-			ProfileName:   strings.TrimSpace(acc.ProfileName),
-			Status:        "available",
+			ProductID:       productID,
+			AccountType:     accountType,
+			DurationMonth:   durationMonth,
+			Email:           email,
+			Password:        encryptedPw,
+			FulfillmentType: fulfillmentType,
+			DeliveryLabel:   deliveryLabel,
+			DeliveryValue:   deliveryValue,
+			DeliverySecret:  deliverySecret,
+			DeliveryNote:    deliveryNote,
+			ProfileName:     strings.TrimSpace(acc.ProfileName),
+			Status:          "available",
 		})
 	}
 

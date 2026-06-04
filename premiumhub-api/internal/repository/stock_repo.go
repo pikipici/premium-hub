@@ -37,12 +37,23 @@ func (r *StockRepo) CreateBulk(stocks []model.Stock) error {
 	return r.db.Create(&stocks).Error
 }
 
-func (r *StockRepo) FindAvailable(productID uuid.UUID, accountType string, durationMonth int) (*model.Stock, error) {
+func (r *StockRepo) FindAvailable(productID uuid.UUID, accountType string, durationMonth int, fulfillmentType string) (*model.Stock, error) {
 	var s model.Stock
 
+	baseQuery := func() *gorm.DB {
+		q := applyUsableCredentialScope(r.db).
+			Where("product_id = ? AND account_type = ? AND status = ?", productID, accountType, "available")
+		if fulfillmentType == model.FulfillmentTypeCredential || fulfillmentType == "" {
+			q = q.Where("(fulfillment_type = ? OR fulfillment_type = '' OR fulfillment_type IS NULL)", model.FulfillmentTypeCredential)
+		} else {
+			q = q.Where("fulfillment_type = ?", fulfillmentType)
+		}
+		return q
+	}
+
 	if durationMonth > 0 {
-		err := applyUsableCredentialScope(r.db).
-			Where("product_id = ? AND account_type = ? AND status = ? AND duration_month = ?", productID, accountType, "available", durationMonth).
+		err := baseQuery().
+			Where("duration_month = ?", durationMonth).
 			Order("created_at ASC").
 			First(&s).Error
 		if err == nil {
@@ -53,8 +64,8 @@ func (r *StockRepo) FindAvailable(productID uuid.UUID, accountType string, durat
 		}
 	}
 
-	err := applyUsableCredentialScope(r.db).
-		Where("product_id = ? AND account_type = ? AND status = ? AND (duration_month = 0 OR duration_month IS NULL)", productID, accountType, "available").
+	err := baseQuery().
+		Where("(duration_month = 0 OR duration_month IS NULL)").
 		Order("created_at ASC").
 		First(&s).Error
 	if err == nil {
@@ -68,9 +79,7 @@ func (r *StockRepo) FindAvailable(productID uuid.UUID, accountType string, durat
 		return nil, err
 	}
 
-	// Fallback terakhir untuk data lama yang mungkin belum punya duration mapping rapi.
-	err = applyUsableCredentialScope(r.db).
-		Where("product_id = ? AND account_type = ? AND status = ?", productID, accountType, "available").
+	err = baseQuery().
 		Order("created_at ASC").
 		First(&s).Error
 	if err != nil {

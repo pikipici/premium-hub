@@ -613,9 +613,11 @@ func TestStockService_AllBranches(t *testing.T) {
 	}
 
 	if _, err := svc.CreateBulk(BulkStockInput{ProductID: "invalid", AccountType: "shared", Accounts: []struct {
-		Email       string `json:"email"`
-		Password    string `json:"password"`
-		ProfileName string `json:"profile_name"`
+		Email          string `json:"email"`
+		Password       string `json:"password"`
+		ProfileName    string `json:"profile_name"`
+		DeliveryValue  string `json:"delivery_value"`
+		DeliverySecret string `json:"delivery_secret"`
 	}{{Email: "a", Password: "b"}}}); err == nil || !strings.Contains(err.Error(), "product_id tidak valid") {
 		t.Fatalf("expected invalid bulk product_id, got: %v", err)
 	}
@@ -624,9 +626,11 @@ func TestStockService_AllBranches(t *testing.T) {
 		ProductID:   product.ID.String(),
 		AccountType: "private",
 		Accounts: []struct {
-			Email       string `json:"email"`
-			Password    string `json:"password"`
-			ProfileName string `json:"profile_name"`
+			Email          string `json:"email"`
+			Password       string `json:"password"`
+			ProfileName    string `json:"profile_name"`
+			DeliveryValue  string `json:"delivery_value"`
+			DeliverySecret string `json:"delivery_secret"`
 		}{
 			{Email: "b1@x.com", Password: "123456", ProfileName: "b1"},
 			{Email: "b2@x.com", Password: "123456", ProfileName: "b2"},
@@ -643,9 +647,11 @@ func TestStockService_AllBranches(t *testing.T) {
 		t.Fatalf("drop stocks table bulk: %v", err)
 	}
 	if _, err := svcBulkErr.CreateBulk(BulkStockInput{ProductID: productBulkErr.ID.String(), AccountType: "shared", Accounts: []struct {
-		Email       string `json:"email"`
-		Password    string `json:"password"`
-		ProfileName string `json:"profile_name"`
+		Email          string `json:"email"`
+		Password       string `json:"password"`
+		ProfileName    string `json:"profile_name"`
+		DeliveryValue  string `json:"delivery_value"`
+		DeliverySecret string `json:"delivery_secret"`
 	}{{Email: "a@x.com", Password: "12345"}}}); err == nil || !strings.Contains(err.Error(), "gagal menambah stok bulk") {
 		t.Fatalf("expected bulk repo error, got: %v", err)
 	}
@@ -963,7 +969,7 @@ func TestPaymentService_AllBranches(t *testing.T) {
 		DuitkuAPIKey:       "DK_test",
 		FrontendURL:        "https://example.com",
 	}
-	walletSvc := NewWalletService(cfg, userRepo, walletRepo, notifRepo, fake)
+	walletSvc := NewWalletService(cfg, userRepo, walletRepo, notifRepo, productRepo, fake)
 	svc := NewPaymentServiceWithGateway(cfg, orderRepo, orderSvc, fake).SetWalletService(walletSvc)
 	if svc == nil {
 		t.Fatalf("NewPaymentServiceWithGateway should return instance")
@@ -1116,7 +1122,8 @@ func TestClaimService_AllBranches(t *testing.T) {
 	orderRepo := repository.NewOrderRepo(db)
 	stockRepo := repository.NewStockRepo(db)
 	notifRepo := repository.NewNotificationRepo(db)
-	svc := NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo)
+	productRepo := repository.NewProductRepo(db)
+	svc := NewClaimService(claimRepo, orderRepo, stockRepo, notifRepo, productRepo)
 	if svc == nil {
 		t.Fatalf("NewClaimService should return instance")
 	}
@@ -1168,7 +1175,7 @@ func TestClaimService_AllBranches(t *testing.T) {
 	if err := dbCreateErr.Model(&model.Order{}).Where("id = ?", orderCreateErr.ID).Update("expires_at", time.Now().Add(1*time.Hour)).Error; err != nil {
 		t.Fatalf("set claim create err expires: %v", err)
 	}
-	svcCreateErr := NewClaimService(repository.NewClaimRepo(dbCreateErr), repository.NewOrderRepo(dbCreateErr), repository.NewStockRepo(dbCreateErr), repository.NewNotificationRepo(dbCreateErr))
+	svcCreateErr := NewClaimService(repository.NewClaimRepo(dbCreateErr), repository.NewOrderRepo(dbCreateErr), repository.NewStockRepo(dbCreateErr), repository.NewNotificationRepo(dbCreateErr), repository.NewProductRepo(dbCreateErr))
 	if err := dbCreateErr.Migrator().DropTable(&model.Claim{}); err != nil {
 		t.Fatalf("drop claims table: %v", err)
 	}

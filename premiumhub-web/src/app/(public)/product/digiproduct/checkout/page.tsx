@@ -9,6 +9,7 @@ import { CreditCard, Landmark, QrCode, ShieldCheck, Wallet, Zap } from 'lucide-r
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatRupiah } from '@/lib/utils'
+import { fulfillmentTypeLabel, isCredentialFulfillment } from '@/lib/fulfillment'
 import { orderService } from '@/services/orderService'
 import { paymentService } from '@/services/paymentService'
 import { walletService } from '@/services/walletService'
@@ -42,11 +43,9 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!authReady) return
-
     if (!isAuthenticated && checkoutMethod === 'wallet') {
       setCheckoutMethod('duitku')
     }
-
     if (!item && !redirectingAfterCheckout) {
       router.replace('/product/digiproduct')
     }
@@ -54,27 +53,18 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!authReady || !isAuthenticated) return
-
     let cancelled = false
     setWalletLoading(true)
-
     walletService.getBalance()
       .then((res) => {
         if (cancelled || !res.success) return
         setWalletBalance(res.data.balance)
       })
-      .catch(() => {
-        // keep silent; checkout still can proceed via gateway
-      })
+      .catch(() => {})
       .finally(() => {
-        if (!cancelled) {
-          setWalletLoading(false)
-        }
+        if (!cancelled) setWalletLoading(false)
       })
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [authReady, isAuthenticated, setWalletBalance])
 
   const walletSufficient = useMemo(() => {
@@ -84,12 +74,10 @@ export default function CheckoutPage() {
 
   const handleCheckout = async () => {
     if (!item) return
-
     if (checkoutMethod === 'wallet' && (!walletSufficient || walletLoading)) {
       setError('Saldo wallet belum cukup buat checkout ini. Topup dulu ya.')
       return
     }
-
     const email = guestEmail.trim()
     if (!isAuthenticated && (!email || !email.includes('@'))) {
       setError('Isi email aktif dulu buat menerima detail order.')
@@ -98,42 +86,21 @@ export default function CheckoutPage() {
 
     setLoading(true)
     setError('')
-
     try {
       const orderRes = isAuthenticated
-        ? await orderService.create({
-            price_id: item.priceId,
-            payment_method: checkoutMethod,
-          })
-        : await orderService.createGuest({
-            price_id: item.priceId,
-            payment_method: 'duitku',
-            email,
-            phone: guestPhone.trim(),
-          })
-      if (!orderRes.success) {
-        setError(orderRes.message)
-        return
-      }
+        ? await orderService.create({ price_id: item.priceId, payment_method: checkoutMethod })
+        : await orderService.createGuest({ price_id: item.priceId, payment_method: 'duitku', email, phone: guestPhone.trim() })
+      if (!orderRes.success) { setError(orderRes.message); return }
 
-      const paymentPayload = {
-        order_id: orderRes.data.id,
-        payment_method: checkoutMethod === 'wallet' ? 'wallet' : duitkuMethod,
-      }
+      const paymentPayload = { order_id: orderRes.data.id, payment_method: checkoutMethod === 'wallet' ? 'wallet' : duitkuMethod }
       const payRes = isAuthenticated
         ? await paymentService.create(paymentPayload)
         : await paymentService.createGuest({ ...paymentPayload, payment_method: duitkuMethod, token: orderRes.data.guest_access_token || '' })
-      if (!payRes.success) {
-        setError(payRes.message)
-        return
-      }
+      if (!payRes.success) { setError(payRes.message); return }
 
       const payment = payRes.data
-
       if (payment.provider === 'wallet' || payment.payment_method === 'wallet') {
-        if (typeof payment.wallet_balance_after === 'number') {
-          setWalletBalance(payment.wallet_balance_after)
-        }
+        if (typeof payment.wallet_balance_after === 'number') setWalletBalance(payment.wallet_balance_after)
         setRedirectingAfterCheckout(true)
         clearCart()
         router.push(`/product/digiproduct/checkout/success?id=${orderRes.data.id}`)
@@ -168,6 +135,10 @@ export default function CheckoutPage() {
 
   if (!authReady || !item) return null
 
+  const showCredentialFields = isCredentialFulfillment(item.fulfillmentType)
+  const accessLabel = showCredentialFields ? 'Jenis Akses' : 'Tipe Produk'
+  const accessValue = showCredentialFields ? item.accountType : fulfillmentTypeLabel(item.fulfillmentType)
+
   return (
     <>
       <Navbar />
@@ -183,13 +154,15 @@ export default function CheckoutPage() {
                 <span className="font-semibold">{item.productName}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#888]">Jenis Akses</span>
-                <span className="font-semibold capitalize">{item.accountType}</span>
+                <span className="text-[#888]">{accessLabel}</span>
+                <span className="font-semibold capitalize">{accessValue}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-[#888]">Paket</span>
-                <span className="font-semibold">{item.duration} Bulan</span>
-              </div>
+              {showCredentialFields && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#888]">Paket</span>
+                  <span className="font-semibold">{item.duration} Bulan</span>
+                </div>
+              )}
               <div className="border-t border-[#EBEBEB] pt-3 flex justify-between">
                 <span className="font-bold">Total</span>
                 <span className="text-xl font-extrabold text-[#FF5733]">{formatRupiah(item.price)}</span>
@@ -206,23 +179,15 @@ export default function CheckoutPage() {
               <div className="space-y-3">
                 <label className="block text-xs font-bold text-[#555]">
                   Email aktif
-                  <input
-                    type="email"
-                    value={guestEmail}
-                    onChange={(event) => setGuestEmail(event.target.value)}
+                  <input type="email" value={guestEmail} onChange={(event) => setGuestEmail(event.target.value)}
                     placeholder="nama@email.com"
-                    className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]"
-                  />
+                    className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
                 </label>
                 <label className="block text-xs font-bold text-[#555]">
                   WhatsApp opsional
-                  <input
-                    type="tel"
-                    value={guestPhone}
-                    onChange={(event) => setGuestPhone(event.target.value)}
+                  <input type="tel" value={guestPhone} onChange={(event) => setGuestPhone(event.target.value)}
                     placeholder="08xxxxxxxxxx"
-                    className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]"
-                  />
+                    className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
                 </label>
               </div>
             </div>
@@ -230,15 +195,9 @@ export default function CheckoutPage() {
 
           <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6 mb-6 space-y-3">
             <h3 className="text-sm font-bold mb-1">Metode Pembayaran</h3>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setCheckoutMethod('duitku')}
-                className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                  checkoutMethod === 'duitku' ? 'border-[#FF5733] bg-[#FFF3EF]' : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D8]'
-                }`}
-              >
+              <button type="button" onClick={() => setCheckoutMethod('duitku')}
+                className={`w-full rounded-xl border p-4 text-left transition-colors ${checkoutMethod === 'duitku' ? 'border-[#FF5733] bg-[#FFF3EF]' : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D8]'}`}>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-[#F7F7F5] flex items-center justify-center">
                     <CreditCard className="w-5 h-5 text-[#141414]" />
@@ -249,17 +208,8 @@ export default function CheckoutPage() {
                   </div>
                 </div>
               </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (isAuthenticated) setCheckoutMethod('wallet')
-                }}
-                disabled={!isAuthenticated}
-                className={`w-full rounded-xl border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                  checkoutMethod === 'wallet' ? 'border-[#FF5733] bg-[#FFF3EF]' : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D8]'
-                }`}
-              >
+              <button type="button" onClick={() => { if (isAuthenticated) setCheckoutMethod('wallet') }} disabled={!isAuthenticated}
+                className={`w-full rounded-xl border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${checkoutMethod === 'wallet' ? 'border-[#FF5733] bg-[#FFF3EF]' : 'border-[#EBEBEB] bg-white hover:border-[#D8D8D8]'}`}>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-[#F7F7F5] flex items-center justify-center">
                     <Wallet className="w-5 h-5 text-[#141414]" />
@@ -279,20 +229,9 @@ export default function CheckoutPage() {
                 <div className="text-[11px] font-bold uppercase tracking-wide text-[#777]">Pilih channel pembayaran</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {DUITKU_METHOD_OPTIONS.map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setDuitkuMethod(option.key)}
-                      className={`rounded-lg border px-3 py-2 text-left transition-colors ${
-                        duitkuMethod === option.key
-                          ? 'border-[#141414] bg-white'
-                          : 'border-[#E5E5E5] bg-white/70 hover:border-[#CFCFCF]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 text-sm font-semibold text-[#141414]">
-                        {option.icon}
-                        {option.label}
-                      </div>
+                    <button key={option.key} type="button" onClick={() => setDuitkuMethod(option.key)}
+                      className={`rounded-lg border px-3 py-2 text-left transition-colors ${duitkuMethod === option.key ? 'border-[#141414] bg-white' : 'border-[#E5E5E5] bg-white/70 hover:border-[#CFCFCF]'}`}>
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[#141414]">{option.icon}{option.label}</div>
                       <div className="text-[11px] text-[#888] mt-1">{option.hint}</div>
                     </button>
                   ))}
@@ -331,12 +270,9 @@ export default function CheckoutPage() {
           <button
             onClick={handleCheckout}
             disabled={redirectingAfterCheckout || loading || (checkoutMethod === 'wallet' && (walletLoading || !walletSufficient))}
-            className="w-full py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm"
-          >
+            className="w-full py-4 bg-[#FF5733] text-white font-bold rounded-full hover:bg-[#e64d2e] transition-all disabled:opacity-50 text-sm">
             {loading
-              ? checkoutMethod === 'wallet'
-                ? 'Memproses Pembayaran Wallet...'
-                : 'Memproses Pembayaran...'
+              ? checkoutMethod === 'wallet' ? 'Memproses Pembayaran Wallet...' : 'Memproses Pembayaran...'
               : checkoutMethod === 'wallet'
                 ? `Bayar via Wallet ${formatRupiah(item.price)}`
                 : `Buat Invoice ${formatRupiah(item.price)}`}

@@ -7,6 +7,7 @@ interface CartItem {
   duration: number
   accountType: string
   price: number
+  fulfillmentType?: string
 }
 
 interface CartState {

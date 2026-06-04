@@ -7,6 +7,7 @@ import { AlertTriangle, Check, Copy, Eye, EyeOff, Loader2, PackageOpen, RefreshC
 
 import { orderService } from '@/services/orderService'
 import { productService } from '@/services/productService'
+import { isCredentialFulfillment, fulfillmentTypeLabel } from '@/lib/fulfillment'
 import { useVisibilityRefresh } from '@/lib/hooks/useVisibilityRefresh'
 import { DashboardSkeleton } from '@/components/shared/DashboardSkeleton'
 import type { Order } from '@/types/order'
@@ -72,19 +73,6 @@ function accountTypeLabel(value?: string | null) {
     .join(' ')
 }
 
-function fulfillmentTypeLabel(value?: string | null) {
-  const normalized = (value || '').trim().toLowerCase()
-  if (normalized === 'license_key') return 'License Key'
-  if (normalized === 'voucher_code') return 'Voucher Code'
-  if (normalized === 'download_link') return 'Download Link'
-  if (normalized === 'manual') return 'Manual Delivery'
-  return 'Credential'
-}
-
-function isCredentialFulfillment(value?: string | null) {
-  const normalized = (value || '').trim().toLowerCase()
-  return !normalized || normalized === 'credential'
-}
 
 export default function AkunAktifPage() {
   const [loading, setLoading] = useState(true)
