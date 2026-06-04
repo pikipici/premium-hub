@@ -4,6 +4,7 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { accountTypeService } from '@/services/accountTypeService'
 import { orderService, type AdminOrderStatus } from '@/services/orderService'
+import { isCredentialFulfillment } from '@/lib/fulfillment'
 import { productService } from '@/services/productService'
 import type { AccountType } from '@/types/accountType'
 import { ListPagination } from '@/components/shared/list-pagination'
@@ -854,28 +855,49 @@ export default function OrderPage() {
                 <span className="mobile-card-value">{formatDate(selectedOrder.created_at)}</span>
               </div>
 
-              {selectedOrder.stock && (
-                <>
-                  <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+              {selectedOrder.stock && (() => {
+                const stockFulfillment = selectedOrder.stock.fulfillment_type || 'credential'
+                const isCredential = isCredentialFulfillment(stockFulfillment)
 
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>Akun Terkait</div>
+                return (
+                  <>
+                    <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
 
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Email Akun</span>
-                    <span className="mobile-card-value">{selectedOrder.stock.email}</span>
-                  </div>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>Detail Stok</div>
 
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Profile</span>
-                    <span className="mobile-card-value">{selectedOrder.stock.profile_name || '-'}</span>
-                  </div>
+                    {isCredential ? (
+                      <>
+                        <div className="mobile-card-row">
+                          <span className="mobile-card-label">Email / Identitas</span>
+                          <span className="mobile-card-value">{selectedOrder.stock.email || '-'}</span>
+                        </div>
+                        <div className="mobile-card-row">
+                          <span className="mobile-card-label">Profile</span>
+                          <span className="mobile-card-value">{selectedOrder.stock.profile_name || '-'}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="mobile-card-row">
+                          <span className="mobile-card-label">{selectedOrder.stock.delivery_label || 'Delivery'}</span>
+                          <span className="mobile-card-value">{selectedOrder.stock.delivery_value || '-'}</span>
+                        </div>
+                        {selectedOrder.stock.delivery_note && (
+                          <div className="mobile-card-row">
+                            <span className="mobile-card-label">Catatan</span>
+                            <span className="mobile-card-value">{selectedOrder.stock.delivery_note}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
 
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Expired</span>
-                    <span className="mobile-card-value">{formatDate(selectedOrder.stock.expires_at)}</span>
-                  </div>
-                </>
-              )}
+                    <div className="mobile-card-row">
+                      <span className="mobile-card-label">Expired</span>
+                      <span className="mobile-card-value">{formatDate(selectedOrder.stock.expires_at)}</span>
+                    </div>
+                  </>
+                )
+              })()}
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
                 <button className="topbar-btn" onClick={() => setSelectedOrder(null)}>
