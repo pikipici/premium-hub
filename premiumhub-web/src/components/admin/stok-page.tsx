@@ -3,6 +3,10 @@
 import { ADMIN_DENSE_PAGE_LIMIT, LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  AdminDialog,
+  Button,
+} from '@/components/admin/admin-ui'
 import { accountTypeService } from '@/services/accountTypeService'
 import { productService } from '@/services/productService'
 import {
@@ -1219,14 +1223,14 @@ export default function StokPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <input
               type="text"
-              className="form-input"
+              className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold w-full"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Cari email / produk / tipe"
             />
 
             <select
-              className="form-select"
+              className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
               value={productFilter}
               onChange={(event) => {
                 setProductFilter(event.target.value)
@@ -1242,7 +1246,7 @@ export default function StokPage() {
             </select>
 
             <select
-              className="form-select"
+              className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
               value={statusFilter}
               onChange={(event) => {
                 setStatusFilter(event.target.value as StockFilter)
@@ -1426,40 +1430,26 @@ export default function StokPage() {
         </button>
       </div>
 
-      {(modalMode === 'create' || modalMode === 'edit') && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(20,20,20,.35)',
-            zIndex: 120,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 12,
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: 560,
-              maxHeight: '90vh',
-              overflow: 'auto',
-            }}
-          >
-            <div className="card-header">
-              <h2>{modalMode === 'create' ? 'Tambah Akun Stok' : 'Edit Akun Stok'}</h2>
-              <button className="action-btn" onClick={closeModal} disabled={saving}>
-                Tutup
-              </button>
-            </div>
-
-            <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+      <AdminDialog
+        open={modalMode === 'create' || modalMode === 'edit'}
+        onOpenChange={(open) => { if (!open) closeModal() }}
+        title={modalMode === 'create' ? 'Tambah Akun Stok' : 'Edit Akun Stok'}
+        description="Kelola stok akun individual untuk produk DigiProduct."
+        className="sm:max-w-xl"
+        footer={
+          <>
+            <Button variant="outline" onClick={closeModal} disabled={saving}>Batal</Button>
+            <Button className="bg-[#ff5733] text-white hover:bg-[#e84b2b]" onClick={runSingleSave} disabled={saving}>
+              {saving ? 'Menyimpan...' : modalMode === 'create' ? 'Simpan Stok' : 'Update Stok'}
+            </Button>
+          </>
+        }
+      >
+            <div style={{ padding: '4px 0', display: 'grid', gap: 10 }}>
               <div>
-                <label className="form-label">Produk</label>
+                <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Produk</label>
                 <select
-                  className="form-select"
+                  className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                   value={form.product_id}
                   onChange={(event) => {
                     const nextProductID = event.target.value
@@ -1492,9 +1482,9 @@ export default function StokPage() {
               </div>
 
               <div>
-                <label className="form-label">Jenis Akses</label>
+                <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Jenis Akses</label>
                 <select
-                  className="form-select"
+                  className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                   value={form.account_type}
                   onChange={(event) =>
                     setForm((prev) => {
@@ -1528,9 +1518,9 @@ export default function StokPage() {
               </div>
 
               <div>
-                <label className="form-label">Durasi Paket</label>
+                <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Durasi Paket</label>
                 <select
-                  className="form-select"
+                  className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                   value={form.duration_month || ''}
                   onChange={(event) =>
                     setForm((prev) => ({
@@ -1557,9 +1547,9 @@ export default function StokPage() {
               </div>
 
               <div>
-                <label className="form-label">Tipe Fulfillment</label>
+                <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Tipe Fulfillment</label>
                 <select
-                  className="form-select"
+                  className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                   value={activeFulfillmentType}
                   onChange={(event) =>
                     setForm((prev) => ({
@@ -1584,9 +1574,9 @@ export default function StokPage() {
               {activeFulfillmentType === 'credential' ? (
                 <>
                   <div>
-                    <label className="form-label">Email / Identitas Akses</label>
+                    <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Email / Identitas Akses</label>
                     <input
-                      className="form-input"
+                      className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold w-full"
                       value={form.email}
                       onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
                       placeholder="akses@domain.com"
@@ -1594,12 +1584,12 @@ export default function StokPage() {
                   </div>
 
                   <div>
-                    <label className="form-label">
+                    <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">
                       Password / Kode Akses {modalMode === 'edit' ? '(kosongkan jika tidak diganti)' : ''}
                     </label>
                     <input
                       type="password"
-                      className="form-input"
+                      className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold w-full"
                       value={form.password}
                       onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
                       placeholder="Password atau kode akses"
@@ -1607,9 +1597,9 @@ export default function StokPage() {
                   </div>
 
                   <div>
-                    <label className="form-label">Nama Profil (opsional)</label>
+                    <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Nama Profil (opsional)</label>
                     <input
-                      className="form-input"
+                      className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold w-full"
                       value={form.profile_name}
                       onChange={(event) => setForm((prev) => ({ ...prev, profile_name: event.target.value }))}
                       placeholder="Contoh: Profile 1"
@@ -1619,37 +1609,37 @@ export default function StokPage() {
               ) : (
                 <>
                   <div>
-                    <label className="form-label">Label Delivery</label>
+                    <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Label Delivery</label>
                     <input
-                      className="form-input"
+                      className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold w-full"
                       value={form.delivery_label}
                       onChange={(event) => setForm((prev) => ({ ...prev, delivery_label: event.target.value }))}
                       placeholder="Contoh: License Key / Kode Voucher / Link Download"
                     />
                   </div>
                   <div>
-                    <label className="form-label">Delivery Value</label>
+                    <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Delivery Value</label>
                     <input
-                      className="form-input"
+                      className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold w-full"
                       value={form.delivery_value}
                       onChange={(event) => setForm((prev) => ({ ...prev, delivery_value: event.target.value }))}
                       placeholder="Kode, link, atau identitas item yang boleh terlihat"
                     />
                   </div>
                   <div>
-                    <label className="form-label">Secret / Redeem Code (opsional)</label>
+                    <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Secret / Redeem Code (opsional)</label>
                     <input
                       type="password"
-                      className="form-input"
+                      className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold w-full"
                       value={form.delivery_secret}
                       onChange={(event) => setForm((prev) => ({ ...prev, delivery_secret: event.target.value }))}
                       placeholder={modalMode === 'edit' ? 'Kosongkan jika tidak diganti' : 'Kode rahasia jika ada'}
                     />
                   </div>
                   <div>
-                    <label className="form-label">Catatan Delivery</label>
+                    <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Catatan Delivery</label>
                     <textarea
-                      className="form-textarea"
+                      className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                       rows={3}
                       value={form.delivery_note}
                       onChange={(event) => setForm((prev) => ({ ...prev, delivery_note: event.target.value }))}
@@ -1658,55 +1648,32 @@ export default function StokPage() {
                   </div>
                 </>
               )}
-
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button className="topbar-btn" onClick={closeModal} disabled={saving}>
-                  Batal
-                </button>
-                <button className="topbar-btn primary" onClick={runSingleSave} disabled={saving}>
-                  {saving ? 'Menyimpan...' : modalMode === 'create' ? 'Simpan Stok' : 'Update Stok'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modalMode === 'bulk' && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(20,20,20,.35)',
-            zIndex: 120,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 12,
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: 620,
-              maxHeight: '90vh',
-              overflow: 'auto',
-            }}
-          >
-            <div className="card-header">
-              <h2>Tambah Stok Massal</h2>
-              <button className="action-btn" onClick={closeModal} disabled={saving}>
-                Tutup
-              </button>
             </div>
 
-            <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+      </AdminDialog>
+
+
+      <AdminDialog
+        open={modalMode === 'bulk'}
+        onOpenChange={(open) => { if (!open) closeModal() }}
+        title="Tambah Stok Massal"
+        description="Import banyak akun sekaligus via format teks sederhana."
+        className="sm:max-w-xl"
+        footer={
+          <>
+            <Button variant="outline" onClick={closeModal} disabled={saving}>Batal</Button>
+            <Button className="bg-[#ff5733] text-white hover:bg-[#e84b2b]" onClick={runBulkSave} disabled={saving}>
+              {saving ? 'Menyimpan...' : 'Simpan Massal'}
+            </Button>
+          </>
+        }
+      >
+            <div style={{ padding: '4px 0', display: 'grid', gap: 10 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
                 <div>
-                  <label className="form-label">Produk</label>
+                  <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Produk</label>
                   <select
-                    className="form-select"
+                    className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                     value={bulkForm.product_id}
                     onChange={(event) => {
                       const nextProductID = event.target.value
@@ -1737,9 +1704,9 @@ export default function StokPage() {
                 </div>
 
                 <div>
-                  <label className="form-label">Jenis Akses</label>
+                  <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Jenis Akses</label>
                   <select
-                    className="form-select"
+                    className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                     value={bulkForm.account_type}
                     onChange={(event) =>
                       setBulkForm((prev) => {
@@ -1773,9 +1740,9 @@ export default function StokPage() {
                 </div>
 
                 <div>
-                  <label className="form-label">Durasi</label>
+                  <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Durasi</label>
                   <select
-                    className="form-select"
+                    className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                     value={bulkForm.duration_month || ''}
                     onChange={(event) =>
                       setBulkForm((prev) => ({
@@ -1803,9 +1770,9 @@ export default function StokPage() {
               </div>
 
               <div>
-                <label className="form-label">Daftar Akun</label>
+                <label className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500 mb-1 block">Daftar Akun</label>
                 <textarea
-                  className="form-textarea"
+                  className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                   rows={12}
                   value={bulkForm.rows}
                   onChange={(event) =>
@@ -1828,18 +1795,10 @@ export default function StokPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button className="topbar-btn" onClick={closeModal} disabled={saving}>
-                  Batal
-                </button>
-                <button className="topbar-btn primary" onClick={runBulkSave} disabled={saving}>
-                  {saving ? 'Memproses...' : 'Import Massal'}
-                </button>
-              </div>
             </div>
-          </div>
-        </div>
-      )}
+
+      </AdminDialog>
+
     </div>
   )
 }
