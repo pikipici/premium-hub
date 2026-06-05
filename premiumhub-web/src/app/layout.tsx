@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import MaintenanceGate from "@/components/maintenance/MaintenanceGate";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -30,9 +31,11 @@ export default function RootLayout({
   return (
     <html lang="id" className={`${jakarta.variable} antialiased`}>
       <body className="min-h-screen bg-[#F7F7F5] font-[family-name:var(--font-jakarta)] text-[#141414]">
-        <Providers>
-          <MaintenanceGate>{children}</MaintenanceGate>
-        </Providers>
+        <TooltipProvider>
+          <Providers>
+            <MaintenanceGate>{children}</MaintenanceGate>
+          </Providers>
+        </TooltipProvider>
       </body>
     </html>
   );

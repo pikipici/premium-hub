@@ -1,7 +1,19 @@
+'use client'
+
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell, TableCaption } from '@/components/ui/table'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 type DivProps = ComponentPropsWithoutRef<'div'>
@@ -144,3 +156,191 @@ export function AdminStatusPill({
     </Badge>
   )
 }
+
+// ─── AdminDialog ────────────────────────────────────────────
+
+export function AdminDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  footer,
+  className,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  description?: string
+  children?: ReactNode
+  footer?: ReactNode
+  className?: string
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={cn('sm:max-w-lg', className)}>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-black tracking-tight">{title}</DialogTitle>
+          {description ? <DialogDescription className="text-xs font-medium">{description}</DialogDescription> : null}
+        </DialogHeader>
+        {children ? <div className="max-h-[60vh] overflow-y-auto pr-1">{children}</div> : null}
+        {footer ? <DialogFooter>{footer}</DialogFooter> : null}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── AdminTabs ──────────────────────────────────────────────
+
+export function AdminTabs({
+  defaultValue,
+  tabs,
+  children,
+  className,
+}: {
+  defaultValue: string
+  tabs: { value: string; label: string; icon?: ReactNode }[]
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <Tabs defaultValue={defaultValue} className={cn('', className)}>
+      <TabsList variant="default" className="w-full flex-wrap justify-start rounded-xl bg-neutral-100/80 p-1">
+        {tabs.map((tab) => (
+          <TabsTrigger key={tab.value} value={tab.value} className="rounded-lg data-active:bg-white data-active:text-[#111118] data-active:font-extrabold data-active:shadow-sm">
+            {tab.icon}
+            {tab.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {children}
+    </Tabs>
+  )
+}
+
+// ─── AdminDataTable ─────────────────────────────────────────
+
+export function AdminDataTable({
+  columns,
+  children,
+  className,
+}: {
+  columns: string[]
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <AdminSurface className={cn('', className)}>
+      <Table>
+        <TableHeader>
+          <TableRow className="border-neutral-100">
+            {columns.map((col) => (
+              <TableHead key={col} className="h-9 text-[11px] font-extrabold uppercase tracking-[0.12em] text-neutral-400">
+                {col}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>{children}</TableBody>
+      </Table>
+    </AdminSurface>
+  )
+}
+
+// ─── AdminFormField ─────────────────────────────────────────
+
+export function AdminFormField({
+  label,
+  htmlFor,
+  required,
+  hint,
+  children,
+  className,
+}: {
+  label: string
+  htmlFor?: string
+  required?: boolean
+  hint?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div className={cn('flex flex-col gap-1.5', className)}>
+      <label htmlFor={htmlFor} className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-neutral-500">
+        {label}
+        {required ? <span className="ml-0.5 text-[#ff5733]">*</span> : null}
+      </label>
+      {children}
+      {hint ? <p className="text-[10px] font-medium leading-relaxed text-neutral-400">{hint}</p> : null}
+    </div>
+  )
+}
+
+// ─── AdminActionMenu ────────────────────────────────────────
+
+export function AdminActionMenu({
+  label,
+  items,
+}: {
+  label: ReactNode
+  items: { label: string; icon?: ReactNode; onClick: () => void; destructive?: boolean; disabled?: boolean }[]
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" className="size-8 rounded-lg">
+            {label}
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end" className="w-44">
+        {items.map((item, i) => (
+          <DropdownMenuItem
+            key={i}
+            onClick={item.onClick}
+            disabled={item.disabled}
+            className={cn(
+              'cursor-pointer text-xs font-semibold',
+              item.destructive && 'text-rose-600 focus:bg-rose-50 focus:text-rose-700'
+            )}
+          >
+            {item.icon}
+            {item.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+// ─── AdminSkeleton ──────────────────────────────────────────
+
+export function AdminSkeleton({
+  rows = 5,
+  className,
+}: {
+  rows?: number
+  className?: string
+}) {
+  return (
+    <AdminSurface className={cn('space-y-3 p-5', className)}>
+      <div className="flex gap-3">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-4 w-20" />
+      </div>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex gap-3">
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+      ))}
+    </AdminSurface>
+  )
+}
+
+// ─── Re-exports for convenience ─────────────────────────────
+
+export { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Checkbox, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel, Skeleton, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Tabs, TabsList, TabsTrigger, TabsContent, Table, TableHeader, TableBody, TableHead, TableRow, TableCell, TableCaption }

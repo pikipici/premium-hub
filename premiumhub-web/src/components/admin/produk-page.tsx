@@ -5,21 +5,20 @@ import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 
 import {
+  AdminDialog,
   AdminFilterBar,
   AdminPageHeader,
   AdminStatCard,
   AdminSurface,
-} from '@/components/admin/admin-ui'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
+  Button,
+  Input,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '@/components/admin/admin-ui'
 import { accountTypeService } from '@/services/accountTypeService'
 import { productCategoryService } from '@/services/productCategoryService'
 import { productService } from '@/services/productService'
@@ -1074,7 +1073,7 @@ export default function ProdukPage() {
   return (
     <div className="page">
       {!!notice && (
-        <div className="alert-bar" style={{ marginBottom: 12 }}>
+        <div className="alert-bar mb-3">
           ✅ <strong>{notice}</strong>
           <button className="link-btn" style={{ marginLeft: 'auto', color: 'inherit' }} onClick={() => setNotice('')}>
             tutup
@@ -1091,48 +1090,18 @@ export default function ProdukPage() {
         </div>
       )}
 
-      {confirmOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={confirmTitle}
-          onClick={() => setConfirmOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.45)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: 16,
-          }}
-        >
-          <div
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              width: '100%',
-              maxWidth: 460,
-              background: '#fff',
-              borderRadius: 14,
-              border: '1px solid var(--border)',
-              boxShadow: '0 24px 60px rgba(0,0,0,.25)',
-              padding: 16,
-            }}
-          >
-            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>{confirmTitle}</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 14 }}>{confirmDescription}</div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="topbar-btn" onClick={() => setConfirmOpen(false)}>
-                Batal
-              </button>
-              <button className="topbar-btn primary" onClick={handleConfirmAction}>
-                Lanjut
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AdminDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={confirmTitle}
+        description={confirmDescription}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Batal</Button>
+            <Button className="bg-[#ff5733] text-white hover:bg-[#e84b2b]" onClick={handleConfirmAction}>Lanjut</Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4">
         <AdminPageHeader
@@ -1257,21 +1226,21 @@ export default function ProdukPage() {
                         </TableCell>
                         <TableCell>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <button className="action-btn" onClick={() => openEdit(product)}>
+                            <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" onClick={() => openEdit(product)}>
                               ✏ Edit
                             </button>
                             <button className={`action-btn${product.is_active ? '' : ' orange'}`} onClick={() => toggleActive(product)}>
                               {product.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                             </button>
                             <button
-                              className="action-btn"
+                              className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                               style={{ color: 'var(--red)', borderColor: '#FECACA' }}
                               onClick={() => archiveProduct(product)}
                             >
                               Arsipkan
                             </button>
                             <button
-                              className="action-btn"
+                              className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                               style={{ color: '#991B1B', borderColor: '#FCA5A5', background: '#FEF2F2' }}
                               onClick={() => hardDeleteProduct(product)}
                             >
@@ -1304,14 +1273,14 @@ export default function ProdukPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <input
               type="text"
-              className="form-input"
+              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Cari nama / slug produk"
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
-              <select className="form-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <select className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
                 <option value="all">Semua Kategori</option>
                 {categoryOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -1320,7 +1289,7 @@ export default function ProdukPage() {
                 ))}
               </select>
 
-              <select className="form-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}>
+              <select className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}>
                 <option value="all">Semua Status</option>
                 <option value="active">Aktif</option>
                 <option value="inactive">Nonaktif</option>
@@ -1380,21 +1349,21 @@ export default function ProdukPage() {
                   </div>
 
                   <div className="mobile-card-actions">
-                    <button className="action-btn" onClick={() => openEdit(product)}>
+                    <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" onClick={() => openEdit(product)}>
                       Edit
                     </button>
                     <button className={`action-btn${product.is_active ? '' : ' orange'}`} onClick={() => toggleActive(product)}>
                       {product.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                     </button>
                     <button
-                      className="action-btn"
+                      className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                       style={{ color: 'var(--red)', borderColor: '#FECACA' }}
                       onClick={() => archiveProduct(product)}
                     >
                       Arsip
                     </button>
                     <button
-                      className="action-btn"
+                      className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                       style={{ color: '#991B1B', borderColor: '#FCA5A5', background: '#FEF2F2' }}
                       onClick={() => hardDeleteProduct(product)}
                     >
@@ -1414,23 +1383,27 @@ export default function ProdukPage() {
 
       </div>
 
-      {formOpen && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(20,20,20,.35)', zIndex: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}
-        >
-          <div className="card" style={{ width: '100%', maxWidth: 780, maxHeight: '90vh', overflow: 'auto' }}>
-            <div className="card-header">
-              <h2>{formMode === 'create' ? 'Tambah Produk Baru' : 'Edit Produk + Konten + Harga'}</h2>
-              <button className="action-btn" onClick={closeForm} disabled={saving}>
-                Tutup
-              </button>
-            </div>
+      <AdminDialog
+        open={formOpen}
+        onOpenChange={(open) => { if (!open) closeForm() }}
+        title={formMode === 'create' ? 'Tambah Produk Baru' : 'Edit Produk + Konten + Harga'}
+        description="Kelola produk digital, konten, dan paket harga."
+        className="sm:max-w-2xl"
+        footer={
+          <>
+            <Button variant="outline" onClick={closeForm} disabled={saving}>Batal</Button>
+            <Button className="bg-[#ff5733] text-white hover:bg-[#e84b2b]" onClick={submitForm} disabled={saving}>
+              {saving ? 'Menyimpan...' : formMode === 'create' ? 'Simpan Produk + Konten + Harga' : 'Update Produk + Konten + Harga'}
+            </Button>
+          </>
+        }
+      >
 
-            <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+            <div style={{ padding: '4px 0', display: 'grid', gap: 12 }}>
               <div>
                 <label className="form-label">Nama Produk</label>
                 <input
-                  className="form-input"
+                  className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                   value={form.name}
                   onChange={(event) => {
                     const nextName = event.target.value
@@ -1448,7 +1421,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Slug URL</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.slug}
                     onChange={(event) => {
                       setSlugTouched(true)
@@ -1467,7 +1440,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Kategori</label>
                   <select
-                    className="form-select"
+                    className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                     value={form.category}
                     onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
                   >
@@ -1484,7 +1457,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Icon Emoji (fallback)</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.icon}
                     onChange={(event) => setForm((prev) => ({ ...prev, icon: event.target.value }))}
                     placeholder="🎬"
@@ -1493,7 +1466,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Warna Kartu</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.color}
                     onChange={(event) => setForm((prev) => ({ ...prev, color: event.target.value }))}
                     placeholder="#FDDAC8"
@@ -1505,7 +1478,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Icon Image URL (R2)</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.icon_image_url}
                     onChange={(event) => setForm((prev) => ({ ...prev, icon_image_url: event.target.value }))}
                     placeholder="https://.../products/{id}/icon/..."
@@ -1525,7 +1498,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Hero Background URL (R2)</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.hero_bg_url}
                     onChange={(event) => setForm((prev) => ({ ...prev, hero_bg_url: event.target.value }))}
                     placeholder="https://.../products/{id}/hero/..."
@@ -1546,7 +1519,7 @@ export default function ProdukPage() {
               <div>
                 <label className="form-label">Deskripsi</label>
                 <textarea
-                  className="form-textarea"
+                  className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                   rows={3}
                   value={form.description}
                   onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
@@ -1559,7 +1532,7 @@ export default function ProdukPage() {
                   <label className="form-label" style={{ marginBottom: 0 }}>
                     Fitur Produk (Checklist)
                   </label>
-                  <button className="action-btn" type="button" onClick={addFeatureItem}>
+                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={addFeatureItem}>
                     + Tambah Fitur
                   </button>
                 </div>
@@ -1568,13 +1541,13 @@ export default function ProdukPage() {
                   {form.feature_items.map((item, index) => (
                     <div key={`feature-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
                       <input
-                        className="form-input"
+                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                         value={item}
                         onChange={(event) => updateFeatureItem(index, event.target.value)}
                         placeholder={`Fitur ${index + 1}`}
                       />
                       <button
-                        className="action-btn"
+                        className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                         type="button"
                         style={{ color: 'var(--red)', borderColor: '#FECACA' }}
                         onClick={() => removeFeatureItem(index)}
@@ -1591,7 +1564,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Tagline Header</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.tagline}
                     onChange={(event) => setForm((prev) => ({ ...prev, tagline: event.target.value }))}
                     placeholder="Shared 4K Ultra HD · 1 profil aktif"
@@ -1600,7 +1573,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Sort Priority</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     type="number"
                     value={form.sort_priority}
                     onChange={(event) =>
@@ -1618,7 +1591,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Badge Populer</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.badge_popular_text}
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, badge_popular_text: event.target.value }))
@@ -1629,7 +1602,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Badge Garansi</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.badge_guarantee_text}
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, badge_guarantee_text: event.target.value }))
@@ -1642,7 +1615,7 @@ export default function ProdukPage() {
               <div>
                 <label className="form-label">Teks Highlight / Sold</label>
                 <input
-                  className="form-input"
+                  className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                   value={form.sold_text}
                   onChange={(event) => setForm((prev) => ({ ...prev, sold_text: event.target.value }))}
                   placeholder="🛒 5.800+ terjual bulan ini"
@@ -1653,7 +1626,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Catatan Shared</label>
                   <textarea
-                    className="form-textarea"
+                    className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                     rows={2}
                     value={form.shared_note}
                     onChange={(event) => setForm((prev) => ({ ...prev, shared_note: event.target.value }))}
@@ -1663,7 +1636,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Catatan Private</label>
                   <textarea
-                    className="form-textarea"
+                    className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                     rows={2}
                     value={form.private_note}
                     onChange={(event) => setForm((prev) => ({ ...prev, private_note: event.target.value }))}
@@ -1677,7 +1650,7 @@ export default function ProdukPage() {
                   <label className="form-label" style={{ marginBottom: 0 }}>
                     Spesifikasi Produk (Label / Nilai)
                   </label>
-                  <button className="action-btn" type="button" onClick={addSpecItem}>
+                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={addSpecItem}>
                     + Tambah Spek
                   </button>
                 </div>
@@ -1686,7 +1659,7 @@ export default function ProdukPage() {
                   {form.spec_items.map((item, index) => (
                     <div key={`spec-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}>
                       <input
-                        className="form-input"
+                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                         value={item.label}
                         onChange={(event) =>
                           updateSpecItem(index, {
@@ -1696,7 +1669,7 @@ export default function ProdukPage() {
                         placeholder="Label (contoh: Kualitas)"
                       />
                       <input
-                        className="form-input"
+                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                         value={item.value}
                         onChange={(event) =>
                           updateSpecItem(index, {
@@ -1706,7 +1679,7 @@ export default function ProdukPage() {
                         placeholder="Nilai (contoh: 4K UHD)"
                       />
                       <button
-                        className="action-btn"
+                        className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                         type="button"
                         style={{ color: 'var(--red)', borderColor: '#FECACA' }}
                         onClick={() => removeSpecItem(index)}
@@ -1724,7 +1697,7 @@ export default function ProdukPage() {
                   <label className="form-label" style={{ marginBottom: 0 }}>
                     Trust Chips / Benefit
                   </label>
-                  <button className="action-btn" type="button" onClick={addTrustBadge}>
+                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={addTrustBadge}>
                     + Tambah Trust
                   </button>
                 </div>
@@ -1733,7 +1706,7 @@ export default function ProdukPage() {
                   {form.trust_badges.map((item, index) => (
                     <div key={`trust-${index}`} style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 8 }}>
                       <input
-                        className="form-input"
+                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                         value={item.icon}
                         onChange={(event) =>
                           updateTrustBadge(index, {
@@ -1743,7 +1716,7 @@ export default function ProdukPage() {
                         placeholder="✨"
                       />
                       <input
-                        className="form-input"
+                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                         value={item.text}
                         onChange={(event) =>
                           updateTrustBadge(index, {
@@ -1753,7 +1726,7 @@ export default function ProdukPage() {
                         placeholder="Contoh: Garansi 30 Hari"
                       />
                       <button
-                        className="action-btn"
+                        className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                         type="button"
                         style={{ color: 'var(--red)', borderColor: '#FECACA' }}
                         onClick={() => removeTrustBadge(index)}
@@ -1771,7 +1744,7 @@ export default function ProdukPage() {
                   <label className="form-label" style={{ marginBottom: 0 }}>
                     FAQ Produk
                   </label>
-                  <button className="action-btn" type="button" onClick={addFaqItem}>
+                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={addFaqItem}>
                     + Tambah FAQ
                   </button>
                 </div>
@@ -1780,7 +1753,7 @@ export default function ProdukPage() {
                   {form.faq_items.map((item, index) => (
                     <div key={`faq-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
                       <input
-                        className="form-input"
+                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                         value={item.question}
                         onChange={(event) =>
                           updateFaqItem(index, {
@@ -1790,7 +1763,7 @@ export default function ProdukPage() {
                         placeholder={`Pertanyaan ${index + 1}`}
                       />
                       <textarea
-                        className="form-textarea"
+                        className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                         rows={2}
                         value={item.answer}
                         onChange={(event) =>
@@ -1802,7 +1775,7 @@ export default function ProdukPage() {
                       />
                       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <button
-                          className="action-btn"
+                          className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                           type="button"
                           style={{ color: 'var(--red)', borderColor: '#FECACA' }}
                           onClick={() => removeFaqItem(index)}
@@ -1820,7 +1793,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Harga Coret / Normal</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.price_original_text}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1834,7 +1807,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Teks Harga Harian</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.price_per_day_text}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1848,7 +1821,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Teks Badge Diskon</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.discount_badge_text}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1879,7 +1852,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Nomor WhatsApp CS</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.whatsapp_number}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1894,7 +1867,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Label Tombol WhatsApp</label>
                   <input
-                    className="form-input"
+                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                     value={form.whatsapp_button_text}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1910,7 +1883,7 @@ export default function ProdukPage() {
               <div>
                 <label className="form-label">Meta Description (SEO)</label>
                 <textarea
-                  className="form-textarea"
+                  className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                   rows={2}
                   value={form.seo_description}
                   onChange={(event) =>
@@ -1927,7 +1900,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Tipe Fulfillment</label>
                   <select
-                    className="form-select"
+                    className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                     value={form.fulfillment_type || 'credential'}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1950,7 +1923,7 @@ export default function ProdukPage() {
                 <div>
                   <label className="form-label">Panduan Delivery</label>
                   <textarea
-                    className="form-textarea"
+                    className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                     rows={2}
                     value={form.fulfillment_guide}
                     onChange={(event) =>
@@ -2000,7 +1973,7 @@ export default function ProdukPage() {
                     {activeAccountTypeOptions.map((option) => (
                       <button
                         key={option.value}
-                        className="action-btn"
+                        className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                         type="button"
                         onClick={() => addPriceRow(option.value)}
                       >
@@ -2026,7 +1999,7 @@ export default function ProdukPage() {
                           <div>
                             <label className="form-label">Tipe</label>
                             <select
-                              className="form-select"
+                              className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                               value={normalizeAccountTypeCode(row.account_type)}
                               onChange={(event) =>
                                 updatePriceRow(row.local_id, {
@@ -2054,7 +2027,7 @@ export default function ProdukPage() {
                           <div>
                             <label className="form-label">Durasi (bulan)</label>
                             <input
-                              className="form-input"
+                              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                               type="number"
                               min={1}
                               value={row.duration}
@@ -2077,7 +2050,7 @@ export default function ProdukPage() {
                           <div>
                             <label className="form-label">Harga (IDR)</label>
                             <input
-                              className="form-input"
+                              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                               type="number"
                               min={1}
                               value={row.price}
@@ -2094,7 +2067,7 @@ export default function ProdukPage() {
                           <div>
                             <label className="form-label">Label Paket</label>
                             <input
-                              className="form-input"
+                              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                               value={row.label}
                               onChange={(event) =>
                                 updatePriceRow(row.local_id, {
@@ -2108,7 +2081,7 @@ export default function ProdukPage() {
                           <div>
                             <label className="form-label">Teks Hemat (opsional)</label>
                             <input
-                              className="form-input"
+                              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
                               value={row.savings_text}
                               onChange={(event) =>
                                 updatePriceRow(row.local_id, {
@@ -2137,7 +2110,7 @@ export default function ProdukPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: 12, color: 'var(--muted)' }}>{formatRupiah(row.price)}</span>
                             <button
-                              className="action-btn"
+                              className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                               type="button"
                               style={{ color: 'var(--red)', borderColor: '#FECACA' }}
                               onClick={() => removePriceRow(row.local_id)}
@@ -2158,22 +2131,11 @@ export default function ProdukPage() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button className="topbar-btn" onClick={closeForm} disabled={saving}>
-                  Batal
-                </button>
-                <button className="topbar-btn primary" onClick={submitForm} disabled={saving}>
-                  {saving
-                    ? 'Menyimpan...'
-                    : formMode === 'create'
-                      ? 'Simpan Produk + Konten + Harga'
-                      : 'Update Produk + Konten + Harga'}
-                </button>
-              </div>
+
             </div>
-          </div>
-        </div>
-      )}
+
+      </AdminDialog>
+
     </div>
   )
 }
