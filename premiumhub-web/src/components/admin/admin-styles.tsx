@@ -62,9 +62,6 @@ export default function AdminStyles() {
       .nav-icon { font-size: 13px; opacity: .82; flex-shrink: 0; width: 25px; height: 25px; border-radius: 9px; background: rgba(255,255,255,.08); display: inline-flex; align-items: center; justify-content: center; text-align: center; }
       .nav-item.active .nav-icon { background: var(--orange-soft); color: var(--orange); opacity: 1; }
       .nav-text { min-width: 0; }
-      .nav-badge { margin-left: auto; font-size: 10px; font-weight: 800; background: var(--orange); color: #fff; padding: 2px 7px; border-radius: 100px; min-width: 20px; text-align: center; box-shadow: 0 8px 18px rgba(255, 87, 51, .24); }
-      .nav-badge.yellow { background: var(--yellow); }
-      .nav-badge.red { background: var(--red); }
       .sidebar-bottom { margin-top: auto; padding: 12px 12px 0; border-top: 1px solid rgba(255,255,255,.08); }
       .admin-profile { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 16px; cursor: pointer; transition: background .15s, border-color .15s; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
       .admin-profile:hover { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.16); }
@@ -160,7 +157,6 @@ export default function AdminStyles() {
       .admin-catalog-tab.is-active:hover { background: var(--orange); border-color: var(--orange); opacity: .94; }
       .admin-catalog-tab-count { display: inline-flex; align-items: center; justify-content: center; padding: 2px 7px; border-radius: 999px; border: 1px solid #E2E8F0; background: #F8FAFC; color: #64748B; font-size: 10px; font-weight: 800; line-height: 1.3; white-space: nowrap; }
       .admin-catalog-tab-count.is-active { border-color: rgba(255,255,255,.42); background: rgba(255,255,255,.22); color: #fff; }
-      .notif-wrap { position: relative; }
       .notif-btn { width: 38px; height: 38px; border-radius: 13px; border: 1px solid var(--border); background: rgba(255,255,255,.92); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; position: relative; transition: border-color .15s, box-shadow .15s; box-shadow: 0 8px 20px rgba(17,17,24,.04); }
       .notif-btn:hover { border-color: var(--orange); box-shadow: 0 0 0 4px var(--ring); }
       .notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: var(--orange); border-radius: 50%; border: 1.5px solid white; }
@@ -366,8 +362,6 @@ export default function AdminStyles() {
         border-radius: 999px;
         padding: 2px 7px;
       }
-      .admin-mobile-drawer-item-badge.yellow { background: var(--yellow); }
-      .admin-mobile-drawer-item-badge.red { background: var(--red); }
       .admin-mobile-drawer-icon {
         width: 18px;
         text-align: center;
@@ -672,7 +666,6 @@ export default function AdminStyles() {
       .icon-opt { width: 36px; height: 36px; border-radius: 9px; border: 2px solid var(--border); background: var(--bg); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color .15s, background .15s; }
       .icon-opt.selected, .icon-opt:hover { border-color: var(--dark); background: var(--white); }
       .admin-toast { position: fixed; bottom: 24px; right: 24px; background: var(--dark); color: #fff; font-size: 13px; font-weight: 600; padding: 12px 20px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.2); opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; pointer-events: none; z-index: 9999; }
-      .admin-toast.show { opacity: 1; transform: translateY(0); }
       .checklist-item { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 0; }
       .checklist-dot { font-size: 10px; }
 
