@@ -892,99 +892,36 @@ export default function StokPage() {
       )}
 
       <div className="admin-desktop-only">
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 14,
-            gap: 8,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="🔍 Cari email / produk / jenis akses..."
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13,
-                padding: '8px 14px',
-                border: '1px solid var(--border)',
-                borderRadius: 9,
-                background: 'var(--white)',
-                outline: 'none',
-                width: 280,
-              }}
-            />
-
-            <select
-              value={productFilter}
-              onChange={(event) => {
-                setProductFilter(event.target.value)
-                setPage(1)
-              }}
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13,
-                padding: '8px 12px',
-                border: '1px solid var(--border)',
-                borderRadius: 9,
-                background: 'var(--white)',
-                outline: 'none',
-              }}
-            >
-              <option value="all">Semua Produk</option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value as StockFilter)
-                setPage(1)
-              }}
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13,
-                padding: '8px 12px',
-                border: '1px solid var(--border)',
-                borderRadius: 9,
-                background: 'var(--white)',
-                outline: 'none',
-              }}
-            >
-              {STATUS_FILTERS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="topbar-btn" onClick={refreshStocks} disabled={loading || syncing}>
+      <AdminPageHeader
+        eyebrow="Admin Inventory"
+        title="Stok DigiProduct"
+        description="Kelola stok akun per produk, import massal, dan pantau kesehatan inventory."
+        actions={
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={refreshStocks} disabled={loading || syncing}>
               {syncing ? 'Menyegarkan...' : 'Refresh'}
-            </button>
-            <button className="topbar-btn" onClick={exportCurrentRows} disabled={loading || syncing}>
+            </Button>
+            <Button variant="outline" onClick={exportCurrentRows} disabled={loading || syncing}>
               Export CSV
-            </button>
-            <button className="topbar-btn" onClick={() => openBulkModal()} disabled={loading || saving}>
-              + Tambah Stok Massal
-            </button>
-            <button className="topbar-btn primary" onClick={() => openCreateModal()} disabled={loading || saving}>
+            </Button>
+            <Button variant="outline" onClick={() => openBulkModal()} disabled={loading || saving}>
+              + Tambah Massal
+            </Button>
+            <Button className="bg-[#ff5733] text-white hover:bg-[#e84b2b]" onClick={() => openCreateModal()} disabled={loading || saving}>
               + Tambah Akun
-            </button>
+            </Button>
           </div>
-        </div>
+        }
+      />
 
-        <div className="card" style={{ marginBottom: 12 }}>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mb-4">
+        <AdminStatCard label="Total Produk" value={stockSummary.length} tone="neutral" />
+        <AdminStatCard label="Total Stok" value={stockSummary.reduce((sum, s) => sum + s.total, 0)} tone="neutral" />
+        <AdminStatCard label="Stok Tersedia" value={stockSummary.reduce((sum, s) => sum + s.available, 0)} tone="green" />
+        <AdminStatCard label="Stok Kritis" value={stockSummary.filter((s) => s.available <= 3 && s.total > 0).length} tone="red" />
+      </div>
+
+<div className="card" style={{ marginBottom: 12 }}>
           <div className="card-header">
             <h2>Ringkasan Stok per Produk</h2>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>

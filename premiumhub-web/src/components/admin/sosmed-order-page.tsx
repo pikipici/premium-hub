@@ -328,6 +328,30 @@ export default function SosmedOrderPage() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 grid gap-4">
+      <AdminPageHeader
+        eyebrow="Admin Sosmed"
+        title="Order DigiSosmed"
+        description="Kelola status order layanan sosmed dari pending sampai selesai."
+        actions={
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => void syncAllProviders()} disabled={loading || saving}>Sync Semua Provider</Button>
+            <Button variant="outline" onClick={() => void loadData()} disabled={loading || saving}>Refresh</Button>
+          </div>
+        }
+      />
+
+{opsSummary ? (
+      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-4 lg:grid-cols-5 mb-4">
+        <AdminStatCard label="Total Order" value={opsSummary.total} tone="neutral" />
+        <AdminStatCard label="Diproses" value={opsSummary.processing} tone="neutral" />
+        <AdminStatCard label="Perlu Sync" value={opsSummary.stale_sync} tone="amber" />
+        <AdminStatCard label="Retryable" value={opsSummary.retryable} tone="amber" />
+        <AdminStatCard label="Provider Kosong" value={opsSummary.missing_provider_order_id} tone="red" />
+        <AdminStatCard label="Provider Error" value={opsSummary.provider_errors} tone="red" />
+        <AdminStatCard label="Stuck 24 Jam" value={opsSummary.stuck_over_24h} tone="red" />
+      </div>
+    ) : null}
+
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div>

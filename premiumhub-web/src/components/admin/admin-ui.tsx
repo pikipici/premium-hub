@@ -81,7 +81,7 @@ export function AdminStatCard({
   label: string
   value: ReactNode
   detail?: string
-  tone?: 'neutral' | 'orange' | 'green' | 'red'
+  tone?: 'neutral' | 'orange' | 'green' | 'red' | 'amber'
   className?: string
 }) {
   const toneClass = {
@@ -89,6 +89,7 @@ export function AdminStatCard({
     orange: 'bg-[#fff1eb] text-[#c2410c] ring-[#fed7aa]',
     green: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
     red: 'bg-rose-50 text-rose-700 ring-rose-100',
+    amber: 'bg-amber-50 text-amber-700 ring-amber-100',
   }[tone]
 
   return (

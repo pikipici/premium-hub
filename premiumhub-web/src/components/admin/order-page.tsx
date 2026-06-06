@@ -460,6 +460,28 @@ export default function OrderPage() {
       )}
 
       <div className="admin-desktop-only">
+      <AdminPageHeader
+        eyebrow="Admin Orders"
+        title="Order DigiProduct"
+        description="Lacak dan kelola status order, payment, dan pengiriman akun."
+        actions={
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => loadOrders({ silent: true })} disabled={syncing}>
+              {syncing ? 'Refresh...' : 'Refresh'}
+            </Button>
+            <Button variant="outline" onClick={exportCurrentRows}>Export CSV</Button>
+          </div>
+        }
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mb-4">
+        <AdminStatCard label="Total Order" value={total} tone="neutral" />
+        <AdminStatCard label="Pending" value={orders.filter(o => o.order_status === 'pending').length} tone="amber" />
+        <AdminStatCard label="Aktif/Lunas" value={orders.filter(o => o.order_status === 'active' || o.payment_status === 'paid').length} tone="green" />
+        <AdminStatCard label="Gagal" value={orders.filter(o => o.order_status === 'failed' || o.payment_status === 'failed').length} tone="red" />
+      </div>
+
+
         <div
           style={{
             display: 'flex',
