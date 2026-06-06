@@ -5,6 +5,9 @@ import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AdminDialog,
+  AdminPageHeader,
+  AdminStatCard,
+  AdminSurface,
   Button,
 } from '@/components/admin/admin-ui'
 import { accountTypeService } from '@/services/accountTypeService'
@@ -860,7 +863,7 @@ export default function StokPage() {
   const statusFilterLabel = STATUS_FILTERS.find((item) => item.value === statusFilter)?.label || 'Semua Status'
 
   return (
-    <div className="page">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 grid gap-4">
       {!!notice && (
         <div className="alert-bar" style={{ marginBottom: 12 }}>
           ✅ <strong>{notice}</strong>
