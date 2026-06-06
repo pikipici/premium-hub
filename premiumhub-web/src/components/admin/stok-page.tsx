@@ -121,16 +121,16 @@ function formatDate(value?: string | null) {
 }
 
 function stockStatusMeta(status: string) {
-  if (status === 'available') return { label: 'Tersedia', className: 's-lunas' }
-  if (status === 'used') return { label: 'Terpakai', className: 's-pending' }
-  return { label: status || '-', className: 's-gagal' }
+  if (status === 'available') return { label: 'Tersedia', tone: 'green' as const }
+  if (status === 'used') return { label: 'Terpakai', tone: 'amber' as const }
+  return { label: status || '-', tone: 'red' as const }
 }
 
 function inventoryStatusMeta(available: number) {
-  if (available <= 0) return { label: 'Habis', className: 's-gagal' }
-  if (available <= 3) return { label: 'Kritis', className: 's-gagal' }
-  if (available <= 7) return { label: 'Rendah', className: 's-pending' }
-  return { label: 'Normal', className: 's-lunas' }
+  if (available <= 0) return { label: 'Habis', tone: 'red' as const }
+  if (available <= 3) return { label: 'Kritis', tone: 'red' as const }
+  if (available <= 7) return { label: 'Rendah', tone: 'amber' as const }
+  return { label: 'Normal', tone: 'green' as const }
 }
 
 function stokColor(stok: number) {
@@ -971,7 +971,7 @@ export default function StokPage() {
                         </td>
                         <td>{item.used}</td>
                         <td>
-                          <span className={`status-badge ${health.className}`}>{health.label}</span>
+                          <AdminStatusPill tone={health.tone}>{health.label}</AdminStatusPill>
                         </td>
                         <td>
                           <button
