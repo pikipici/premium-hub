@@ -7,7 +7,7 @@ import { orderService, type AdminOrderStatus } from '@/services/orderService'
 import { isCredentialFulfillment } from '@/lib/fulfillment'
 import { productService } from '@/services/productService'
 import type { AccountType } from '@/types/accountType'
-import { AdminPageHeader, AdminStatCard, AdminStatusPill, AdminSurface, Button } from '@/components/admin/admin-ui'
+import { AdminDialog, AdminPageHeader, AdminStatCard, AdminStatusPill, Button } from '@/components/admin/admin-ui'
 import { ListPagination } from '@/components/shared/list-pagination'
 import { ADMIN_PAGE_LIMIT, LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import type { Order } from '@/types/order'
@@ -136,27 +136,6 @@ function accountPackage(order: Order, accountTypeLookup?: Record<string, Account
   if (accountType === '-') return `${duration} Bulan`
 
   return `${duration} Bulan · ${accountType}`
-}
-
-const MODAL_OVERLAY_STYLE = {
-  position: 'fixed' as const,
-  inset: 0,
-  background: 'rgba(15, 23, 42, 0.48)',
-  backdropFilter: 'blur(2px)',
-  zIndex: 9999,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 12,
-}
-
-const MODAL_CARD_STYLE = {
-  width: '100%',
-  maxWidth: 560,
-  maxHeight: '90vh',
-  overflow: 'auto' as const,
-  borderRadius: 16,
-  boxShadow: '0 24px 60px rgba(15, 23, 42, 0.28)',
 }
 
 export default function OrderPage() {
@@ -822,131 +801,127 @@ export default function OrderPage() {
       </div>
 
       {selectedOrder && (
-        <div style={MODAL_OVERLAY_STYLE} onClick={() => setSelectedOrder(null)}>
-          <div className="card" style={MODAL_CARD_STYLE} onClick={(event) => event.stopPropagation()}>
-            <div className="card-header">
-              <h2>Detail Order {shortOrderCode(selectedOrder.id)}</h2>
-              <button className="action-btn" onClick={() => setSelectedOrder(null)}>
+        <AdminDialog
+          open={!!selectedOrder}
+          onOpenChange={(open) => { if (!open) setSelectedOrder(null) }}
+          title={`Detail Order ${shortOrderCode(selectedOrder.id)}`}
+          footer={
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="topbar-btn" onClick={() => setSelectedOrder(null)}>
                 Tutup
               </button>
-            </div>
 
-            <div style={{ padding: 16, display: 'grid', gap: 10 }}>
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Pembeli</span>
-                <span className="mobile-card-value">{getBuyerName(selectedOrder)}</span>
-              </div>
-
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Email</span>
-                <span className="mobile-card-value">{getBuyerEmail(selectedOrder)}</span>
-              </div>
-
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Produk</span>
-                <span className="mobile-card-value">
-                  {resolveProduct(selectedOrder).icon} {resolveProduct(selectedOrder).name}
-                </span>
-              </div>
-
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Paket</span>
-                <span className="mobile-card-value">{accountPackage(selectedOrder, accountTypeLookup)}</span>
-              </div>
-
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Total</span>
-                <span className="mobile-card-value">{formatRupiah(selectedOrder.total_price || 0)}</span>
-              </div>
-
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Payment</span>
-                <span className="mobile-card-value">{paymentStatusLabel(selectedOrder.payment_status)}</span>
-              </div>
-
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Order State</span>
-                <span className="mobile-card-value">{orderStatusLabel(selectedOrder.order_status)}</span>
-              </div>
-
-              <div className="mobile-card-row">
-                <span className="mobile-card-label">Dibuat</span>
-                <span className="mobile-card-value">{formatDate(selectedOrder.created_at)}</span>
-              </div>
-
-              {selectedOrder.stock && (() => {
-                const stockFulfillment = selectedOrder.stock.fulfillment_type || 'credential'
-                const isCredential = isCredentialFulfillment(stockFulfillment)
-
-                return (
-                  <>
-                    <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>Detail Stok</div>
-
-                    {isCredential ? (
-                      <>
-                        <div className="mobile-card-row">
-                          <span className="mobile-card-label">Email / Identitas</span>
-                          <span className="mobile-card-value">{selectedOrder.stock.email || '-'}</span>
-                        </div>
-                        <div className="mobile-card-row">
-                          <span className="mobile-card-label">Profile</span>
-                          <span className="mobile-card-value">{selectedOrder.stock.profile_name || '-'}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="mobile-card-row">
-                          <span className="mobile-card-label">{selectedOrder.stock.delivery_label || 'Delivery'}</span>
-                          <span className="mobile-card-value">{selectedOrder.stock.delivery_value || '-'}</span>
-                        </div>
-                        {selectedOrder.stock.delivery_note && (
-                          <div className="mobile-card-row">
-                            <span className="mobile-card-label">Catatan</span>
-                            <span className="mobile-card-value">{selectedOrder.stock.delivery_note}</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    <div className="mobile-card-row">
-                      <span className="mobile-card-label">Expired</span>
-                      <span className="mobile-card-value">{formatDate(selectedOrder.stock.expires_at)}</span>
-                    </div>
-                  </>
-                )
-              })()}
-
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
-                <button className="topbar-btn" onClick={() => setSelectedOrder(null)}>
-                  Tutup
+              {selectedOrder.payment_status === 'pending' && selectedOrder.order_status === 'pending' && (
+                <button
+                  className="topbar-btn primary"
+                  disabled={actionOrderID === selectedOrder.id}
+                  onClick={() => runOrderAction(selectedOrder, 'confirm')}
+                >
+                  {actionOrderID === selectedOrder.id ? 'Memproses...' : 'Konfirmasi'}
                 </button>
+              )}
 
-                {selectedOrder.payment_status === 'pending' && selectedOrder.order_status === 'pending' && (
+              {(selectedOrder.payment_status === 'paid' || selectedOrder.order_status === 'active') &&
+                !selectedOrder.stock_id && (
                   <button
                     className="topbar-btn primary"
                     disabled={actionOrderID === selectedOrder.id}
-                    onClick={() => runOrderAction(selectedOrder, 'confirm')}
+                    onClick={() => runOrderAction(selectedOrder, 'send')}
                   >
-                    {actionOrderID === selectedOrder.id ? 'Memproses...' : 'Konfirmasi'}
+                    {actionOrderID === selectedOrder.id ? 'Memproses...' : 'Kirim Akun'}
                   </button>
                 )}
-
-                {(selectedOrder.payment_status === 'paid' || selectedOrder.order_status === 'active') &&
-                  !selectedOrder.stock_id && (
-                    <button
-                      className="topbar-btn primary"
-                      disabled={actionOrderID === selectedOrder.id}
-                      onClick={() => runOrderAction(selectedOrder, 'send')}
-                    >
-                      {actionOrderID === selectedOrder.id ? 'Memproses...' : 'Kirim Akun'}
-                    </button>
-                  )}
-              </div>
             </div>
+          }
+        >
+          <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+            <div className="mobile-card-row">
+              <span className="mobile-card-label">Pembeli</span>
+              <span className="mobile-card-value">{getBuyerName(selectedOrder)}</span>
+            </div>
+
+            <div className="mobile-card-row">
+              <span className="mobile-card-label">Email</span>
+              <span className="mobile-card-value">{getBuyerEmail(selectedOrder)}</span>
+            </div>
+
+            <div className="mobile-card-row">
+              <span className="mobile-card-label">Produk</span>
+              <span className="mobile-card-value">
+                {resolveProduct(selectedOrder).icon} {resolveProduct(selectedOrder).name}
+              </span>
+            </div>
+
+            <div className="mobile-card-row">
+              <span className="mobile-card-label">Paket</span>
+              <span className="mobile-card-value">{accountPackage(selectedOrder, accountTypeLookup)}</span>
+            </div>
+
+            <div className="mobile-card-row">
+              <span className="mobile-card-label">Total</span>
+              <span className="mobile-card-value">{formatRupiah(selectedOrder.total_price || 0)}</span>
+            </div>
+
+            <div className="mobile-card-row">
+              <span className="mobile-card-label">Payment</span>
+              <span className="mobile-card-value">{paymentStatusLabel(selectedOrder.payment_status)}</span>
+            </div>
+
+            <div className="mobile-card-row">
+              <span className="mobile-card-label">Order State</span>
+              <span className="mobile-card-value">{orderStatusLabel(selectedOrder.order_status)}</span>
+            </div>
+
+            <div className="mobile-card-row">
+              <span className="mobile-card-label">Dibuat</span>
+              <span className="mobile-card-value">{formatDate(selectedOrder.created_at)}</span>
+            </div>
+
+            {selectedOrder.stock && (() => {
+              const stockFulfillment = selectedOrder.stock.fulfillment_type || 'credential'
+              const isCredential = isCredentialFulfillment(stockFulfillment)
+
+              return (
+                <>
+                  <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>Detail Stok</div>
+
+                  {isCredential ? (
+                    <>
+                      <div className="mobile-card-row">
+                        <span className="mobile-card-label">Email / Identitas</span>
+                        <span className="mobile-card-value">{selectedOrder.stock.email || '-'}</span>
+                      </div>
+                      <div className="mobile-card-row">
+                        <span className="mobile-card-label">Profile</span>
+                        <span className="mobile-card-value">{selectedOrder.stock.profile_name || '-'}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mobile-card-row">
+                        <span className="mobile-card-label">{selectedOrder.stock.delivery_label || 'Delivery'}</span>
+                        <span className="mobile-card-value">{selectedOrder.stock.delivery_value || '-'}</span>
+                      </div>
+                      {selectedOrder.stock.delivery_note && (
+                        <div className="mobile-card-row">
+                          <span className="mobile-card-label">Catatan</span>
+                          <span className="mobile-card-value">{selectedOrder.stock.delivery_note}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Expired</span>
+                    <span className="mobile-card-value">{formatDate(selectedOrder.stock.expires_at)}</span>
+                  </div>
+                </>
+              )
+            })()}
           </div>
-        </div>
+        </AdminDialog>
       )}
     </div>
   )
