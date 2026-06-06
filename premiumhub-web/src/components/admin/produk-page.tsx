@@ -381,7 +381,7 @@ export default function ProdukPage() {
 
   const [priceDrafts, setPriceDrafts] = useState<ProductPriceDraft[]>([])
   const [removedPriceIds, setRemovedPriceIds] = useState<string[]>([])
-  const [uploadingAssetKind, setUploadingAssetKind] = useState<null | 'icon' | 'hero'>(null)
+  const [uploadingAssetKind, setUploadingAssetKind] = useState<null | 'icon' | 'hero' | 'cover'>(null)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmTitle, setConfirmTitle] = useState('')
@@ -1044,7 +1044,7 @@ export default function ProdukPage() {
     await doHardDeleteProduct(confirmAction.product)
   }
 
-  const handleUploadAsset = async (kind: 'icon' | 'hero', file?: File) => {
+  const handleUploadAsset = async (kind: 'icon' | 'hero' | 'cover', file?: File) => {
     if (!file) return
     if (!editingId || formMode !== 'edit') {
       setError('Upload gambar hanya bisa setelah produk dibuat (mode edit).')
