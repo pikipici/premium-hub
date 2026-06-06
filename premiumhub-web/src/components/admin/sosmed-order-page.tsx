@@ -4,7 +4,7 @@ import { ListPagination } from '@/components/shared/list-pagination'
 import { ADMIN_PAGE_LIMIT, BATCH_ACTION_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { AdminPageHeader, AdminStatCard, AdminStatusPill, AdminSurface, Button } from '@/components/admin/admin-ui'
+import { AdminDialog, AdminPageHeader, AdminStatCard, AdminStatusPill, Button } from '@/components/admin/admin-ui'
 import {
   buildMissingProviderOrderIdRecoveryPayload,
   canRetrySosmedProvider,
@@ -12,6 +12,7 @@ import {
   isMissingProviderOrderIdRecoveryCandidate,
 } from '@/lib/adminSosmedOrderRecovery'
 import { canAdminTriggerRefill, formatProviderStatus, getAdminRefillStatusLabel, isJAPRefillCooldown } from '@/lib/sosmedRefillUi'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { sosmedOrderService, type AdminSosmedOpsSummary } from '@/services/sosmedOrderService'
 import type { SosmedOrder, SosmedOrderDetail } from '@/types/sosmedOrder'
 
@@ -93,6 +94,13 @@ export default function SosmedOrderPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [opsSummary, setOpsSummary] = useState<AdminSosmedOpsSummary | null>(null)
 
+  const [statusDialog, setStatusDialog] = useState<{ order: SosmedOrder; toStatus: string } | null>(null)
+  const [statusReason, setStatusReason] = useState('')
+  const [recoveryDialog, setRecoveryDialog] = useState<SosmedOrder | null>(null)
+  const [retryDialog, setRetryDialog] = useState<SosmedOrder | null>(null)
+  const [retryReason, setRetryReason] = useState('')
+  const [refillDialog, setRefillDialog] = useState<SosmedOrder | null>(null)
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -156,23 +164,26 @@ export default function SosmedOrderPage() {
 
   const updateStatus = async (order: SosmedOrder, toStatus: string) => {
     if (!toStatus) return
+    setStatusDialog({ order, toStatus })
+    setStatusReason('')
+  }
 
-    const reason = window.prompt(`Alasan ubah status ke ${toStatus}`, '') || ''
-
+  const confirmUpdateStatus = async () => {
+    const dialog = statusDialog
+    if (!dialog) return
+    setStatusDialog(null)
     setSaving(true)
     setError('')
-
     try {
-      const res = await sosmedOrderService.adminUpdateStatus(order.id, {
-        to_status: toStatus,
-        reason,
+      const res = await sosmedOrderService.adminUpdateStatus(dialog.order.id, {
+        to_status: dialog.toStatus,
+        reason: statusReason,
       })
       if (!res.success) {
         setError(res.message || 'Gagal update status order sosmed')
         return
       }
-
-      setNotice(`Status order ${order.id} diubah ke ${toStatus}`)
+      setNotice(`Status order ${dialog.order.id} diubah ke ${dialog.toStatus}`)
       await loadData()
     } catch {
       setError('Gagal update status order sosmed')
@@ -182,11 +193,13 @@ export default function SosmedOrderPage() {
   }
 
   const prepareMissingProviderRecovery = async (order: SosmedOrder) => {
-    const confirmed = window.confirm(
-      `${getMissingProviderOrderIdNotice(order)}\n\nLanjut tandai gagal agar tombol Retry Provider muncul?`
-    )
-    if (!confirmed) return
+    setRecoveryDialog(order)
+  }
 
+  const confirmRecovery = async () => {
+    const order = recoveryDialog
+    if (!order) return
+    setRecoveryDialog(null)
     setSaving(true)
     setError('')
 
@@ -277,12 +290,19 @@ export default function SosmedOrderPage() {
   }
 
   const retryProvider = async (order: SosmedOrder) => {
-    const reason = window.prompt('Alasan retry provider', order.provider_error || '') || ''
+    setRetryDialog(order)
+    setRetryReason(order.provider_error || '')
+  }
+
+  const confirmRetryProvider = async () => {
+    const order = retryDialog
+    if (!order) return
+    setRetryDialog(null)
     setSaving(true)
     setError('')
 
     try {
-      const res = await sosmedOrderService.adminRetryProvider(order.id, { reason })
+      const res = await sosmedOrderService.adminRetryProvider(order.id, { reason: retryReason })
       if (!res.success) {
         setError(res.message || 'Gagal retry provider order sosmed')
         return
@@ -301,9 +321,13 @@ export default function SosmedOrderPage() {
   }
 
   const triggerRefill = async (order: SosmedOrder) => {
-    const confirmed = window.confirm(`Trigger refill untuk order ${order.id.slice(0, 8)}?`)
-    if (!confirmed) return
+    setRefillDialog(order)
+  }
 
+  const confirmRefill = async () => {
+    const order = refillDialog
+    if (!order) return
+    setRefillDialog(null)
     setSaving(true)
     setError('')
 
@@ -604,179 +628,202 @@ export default function SosmedOrderPage() {
         ) : null}
       </div>
 
-      {detail ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 60,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 18,
-            background: 'rgba(10,10,10,0.42)',
-          }}
-          onClick={() => setDetail(null)}
-        >
-          <div
-            style={{
-              width: 'min(760px, 100%)',
-              maxHeight: '88vh',
-              overflow: 'auto',
-              borderRadius: 8,
-              background: '#fff',
-              border: '1px solid var(--border)',
-              boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
-            }}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div style={{ padding: 18, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-              <div>
-                <h3 style={{ margin: 0 }}>Detail Order DigiSosmed</h3>
-                <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>{detail.order.id}</div>
-              </div>
-              <button className="action-btn" type="button" onClick={() => setDetail(null)}>Tutup</button>
+      <AdminDialog
+        open={!!detail}
+        onOpenChange={(open) => { if (!open) setDetail(null) }}
+        title="Detail Order DigiSosmed"
+        description={detail?.order.id}
+        footer={
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            {detail?.order.provider_code === 'jap' && detail?.order.provider_order_id ? (
+              <button className="action-btn" type="button" disabled={saving} onClick={() => void syncProvider(detail!.order)}>
+                Sync Provider
+              </button>
+            ) : null}
+            {detail && isMissingProviderOrderIdRecoveryCandidate(detail.order) ? (
+              <button className="action-btn" type="button" disabled={saving} onClick={() => void prepareMissingProviderRecovery(detail.order)}>
+                Siapkan Retry Aman
+              </button>
+            ) : null}
+            {detail && canRetryProvider(detail.order) ? (
+              <button className="action-btn" type="button" disabled={saving} onClick={() => void retryProvider(detail.order)}>
+                Retry Provider
+              </button>
+            ) : null}
+            <button className="action-btn" type="button" onClick={() => setDetail(null)}>Tutup</button>
+          </div>
+        }
+      >
+        {detail && (
+        <div style={{ display: 'grid', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>Layanan</div>
+              <div style={{ fontWeight: 700 }}>{detail.order.service_title}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detail.order.service_code}</div>
             </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status</div>
+              <div><AdminStatusPill tone={statusLabel(detail.order.order_status).tone}>{statusLabel(detail.order.order_status).label}</AdminStatusPill></div>
+              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>{detail.order.payment_status} via {detail.order.payment_method || '-'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>Provider</div>
+              <div style={{ fontWeight: 700 }}>{(detail.order.provider_code || '-').toUpperCase()}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detail.order.provider_order_id || 'Belum ada provider order id'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>Total</div>
+              <div style={{ fontWeight: 700 }}>{formatRupiah(detail.order.total_price)}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detail.order.quantity} paket x {formatRupiah(detail.order.unit_price)}</div>
+            </div>
+          </div>
 
-            <div style={{ padding: 18, display: 'grid', gap: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Layanan</div>
-                  <div style={{ fontWeight: 700 }}>{detail.order.service_title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detail.order.service_code}</div>
-                </div>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Target</div>
+            <div style={{ wordBreak: 'break-all' }}>{detail.order.target_link || '-'}</div>
+          </div>
+
+          {detail.order.refill_eligible ? (
+            <div style={{ padding: 14, borderRadius: 8, border: '1px solid var(--border)', background: '#faf5ff' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Garansi Refill</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status</div>
-                  <div><AdminStatusPill tone={statusLabel(detail.order.order_status).tone}>{statusLabel(detail.order.order_status).label}</AdminStatusPill></div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>{detail.order.payment_status} via {detail.order.payment_method || '-'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Provider</div>
-                  <div style={{ fontWeight: 700 }}>{(detail.order.provider_code || '-').toUpperCase()}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detail.order.provider_order_id || 'Belum ada provider order id'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Total</div>
-                  <div style={{ fontWeight: 700 }}>{formatRupiah(detail.order.total_price)}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{detail.order.quantity} paket x {formatRupiah(detail.order.unit_price)}</div>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>Target</div>
-                <div style={{ wordBreak: 'break-all' }}>{detail.order.target_link || '-'}</div>
-              </div>
-
-              {detail.order.refill_eligible ? (
-                <div style={{ padding: 14, borderRadius: 8, border: '1px solid var(--border)', background: '#faf5ff' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Garansi Refill</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status</div>
-                      <div style={{ fontWeight: 700, color: getAdminRefillStatusLabel(detail.order).color }}>
-                        {getAdminRefillStatusLabel(detail.order).text}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Periode</div>
-                      <div style={{ fontWeight: 600 }}>{detail.order.refill_period_days || '-'} Hari</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Deadline</div>
-                      <div style={{ fontWeight: 600 }}>{detail.order.refill_deadline ? formatDate(detail.order.refill_deadline) : '-'}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Diklaim</div>
-                      <div style={{ fontWeight: 600 }}>{detail.order.refill_requested_at ? formatDate(detail.order.refill_requested_at) : '-'}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Refill ID JAP</div>
-                      <div style={{ fontWeight: 600 }}>{detail.order.refill_provider_order_id || '-'}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status JAP</div>
-                      <div style={{ fontWeight: 600 }}>{formatProviderStatus(detail.order.refill_provider_status)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>Selesai</div>
-                      <div style={{ fontWeight: 600 }}>{detail.order.refill_completed_at ? formatDate(detail.order.refill_completed_at) : '-'}</div>
-                    </div>
+                  <div style={{ fontWeight: 700, color: getAdminRefillStatusLabel(detail.order).color }}>
+                    {getAdminRefillStatusLabel(detail.order).text}
                   </div>
-                  {isJAPRefillCooldown(detail.order) ? (
-                    <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600 }}>
-                      JAP lagi minta jeda/cooldown. Tombol retry admin tersedia karena belum ada Refill ID JAP; jalankan ulang setelah waktu tunggu supplier lewat.
-                    </div>
-                  ) : null}
-                  {detail.order.refill_provider_error ? (
-                    <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: '#FFF1F2', color: 'var(--red)', fontSize: 12 }}>
-                      {detail.order.refill_provider_error}
-                    </div>
-                  ) : null}
-                  {canTriggerRefill(detail.order) ? (
-                    <div style={{ marginTop: 10 }}>
-                      <button className="action-btn" type="button" disabled={saving} onClick={() => void triggerRefill(detail.order)}>
-                        {isJAPRefillCooldown(detail.order) ? 'Retry Refill Cooldown' : 'Trigger Refill'}
-                      </button>
-                    </div>
-                  ) : null}
                 </div>
-              ) : null}
-
-              {isMissingProviderOrderIdRecoveryCandidate(detail.order) ? (
-                <div style={{ padding: 12, borderRadius: 8, background: '#fff7ed', color: '#9a3412', fontSize: 13, fontWeight: 700 }}>
-                  {getMissingProviderOrderIdNotice(detail.order)}
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Periode</div>
+                  <div style={{ fontWeight: 600 }}>{detail.order.refill_period_days || '-'} Hari</div>
                 </div>
-              ) : null}
-
-              {detail.order.provider_error ? (
-                <div style={{ padding: 12, borderRadius: 8, background: '#FFF1F2', color: 'var(--red)', fontSize: 13 }}>
-                  {detail.order.provider_error}
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Deadline</div>
+                  <div style={{ fontWeight: 600 }}>{detail.order.refill_deadline ? formatDate(detail.order.refill_deadline) : '-'}</div>
                 </div>
-              ) : null}
-
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {detail.order.provider_code === 'jap' && detail.order.provider_order_id ? (
-                  <button className="action-btn" type="button" disabled={saving} onClick={() => void syncProvider(detail.order)}>
-                    Sync Provider
-                  </button>
-                ) : null}
-                {isMissingProviderOrderIdRecoveryCandidate(detail.order) ? (
-                  <button className="action-btn" type="button" disabled={saving} onClick={() => void prepareMissingProviderRecovery(detail.order)}>
-                    Siapkan Retry Aman
-                  </button>
-                ) : null}
-                {canRetryProvider(detail.order) ? (
-                  <button className="action-btn" type="button" disabled={saving} onClick={() => void retryProvider(detail.order)}>
-                    Retry Provider
-                  </button>
-                ) : null}
-              </div>
-
-              <div>
-                <h4 style={{ margin: '0 0 10px' }}>Timeline</h4>
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {detail.events.length === 0 ? (
-                    <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada event.</div>
-                  ) : (
-                    detail.events.map((event) => (
-                      <div key={event.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                          <div style={{ fontWeight: 700 }}>{event.from_status || '-'} → {event.to_status || '-'}</div>
-                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{formatDate(event.created_at)}</div>
-                        </div>
-                        <div style={{ marginTop: 4, fontSize: 13 }}>{event.reason || '-'}</div>
-                        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Actor: {event.actor_type}</div>
-                      </div>
-                    ))
-                  )}
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Diklaim</div>
+                  <div style={{ fontWeight: 600 }}>{detail.order.refill_requested_at ? formatDate(detail.order.refill_requested_at) : '-'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Refill ID JAP</div>
+                  <div style={{ fontWeight: 600 }}>{detail.order.refill_provider_order_id || '-'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status JAP</div>
+                  <div style={{ fontWeight: 600 }}>{formatProviderStatus(detail.order.refill_provider_status)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Selesai</div>
+                  <div style={{ fontWeight: 600 }}>{detail.order.refill_completed_at ? formatDate(detail.order.refill_completed_at) : '-'}</div>
                 </div>
               </div>
+              {isJAPRefillCooldown(detail.order) ? (
+                <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600 }}>
+                  JAP lagi minta jeda/cooldown. Tombol retry admin tersedia karena belum ada Refill ID JAP; jalankan ulang setelah waktu tunggu supplier lewat.
+                </div>
+              ) : null}
+              {detail.order.refill_provider_error ? (
+                <div style={{ marginTop: 10, padding: 10, borderRadius: 6, background: '#FFF1F2', color: 'var(--red)', fontSize: 12 }}>
+                  {detail.order.refill_provider_error}
+                </div>
+              ) : null}
+              {canTriggerRefill(detail.order) ? (
+                <div style={{ marginTop: 10 }}>
+                  <button className="action-btn" type="button" disabled={saving} onClick={() => void triggerRefill(detail.order)}>
+                    {isJAPRefillCooldown(detail.order) ? 'Retry Refill Cooldown' : 'Trigger Refill'}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {isMissingProviderOrderIdRecoveryCandidate(detail.order) ? (
+            <div style={{ padding: 12, borderRadius: 8, background: '#fff7ed', color: '#9a3412', fontSize: 13, fontWeight: 700 }}>
+              {getMissingProviderOrderIdNotice(detail.order)}
+            </div>
+          ) : null}
+
+          {detail.order.provider_error ? (
+            <div style={{ padding: 12, borderRadius: 8, background: '#FFF1F2', color: 'var(--red)', fontSize: 13 }}>
+              {detail.order.provider_error}
+            </div>
+          ) : null}
+
+          <div>
+            <h4 style={{ margin: '0 0 10px' }}>Timeline</h4>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {detail.events.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada event.</div>
+              ) : (
+                detail.events.map((event) => (
+                  <div key={event.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ fontWeight: 700 }}>{event.from_status || '-'} → {event.to_status || '-'}</div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{formatDate(event.created_at)}</div>
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 13 }}>{event.reason || '-'}</div>
+                    <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Actor: {event.actor_type}</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
-      ) : null}
+        )}
+      </AdminDialog>
+
+      <AdminDialog
+        open={!!statusDialog}
+        onOpenChange={(open) => { if (!open) setStatusDialog(null) }}
+        title={statusDialog ? `Ubah Status ke ${statusDialog.toStatus}` : ''}
+        footer={
+          <div className="flex justify-end gap-3">
+            <button className="topbar-btn" onClick={() => setStatusDialog(null)} disabled={saving}>Batal</button>
+            <button className="topbar-btn primary" onClick={confirmUpdateStatus} disabled={saving}>{saving ? 'Menyimpan...' : 'Ubah Status'}</button>
+          </div>
+        }
+      >
+        <label className="block text-sm font-medium mb-2">Alasan</label>
+        <textarea className="w-full rounded-xl border border-neutral-200 p-3 text-sm" rows={3} value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Masukkan alasan..." />
+      </AdminDialog>
+
+      <ConfirmDialog
+        open={!!recoveryDialog}
+        title="Recovery Provider"
+        description={recoveryDialog ? `${getMissingProviderOrderIdNotice(recoveryDialog)}\n\nLanjut tandai gagal agar tombol Retry Provider muncul?` : ''}
+        confirmLabel="Tandai Gagal"
+        destructive
+        loading={saving}
+        onConfirm={confirmRecovery}
+        onCancel={() => setRecoveryDialog(null)}
+      />
+
+      <AdminDialog
+        open={!!retryDialog}
+        onOpenChange={(open) => { if (!open) setRetryDialog(null) }}
+        title={retryDialog ? `Retry Provider — ${retryDialog.id.slice(0, 8)}` : ''}
+        footer={
+          <div className="flex justify-end gap-3">
+            <button className="topbar-btn" onClick={() => setRetryDialog(null)} disabled={saving}>Batal</button>
+            <button className="topbar-btn primary" onClick={confirmRetryProvider} disabled={saving}>{saving ? 'Mengirim...' : 'Retry Provider'}</button>
+          </div>
+        }
+      >
+        <label className="block text-sm font-medium mb-2">Alasan retry</label>
+        <textarea className="w-full rounded-xl border border-neutral-200 p-3 text-sm" rows={3} value={retryReason} onChange={(e) => setRetryReason(e.target.value)} placeholder="Masukkan alasan retry..." />
+      </AdminDialog>
+
+      <ConfirmDialog
+        open={!!refillDialog}
+        title="Trigger Refill"
+        description={refillDialog ? `Trigger refill untuk order ${refillDialog.id.slice(0, 8)}?` : ''}
+        confirmLabel="Trigger Refill"
+        loading={saving}
+        onConfirm={confirmRefill}
+        onCancel={() => setRefillDialog(null)}
+      />
     </div>
   )
 }
