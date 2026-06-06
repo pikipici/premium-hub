@@ -18,6 +18,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
 } from '@/components/admin/admin-ui'
 import { accountTypeService } from '@/services/accountTypeService'
 import { productCategoryService } from '@/services/productCategoryService'
@@ -1247,13 +1248,13 @@ export default function ProdukPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
+                    <TableCell colSpan={8} style={{ textAlign: 'center', color: '#6B7280', padding: 28 }}>
                       Memuat data produk...
                     </TableCell>
                   </TableRow>
                 ) : filteredProducts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
+                    <TableCell colSpan={8} style={{ textAlign: 'center', color: '#6B7280', padding: 28 }}>
                       Tidak ada produk yang cocok dengan filter.
                     </TableCell>
                   </TableRow>
@@ -1264,11 +1265,11 @@ export default function ProdukPage() {
                     return (
                       <TableRow key={product.id}>
                         <TableCell>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div className="flex items-center gap-2.5">
                             <span style={{ fontSize: 22 }}>{product.icon || '📦'}</span>
                             <div>
                               <div style={{ fontWeight: 600, fontSize: 13 }}>{product.name}</div>
-                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>/{product.slug}</div>
+                              <div style={{ fontSize: 11, color: '#6B7280' }}>/{product.slug}</div>
                             </div>
                           </div>
                         </TableCell>
@@ -1276,7 +1277,7 @@ export default function ProdukPage() {
                           <span className="product-pill">{getCategoryLabel(product.category, categoryOptions)}</span>
                         </TableCell>
                         <TableCell style={{ fontWeight: 600 }}>{minPrice ? formatRupiah(minPrice) : '-'}</TableCell>
-                        <TableCell style={{ fontSize: 12, color: 'var(--muted)' }}>{summarizePrices(product.prices, accountTypeMap)}</TableCell>
+                        <TableCell style={{ fontSize: 12, color: '#6B7280' }}>{summarizePrices(product.prices, accountTypeMap)}</TableCell>
                         <TableCell style={{ fontWeight: 600, fontSize: 12 }}>{product.sort_priority || 0}</TableCell>
                         <TableCell>
                           <span className={`status-badge ${product.is_popular ? 's-lunas' : 's-pending'}`}>
@@ -1289,7 +1290,7 @@ export default function ProdukPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <div className="flex gap-1.5 flex-wrap">
                             <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" onClick={() => openEdit(product)}>
                               ✏ Edit
                             </button>
@@ -1298,7 +1299,7 @@ export default function ProdukPage() {
                             </button>
                             <button
                               className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                              style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                              style={{ color: '#EF4444', borderColor: '#FECACA' }}
                               onClick={() => archiveProduct(product)}
                             >
                               Arsipkan
@@ -1421,7 +1422,7 @@ export default function ProdukPage() {
                     </button>
                     <button
                       className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                      style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                      style={{ color: '#EF4444', borderColor: '#FECACA' }}
                       onClick={() => archiveProduct(product)}
                     >
                       Arsip
@@ -1466,8 +1467,7 @@ export default function ProdukPage() {
             <div style={{ padding: '4px 0', display: 'grid', gap: 12 }}>
               <div>
                 <label className="form-label">Nama Produk</label>
-                <input
-                  className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                <Input
                   value={form.name}
                   onChange={(event) => {
                     const nextName = event.target.value
@@ -1481,11 +1481,10 @@ export default function ProdukPage() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="form-label">Slug URL</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.slug}
                     onChange={(event) => {
                       setSlugTouched(true)
@@ -1496,7 +1495,7 @@ export default function ProdukPage() {
                     }}
                     placeholder="contoh: netflix-premium"
                   />
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>
                     URL publik: /product/digiproduct/{form.slug || 'slug-produk'}
                   </div>
                 </div>
@@ -1517,11 +1516,10 @@ export default function ProdukPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="form-label">Icon Emoji (fallback)</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.icon}
                     onChange={(event) => setForm((prev) => ({ ...prev, icon: event.target.value }))}
                     placeholder="🎬"
@@ -1529,8 +1527,7 @@ export default function ProdukPage() {
                 </div>
                 <div>
                   <label className="form-label">Warna Kartu</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.color}
                     onChange={(event) => setForm((prev) => ({ ...prev, color: event.target.value }))}
                     placeholder="#FDDAC8"
@@ -1538,11 +1535,10 @@ export default function ProdukPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="form-label">Icon Image URL (R2)</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.icon_image_url}
                     onChange={(event) => setForm((prev) => ({ ...prev, icon_image_url: event.target.value }))}
                     placeholder="https://.../products/{id}/icon/..."
@@ -1554,15 +1550,14 @@ export default function ProdukPage() {
                     disabled={uploadingAssetKind === 'icon' || formMode !== 'edit'}
                     style={{ marginTop: 8, fontSize: 12 }}
                   />
-                  <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
+                  <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>
                     Wajib rasio 1:1, minimal 256x256 (rekomendasi 512x512).
                   </div>
                 </div>
 
                 <div>
                   <label className="form-label">Hero Background URL (R2)</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.hero_bg_url}
                     onChange={(event) => setForm((prev) => ({ ...prev, hero_bg_url: event.target.value }))}
                     placeholder="https://.../products/{id}/hero/..."
@@ -1574,7 +1569,7 @@ export default function ProdukPage() {
                     disabled={uploadingAssetKind === 'hero' || formMode !== 'edit'}
                     style={{ marginTop: 8, fontSize: 12 }}
                   />
-                  <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>
+                  <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>
                     Wajib rasio 16:9, minimal 1280x720 (rekomendasi 1600x900).
                   </div>
                 </div>
@@ -1582,12 +1577,12 @@ export default function ProdukPage() {
 
               {/* Cover Images */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
                   <div>
                     <label className="form-label" style={{ marginBottom: 0 }}>
                       Cover Images (Carousel)
                     </label>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    <div style={{ fontSize: 11, color: '#6B7280' }}>
                       Maksimal 8 gambar. Format PNG/JPG/WebP, minimal 640x360px.
                     </div>
                   </div>
@@ -1607,7 +1602,7 @@ export default function ProdukPage() {
                 </div>
 
                 {form.cover_images.length === 0 ? (
-                  <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 12, fontSize: 12, color: 'var(--muted)' }}>
+                  <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 12, fontSize: 12, color: '#6B7280' }}>
                     Belum ada cover images. Upload gambar tambahan untuk carousel produk.
                   </div>
                 ) : (
@@ -1618,13 +1613,13 @@ export default function ProdukPage() {
                           <img src={url} alt={`Cover ${index + 1}`} style={{ objectFit: 'contain', padding: 8, width: '100%', height: '100%' }} />
                         </div>
                         <div style={{ padding: '4px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAFAFA' }}>
-                          <span style={{ fontSize: 10, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>
+                          <span style={{ fontSize: 10, color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>
                             Cover {index + 1}
                           </span>
                           <button
                             type="button"
                             className="inline-flex h-7 items-center rounded-lg px-2 text-[10px] font-bold"
-                            style={{ color: 'var(--red)', border: '1px solid #FECACA' }}
+                            style={{ color: '#EF4444', border: '1px solid #FECACA' }}
                             onClick={() => handleRemoveCover(url)}
                           >
                             Hapus
@@ -1638,8 +1633,7 @@ export default function ProdukPage() {
 
               <div>
                 <label className="form-label">Deskripsi</label>
-                <textarea
-                  className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
+                <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                   rows={3}
                   value={form.description}
                   onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
@@ -1648,7 +1642,7 @@ export default function ProdukPage() {
               </div>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
                   <label className="form-label" style={{ marginBottom: 0 }}>
                     Fitur Produk (Checklist)
                   </label>
@@ -1657,11 +1651,10 @@ export default function ProdukPage() {
                   </button>
                 </div>
 
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div className="grid gap-2">
                   {form.feature_items.map((item, index) => (
                     <div key={`feature-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
-                      <input
-                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                      <Input
                         value={item}
                         onChange={(event) => updateFeatureItem(index, event.target.value)}
                         placeholder={`Fitur ${index + 1}`}
@@ -1669,7 +1662,7 @@ export default function ProdukPage() {
                       <button
                         className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                         type="button"
-                        style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                        style={{ color: '#EF4444', borderColor: '#FECACA' }}
                         onClick={() => removeFeatureItem(index)}
                         disabled={form.feature_items.length <= 1}
                       >
@@ -1680,11 +1673,10 @@ export default function ProdukPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="form-label">Tagline Header</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.tagline}
                     onChange={(event) => setForm((prev) => ({ ...prev, tagline: event.target.value }))}
                     placeholder="Shared 4K Ultra HD · 1 profil aktif"
@@ -1692,8 +1684,7 @@ export default function ProdukPage() {
                 </div>
                 <div>
                   <label className="form-label">Sort Priority</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     type="number"
                     value={form.sort_priority}
                     onChange={(event) =>
@@ -1707,11 +1698,10 @@ export default function ProdukPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="form-label">Badge Populer</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.badge_popular_text}
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, badge_popular_text: event.target.value }))
@@ -1721,8 +1711,7 @@ export default function ProdukPage() {
                 </div>
                 <div>
                   <label className="form-label">Badge Garansi</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.badge_guarantee_text}
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, badge_guarantee_text: event.target.value }))
@@ -1734,19 +1723,17 @@ export default function ProdukPage() {
 
               <div>
                 <label className="form-label">Teks Highlight / Sold</label>
-                <input
-                  className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                <Input
                   value={form.sold_text}
                   onChange={(event) => setForm((prev) => ({ ...prev, sold_text: event.target.value }))}
                   placeholder="🛒 5.800+ terjual bulan ini"
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="form-label">Catatan Shared</label>
-                  <textarea
-                    className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
+                  <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                     rows={2}
                     value={form.shared_note}
                     onChange={(event) => setForm((prev) => ({ ...prev, shared_note: event.target.value }))}
@@ -1755,8 +1742,7 @@ export default function ProdukPage() {
                 </div>
                 <div>
                   <label className="form-label">Catatan Private</label>
-                  <textarea
-                    className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
+                  <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                     rows={2}
                     value={form.private_note}
                     onChange={(event) => setForm((prev) => ({ ...prev, private_note: event.target.value }))}
@@ -1766,7 +1752,7 @@ export default function ProdukPage() {
               </div>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
                   <label className="form-label" style={{ marginBottom: 0 }}>
                     Spesifikasi Produk (Label / Nilai)
                   </label>
@@ -1775,11 +1761,10 @@ export default function ProdukPage() {
                   </button>
                 </div>
 
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div className="grid gap-2">
                   {form.spec_items.map((item, index) => (
                     <div key={`spec-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}>
-                      <input
-                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                      <Input
                         value={item.label}
                         onChange={(event) =>
                           updateSpecItem(index, {
@@ -1788,8 +1773,7 @@ export default function ProdukPage() {
                         }
                         placeholder="Label (contoh: Kualitas)"
                       />
-                      <input
-                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                      <Input
                         value={item.value}
                         onChange={(event) =>
                           updateSpecItem(index, {
@@ -1801,7 +1785,7 @@ export default function ProdukPage() {
                       <button
                         className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                         type="button"
-                        style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                        style={{ color: '#EF4444', borderColor: '#FECACA' }}
                         onClick={() => removeSpecItem(index)}
                         disabled={form.spec_items.length <= 1}
                       >
@@ -1813,7 +1797,7 @@ export default function ProdukPage() {
               </div>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
                   <label className="form-label" style={{ marginBottom: 0 }}>
                     Trust Chips / Benefit
                   </label>
@@ -1822,11 +1806,10 @@ export default function ProdukPage() {
                   </button>
                 </div>
 
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div className="grid gap-2">
                   {form.trust_badges.map((item, index) => (
                     <div key={`trust-${index}`} style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 8 }}>
-                      <input
-                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                      <Input
                         value={item.icon}
                         onChange={(event) =>
                           updateTrustBadge(index, {
@@ -1835,8 +1818,7 @@ export default function ProdukPage() {
                         }
                         placeholder="✨"
                       />
-                      <input
-                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                      <Input
                         value={item.text}
                         onChange={(event) =>
                           updateTrustBadge(index, {
@@ -1848,7 +1830,7 @@ export default function ProdukPage() {
                       <button
                         className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                         type="button"
-                        style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                        style={{ color: '#EF4444', borderColor: '#FECACA' }}
                         onClick={() => removeTrustBadge(index)}
                         disabled={form.trust_badges.length <= 1}
                       >
@@ -1860,7 +1842,7 @@ export default function ProdukPage() {
               </div>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
                   <label className="form-label" style={{ marginBottom: 0 }}>
                     FAQ Produk
                   </label>
@@ -1869,11 +1851,10 @@ export default function ProdukPage() {
                   </button>
                 </div>
 
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div className="grid gap-2">
                   {form.faq_items.map((item, index) => (
                     <div key={`faq-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
-                      <input
-                        className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                      <Input
                         value={item.question}
                         onChange={(event) =>
                           updateFaqItem(index, {
@@ -1882,8 +1863,7 @@ export default function ProdukPage() {
                         }
                         placeholder={`Pertanyaan ${index + 1}`}
                       />
-                      <textarea
-                        className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
+                      <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                         rows={2}
                         value={item.answer}
                         onChange={(event) =>
@@ -1893,11 +1873,11 @@ export default function ProdukPage() {
                         }
                         placeholder="Jawaban FAQ"
                       />
-                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <div className="flex justify-end">
                         <button
                           className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                           type="button"
-                          style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                          style={{ color: '#EF4444', borderColor: '#FECACA' }}
                           onClick={() => removeFaqItem(index)}
                           disabled={form.faq_items.length <= 1}
                         >
@@ -1909,11 +1889,10 @@ export default function ProdukPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-3 gap-2.5">
                 <div>
                   <label className="form-label">Harga Coret / Normal</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.price_original_text}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1926,8 +1905,7 @@ export default function ProdukPage() {
                 </div>
                 <div>
                   <label className="form-label">Teks Harga Harian</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.price_per_day_text}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1940,8 +1918,7 @@ export default function ProdukPage() {
                 </div>
                 <div>
                   <label className="form-label">Teks Badge Diskon</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.discount_badge_text}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1971,8 +1948,7 @@ export default function ProdukPage() {
 
                 <div>
                   <label className="form-label">Nomor WhatsApp CS</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.whatsapp_number}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -1986,8 +1962,7 @@ export default function ProdukPage() {
 
                 <div>
                   <label className="form-label">Label Tombol WhatsApp</label>
-                  <input
-                    className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                  <Input
                     value={form.whatsapp_button_text}
                     onChange={(event) =>
                       setForm((prev) => ({
@@ -2002,8 +1977,7 @@ export default function ProdukPage() {
 
               <div>
                 <label className="form-label">Meta Description (SEO)</label>
-                <textarea
-                  className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
+                <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                   rows={2}
                   value={form.seo_description}
                   onChange={(event) =>
@@ -2016,7 +1990,7 @@ export default function ProdukPage() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 10 }}>
+              <div className="grid grid-cols-[260px_1fr] gap-2.5">
                 <div>
                   <label className="form-label">Tipe Fulfillment</label>
                   <select
@@ -2035,15 +2009,14 @@ export default function ProdukPage() {
                       </option>
                     ))}
                   </select>
-                  <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
+                  <div style={{ marginTop: 6, fontSize: 11, color: '#6B7280' }}>
                     {FULFILLMENT_TYPE_OPTIONS.find((option) => option.value === form.fulfillment_type)?.hint ||
                       FULFILLMENT_TYPE_OPTIONS[0].hint}
                   </div>
                 </div>
                 <div>
                   <label className="form-label">Panduan Delivery</label>
-                  <textarea
-                    className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
+                  <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
                     rows={2}
                     value={form.fulfillment_guide}
                     onChange={(event) =>
@@ -2079,17 +2052,17 @@ export default function ProdukPage() {
               <hr style={{ border: 0, borderTop: '1px solid var(--border)' }} />
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
                   <div>
                     <label className="form-label" style={{ marginBottom: 0 }}>
                       Paket Harga Prem-Apps
                     </label>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    <div style={{ fontSize: 11, color: '#6B7280' }}>
                       Kombinasi unik berdasarkan account_type + durasi bulan. Kelola master tipe di menu Pengaturan.
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <div className="flex gap-1.5 flex-wrap">
                     {activeAccountTypeOptions.map((option) => (
                       <button
                         key={option.value}
@@ -2103,13 +2076,13 @@ export default function ProdukPage() {
                   </div>
                 </div>
 
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: '#6B7280', marginBottom: 6 }}>
                   Klik tipe yang sama berulang kali untuk bikin paket durasi baru (auto isi 1, 2, 3 bulan tanpa duplikat).
                 </div>
 
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div className="grid gap-2">
                   {priceDrafts.length === 0 ? (
-                    <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 12, fontSize: 12, color: 'var(--muted)' }}>
+                    <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 12, fontSize: 12, color: '#6B7280' }}>
                       Belum ada paket harga. Tambahkan minimal satu paket agar produk bisa dibeli.
                     </div>
                   ) : (
@@ -2146,8 +2119,7 @@ export default function ProdukPage() {
 
                           <div>
                             <label className="form-label">Durasi (bulan)</label>
-                            <input
-                              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                            <Input
                               type="number"
                               min={1}
                               value={row.duration}
@@ -2169,8 +2141,7 @@ export default function ProdukPage() {
 
                           <div>
                             <label className="form-label">Harga (IDR)</label>
-                            <input
-                              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                            <Input
                               type="number"
                               min={1}
                               value={row.price}
@@ -2186,8 +2157,7 @@ export default function ProdukPage() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                           <div>
                             <label className="form-label">Label Paket</label>
-                            <input
-                              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                            <Input
                               value={row.label}
                               onChange={(event) =>
                                 updatePriceRow(row.local_id, {
@@ -2200,8 +2170,7 @@ export default function ProdukPage() {
 
                           <div>
                             <label className="form-label">Teks Hemat (opsional)</label>
-                            <input
-                              className="min-h-11 rounded-2xl border-neutral-200 bg-neutral-50/70 px-4 text-sm font-semibold"
+                            <Input
                               value={row.savings_text}
                               onChange={(event) =>
                                 updatePriceRow(row.local_id, {
@@ -2228,11 +2197,11 @@ export default function ProdukPage() {
                           </label>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{formatRupiah(row.price)}</span>
+                            <span style={{ fontSize: 12, color: '#6B7280' }}>{formatRupiah(row.price)}</span>
                             <button
                               className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
                               type="button"
-                              style={{ color: 'var(--red)', borderColor: '#FECACA' }}
+                              style={{ color: '#EF4444', borderColor: '#FECACA' }}
                               onClick={() => removePriceRow(row.local_id)}
                             >
                               Hapus Paket
