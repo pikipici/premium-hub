@@ -21,6 +21,7 @@ import {
   TableRow,
   Textarea,
 } from '@/components/admin/admin-ui'
+import AdminMobileCardList from '@/components/admin/admin-mobile-card-list'
 import { accountTypeService } from '@/services/accountTypeService'
 import { productCategoryService } from '@/services/productCategoryService'
 import { productService } from '@/services/productService'
@@ -1360,81 +1361,32 @@ export default function ProdukPage() {
           </div>
         </div>
 
-        <div className="mobile-card-list">
-          {loading ? (
-            <article className="mobile-card">
-              <div className="mobile-card-sub">Memuat data produk...</div>
-            </article>
-          ) : filteredProducts.length === 0 ? (
-            <article className="mobile-card">
-              <div className="mobile-card-sub">Tidak ada produk untuk filter saat ini.</div>
-            </article>
-          ) : (
-            filteredProducts.map((product) => {
-              const minPrice = getLowestPrice(product)
-
-              return (
-                <article className="mobile-card" key={product.id}>
-                  <div className="mobile-card-head">
-                    <div>
-                      <div className="mobile-card-title">
-                        {product.icon || '📦'} {product.name}
-                      </div>
-                      <div className="mobile-card-sub">/{product.slug}</div>
-                    </div>
-                    <AdminStatusPill tone={product.is_active ? 'green' : 'red'}>{product.is_active ? 'Aktif' : 'Nonaktif'}</AdminStatusPill>
-                  </div>
-
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Kategori</span>
-                    <span className="mobile-card-value">{getCategoryLabel(product.category, categoryOptions)}</span>
-                  </div>
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Harga mulai</span>
-                    <span className="mobile-card-value">{minPrice ? formatRupiah(minPrice) : '-'}</span>
-                  </div>
-                  <div className="mobile-card-row" style={{ alignItems: 'flex-start' }}>
-                    <span className="mobile-card-label">Paket</span>
-                    <span className="mobile-card-value" style={{ maxWidth: '68%' }}>
-                      {summarizePrices(product.prices, accountTypeMap)}
-                    </span>
-                  </div>
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Priority</span>
-                    <span className="mobile-card-value">{product.sort_priority || 0}</span>
-                  </div>
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Flag</span>
-                    <span className="mobile-card-value">{product.is_popular ? 'Populer' : 'Normal'}</span>
-                  </div>
-
-                  <div className="mobile-card-actions">
-                    <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" onClick={() => openEdit(product)}>
-                      Edit
-                    </button>
-                    <button className={`action-btn${product.is_active ? '' : ' orange'}`} onClick={() => toggleActive(product)}>
-                      {product.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-                    </button>
-                    <button
-                      className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                      style={{ color: '#EF4444', borderColor: '#FECACA' }}
-                      onClick={() => archiveProduct(product)}
-                    >
-                      Arsip
-                    </button>
-                    <button
-                      className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                      style={{ color: '#991B1B', borderColor: '#FCA5A5', background: '#FEF2F2' }}
-                      onClick={() => hardDeleteProduct(product)}
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                </article>
-              )
-            })
-          )}
-        </div>
+        <AdminMobileCardList
+          items={filteredProducts}
+          loading={loading}
+          emptyTitle="Tidak ada produk"
+          emptyDescription="Tidak ada produk untuk filter saat ini."
+          renderItem={(product) => {
+            const minPrice = getLowestPrice(product)
+            return (<>
+                <div className="mobile-card-head">
+                  <div><div className="mobile-card-title">{product.icon || '📦'} {product.name}</div><div className="mobile-card-sub">/{product.slug}</div></div>
+                  <AdminStatusPill tone={product.is_active ? 'green' : 'red'}>{product.is_active ? 'Aktif' : 'Nonaktif'}</AdminStatusPill>
+                </div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Kategori</span><span className="mobile-card-value">{getCategoryLabel(product.category, categoryOptions)}</span></div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Harga mulai</span><span className="mobile-card-value">{minPrice ? formatRupiah(minPrice) : '-'}</span></div>
+                <div className="mobile-card-row" style={{ alignItems: 'flex-start' }}><span className="mobile-card-label">Paket</span><span className="mobile-card-value" style={{ maxWidth: '68%' }}>{summarizePrices(product.prices, accountTypeMap)}</span></div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Priority</span><span className="mobile-card-value">{product.sort_priority || 0}</span></div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Flag</span><span className="mobile-card-value">{product.is_popular ? 'Populer' : 'Normal'}</span></div>
+                <div className="mobile-card-actions">
+                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" onClick={() => openEdit(product)}>Edit</button>
+                  <button className={`action-btn${product.is_active ? '' : ' orange'}`} onClick={() => toggleActive(product)}>{product.is_active ? 'Nonaktifkan' : 'Aktifkan'}</button>
+                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => archiveProduct(product)}>Arsip</button>
+                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" style={{ color: '#991B1B', borderColor: '#FCA5A5', background: '#FEF2F2' }} onClick={() => hardDeleteProduct(product)}>Hapus</button>
+                </div>
+              </>)
+          }}
+        />
 
         <button className="mobile-fab" onClick={openCreate}>
           + Produk

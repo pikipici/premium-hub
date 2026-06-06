@@ -5,6 +5,7 @@ import { ADMIN_PAGE_LIMIT, BATCH_ACTION_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AdminDialog, AdminPageHeader, AdminStatCard, AdminStatusPill, Button } from '@/components/admin/admin-ui'
+import AdminMobileCardList from '@/components/admin/admin-mobile-card-list'
 import {
   buildMissingProviderOrderIdRecoveryPayload,
   canRetrySosmedProvider,
@@ -613,6 +614,33 @@ export default function SosmedOrderPage() {
               </table>
             </div>
           )}
+        </div>
+
+        <div className="block sm:hidden">
+          <AdminMobileCardList
+            items={items}
+            loading={loading}
+            emptyTitle="Tidak ada order"
+            emptyDescription="Belum ada order sosmed."
+            renderItem={(order) => {
+              const status = statusLabel(order.order_status)
+              const actions = nextStatusActions(order)
+              return (<>
+                <div style={{ fontWeight: 600 }}>{order.service_title}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{order.service_code}</div>
+                <div style={{ marginTop: 6, fontSize: 12, wordBreak: 'break-all' }}>{order.target_link || '-'}</div>
+                <div style={{ marginTop: 4, fontWeight: 600 }}>{formatRupiah(order.total_price)}</div>
+                <div style={{ marginTop: 4 }}><AdminStatusPill tone={status.tone}>{status.label}</AdminStatusPill></div>
+                <div style={{ marginTop: 4, fontSize: 11, color: 'var(--muted)' }}>{formatDate(order.created_at)}</div>
+                <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button className="action-btn" type="button" disabled={saving || detailLoading} onClick={() => void openDetail(order)}>Detail</button>
+                  {order.provider_code === 'jap' && order.provider_order_id ? <button className="action-btn" type="button" disabled={saving} onClick={() => void syncProvider(order)}>Sync</button> : null}
+                  {canRetryProvider(order) ? <button className="action-btn" type="button" disabled={saving} onClick={() => void retryProvider(order)}>Retry</button> : null}
+                  {actions.map((action) => <button key={`${order.id}-${action.status}`} className="action-btn" type="button" disabled={saving} onClick={() => void updateStatus(order, action.status)}>{action.label}</button>)}
+                </div>
+              </>)
+            }}
+          />
         </div>
 
         {!loading && total > 0 ? (

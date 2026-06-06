@@ -8,6 +8,7 @@ import { isCredentialFulfillment } from '@/lib/fulfillment'
 import { productService } from '@/services/productService'
 import type { AccountType } from '@/types/accountType'
 import { AdminDialog, AdminPageHeader, AdminStatCard, AdminStatusPill, Button } from '@/components/admin/admin-ui'
+import AdminMobileCardList from '@/components/admin/admin-mobile-card-list'
 import { ListPagination } from '@/components/shared/list-pagination'
 import { ADMIN_PAGE_LIMIT, LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import type { Order } from '@/types/order'
@@ -678,96 +679,36 @@ export default function OrderPage() {
           </div>
         </div>
 
-        <div className="mobile-card-list">
-          {loading ? (
-            <article className="mobile-card">
-              <div className="mobile-card-sub">Memuat daftar order...</div>
-            </article>
-          ) : filteredOrders.length === 0 ? (
-            <article className="mobile-card">
-              <div className="mobile-card-sub">Tidak ada order pada filter ini.</div>
-            </article>
-          ) : (
-            filteredOrders.map((order) => {
-              const product = resolveProduct(order)
-              const currentStatus = statusMeta(order)
-              const isRunning = actionOrderID === order.id
-
-              const canConfirm = order.payment_status === 'pending' && order.order_status === 'pending'
-              const canSendAccount =
-                (order.payment_status === 'paid' || order.order_status === 'active') &&
-                !order.stock_id
-
-              return (
-                <article className="mobile-card" key={order.id}>
-                  <div className="mobile-card-head">
-                    <div>
-                      <div className="mobile-card-title">
-                        {shortOrderCode(order.id)} · {getBuyerName(order)}
-                      </div>
-                      <div className="mobile-card-sub">{getBuyerEmail(order)}</div>
-                    </div>
-                    <AdminStatusPill tone={currentStatus.tone}>{currentStatus.label}</AdminStatusPill>
-                  </div>
-
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Produk</span>
-                    <span className="mobile-card-value">
-                      {product.icon} {product.name}
-                    </span>
-                  </div>
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Paket</span>
-                    <span className="mobile-card-value">{accountPackage(order, accountTypeLookup)}</span>
-                  </div>
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Tanggal</span>
-                    <span className="mobile-card-value">{formatDate(order.created_at)}</span>
-                  </div>
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Total</span>
-                    <span className="mobile-card-value">{formatRupiah(order.total_price || 0)}</span>
-                  </div>
-
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Payment</span>
-                    <span className="mobile-card-value">{paymentStatusLabel(order.payment_status)}</span>
-                  </div>
-                  <div className="mobile-card-row">
-                    <span className="mobile-card-label">Order</span>
-                    <span className="mobile-card-value">{orderStatusLabel(order.order_status)}</span>
-                  </div>
-
-                  <div className="mobile-card-actions">
-                    <button className="action-btn" onClick={() => setSelectedOrder(order)}>
-                      Detail
-                    </button>
-
-                    {canConfirm && (
-                      <button
-                        className="action-btn orange"
-                        disabled={isRunning}
-                        onClick={() => runOrderAction(order, 'confirm')}
-                      >
-                        {isRunning ? 'Proses...' : 'Konfirmasi'}
-                      </button>
-                    )}
-
-                    {!canConfirm && canSendAccount && (
-                      <button
-                        className="action-btn orange"
-                        disabled={isRunning}
-                        onClick={() => runOrderAction(order, 'send')}
-                      >
-                        {isRunning ? 'Proses...' : 'Kirim Akun'}
-                      </button>
-                    )}
-                  </div>
-                </article>
-              )
-            })
-          )}
-        </div>
+        <AdminMobileCardList
+          items={filteredOrders}
+          loading={loading}
+          emptyTitle="Tidak ada order"
+          emptyDescription="Tidak ada order pada filter ini."
+          renderItem={(order) => {
+            const product = resolveProduct(order)
+            const currentStatus = statusMeta(order)
+            const isRunning = actionOrderID === order.id
+            const canConfirm = order.payment_status === 'pending' && order.order_status === 'pending'
+            const canSendAccount = (order.payment_status === 'paid' || order.order_status === 'active') && !order.stock_id
+            return (<>
+                <div className="mobile-card-head">
+                  <div><div className="mobile-card-title">{shortOrderCode(order.id)} · {getBuyerName(order)}</div><div className="mobile-card-sub">{getBuyerEmail(order)}</div></div>
+                  <AdminStatusPill tone={currentStatus.tone}>{currentStatus.label}</AdminStatusPill>
+                </div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Produk</span><span className="mobile-card-value">{product.icon} {product.name}</span></div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Paket</span><span className="mobile-card-value">{accountPackage(order, accountTypeLookup)}</span></div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Tanggal</span><span className="mobile-card-value">{formatDate(order.created_at)}</span></div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Total</span><span className="mobile-card-value">{formatRupiah(order.total_price || 0)}</span></div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Payment</span><span className="mobile-card-value">{paymentStatusLabel(order.payment_status)}</span></div>
+                <div className="mobile-card-row"><span className="mobile-card-label">Order</span><span className="mobile-card-value">{orderStatusLabel(order.order_status)}</span></div>
+                <div className="mobile-card-actions">
+                  <button className="action-btn" onClick={() => setSelectedOrder(order)}>Detail</button>
+                  {canConfirm && <button className="action-btn orange" disabled={isRunning} onClick={() => runOrderAction(order, 'confirm')}>{isRunning ? 'Proses...' : 'Konfirmasi'}</button>}
+                  {!canConfirm && canSendAccount && <button className="action-btn orange" disabled={isRunning} onClick={() => runOrderAction(order, 'send')}>{isRunning ? 'Proses...' : 'Kirim Akun'}</button>}
+                </div>
+              </>)
+          }}
+        />
 
         <div className="mobile-card" style={{ marginTop: 10 }}>
           <div className="mobile-card-row">
