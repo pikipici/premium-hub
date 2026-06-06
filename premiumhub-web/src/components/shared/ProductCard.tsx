@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { formatRupiah } from '@/lib/utils'
 import { fulfillmentTypeLabel, isCredentialFulfillment } from '@/lib/fulfillment'
+import EmblaCarousel from '@/components/shared/EmblaCarousel'
 import type { Product } from '@/types/product'
 
 export default function ProductCard({ product }: { product: Product }) {
@@ -59,7 +60,9 @@ export default function ProductCard({ product }: { product: Product }) {
 
         {/* Image / icon */}
         <div className="relative aspect-[4/3] rounded-xl bg-[#F7F7F5] mb-3 overflow-hidden flex items-center justify-center">
-          {product.icon_image_url ? (
+          {product.cover_images && product.cover_images.length > 0 ? (
+            <EmblaCarousel images={product.cover_images} alt={product.name} />
+          ) : product.icon_image_url ? (
             <Image src={product.icon_image_url} alt={product.name} fill unoptimized className="object-contain p-4" />
           ) : (
             <span className="text-5xl sm:text-6xl">{product.icon || '📦'}</span>

@@ -16,6 +16,7 @@ export interface AdminProductPayload {
   tagline?: string
   icon?: string
   icon_image_url?: string
+  cover_images?: string[]
   color?: string
   hero_bg_url?: string
   badge_popular_text?: string
@@ -114,12 +115,19 @@ export const productService = {
     return res.data
   },
 
+  adminDeleteCoverAsset: async (productId: string, coverUrl: string) => {
+    const res = await api.delete<ApiResponse<unknown>>(`/admin/products/${productId}/assets/cover`, {
+      params: { url: coverUrl },
+    })
+    return res.data
+  },
+
   adminDeletePrice: async (productId: string, priceId: string) => {
     const res = await api.delete<ApiResponse<null>>(`/admin/products/${productId}/prices/${priceId}`)
     return res.data
   },
 
-  adminUploadAsset: async (productId: string, kind: 'icon' | 'hero', file: File) => {
+  adminUploadAsset: async (productId: string, kind: 'icon' | 'hero' | 'cover', file: File) => {
     const formData = new FormData()
     formData.append('kind', kind)
     formData.append('file', file)

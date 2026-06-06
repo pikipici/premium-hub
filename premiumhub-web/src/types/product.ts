@@ -27,6 +27,7 @@ export interface Product {
   tagline?: string
   icon: string
   icon_image_url?: string
+  cover_images?: string[]
   color: string
   hero_bg_url?: string
   badge_popular_text?: string

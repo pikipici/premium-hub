@@ -584,6 +584,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/products", productHandler.Create)
 	admin.PUT("/products/:id", productHandler.Update)
 	admin.POST("/products/:id/assets", productHandler.UploadAsset)
+	admin.DELETE("/products/:id/assets/cover", productHandler.DeleteCoverAsset)
 	admin.DELETE("/products/:id", productHandler.Delete)
 	admin.DELETE("/products/:id/permanent", productHandler.DeletePermanent)
 	admin.POST("/products/:id/prices", productHandler.CreatePrice)

@@ -40,6 +40,7 @@ type FormState = {
   tagline: string
   icon: string
   icon_image_url: string
+  cover_images: string[]
   color: string
   hero_bg_url: string
   badge_popular_text: string
@@ -135,6 +136,7 @@ function createDefaultForm(): FormState {
     tagline: '',
     icon: '📦',
     icon_image_url: '',
+    cover_images: [],
     color: '#FDDAC8',
     hero_bg_url: '',
     badge_popular_text: '🔥 Terlaris',
@@ -380,6 +382,7 @@ export default function ProdukPage() {
   const [priceDrafts, setPriceDrafts] = useState<ProductPriceDraft[]>([])
   const [removedPriceIds, setRemovedPriceIds] = useState<string[]>([])
   const [uploadingAssetKind, setUploadingAssetKind] = useState<null | 'icon' | 'hero'>(null)
+  const [uploadingCover, setUploadingCover] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmTitle, setConfirmTitle] = useState('')
   const [confirmDescription, setConfirmDescription] = useState('')
@@ -595,6 +598,7 @@ export default function ProdukPage() {
       tagline: product.tagline ?? '',
       icon: product.icon || '📦',
       icon_image_url: product.icon_image_url || '',
+      cover_images: product.cover_images || [],
       color: product.color || '#FDDAC8',
       hero_bg_url: product.hero_bg_url || '',
       badge_popular_text: product.badge_popular_text || '🔥 Terlaris',
@@ -874,6 +878,7 @@ export default function ProdukPage() {
       tagline: form.tagline.trim(),
       icon: form.icon.trim() || '📦',
       icon_image_url: form.icon_image_url.trim(),
+      cover_images: form.cover_images.filter(Boolean),
       color: form.color.trim() || '#FDDAC8',
       hero_bg_url: form.hero_bg_url.trim(),
       badge_popular_text: form.badge_popular_text.trim(),
@@ -1067,6 +1072,65 @@ export default function ProdukPage() {
       setError(mapErrorMessage(err, 'Gagal upload gambar produk'))
     } finally {
       setUploadingAssetKind(null)
+    }
+  }
+
+  const handleUploadCover = async (file?: File) => {
+    if (!file) return
+    if (!editingId || formMode !== 'edit') {
+      setError('Upload cover hanya bisa setelah produk dibuat (mode edit).')
+      return
+    }
+    if (form.cover_images.length >= 8) {
+      setError('Maksimal 8 cover images per produk.')
+      return
+    }
+
+    try {
+      setUploadingCover(true)
+      setError('')
+
+      const res = await productService.adminUploadAsset(editingId, 'cover', file)
+      if (!res.success) {
+        setError(res.message || 'Gagal upload cover image')
+        return
+      }
+
+      const nextUrl = res.data?.url || ''
+      setForm((prev) => ({
+        ...prev,
+        cover_images: [...prev.cover_images, nextUrl],
+      }))
+      setNotice('Cover image berhasil diupload ke R2.')
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal upload cover image'))
+    } finally {
+      setUploadingCover(false)
+    }
+  }
+
+  const handleRemoveCover = async (coverUrl: string) => {
+    if (!editingId || formMode !== 'edit') {
+      setForm((prev) => ({
+        ...prev,
+        cover_images: prev.cover_images.filter((url) => url !== coverUrl),
+      }))
+      return
+    }
+
+    try {
+      const res = await productService.adminDeleteCoverAsset(editingId, coverUrl)
+      if (!res.success) {
+        setError(res.message || 'Gagal menghapus cover image')
+        return
+      }
+      setForm((prev) => ({
+        ...prev,
+        cover_images: prev.cover_images.filter((url) => url !== coverUrl),
+      }))
+      setNotice('Cover image berhasil dihapus.')
+    } catch (err) {
+      setError(mapErrorMessage(err, 'Gagal menghapus cover image'))
     }
   }
 
@@ -1514,6 +1578,62 @@ export default function ProdukPage() {
                     Wajib rasio 16:9, minimal 1280x720 (rekomendasi 1600x900).
                   </div>
                 </div>
+              </div>
+
+              {/* Cover Images */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                  <div>
+                    <label className="form-label" style={{ marginBottom: 0 }}>
+                      Cover Images (Carousel)
+                    </label>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                      Maksimal 8 gambar. Format PNG/JPG/WebP, minimal 640x360px.
+                    </div>
+                  </div>
+                  <label
+                    className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition cursor-pointer"
+                    style={{ cursor: uploadingCover || formMode !== 'edit' ? 'not-allowed' : 'pointer', opacity: uploadingCover || formMode !== 'edit' ? 0.5 : 1 }}
+                  >
+                    {uploadingCover ? 'Uploading...' : '+ Upload Cover'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={(event) => void handleUploadCover(event.target.files?.[0])}
+                      disabled={uploadingCover || formMode !== 'edit'}
+                    />
+                  </label>
+                </div>
+
+                {form.cover_images.length === 0 ? (
+                  <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 12, fontSize: 12, color: 'var(--muted)' }}>
+                    Belum ada cover images. Upload gambar tambahan untuk carousel produk.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                    {form.cover_images.map((url, index) => (
+                      <div key={`cover-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', position: 'relative' }}>
+                        <div style={{ aspectRatio: '4/3', background: '#F7F7F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <img src={url} alt={`Cover ${index + 1}`} style={{ objectFit: 'contain', padding: 8, width: '100%', height: '100%' }} />
+                        </div>
+                        <div style={{ padding: '4px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAFAFA' }}>
+                          <span style={{ fontSize: 10, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>
+                            Cover {index + 1}
+                          </span>
+                          <button
+                            type="button"
+                            className="inline-flex h-7 items-center rounded-lg px-2 text-[10px] font-bold"
+                            style={{ color: 'var(--red)', border: '1px solid #FECACA' }}
+                            onClick={() => handleRemoveCover(url)}
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

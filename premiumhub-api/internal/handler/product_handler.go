@@ -136,6 +136,28 @@ func (h *ProductHandler) UploadAsset(c *gin.Context) {
 	response.Success(c, "Asset produk berhasil diupload", gin.H{"url": assetURL})
 }
 
+func (h *ProductHandler) DeleteCoverAsset(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "ID tidak valid")
+		return
+	}
+
+	coverURL := strings.TrimSpace(c.Query("url"))
+	if coverURL == "" {
+		response.BadRequest(c, "url cover wajib diisi")
+		return
+	}
+
+	product, err := h.productSvc.DeleteCoverImage(id, coverURL)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Cover image berhasil dihapus", product)
+}
+
 func (h *ProductHandler) Delete(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {

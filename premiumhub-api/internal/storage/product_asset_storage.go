@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	productAssetKindIcon = "icon"
-	productAssetKindHero = "hero"
+	productAssetKindIcon  = "icon"
+	productAssetKindHero  = "hero"
+	productAssetKindCover = "cover"
 )
 
 type ProductAssetStorage struct {
@@ -53,7 +54,7 @@ func (s *ProductAssetStorage) Store(ctx context.Context, productID, kind string,
 	}
 
 	kind = strings.ToLower(strings.TrimSpace(kind))
-	if kind != productAssetKindIcon && kind != productAssetKindHero {
+	if kind != productAssetKindIcon && kind != productAssetKindHero && kind != productAssetKindCover {
 		return "", fmt.Errorf("kind asset tidak valid")
 	}
 
@@ -123,6 +124,11 @@ func validateProductAssetDimensions(kind string, width, height int) error {
 		}
 		if !isNearRatio(width, height, 16, 9, 0.03) {
 			return fmt.Errorf("background wajib rasio 16:9, contoh 1600x900")
+		}
+		return nil
+	case productAssetKindCover:
+		if width < 640 || height < 360 {
+			return fmt.Errorf("cover minimal 640x360 px (rekomendasi 1280x720)")
 		}
 		return nil
 	default:

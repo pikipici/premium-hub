@@ -194,6 +194,7 @@ type CreateProductInput struct {
 	Tagline            string                    `json:"tagline"`
 	Icon               string                    `json:"icon"`
 	IconImageURL       string                    `json:"icon_image_url"`
+	CoverImages        []string                  `json:"cover_images"`
 	Color              string                    `json:"color"`
 	HeroBgURL          string                    `json:"hero_bg_url"`
 	BadgePopularText   string                    `json:"badge_popular_text"`
@@ -272,6 +273,7 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 		Tagline:            strings.TrimSpace(input.Tagline),
 		Icon:               strings.TrimSpace(input.Icon),
 		IconImageURL:       strings.TrimSpace(input.IconImageURL),
+		CoverImages:        sanitizeStringListWithLimit(input.CoverImages, 8),
 		Color:              strings.TrimSpace(input.Color),
 		HeroBgURL:          strings.TrimSpace(input.HeroBgURL),
 		BadgePopularText:   strings.TrimSpace(input.BadgePopularText),
@@ -311,6 +313,7 @@ type UpdateProductInput struct {
 	Tagline            *string                    `json:"tagline"`
 	Icon               *string                    `json:"icon"`
 	IconImageURL       *string                    `json:"icon_image_url"`
+	CoverImages        *[]string                  `json:"cover_images"`
 	Color              *string                    `json:"color"`
 	HeroBgURL          *string                    `json:"hero_bg_url"`
 	BadgePopularText   *string                    `json:"badge_popular_text"`
@@ -385,6 +388,9 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 	}
 	if input.IconImageURL != nil {
 		product.IconImageURL = strings.TrimSpace(*input.IconImageURL)
+	}
+	if input.CoverImages != nil {
+		product.CoverImages = sanitizeStringListWithLimit(*input.CoverImages, 8)
 	}
 	if input.Color != nil {
 		product.Color = strings.TrimSpace(*input.Color)
@@ -644,6 +650,11 @@ func (s *ProductService) UploadAsset(productID uuid.UUID, kind string, file *mul
 		product.IconImageURL = assetURL
 	case "hero":
 		product.HeroBgURL = assetURL
+	case "cover":
+		if len(product.CoverImages) >= 8 {
+			return "", errors.New("maksimal 8 cover images per produk")
+		}
+		product.CoverImages = append(product.CoverImages, assetURL)
 	default:
 		return "", errors.New("kind asset tidak valid")
 	}
@@ -653,6 +664,30 @@ func (s *ProductService) UploadAsset(productID uuid.UUID, kind string, file *mul
 	}
 
 	return assetURL, nil
+}
+
+func (s *ProductService) DeleteCoverImage(productID uuid.UUID, coverURL string) (*model.Product, error) {
+	if coverURL == "" {
+		return nil, errors.New("url cover wajib diisi")
+	}
+
+	product, err := s.productRepo.FindByID(productID)
+	if err != nil {
+		return nil, errors.New("produk tidak ditemukan")
+	}
+
+	filtered := make([]string, 0, len(product.CoverImages))
+	for _, url := range product.CoverImages {
+		if url != coverURL {
+			filtered = append(filtered, url)
+		}
+	}
+	product.CoverImages = filtered
+
+	if err := s.productRepo.Update(product); err != nil {
+		return nil, errors.New("gagal menghapus cover image")
+	}
+	return product, nil
 }
 
 func (s *ProductService) DeletePrice(productID, priceID uuid.UUID) error {
