@@ -7,6 +7,7 @@ import { orderService, type AdminOrderStatus } from '@/services/orderService'
 import { isCredentialFulfillment } from '@/lib/fulfillment'
 import { productService } from '@/services/productService'
 import type { AccountType } from '@/types/accountType'
+import { AdminPageHeader, AdminStatCard, AdminStatusPill, AdminSurface, Button } from '@/components/admin/admin-ui'
 import { ListPagination } from '@/components/shared/list-pagination'
 import { ADMIN_PAGE_LIMIT, LOOKUP_PRELOAD_LIMIT } from '@/config/pagination'
 import type { Order } from '@/types/order'
@@ -67,22 +68,18 @@ function mapErrorMessage(err: unknown, fallback: string) {
 
 function statusMeta(order: Order) {
   if (order.payment_status === 'failed' || order.payment_status === 'expired' || order.order_status === 'failed') {
-    return { label: 'Gagal', className: 's-gagal' }
+    return { label: 'Gagal', tone: 'red' as const }
   }
-
   if (order.order_status === 'completed') {
-    return { label: 'Selesai', className: 's-proses' }
+    return { label: 'Selesai', tone: 'neutral' as const }
   }
-
   if (order.order_status === 'active') {
-    return { label: 'Aktif', className: 's-lunas' }
+    return { label: 'Aktif', tone: 'green' as const }
   }
-
   if (order.payment_status === 'paid') {
-    return { label: 'Lunas', className: 's-lunas' }
+    return { label: 'Lunas', tone: 'green' as const }
   }
-
-  return { label: 'Pending', className: 's-pending' }
+  return { label: 'Pending', tone: 'amber' as const }
 }
 
 function paymentStatusLabel(value: Order['payment_status']) {
@@ -434,7 +431,7 @@ export default function OrderPage() {
   }
 
   return (
-    <div className="page">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 grid gap-4">
       {!!notice && (
         <div className="alert-bar" style={{ marginBottom: 12 }}>
           ✅ <strong>{notice}</strong>
@@ -588,7 +585,7 @@ export default function OrderPage() {
                         <td style={{ fontWeight: 600 }}>{formatRupiah(order.total_price || 0)}</td>
                         <td style={{ color: 'var(--muted)', fontSize: 12 }}>{formatDate(order.created_at)}</td>
                         <td>
-                          <span className={`status-badge ${currentStatus.className}`}>{currentStatus.label}</span>
+                          <AdminStatusPill tone={currentStatus.tone}>{currentStatus.label}</AdminStatusPill>
                           <div style={{ marginTop: 4, fontSize: 10, color: 'var(--muted)' }}>
                             pay:{paymentStatusLabel(order.payment_status)} · order:{orderStatusLabel(order.order_status)}
                           </div>
@@ -709,7 +706,7 @@ export default function OrderPage() {
                       </div>
                       <div className="mobile-card-sub">{getBuyerEmail(order)}</div>
                     </div>
-                    <span className={`status-badge ${currentStatus.className}`}>{currentStatus.label}</span>
+                    <AdminStatusPill tone={currentStatus.tone}>{currentStatus.label}</AdminStatusPill>
                   </div>
 
                   <div className="mobile-card-row">

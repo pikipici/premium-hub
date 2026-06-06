@@ -4,6 +4,7 @@ import { ListPagination } from '@/components/shared/list-pagination'
 import { ADMIN_PAGE_LIMIT, BATCH_ACTION_LIMIT } from '@/config/pagination'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { AdminPageHeader, AdminStatCard, AdminStatusPill, AdminSurface, Button } from '@/components/admin/admin-ui'
 import {
   buildMissingProviderOrderIdRecoveryPayload,
   canRetrySosmedProvider,
@@ -40,19 +41,19 @@ function formatDate(value: string) {
 function statusLabel(value: string) {
   switch (value) {
     case 'pending_payment':
-      return { label: 'Menunggu Bayar', className: 's-tunggu' }
+      return { label: 'Menunggu Bayar', tone: 'amber' as const }
     case 'processing':
-      return { label: 'Diproses', className: 's-proses' }
+      return { label: 'Diproses', tone: 'neutral' as const }
     case 'success':
-      return { label: 'Sukses', className: 's-lunas' }
+      return { label: 'Sukses', tone: 'green' as const }
     case 'failed':
-      return { label: 'Gagal', className: 's-gagal' }
+      return { label: 'Gagal', tone: 'red' as const }
     case 'canceled':
-      return { label: 'Dibatalkan', className: 's-gagal' }
+      return { label: 'Dibatalkan', tone: 'red' as const }
     case 'expired':
-      return { label: 'Expired', className: 's-gagal' }
+      return { label: 'Expired', tone: 'red' as const }
     default:
-      return { label: value || '-', className: 's-tunggu' }
+      return { label: value || '-', tone: 'amber' as const }
   }
 }
 
@@ -326,7 +327,7 @@ export default function SosmedOrderPage() {
   }
 
   return (
-    <div className="page">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 grid gap-4">
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div>
@@ -462,7 +463,7 @@ export default function SosmedOrderPage() {
                           <div style={{ textTransform: 'uppercase', fontWeight: 600 }}>{order.payment_status}</div>
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>{order.payment_method || '-'}</div>
                         </td>
-                        <td><span className={`status ${status.className}`}>{status.label}</span></td>
+                        <td><AdminStatusPill tone={status.tone}>{status.label}</AdminStatusPill></td>
                         <td>
                           <div style={{ fontWeight: 600 }}>{(order.provider_code || '-').toUpperCase()}</div>
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
@@ -624,7 +625,7 @@ export default function SosmedOrderPage() {
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>Status</div>
-                  <div><span className={`status ${statusLabel(detail.order.order_status).className}`}>{statusLabel(detail.order.order_status).label}</span></div>
+                  <div><AdminStatusPill tone={statusLabel(detail.order.order_status).tone}>{statusLabel(detail.order.order_status).label}</AdminStatusPill></div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>{detail.order.payment_status} via {detail.order.payment_method || '-'}</div>
                 </div>
                 <div>
