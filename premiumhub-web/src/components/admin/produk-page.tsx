@@ -9,6 +9,7 @@ import {
   AdminFilterBar,
   AdminPageHeader,
   AdminStatCard,
+  AdminStatusPill,
   AdminSurface,
   Button,
   Input,
@@ -1280,14 +1281,10 @@ export default function ProdukPage() {
                         <TableCell style={{ fontSize: 12, color: '#6B7280' }}>{summarizePrices(product.prices, accountTypeMap)}</TableCell>
                         <TableCell style={{ fontWeight: 600, fontSize: 12 }}>{product.sort_priority || 0}</TableCell>
                         <TableCell>
-                          <span className={`status-badge ${product.is_popular ? 's-lunas' : 's-pending'}`}>
-                            {product.is_popular ? 'Populer' : 'Normal'}
-                          </span>
+                          <AdminStatusPill tone={product.is_popular ? 'green' : 'neutral'}>{product.is_popular ? 'Populer' : 'Normal'}</AdminStatusPill>
                         </TableCell>
                         <TableCell>
-                          <span className={`status-badge ${product.is_active ? 's-lunas' : 's-gagal'}`}>
-                            {product.is_active ? 'Aktif' : 'Nonaktif'}
-                          </span>
+                          <AdminStatusPill tone={product.is_active ? 'green' : 'red'}>{product.is_active ? 'Aktif' : 'Nonaktif'}</AdminStatusPill>
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1.5 flex-wrap">
@@ -1385,9 +1382,7 @@ export default function ProdukPage() {
                       </div>
                       <div className="mobile-card-sub">/{product.slug}</div>
                     </div>
-                    <span className={`status-badge ${product.is_active ? 's-lunas' : 's-gagal'}`}>
-                      {product.is_active ? 'Aktif' : 'Nonaktif'}
-                    </span>
+                    <AdminStatusPill tone={product.is_active ? 'green' : 'red'}>{product.is_active ? 'Aktif' : 'Nonaktif'}</AdminStatusPill>
                   </div>
 
                   <div className="mobile-card-row">
