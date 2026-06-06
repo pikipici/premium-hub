@@ -66,6 +66,7 @@ type Product struct {
 	SeoDescription     string                    `gorm:"type:text" json:"seo_description"`
 	FulfillmentType    string                    `gorm:"size:40;default:credential" json:"fulfillment_type"`
 	FulfillmentGuide   string                    `gorm:"type:text" json:"fulfillment_guide"`
+	Metadata           map[string]any            `gorm:"serializer:json" json:"metadata,omitempty"`
 	SortPriority       int                       `gorm:"default:0" json:"sort_priority"`
 	IsPopular          bool                      `gorm:"default:false" json:"is_popular"`
 	IsActive           bool                      `gorm:"default:true" json:"is_active"`

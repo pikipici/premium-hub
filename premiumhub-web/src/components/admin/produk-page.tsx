@@ -65,6 +65,7 @@ type FormState = {
   seo_description: string
   fulfillment_type: Product['fulfillment_type']
   fulfillment_guide: string
+  metadata: Record<string, unknown>
   sort_priority: number
   is_popular: boolean
   is_active: boolean
@@ -161,6 +162,7 @@ function createDefaultForm(): FormState {
     seo_description: '',
     fulfillment_type: 'credential',
     fulfillment_guide: '',
+    metadata: {},
     sort_priority: 0,
     is_popular: false,
     is_active: true,
@@ -400,6 +402,25 @@ export default function ProdukPage() {
     }, {})
   }, [accountTypes])
 
+  const CATEGORY_TEMPLATES: Record<string, { defaultFulfillment: Product['fulfillment_type']; hiddenFields: string[] }> = {
+    streaming: { defaultFulfillment: 'credential', hiddenFields: [] },
+    music: { defaultFulfillment: 'credential', hiddenFields: [] },
+    gaming: { defaultFulfillment: 'manual', hiddenFields: ['shared_note', 'private_note'] },
+    design: { defaultFulfillment: 'credential', hiddenFields: [] },
+    productivity: { defaultFulfillment: 'license_key', hiddenFields: ['shared_note', 'private_note'] },
+  }
+
+
+const PRODUCT_TYPE_OPTIONS = [
+  { value: 'subscription', label: 'Akun Premium', icon: '👤', desc: 'Akun sharing/private (Netflix, Spotify, dsb)', defaultFulfillment: 'credential', defaultCategory: 'streaming' },
+  { value: 'game', label: 'Akun Game', icon: '🎮', desc: 'Akun game / top-up / joki', defaultFulfillment: 'manual', defaultCategory: 'gaming' },
+  { value: 'license', label: 'Lisensi / Key', icon: '🔑', desc: 'Kode lisensi, software key, redeem code', defaultFulfillment: 'license_key', defaultCategory: 'productivity' },
+  { value: 'digital', label: 'Voucher / Digital', icon: '🎟', desc: 'Voucher, gift card, download link', defaultFulfillment: 'voucher_code', defaultCategory: 'design' },
+]
+
+  const currentTemplate = CATEGORY_TEMPLATES[form.category]
+  const showField = (field: string) => !currentTemplate?.hiddenFields.includes(field)
+
   const activeAccountTypeOptions = useMemo(() => {
     const sorted = [...accountTypes]
       .filter((item) => item.is_active)
@@ -635,6 +656,7 @@ export default function ProdukPage() {
       seo_description: product.seo_description || '',
       fulfillment_type: product.fulfillment_type || 'credential',
       fulfillment_guide: product.fulfillment_guide || '',
+      metadata: product.metadata || {},
       sort_priority: product.sort_priority || 0,
       is_popular: product.is_popular,
       is_active: product.is_active,
@@ -1400,777 +1422,394 @@ export default function ProdukPage() {
         onOpenChange={(open) => { if (!open) closeForm() }}
         title={formMode === 'create' ? 'Tambah Produk Baru' : 'Edit Produk + Konten + Harga'}
         description="Kelola produk digital, konten, dan paket harga."
+
         className="sm:max-w-2xl"
         footer={
           <>
             <Button variant="outline" onClick={closeForm} disabled={saving}>Batal</Button>
             <Button className="bg-[#ff5733] text-white hover:bg-[#e84b2b]" onClick={submitForm} disabled={saving}>
-              {saving ? 'Menyimpan...' : formMode === 'create' ? 'Simpan Produk + Konten + Harga' : 'Update Produk + Konten + Harga'}
+              {saving ? 'Menyimpan...' : formMode === 'create' ? 'Simpan Produk' : 'Update Produk'}
             </Button>
           </>
         }
       >
 
-            <div style={{ padding: '4px 0', display: 'grid', gap: 12 }}>
-              <div>
-                <label className="form-label">Nama Produk</label>
-                <Input
-                  value={form.name}
-                  onChange={(event) => {
-                    const nextName = event.target.value
-                    setForm((prev) => ({
-                      ...prev,
-                      name: nextName,
-                      slug: !slugTouched ? slugify(nextName) : prev.slug,
-                    }))
-                  }}
-                  placeholder="Contoh: Netflix Premium"
-                />
-              </div>
+        <div style={{ padding: '4px 0', display: 'grid', gap: 16 }}>
+          {/* ===== SECTION 1: INFORMASI DASAR ===== */}
+          <div style={{ padding: 14, borderRadius: 12, border: '1px solid #E5E7EB', background: '#FAFAFA' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#141414' }}>1. Informasi Dasar</div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="form-label">Nama Produk</label>
+              <Input value={form.name}
+                onChange={(event) => { const n = event.target.value; setForm((prev) => ({ ...prev, name: n, slug: !slugTouched ? slugify(n) : prev.slug })) }}
+                placeholder="Contoh: Netflix Premium 1 Bulan" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5" style={{ marginTop: 10 }}>
+              <div>
+                <label className="form-label">Slug URL</label>
+                <Input value={form.slug}
+                  onChange={(event) => { setSlugTouched(true); setForm((prev) => ({ ...prev, slug: slugify(event.target.value) })) }}
+                  placeholder="netflix-premium" />
+                <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>/product/digiproduct/{form.slug || 'slug-produk'}</div>
+              </div>
+              <div>
+                <label className="form-label">Kategori</label>
+                <select className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
+                  value={form.category}
+                  onChange={(event) => { const cat = event.target.value; const tmpl = CATEGORY_TEMPLATES[cat]; setForm((prev) => ({ ...prev, category: cat, fulfillment_type: tmpl ? tmpl.defaultFulfillment : prev.fulfillment_type })) }}>
+                  {formCategoryOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5" style={{ marginTop: 10 }}>
+              <div>
+                <label className="form-label">Tipe Produk</label>
+                <select className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
+                  value={(form.metadata?.product_type as string) || ''}
+                  onChange={(event) => { const type = event.target.value; const opt = PRODUCT_TYPE_OPTIONS.find((o) => o.value === type); if (opt) { setForm((prev) => ({ ...prev, category: opt.defaultCategory, fulfillment_type: opt.defaultFulfillment as Product['fulfillment_type'], metadata: { product_type: type } })) } }}>
+                  <option value="">-- Pilih Tipe Produk --</option>
+                  {PRODUCT_TYPE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>)}
+                </select>
+                {(() => { const sel = PRODUCT_TYPE_OPTIONS.find((o) => o.value === form.metadata?.product_type); return sel ? <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>{sel.desc}</div> : null })()}
+              </div>
+              <div>
+                <label className="form-label">Icon Emoji</label>
+                <Input value={form.icon} onChange={(e) => setForm((prev) => ({ ...prev, icon: e.target.value }))} placeholder="🎬" />
+              </div>
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              <label className="form-label">Deskripsi Singkat</label>
+              <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={3}
+                value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                placeholder="Deskripsikan produk dalam 1-2 kalimat" />
+            </div>
+          </div>
+
+          {/* ===== SECTION 2: DETAIL PER TIPE ===== */}
+          <div style={{ padding: 14, borderRadius: 12, border: '1px solid #E5E7EB', background: '#FAFAFA' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#141414' }}>2. Detail Produk</div>
+
+            {/* Tipe: Akun Premium */}
+            {form.metadata?.product_type === 'subscription' && (
+              <div style={{ display: 'grid', gap: 10 }}>
                 <div>
-                  <label className="form-label">Slug URL</label>
-                  <Input
-                    value={form.slug}
-                    onChange={(event) => {
-                      setSlugTouched(true)
-                      setForm((prev) => ({
-                        ...prev,
-                        slug: slugify(event.target.value),
-                      }))
-                    }}
-                    placeholder="contoh: netflix-premium"
-                  />
-                  <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>
-                    URL publik: /product/digiproduct/{form.slug || 'slug-produk'}
+                  <label className="form-label">Tipe Fulfillment (auto)</label>
+                  <Input value="Credential — Email/password atau akses akun" disabled style={{ opacity: 0.7 }} />
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="form-label">Catatan Akun Shared</label>
+                    <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                      value={form.shared_note} onChange={(e) => setForm((prev) => ({ ...prev, shared_note: e.target.value }))}
+                      placeholder="Contoh: Akun dipakai bersama, 1 profil aktif" />
+                  </div>
+                  <div>
+                    <label className="form-label">Catatan Akun Private</label>
+                    <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                      value={form.private_note} onChange={(e) => setForm((prev) => ({ ...prev, private_note: e.target.value }))}
+                      placeholder="Contoh: Akses penuh, ganti password bebas" />
                   </div>
                 </div>
-
                 <div>
-                  <label className="form-label">Kategori</label>
-                  <select
-                    className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
-                    value={form.category}
-                    onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-                  >
-                    {formCategoryOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="form-label">Panduan / Instruksi (opsional)</label>
+                  <Textarea className="min-h-[60px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                    value={form.fulfillment_guide} onChange={(e) => setForm((prev) => ({ ...prev, fulfillment_guide: e.target.value }))}
+                    placeholder="Langkah setelah pembeli dapat akun..." />
                 </div>
               </div>
+            )}
 
-              <div className="grid grid-cols-2 gap-2.5">
+            {/* Tipe: Akun Game */}
+            {form.metadata?.product_type === 'game' && (
+              <div style={{ display: 'grid', gap: 10 }}>
                 <div>
-                  <label className="form-label">Icon Emoji (fallback)</label>
-                  <Input
-                    value={form.icon}
-                    onChange={(event) => setForm((prev) => ({ ...prev, icon: event.target.value }))}
-                    placeholder="🎬"
-                  />
+                  <label className="form-label">Tipe Fulfillment (auto)</label>
+                  <Input value="Manual — Instruksi dikirim manual oleh CS/admin" disabled style={{ opacity: 0.7 }} />
                 </div>
+                <div>
+                  <label className="form-label">Platform / Server</label>
+                  <Input value={(form.metadata?.platform as string) || ''}
+                    onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, platform: e.target.value } }))}
+                    placeholder="Contoh: Steam, Mobile Legends, Garena" />
+                </div>
+                <div>
+                  <label className="form-label">Requirement / Info Game</label>
+                  <Textarea className="min-h-[60px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                    value={(form.metadata?.game_info as string) || ''}
+                    onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, game_info: e.target.value } }))}
+                    placeholder="Contoh: Butuh login via Google, wajib ada akun game level 10+" />
+                </div>
+                <div>
+                  <label className="form-label">Panduan Delivery</label>
+                  <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                    value={form.fulfillment_guide} onChange={(e) => setForm((prev) => ({ ...prev, fulfillment_guide: e.target.value }))}
+                    placeholder="Langkah pengiriman ke buyer setelah pembayaran..." />
+                </div>
+              </div>
+            )}
+
+            {/* Tipe: Lisensi / Key */}
+            {form.metadata?.product_type === 'license' && (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div>
+                  <label className="form-label">Tipe Fulfillment (auto)</label>
+                  <Input value="License Key — Kode lisensi per pembelian" disabled style={{ opacity: 0.7 }} />
+                </div>
+                <div>
+                  <label className="form-label">Informasi Lisensi</label>
+                  <Textarea className="min-h-[60px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                    value={(form.metadata?.license_info as string) || ''}
+                    onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, license_info: e.target.value } }))}
+                    placeholder="Contoh: Lisensi permanen, 1 device, support update gratis" />
+                </div>
+                <div>
+                  <label className="form-label">Panduan Delivery</label>
+                  <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                    value={form.fulfillment_guide} onChange={(e) => setForm((prev) => ({ ...prev, fulfillment_guide: e.target.value }))}
+                    placeholder="Cara redeem / aktivasi kode lisensi..." />
+                </div>
+              </div>
+            )}
+
+            {/* Tipe: Voucher / Digital */}
+            {form.metadata?.product_type === 'digital' && (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div>
+                  <label className="form-label">Tipe Fulfillment (auto)</label>
+                  <Input value="Voucher Code — Kode redeem/voucher" disabled style={{ opacity: 0.7 }} />
+                </div>
+                <div>
+                  <label className="form-label">Info Voucher / Digital</label>
+                  <Textarea className="min-h-[60px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                    value={(form.metadata?.voucher_info as string) || ''}
+                    onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, voucher_info: e.target.value } }))}
+                    placeholder="Contoh: Gift card Google Play IDR 50.000, berlaku 1 tahun" />
+                </div>
+                <div>
+                  <label className="form-label">Link Download / Redeem</label>
+                  <Input value={(form.metadata?.download_link as string) || ''}
+                    onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, download_link: e.target.value } }))}
+                    placeholder="https://..." />
+                </div>
+                <div>
+                  <label className="form-label">Panduan Delivery</label>
+                  <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                    value={form.fulfillment_guide} onChange={(e) => setForm((prev) => ({ ...prev, fulfillment_guide: e.target.value }))}
+                    placeholder="Cara klaim / redeem voucher..." />
+                </div>
+              </div>
+            )}
+
+            {/* Belum pilih tipe */}
+            {!form.metadata?.product_type && (
+              <div style={{ padding: 20, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>
+                Pilih <strong>Tipe Produk</strong> di atas untuk melihat form detail yang sesuai.
+              </div>
+            )}
+          </div>
+
+          {/* ===== SECTION 3: TAMPILAN & MARKETING (collapsible) ===== */}
+          <details style={{ border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+            <summary style={{ padding: '12px 16px', background: '#FAFAFA', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#141414', userSelect: 'none' }}>
+              3. Tampilan & Marketing (Opsional)
+            </summary>
+            <div style={{ padding: '14px 16px', display: 'grid', gap: 10, background: '#fff' }}>
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="form-label">Warna Kartu</label>
-                  <Input
-                    value={form.color}
-                    onChange={(event) => setForm((prev) => ({ ...prev, color: event.target.value }))}
-                    placeholder="#FDDAC8"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="form-label">Icon Image URL (R2)</label>
-                  <Input
-                    value={form.icon_image_url}
-                    onChange={(event) => setForm((prev) => ({ ...prev, icon_image_url: event.target.value }))}
-                    placeholder="https://.../products/{id}/icon/..."
-                  />
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => void handleUploadAsset('icon', event.target.files?.[0])}
-                    disabled={uploadingAssetKind === 'icon' || formMode !== 'edit'}
-                    style={{ marginTop: 8, fontSize: 12 }}
-                  />
-                  <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>
-                    Wajib rasio 1:1, minimal 256x256 (rekomendasi 512x512).
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">Hero Background URL (R2)</label>
-                  <Input
-                    value={form.hero_bg_url}
-                    onChange={(event) => setForm((prev) => ({ ...prev, hero_bg_url: event.target.value }))}
-                    placeholder="https://.../products/{id}/hero/..."
-                  />
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => void handleUploadAsset('hero', event.target.files?.[0])}
-                    disabled={uploadingAssetKind === 'hero' || formMode !== 'edit'}
-                    style={{ marginTop: 8, fontSize: 12 }}
-                  />
-                  <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>
-                    Wajib rasio 16:9, minimal 1280x720 (rekomendasi 1600x900).
-                  </div>
-                </div>
-              </div>
-
-              {/* Cover Images */}
-              <div>
-                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
-                  <div>
-                    <label className="form-label" style={{ marginBottom: 0 }}>
-                      Cover Images (Carousel)
-                    </label>
-                    <div style={{ fontSize: 11, color: '#6B7280' }}>
-                      Maksimal 8 gambar. Format PNG/JPG/WebP, minimal 640x360px.
-                    </div>
-                  </div>
-                  <label
-                    className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition cursor-pointer"
-                    style={{ cursor: uploadingCover || formMode !== 'edit' ? 'not-allowed' : 'pointer', opacity: uploadingCover || formMode !== 'edit' ? 0.5 : 1 }}
-                  >
-                    {uploadingCover ? 'Uploading...' : '+ Upload Cover'}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      style={{ display: 'none' }}
-                      onChange={(event) => void handleUploadCover(event.target.files?.[0])}
-                      disabled={uploadingCover || formMode !== 'edit'}
-                    />
-                  </label>
-                </div>
-
-                {form.cover_images.length === 0 ? (
-                  <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 12, fontSize: 12, color: '#6B7280' }}>
-                    Belum ada cover images. Upload gambar tambahan untuk carousel produk.
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-                    {form.cover_images.map((url, index) => (
-                      <div key={`cover-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', position: 'relative' }}>
-                        <div style={{ aspectRatio: '4/3', background: '#F7F7F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <img src={url} alt={`Cover ${index + 1}`} style={{ objectFit: 'contain', padding: 8, width: '100%', height: '100%' }} />
-                        </div>
-                        <div style={{ padding: '4px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAFAFA' }}>
-                          <span style={{ fontSize: 10, color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>
-                            Cover {index + 1}
-                          </span>
-                          <button
-                            type="button"
-                            className="inline-flex h-7 items-center rounded-lg px-2 text-[10px] font-bold"
-                            style={{ color: '#EF4444', border: '1px solid #FECACA' }}
-                            onClick={() => handleRemoveCover(url)}
-                          >
-                            Hapus
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="form-label">Deskripsi</label>
-                <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
-                  rows={3}
-                  value={form.description}
-                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-                  placeholder="Deskripsi singkat produk"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
-                  <label className="form-label" style={{ marginBottom: 0 }}>
-                    Fitur Produk (Checklist)
-                  </label>
-                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={addFeatureItem}>
-                    + Tambah Fitur
-                  </button>
-                </div>
-
-                <div className="grid gap-2">
-                  {form.feature_items.map((item, index) => (
-                    <div key={`feature-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
-                      <Input
-                        value={item}
-                        onChange={(event) => updateFeatureItem(index, event.target.value)}
-                        placeholder={`Fitur ${index + 1}`}
-                      />
-                      <button
-                        className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                        type="button"
-                        style={{ color: '#EF4444', borderColor: '#FECACA' }}
-                        onClick={() => removeFeatureItem(index)}
-                        disabled={form.feature_items.length <= 1}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="form-label">Tagline Header</label>
-                  <Input
-                    value={form.tagline}
-                    onChange={(event) => setForm((prev) => ({ ...prev, tagline: event.target.value }))}
-                    placeholder="Shared 4K Ultra HD · 1 profil aktif"
-                  />
+                  <Input value={form.color} onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))} placeholder="#FDDAC8" />
                 </div>
                 <div>
                   <label className="form-label">Sort Priority</label>
-                  <Input
-                    type="number"
-                    value={form.sort_priority}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        sort_priority: Number(event.target.value) || 0,
-                      }))
-                    }
-                    placeholder="0"
-                  />
+                  <Input type="number" value={form.sort_priority} onChange={(e) => setForm((prev) => ({ ...prev, sort_priority: Number(e.target.value) || 0 }))} placeholder="0" />
                 </div>
+              </div>
+
+              <div>
+                <label className="form-label">Tagline Header</label>
+                <Input value={form.tagline} onChange={(e) => setForm((prev) => ({ ...prev, tagline: e.target.value }))} placeholder="Shared 4K Ultra HD · 1 profil aktif" />
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="form-label">Badge Populer</label>
-                  <Input
-                    value={form.badge_popular_text}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, badge_popular_text: event.target.value }))
-                    }
-                    placeholder="🔥 Terlaris"
-                  />
+                  <Input value={form.badge_popular_text} onChange={(e) => setForm((prev) => ({ ...prev, badge_popular_text: e.target.value }))} placeholder="🔥 Terlaris" />
                 </div>
                 <div>
                   <label className="form-label">Badge Garansi</label>
-                  <Input
-                    value={form.badge_guarantee_text}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, badge_guarantee_text: event.target.value }))
-                    }
-                    placeholder="🛡 Garansi 30 Hari"
-                  />
+                  <Input value={form.badge_guarantee_text} onChange={(e) => setForm((prev) => ({ ...prev, badge_guarantee_text: e.target.value }))} placeholder="🛡 Garansi 30 Hari" />
                 </div>
               </div>
 
               <div>
                 <label className="form-label">Teks Highlight / Sold</label>
-                <Input
-                  value={form.sold_text}
-                  onChange={(event) => setForm((prev) => ({ ...prev, sold_text: event.target.value }))}
-                  placeholder="🛒 5.800+ terjual bulan ini"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="form-label">Catatan Shared</label>
-                  <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
-                    rows={2}
-                    value={form.shared_note}
-                    onChange={(event) => setForm((prev) => ({ ...prev, shared_note: event.target.value }))}
-                    placeholder="Berbagi dengan pengguna lain"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Catatan Private</label>
-                  <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
-                    rows={2}
-                    value={form.private_note}
-                    onChange={(event) => setForm((prev) => ({ ...prev, private_note: event.target.value }))}
-                    placeholder="Akun pribadi, akses penuh"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
-                  <label className="form-label" style={{ marginBottom: 0 }}>
-                    Spesifikasi Produk (Label / Nilai)
-                  </label>
-                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={addSpecItem}>
-                    + Tambah Spek
-                  </button>
-                </div>
-
-                <div className="grid gap-2">
-                  {form.spec_items.map((item, index) => (
-                    <div key={`spec-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}>
-                      <Input
-                        value={item.label}
-                        onChange={(event) =>
-                          updateSpecItem(index, {
-                            label: event.target.value,
-                          })
-                        }
-                        placeholder="Label (contoh: Kualitas)"
-                      />
-                      <Input
-                        value={item.value}
-                        onChange={(event) =>
-                          updateSpecItem(index, {
-                            value: event.target.value,
-                          })
-                        }
-                        placeholder="Nilai (contoh: 4K UHD)"
-                      />
-                      <button
-                        className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                        type="button"
-                        style={{ color: '#EF4444', borderColor: '#FECACA' }}
-                        onClick={() => removeSpecItem(index)}
-                        disabled={form.spec_items.length <= 1}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
-                  <label className="form-label" style={{ marginBottom: 0 }}>
-                    Trust Chips / Benefit
-                  </label>
-                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={addTrustBadge}>
-                    + Tambah Trust
-                  </button>
-                </div>
-
-                <div className="grid gap-2">
-                  {form.trust_badges.map((item, index) => (
-                    <div key={`trust-${index}`} style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 8 }}>
-                      <Input
-                        value={item.icon}
-                        onChange={(event) =>
-                          updateTrustBadge(index, {
-                            icon: event.target.value,
-                          })
-                        }
-                        placeholder="✨"
-                      />
-                      <Input
-                        value={item.text}
-                        onChange={(event) =>
-                          updateTrustBadge(index, {
-                            text: event.target.value,
-                          })
-                        }
-                        placeholder="Contoh: Garansi 30 Hari"
-                      />
-                      <button
-                        className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                        type="button"
-                        style={{ color: '#EF4444', borderColor: '#FECACA' }}
-                        onClick={() => removeTrustBadge(index)}
-                        disabled={form.trust_badges.length <= 1}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
-                  <label className="form-label" style={{ marginBottom: 0 }}>
-                    FAQ Produk
-                  </label>
-                  <button className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={addFaqItem}>
-                    + Tambah FAQ
-                  </button>
-                </div>
-
-                <div className="grid gap-2">
-                  {form.faq_items.map((item, index) => (
-                    <div key={`faq-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
-                      <Input
-                        value={item.question}
-                        onChange={(event) =>
-                          updateFaqItem(index, {
-                            question: event.target.value,
-                          })
-                        }
-                        placeholder={`Pertanyaan ${index + 1}`}
-                      />
-                      <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
-                        rows={2}
-                        value={item.answer}
-                        onChange={(event) =>
-                          updateFaqItem(index, {
-                            answer: event.target.value,
-                          })
-                        }
-                        placeholder="Jawaban FAQ"
-                      />
-                      <div className="flex justify-end">
-                        <button
-                          className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                          type="button"
-                          style={{ color: '#EF4444', borderColor: '#FECACA' }}
-                          onClick={() => removeFaqItem(index)}
-                          disabled={form.faq_items.length <= 1}
-                        >
-                          Hapus FAQ
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <Input value={form.sold_text} onChange={(e) => setForm((prev) => ({ ...prev, sold_text: e.target.value }))} placeholder="🛒 5.800+ terjual bulan ini" />
               </div>
 
               <div className="grid grid-cols-3 gap-2.5">
-                <div>
-                  <label className="form-label">Harga Coret / Normal</label>
-                  <Input
-                    value={form.price_original_text}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        price_original_text: event.target.value,
-                      }))
-                    }
-                    placeholder="Contoh: Rp 54.000"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Teks Harga Harian</label>
-                  <Input
-                    value={form.price_per_day_text}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        price_per_day_text: event.target.value,
-                      }))
-                    }
-                    placeholder="Contoh: ≈ Rp 1.300/hari"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Teks Badge Diskon</label>
-                  <Input
-                    value={form.discount_badge_text}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        discount_badge_text: event.target.value,
-                      }))
-                    }
-                    placeholder="Contoh: Promo aktif · hemat 25%"
-                  />
-                </div>
+                <div><label className="form-label">Harga Coret</label><Input value={form.price_original_text} onChange={(e) => setForm((prev) => ({ ...prev, price_original_text: e.target.value }))} placeholder="Rp 54.000" /></div>
+                <div><label className="form-label">Harga /Hari</label><Input value={form.price_per_day_text} onChange={(e) => setForm((prev) => ({ ...prev, price_per_day_text: e.target.value }))} placeholder="≈ Rp 1.300/hari" /></div>
+                <div><label className="form-label">Badge Diskon</label><Input value={form.discount_badge_text} onChange={(e) => setForm((prev) => ({ ...prev, discount_badge_text: e.target.value }))} placeholder="hemat 25%" /></div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, alignItems: 'end' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                  <input
-                    type="checkbox"
-                    checked={form.show_whatsapp_button}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        show_whatsapp_button: event.target.checked,
-                      }))
-                    }
-                  />
-                  Tampilkan Tombol WhatsApp
-                </label>
-
-                <div>
-                  <label className="form-label">Nomor WhatsApp CS</label>
-                  <Input
-                    value={form.whatsapp_number}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        whatsapp_number: sanitizeWhatsAppNumber(event.target.value),
-                      }))
-                    }
-                    placeholder="62812xxxx"
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label">Label Tombol WhatsApp</label>
-                  <Input
-                    value={form.whatsapp_button_text}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        whatsapp_button_text: event.target.value,
-                      }))
-                    }
-                    placeholder="Tanya via WhatsApp"
-                  />
-                </div>
-              </div>
-
+              {/* Icon Image */}
               <div>
-                <label className="form-label">Meta Description (SEO)</label>
-                <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
-                  rows={2}
-                  value={form.seo_description}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      seo_description: event.target.value,
-                    }))
-                  }
-                  placeholder="Deskripsi SEO untuk halaman produk"
-                />
+                <label className="form-label">Icon Image URL (R2)</label>
+                <Input value={form.icon_image_url} onChange={(e) => setForm((prev) => ({ ...prev, icon_image_url: e.target.value }))} placeholder="https://..." />
+                {formMode === 'edit' && <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => void handleUploadAsset('icon', e.target.files?.[0])} disabled={uploadingAssetKind === 'icon'} style={{ marginTop: 8, fontSize: 12 }} />}
+                <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>Rasio 1:1, min 256x256.</div>
               </div>
 
-              <div className="grid grid-cols-[260px_1fr] gap-2.5">
-                <div>
-                  <label className="form-label">Tipe Fulfillment</label>
-                  <select
-                    className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
-                    value={form.fulfillment_type || 'credential'}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        fulfillment_type: event.target.value as Product['fulfillment_type'],
-                      }))
-                    }
-                  >
-                    {FULFILLMENT_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div style={{ marginTop: 6, fontSize: 11, color: '#6B7280' }}>
-                    {FULFILLMENT_TYPE_OPTIONS.find((option) => option.value === form.fulfillment_type)?.hint ||
-                      FULFILLMENT_TYPE_OPTIONS[0].hint}
-                  </div>
-                </div>
-                <div>
-                  <label className="form-label">Panduan Delivery</label>
-                  <Textarea className="min-h-[80px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full"
-                    rows={2}
-                    value={form.fulfillment_guide}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        fulfillment_guide: event.target.value,
-                      }))
-                    }
-                    placeholder="Contoh: Simpan kode lisensi unik di stok. Buyer akan melihat detail setelah pembayaran sukses."
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignItems: 'end' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                  <input
-                    type="checkbox"
-                    checked={form.is_popular}
-                    onChange={(event) => setForm((prev) => ({ ...prev, is_popular: event.target.checked }))}
-                  />
-                  Populer
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
-                  />
-                  Aktif
-                </label>
-              </div>
-
-              <hr style={{ border: 0, borderTop: '1px solid var(--border)' }} />
-
+              {/* Hero */}
               <div>
-                <div className="flex justify-between items-center mb-2 gap-2 flex-wrap">
-                  <div>
-                    <label className="form-label" style={{ marginBottom: 0 }}>
-                      Paket Harga Prem-Apps
-                    </label>
-                    <div style={{ fontSize: 11, color: '#6B7280' }}>
-                      Kombinasi unik berdasarkan account_type + durasi bulan. Kelola master tipe di menu Pengaturan.
-                    </div>
-                  </div>
-
-                  <div className="flex gap-1.5 flex-wrap">
-                    {activeAccountTypeOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                        type="button"
-                        onClick={() => addPriceRow(option.value)}
-                      >
-                        + Tambah Paket {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ fontSize: 11, color: '#6B7280', marginBottom: 6 }}>
-                  Klik tipe yang sama berulang kali untuk bikin paket durasi baru (auto isi 1, 2, 3 bulan tanpa duplikat).
-                </div>
-
-                <div className="grid gap-2">
-                  {priceDrafts.length === 0 ? (
-                    <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 12, fontSize: 12, color: '#6B7280' }}>
-                      Belum ada paket harga. Tambahkan minimal satu paket agar produk bisa dibeli.
-                    </div>
-                  ) : (
-                    priceDrafts.map((row) => (
-                      <div key={row.local_id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                          <div>
-                            <label className="form-label">Tipe</label>
-                            <select
-                              className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
-                              value={normalizeAccountTypeCode(row.account_type)}
-                              onChange={(event) =>
-                                updatePriceRow(row.local_id, {
-                                  account_type: event.target.value,
-                                })
-                              }
-                            >
-                              {activeAccountTypeOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                              {(() => {
-                                const normalized = normalizeAccountTypeCode(row.account_type)
-                                if (!normalized || accountTypeOptionsByValue[normalized]) {
-                                  return null
-                                }
-                                return (
-                                  <option value={normalized}>{normalized} · (Legacy)</option>
-                                )
-                              })()}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="form-label">Durasi (bulan)</label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={row.duration}
-                              onChange={(event) => {
-                                const nextDuration = Number(event.target.value) || 0
-                                const currentDefaultLabel = normalizePriceLabel('', row.duration)
-                                const shouldSyncLabel =
-                                  !row.label.trim() || row.label.trim() === currentDefaultLabel
-
-                                updatePriceRow(row.local_id, {
-                                  duration: nextDuration,
-                                  label: shouldSyncLabel
-                                    ? normalizePriceLabel('', nextDuration)
-                                    : row.label,
-                                })
-                              }}
-                            />
-                          </div>
-
-                          <div>
-                            <label className="form-label">Harga (IDR)</label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={row.price}
-                              onChange={(event) =>
-                                updatePriceRow(row.local_id, {
-                                  price: Number(event.target.value) || 0,
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <div>
-                            <label className="form-label">Label Paket</label>
-                            <Input
-                              value={row.label}
-                              onChange={(event) =>
-                                updatePriceRow(row.local_id, {
-                                  label: event.target.value,
-                                })
-                              }
-                              placeholder={`${row.duration} Bulan`}
-                            />
-                          </div>
-
-                          <div>
-                            <label className="form-label">Teks Hemat (opsional)</label>
-                            <Input
-                              value={row.savings_text}
-                              onChange={(event) =>
-                                updatePriceRow(row.local_id, {
-                                  savings_text: event.target.value,
-                                })
-                              }
-                              placeholder="Contoh: Hemat 20%"
-                            />
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                            <input
-                              type="checkbox"
-                              checked={row.is_active}
-                              onChange={(event) =>
-                                updatePriceRow(row.local_id, {
-                                  is_active: event.target.checked,
-                                })
-                              }
-                            />
-                            Aktif di katalog
-                          </label>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 12, color: '#6B7280' }}>{formatRupiah(row.price)}</span>
-                            <button
-                              className="inline-flex h-9 items-center rounded-xl border border-neutral-200 bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition"
-                              type="button"
-                              style={{ color: '#EF4444', borderColor: '#FECACA' }}
-                              onClick={() => removePriceRow(row.local_id)}
-                            >
-                              Hapus Paket
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {removedPriceIds.length > 0 && (
-                  <div style={{ fontSize: 11, color: '#B45309', marginTop: 6 }}>
-                    {removedPriceIds.length} paket existing akan dinonaktifkan saat simpan.
-                  </div>
-                )}
+                <label className="form-label">Hero Background URL (R2)</label>
+                <Input value={form.hero_bg_url} onChange={(e) => setForm((prev) => ({ ...prev, hero_bg_url: e.target.value }))} placeholder="https://..." />
+                {formMode === 'edit' && <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => void handleUploadAsset('hero', e.target.files?.[0])} disabled={uploadingAssetKind === 'hero'} style={{ marginTop: 8, fontSize: 12 }} />}
+                <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>Rasio 16:9, min 1280x720.</div>
               </div>
 
+              {/* Cover */}
+              <div>
+                <div className="flex justify-between items-center"><label className="form-label">Cover Images (Carousel)</label>
+                  {formMode === 'edit' && <label className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold cursor-pointer" style={{ opacity: uploadingCover ? 0.5 : 1 }}>{uploadingCover ? 'Uploading...' : '+ Upload'}<input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={(e) => void handleUploadCover(e.target.files?.[0])} disabled={uploadingCover} /></label>}
+                </div>
+                {form.cover_images.length === 0 ? <div style={{ border: '1px dashed #E5E7EB', borderRadius: 10, padding: 12, fontSize: 12, color: '#6B7280' }}>Belum ada cover.</div> :
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 6 }}>
+                    {form.cover_images.map((url, i) => (
+                      <div key={i} style={{ border: '1px solid #E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
+                        <div style={{ aspectRatio: '4/3', background: '#F7F7F5' }}><img src={url} alt={`Cover ${i+1}`} style={{ objectFit: 'contain', padding: 6, width: '100%', height: '100%' }} /></div>
+                        <button type="button" style={{ width: '100%', fontSize: 10, padding: '4px 0', color: '#EF4444', border: 'none', background: '#FEF2F2' }} onClick={() => handleRemoveCover(url)}>Hapus</button>
+                      </div>))}
+                  </div>}
+              </div>
 
+              {/* Fitur */}
+              <div>
+                <div className="flex justify-between items-center"><label className="form-label">Fitur Produk</label><button className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" onClick={addFeatureItem}>+ Fitur</button></div>
+                <div className="grid gap-2" style={{ marginTop: 6 }}>
+                  {form.feature_items.map((item, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6 }}>
+                      <Input value={item} onChange={(e) => updateFeatureItem(i, e.target.value)} placeholder={`Fitur ${i+1}`} />
+                      <button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removeFeatureItem(i)} disabled={form.feature_items.length <= 1}>Hapus</button>
+                    </div>))}
+                </div>
+              </div>
+
+              {/* Spesifikasi */}
+              <div>
+                <div className="flex justify-between items-center"><label className="form-label">Spesifikasi</label><button className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" onClick={addSpecItem}>+ Spek</button></div>
+                <div className="grid gap-2" style={{ marginTop: 6 }}>
+                  {form.spec_items.map((item, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6 }}>
+                      <Input value={item.label} onChange={(e) => updateSpecItem(i, { label: e.target.value })} placeholder="Label" />
+                      <Input value={item.value} onChange={(e) => updateSpecItem(i, { value: e.target.value })} placeholder="Nilai" />
+                      <button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removeSpecItem(i)} disabled={form.spec_items.length <= 1}>Hapus</button>
+                    </div>))}
+                </div>
+              </div>
+
+              {/* Trust */}
+              <div>
+                <div className="flex justify-between items-center"><label className="form-label">Trust Chips</label><button className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" onClick={addTrustBadge}>+ Trust</button></div>
+                <div className="grid gap-2" style={{ marginTop: 6 }}>
+                  {form.trust_badges.map((item, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr auto', gap: 6 }}>
+                      <Input value={item.icon} onChange={(e) => updateTrustBadge(i, { icon: e.target.value })} placeholder="✨" />
+                      <Input value={item.text} onChange={(e) => updateTrustBadge(i, { text: e.target.value })} placeholder="Garansi 30 Hari" />
+                      <button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removeTrustBadge(i)} disabled={form.trust_badges.length <= 1}>Hapus</button>
+                    </div>))}
+                </div>
+              </div>
+
+              {/* FAQ */}
+              <div>
+                <div className="flex justify-between items-center"><label className="form-label">FAQ</label><button className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" onClick={addFaqItem}>+ FAQ</button></div>
+                <div className="grid gap-2" style={{ marginTop: 6 }}>
+                  {form.faq_items.map((item, i) => (
+                    <div key={i} style={{ border: '1px solid #E5E7EB', borderRadius: 10, padding: 10, display: 'grid', gap: 6 }}>
+                      <Input value={item.question} onChange={(e) => updateFaqItem(i, { question: e.target.value })} placeholder={`Pertanyaan ${i+1}`} />
+                      <Textarea className="min-h-[60px] rounded-xl border px-3 py-2 text-sm resize-y w-full" rows={2} value={item.answer} onChange={(e) => updateFaqItem(i, { answer: e.target.value })} placeholder="Jawaban" />
+                      <div className="flex justify-end"><button className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removeFaqItem(i)} disabled={form.faq_items.length <= 1}>Hapus</button></div>
+                    </div>))}
+                </div>
+              </div>
+
+              {/* WhatsApp */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: 8, alignItems: 'end' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}><input type="checkbox" checked={form.show_whatsapp_button} onChange={(e) => setForm((prev) => ({ ...prev, show_whatsapp_button: e.target.checked }))} /> WA</label>
+                <div><label className="form-label">No WA</label><Input value={form.whatsapp_number} onChange={(e) => setForm((prev) => ({ ...prev, whatsapp_number: sanitizeWhatsAppNumber(e.target.value) }))} placeholder="62812xxxx" /></div>
+                <div><label className="form-label">Label WA</label><Input value={form.whatsapp_button_text} onChange={(e) => setForm((prev) => ({ ...prev, whatsapp_button_text: e.target.value }))} placeholder="Tanya via WhatsApp" /></div>
+              </div>
+
+              {/* SEO */}
+              <div>
+                <label className="form-label">Meta SEO</label>
+                <Textarea className="min-h-[60px] rounded-xl border px-3 py-2 text-sm resize-y w-full" rows={2} value={form.seo_description} onChange={(e) => setForm((prev) => ({ ...prev, seo_description: e.target.value }))} placeholder="Deskripsi SEO" />
+              </div>
+            </div>
+          </details>
+
+          {/* ===== SECTION 4: PAKET HARGA ===== */}
+          <div style={{ padding: 14, borderRadius: 12, border: '1px solid #E5E7EB', background: '#FAFAFA' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#141414' }}>4. Paket Harga</div>
+
+            <div className="flex gap-1.5 flex-wrap" style={{ marginBottom: 8 }}>
+              {activeAccountTypeOptions.map((option) => (
+                <button key={option.value} className="inline-flex h-9 items-center rounded-xl border bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={() => addPriceRow(option.value)}>
+                  + Paket {option.label}
+                </button>))}
             </div>
 
-      </AdminDialog>
+            <div className="grid gap-2">
+              {priceDrafts.length === 0 ? (
+                <div style={{ border: '1px dashed #E5E7EB', borderRadius: 10, padding: 12, fontSize: 12, color: '#6B7280' }}>Belum ada paket harga.</div>
+              ) : priceDrafts.map((row) => (
+                <div key={row.local_id} style={{ border: '1px solid #E5E7EB', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <div>
+                      <label className="form-label">Tipe</label>
+                      <select className="min-h-11 rounded-2xl border bg-neutral-50/70 px-4 text-sm font-bold w-full"
+                        value={normalizeAccountTypeCode(row.account_type)}
+                        onChange={(e) => updatePriceRow(row.local_id, { account_type: e.target.value })}>
+                        {activeAccountTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Durasi (bulan)</label>
+                      <Input type="number" value={row.duration} onChange={(e) => updatePriceRow(row.local_id, { duration: Number(e.target.value) || 1 })} min={1} />
+                    </div>
+                    <div>
+                      <label className="form-label">Harga (Rp)</label>
+                      <Input type="number" value={row.price} onChange={(e) => updatePriceRow(row.local_id, { price: Number(e.target.value) || 0 })} min={100} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                    <div><label className="form-label">Label (opsional)</label><Input value={row.label} onChange={(e) => updatePriceRow(row.local_id, { label: e.target.value })} placeholder="Paling hemat" /></div>
+                    <div><label className="form-label">Hemat (opsional)</label><Input value={row.savings_text} onChange={(e) => updatePriceRow(row.local_id, { savings_text: e.target.value })} placeholder="Hemat 30%" /></div>
+                    <div className="flex items-end"><button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removePriceRow(row.local_id)}>Hapus</button></div>
+                  </div>
+                </div>))}
+            </div>
+          </div>
+
+          {/* ===== SECTION 5: STATUS ===== */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '0 4px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
+              <input type="checkbox" checked={form.is_popular} onChange={(e) => setForm((prev) => ({ ...prev, is_popular: e.target.checked }))} />
+              Tandai Populer
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
+              <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))} />
+              Aktif
+            </label>
+          </div>
+        </div>
+
+</AdminDialog>
 
     </div>
   )

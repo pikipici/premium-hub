@@ -38,6 +38,7 @@ export interface AdminProductPayload {
   seo_description?: string
   fulfillment_type?: Product['fulfillment_type']
   fulfillment_guide?: string
+  metadata?: Record<string, unknown>
   sort_priority?: number
   is_popular?: boolean
   is_active?: boolean

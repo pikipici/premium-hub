@@ -216,6 +216,7 @@ type CreateProductInput struct {
 	SeoDescription     string                    `json:"seo_description"`
 	FulfillmentType    string                    `json:"fulfillment_type"`
 	FulfillmentGuide   string                    `json:"fulfillment_guide"`
+	Metadata           map[string]any            `json:"metadata"`
 	SortPriority       *int                      `json:"sort_priority"`
 	IsPopular          bool                      `json:"is_popular"`
 	IsActive           *bool                     `json:"is_active"`
@@ -295,6 +296,7 @@ func (s *ProductService) Create(input CreateProductInput) (*model.Product, error
 		SeoDescription:     strings.TrimSpace(input.SeoDescription),
 		FulfillmentType:    normalizeFulfillmentType(input.FulfillmentType),
 		FulfillmentGuide:   strings.TrimSpace(input.FulfillmentGuide),
+		Metadata:           input.Metadata,
 		SortPriority:       sortPriority,
 		IsPopular:          input.IsPopular,
 		IsActive:           isActive,
@@ -335,6 +337,7 @@ type UpdateProductInput struct {
 	SeoDescription     *string                    `json:"seo_description"`
 	FulfillmentType    *string                    `json:"fulfillment_type"`
 	FulfillmentGuide   *string                    `json:"fulfillment_guide"`
+	Metadata           *map[string]any            `json:"metadata"`
 	SortPriority       *int                       `json:"sort_priority"`
 	IsPopular          *bool                      `json:"is_popular"`
 	IsActive           *bool                      `json:"is_active"`
@@ -457,6 +460,9 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 	}
 	if input.FulfillmentGuide != nil {
 		product.FulfillmentGuide = strings.TrimSpace(*input.FulfillmentGuide)
+	}
+	if input.Metadata != nil {
+		product.Metadata = *input.Metadata
 	}
 	if input.SortPriority != nil {
 		product.SortPriority = *input.SortPriority
