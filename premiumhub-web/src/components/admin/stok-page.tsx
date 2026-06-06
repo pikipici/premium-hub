@@ -7,6 +7,7 @@ import {
   AdminDialog,
   AdminPageHeader,
   AdminStatCard,
+  AdminStatusPill,
   AdminSurface,
   Button,
 } from '@/components/admin/admin-ui'
@@ -1073,7 +1074,7 @@ export default function StokPage() {
                         </td>
                         <td>{stock.profile_name || '-'}</td>
                         <td>
-                          <span className={`status-badge ${status.className}`}>{status.label}</span>
+                          <AdminStatusPill tone={status.tone as 'green'|'amber'|'red'}>{status.label}</AdminStatusPill>
                         </td>
                         <td style={{ color: 'var(--muted)', fontSize: 12 }}>
                           {stock.used_by ? shortID(stock.used_by) : '-'}
@@ -1223,7 +1224,7 @@ export default function StokPage() {
                       </div>
                       <div className="mobile-card-sub">Total {summary.total} akun (halaman ini)</div>
                     </div>
-                    <span className={`status-badge ${health.className}`}>{health.label}</span>
+                    <AdminStatusPill tone={health.tone as 'green'|'amber'|'red'}>{health.label}</AdminStatusPill>
                   </div>
 
                   <div className="mobile-card-row">
@@ -1304,7 +1305,7 @@ export default function StokPage() {
                           </span>
                         </div>
                       </div>
-                      <span className={`status-badge ${status.className}`}>{status.label}</span>
+                      <AdminStatusPill tone={status.tone as 'green'|'amber'|'red'}>{status.label}</AdminStatusPill>
                     </div>
 
                     <div className="mobile-card-row">
