@@ -378,6 +378,7 @@ export default function ProdukPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
 
+  const [typeSelectOpen, setTypeSelectOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -568,11 +569,17 @@ const PRODUCT_TYPE_OPTIONS = [
   }, [products])
 
   const openCreate = () => {
+    setTypeSelectOpen(true)
+  }
+
+  const onSelectProductType = (type: string) => {
+    setTypeSelectOpen(false)
     setFormMode('create')
     setEditingId(null)
     setSlugTouched(false)
 
-    const defaultCategory =
+    const opt = PRODUCT_TYPE_OPTIONS.find((o) => o.value === type)
+    const defaultCategory = opt?.defaultCategory ||
       activePremAppsCategoryOptions[0]?.value ||
       categoryOptions[0]?.value ||
       DEFAULT_PREM_APPS_CATEGORY_OPTIONS[0]?.value ||
@@ -581,6 +588,8 @@ const PRODUCT_TYPE_OPTIONS = [
     setForm({
       ...createDefaultForm(),
       category: defaultCategory,
+      fulfillment_type: (opt?.defaultFulfillment as Product['fulfillment_type']) || 'credential',
+      metadata: { product_type: type },
     })
 
     const primaryType = activeAccountTypeOptions[0]?.value || 'shared'
@@ -1416,6 +1425,31 @@ const PRODUCT_TYPE_OPTIONS = [
       </div>
 
       </div>
+
+      <AdminDialog
+        open={typeSelectOpen}
+        onOpenChange={setTypeSelectOpen}
+        title="Pilih Tipe Produk"
+        description="Pilih jenis produk yang ingin ditambahkan. Form akan disesuaikan otomatis."
+        footer={null}
+      >
+        <div className="grid grid-cols-2 gap-3 p-1">
+          {PRODUCT_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onSelectProductType(opt.value)}
+              className="flex flex-col items-start gap-2 rounded-xl border border-neutral-200 bg-white p-4 text-left transition hover:border-[#ff5733] hover:shadow-sm"
+            >
+              <span className="text-2xl">{opt.icon}</span>
+              <div>
+                <div className="text-sm font-bold text-neutral-900">{opt.label}</div>
+                <div className="text-xs text-neutral-500 mt-0.5">{opt.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </AdminDialog>
 
       <AdminDialog
         open={formOpen}
