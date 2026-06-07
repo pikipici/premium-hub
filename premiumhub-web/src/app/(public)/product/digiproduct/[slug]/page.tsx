@@ -280,7 +280,7 @@ export default function DigiProductDetailPage() {
   }, [inStockFilteredPrices, selectedPrice])
 
   const selectedPriceLabel = effectiveSelectedPrice
-    ? `${formatAccountTypeLabel(effectiveSelectedPrice.account_type)} ${effectiveSelectedPrice.duration} bln`
+    ? effectiveSelectedPrice.display_label?.trim() || `${formatAccountTypeLabel(effectiveSelectedPrice.account_type)} ${effectiveSelectedPrice.duration} bln`
     : null
 
   const handleBuy = () => {
@@ -498,8 +498,12 @@ export default function DigiProductDetailPage() {
                 </div>
               ) : (
                 filteredPrices.map((price) => {
-                  const label = price.label?.trim() || `${price.duration} Bulan`
+                  const label = price.display_label?.trim() || price.label?.trim() || `${price.duration} Bulan`
                   const savingsText = price.savings_text?.trim() || ''
+                  const metaText = [price.unit_label, price.billing_period, price.delivery_label]
+                    .map((item) => item?.trim())
+                    .filter(Boolean)
+                    .join(' · ')
                   const stockCount = priceStockByID.get(price.id) || 0
                   const disabled = stockCount <= 0
                   const isSelected = effectiveSelectedPrice?.id === price.id && !disabled
@@ -527,6 +531,9 @@ export default function DigiProductDetailPage() {
                         {formatRupiah(price.price)}
                         <span className="text-[11px] font-medium text-[#888] ml-0.5">/{label}</span>
                       </div>
+                      {metaText && (
+                        <div className="mb-2 text-[11px] font-semibold text-[#6B7280]">{metaText}</div>
+                      )}
                       {savingsText && !disabled && (
                         <span className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#ECFDF3] text-[#0F766E] mb-2">
                           {savingsText}

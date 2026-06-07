@@ -480,21 +480,45 @@ func (s *ProductService) Update(id uuid.UUID, input UpdateProductInput) (*model.
 }
 
 type CreateProductPriceInput struct {
-	Duration    int    `json:"duration" binding:"required,min=1"`
-	AccountType string `json:"account_type" binding:"required"`
-	Label       string `json:"label"`
-	SavingsText string `json:"savings_text"`
-	Price       int64  `json:"price" binding:"required,min=1"`
-	IsActive    *bool  `json:"is_active"`
+	Duration      int    `json:"duration"`
+	AccountType   string `json:"account_type"`
+	PriceType     string `json:"price_type"`
+	BillingPeriod string `json:"billing_period"`
+	UnitLabel     string `json:"unit_label"`
+	DeliveryLabel string `json:"delivery_label"`
+	Label         string `json:"label"`
+	DisplayLabel  string `json:"display_label"`
+	SavingsText   string `json:"savings_text"`
+	Price         int64  `json:"price" binding:"required,min=1"`
+	IsActive      *bool  `json:"is_active"`
 }
 
 type UpdateProductPriceInput struct {
-	Duration    *int    `json:"duration"`
-	AccountType *string `json:"account_type"`
-	Label       *string `json:"label"`
-	SavingsText *string `json:"savings_text"`
-	Price       *int64  `json:"price"`
-	IsActive    *bool   `json:"is_active"`
+	Duration      *int    `json:"duration"`
+	AccountType   *string `json:"account_type"`
+	PriceType     *string `json:"price_type"`
+	BillingPeriod *string `json:"billing_period"`
+	UnitLabel     *string `json:"unit_label"`
+	DeliveryLabel *string `json:"delivery_label"`
+	Label         *string `json:"label"`
+	DisplayLabel  *string `json:"display_label"`
+	SavingsText   *string `json:"savings_text"`
+	Price         *int64  `json:"price"`
+	IsActive      *bool   `json:"is_active"`
+}
+
+type normalizedProductPriceInput struct {
+	Duration      int
+	AccountType   string
+	PriceType     string
+	BillingPeriod string
+	UnitLabel     string
+	DeliveryLabel string
+	Label         string
+	DisplayLabel  string
+	SavingsText   string
+	Price         int64
+	IsActive      bool
 }
 
 func (s *ProductService) validateCatalogAccountType(raw string) (string, error) {
@@ -520,31 +544,14 @@ func (s *ProductService) CreatePrice(productID uuid.UUID, input CreateProductPri
 		return nil, errors.New("produk tidak ditemukan")
 	}
 
-	accountType, err := s.validateCatalogAccountType(input.AccountType)
+	normalized, err := s.normalizeCreatePriceInput(input)
 	if err != nil {
 		return nil, err
 	}
-	if input.Duration < 1 {
-		return nil, errors.New("durasi harus lebih dari 0")
-	}
-	if input.Price < 1 {
-		return nil, errors.New("harga harus lebih dari 0")
-	}
 
-	isActive := true
-	if input.IsActive != nil {
-		isActive = *input.IsActive
-	}
-
-	label := normalizePriceLabel(input.Label, input.Duration)
-	savingsText := strings.TrimSpace(input.SavingsText)
-
-	existing, err := s.productRepo.FindPriceBySignature(productID, input.Duration, accountType)
+	existing, err := s.productRepo.FindPriceBySignature(productID, normalized.Duration, normalized.AccountType)
 	if err == nil {
-		existing.Label = label
-		existing.SavingsText = savingsText
-		existing.Price = input.Price
-		existing.IsActive = isActive
+		applyNormalizedPrice(existing, normalized)
 		if err := s.productRepo.UpdatePrice(existing); err != nil {
 			return nil, errors.New("gagal memperbarui harga produk")
 		}
@@ -555,14 +562,9 @@ func (s *ProductService) CreatePrice(productID uuid.UUID, input CreateProductPri
 	}
 
 	price := &model.ProductPrice{
-		ProductID:   productID,
-		Duration:    input.Duration,
-		AccountType: accountType,
-		Label:       label,
-		SavingsText: savingsText,
-		Price:       input.Price,
-		IsActive:    isActive,
+		ProductID: productID,
 	}
+	applyNormalizedPrice(price, normalized)
 	if err := s.productRepo.CreatePrice(price); err != nil {
 		return nil, errors.New("gagal membuat harga produk")
 	}
@@ -582,28 +584,67 @@ func (s *ProductService) UpdatePrice(productID, priceID uuid.UUID, input UpdateP
 		return nil, errors.New("harga produk tidak cocok dengan produk")
 	}
 
-	nextDuration := price.Duration
-	nextAccountType := price.AccountType
+	next := normalizedProductPriceInput{
+		Duration:      price.Duration,
+		AccountType:   price.AccountType,
+		PriceType:     price.PriceType,
+		BillingPeriod: price.BillingPeriod,
+		UnitLabel:     price.UnitLabel,
+		DeliveryLabel: price.DeliveryLabel,
+		Label:         price.Label,
+		DisplayLabel:  price.DisplayLabel,
+		SavingsText:   price.SavingsText,
+		Price:         price.Price,
+		IsActive:      price.IsActive,
+	}
 
 	if input.Duration != nil {
 		if *input.Duration < 1 {
 			return nil, errors.New("durasi harus lebih dari 0")
 		}
-		nextDuration = *input.Duration
+		next.Duration = *input.Duration
 	}
 	if input.AccountType != nil {
 		validated, err := s.validateCatalogAccountType(*input.AccountType)
 		if err != nil {
 			return nil, err
 		}
-		nextAccountType = validated
+		next.AccountType = validated
 	}
 	if input.Price != nil && *input.Price < 1 {
 		return nil, errors.New("harga harus lebih dari 0")
 	}
+	if input.PriceType != nil {
+		next.PriceType = normalizePriceType(*input.PriceType)
+	}
+	if input.BillingPeriod != nil {
+		next.BillingPeriod = normalizeBillingPeriod(*input.BillingPeriod, next.Duration)
+	}
+	if input.UnitLabel != nil {
+		next.UnitLabel = strings.TrimSpace(*input.UnitLabel)
+	}
+	if input.DeliveryLabel != nil {
+		next.DeliveryLabel = strings.TrimSpace(*input.DeliveryLabel)
+	}
+	if input.Label != nil {
+		next.Label = strings.TrimSpace(*input.Label)
+	}
+	if input.DisplayLabel != nil {
+		next.DisplayLabel = strings.TrimSpace(*input.DisplayLabel)
+	}
+	if input.SavingsText != nil {
+		next.SavingsText = strings.TrimSpace(*input.SavingsText)
+	}
+	if input.Price != nil {
+		next.Price = *input.Price
+	}
+	if input.IsActive != nil {
+		next.IsActive = *input.IsActive
+	}
+	next = finalizeNormalizedPrice(next)
 
-	if nextDuration != price.Duration || nextAccountType != price.AccountType {
-		duplicate, err := s.productRepo.FindPriceBySignature(productID, nextDuration, nextAccountType)
+	if next.Duration != price.Duration || next.AccountType != price.AccountType {
+		duplicate, err := s.productRepo.FindPriceBySignature(productID, next.Duration, next.AccountType)
 		if err == nil && duplicate.ID != priceID {
 			return nil, errors.New("kombinasi paket dan jenis akses sudah ada")
 		}
@@ -612,23 +653,7 @@ func (s *ProductService) UpdatePrice(productID, priceID uuid.UUID, input UpdateP
 		}
 	}
 
-	price.Duration = nextDuration
-	price.AccountType = nextAccountType
-	if input.Label != nil {
-		price.Label = normalizePriceLabel(*input.Label, nextDuration)
-	}
-	if input.SavingsText != nil {
-		price.SavingsText = strings.TrimSpace(*input.SavingsText)
-	}
-	if strings.TrimSpace(price.Label) == "" {
-		price.Label = normalizePriceLabel("", nextDuration)
-	}
-	if input.Price != nil {
-		price.Price = *input.Price
-	}
-	if input.IsActive != nil {
-		price.IsActive = *input.IsActive
-	}
+	applyNormalizedPrice(price, next)
 
 	if err := s.productRepo.UpdatePrice(price); err != nil {
 		return nil, errors.New("gagal memperbarui harga produk")
@@ -884,6 +909,87 @@ func normalizePriceLabel(label string, duration int) string {
 		duration = 1
 	}
 	return strings.TrimSpace(strconv.Itoa(duration) + " Bulan")
+}
+
+func (s *ProductService) normalizeCreatePriceInput(input CreateProductPriceInput) (normalizedProductPriceInput, error) {
+	if input.Price < 1 {
+		return normalizedProductPriceInput{}, errors.New("harga harus lebih dari 0")
+	}
+
+	duration := input.Duration
+	if duration < 1 {
+		duration = 1
+	}
+
+	accountType, err := s.validateCatalogAccountType(input.AccountType)
+	if err != nil {
+		return normalizedProductPriceInput{}, err
+	}
+
+	return finalizeNormalizedPrice(normalizedProductPriceInput{
+		Duration:      duration,
+		AccountType:   accountType,
+		PriceType:     normalizePriceType(input.PriceType),
+		BillingPeriod: normalizeBillingPeriod(input.BillingPeriod, duration),
+		UnitLabel:     strings.TrimSpace(input.UnitLabel),
+		DeliveryLabel: strings.TrimSpace(input.DeliveryLabel),
+		Label:         strings.TrimSpace(input.Label),
+		DisplayLabel:  strings.TrimSpace(input.DisplayLabel),
+		SavingsText:   strings.TrimSpace(input.SavingsText),
+		Price:         input.Price,
+		IsActive:      input.IsActive == nil || *input.IsActive,
+	}), nil
+}
+
+func finalizeNormalizedPrice(input normalizedProductPriceInput) normalizedProductPriceInput {
+	if input.Duration < 1 {
+		input.Duration = 1
+	}
+	input.AccountType = normalizeAccountType(input.AccountType)
+	input.PriceType = normalizePriceType(input.PriceType)
+	input.BillingPeriod = normalizeBillingPeriod(input.BillingPeriod, input.Duration)
+	input.Label = normalizePriceLabel(input.Label, input.Duration)
+	if strings.TrimSpace(input.DisplayLabel) == "" {
+		input.DisplayLabel = input.Label
+	}
+	return input
+}
+
+func applyNormalizedPrice(price *model.ProductPrice, input normalizedProductPriceInput) {
+	price.Duration = input.Duration
+	price.AccountType = input.AccountType
+	price.PriceType = input.PriceType
+	price.BillingPeriod = input.BillingPeriod
+	price.UnitLabel = input.UnitLabel
+	price.DeliveryLabel = input.DeliveryLabel
+	price.Label = input.Label
+	price.DisplayLabel = input.DisplayLabel
+	price.SavingsText = input.SavingsText
+	price.Price = input.Price
+	price.IsActive = input.IsActive
+}
+
+func normalizePriceType(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "unit", "license", "voucher", "digital", "download", "service", "manual":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return "subscription"
+	}
+}
+
+func normalizeBillingPeriod(value string, duration int) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed != "" {
+		return trimmed
+	}
+	if duration < 1 {
+		duration = 1
+	}
+	if duration == 1 {
+		return "1 bulan"
+	}
+	return strconv.Itoa(duration) + " bulan"
 }
 
 func normalizeAccountType(value string) string {

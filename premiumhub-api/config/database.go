@@ -111,8 +111,30 @@ func InitDB(cfg *Config) *gorm.DB {
 		log.Fatal("DB wallet pocket migration:", err)
 	}
 
+	if err := applyProductPriceDisplayBackfill(db); err != nil {
+		log.Fatal("DB product price display migration:", err)
+	}
+
 	log.Println("DB connected & migrated")
 	return db
+}
+
+func applyProductPriceDisplayBackfill(db *gorm.DB) error {
+	res := db.Exec(`
+		UPDATE product_prices
+		SET
+			price_type = COALESCE(NULLIF(price_type, ''), 'subscription'),
+			billing_period = COALESCE(NULLIF(billing_period, ''), duration::text || ' bulan'),
+			display_label = COALESCE(NULLIF(display_label, ''), NULLIF(label, ''), duration::text || ' Bulan')
+		WHERE price_type IS NULL OR price_type = '' OR billing_period IS NULL OR billing_period = '' OR display_label IS NULL OR display_label = ''
+	`)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected > 0 {
+		log.Printf("product price display backfill: updated %d legacy price rows", res.RowsAffected)
+	}
+	return nil
 }
 
 // applyWalletPocketBackfill ensures every existing wallet_ledgers row

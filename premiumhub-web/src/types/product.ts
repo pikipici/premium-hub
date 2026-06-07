@@ -65,7 +65,12 @@ export interface ProductPrice {
   product_id: string
   duration: number
   account_type: string
+  price_type?: 'subscription' | 'unit' | 'license' | 'voucher' | 'digital' | 'download' | 'service' | 'manual'
+  billing_period?: string
+  unit_label?: string
+  delivery_label?: string
   label?: string
+  display_label?: string
   savings_text?: string
   price: number
   is_active: boolean

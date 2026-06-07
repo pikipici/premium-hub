@@ -47,7 +47,12 @@ export interface AdminProductPayload {
 export interface AdminProductPricePayload {
   duration: number
   account_type: ProductPrice['account_type']
+  price_type?: ProductPrice['price_type']
+  billing_period?: string
+  unit_label?: string
+  delivery_label?: string
   label?: string
+  display_label?: string
   savings_text?: string
   price: number
   is_active?: boolean

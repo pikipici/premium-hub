@@ -82,7 +82,12 @@ type ProductPrice struct {
 	ProductID      uuid.UUID `gorm:"type:uuid;not null" json:"product_id"`
 	Duration       int       `gorm:"not null" json:"duration"`
 	AccountType    string    `gorm:"size:20;not null" json:"account_type"`
+	PriceType      string    `gorm:"size:40;default:subscription" json:"price_type"`
+	BillingPeriod  string    `gorm:"size:40" json:"billing_period"`
+	UnitLabel      string    `gorm:"size:80" json:"unit_label"`
+	DeliveryLabel  string    `gorm:"size:120" json:"delivery_label"`
 	Label          string    `gorm:"size:80" json:"label"`
+	DisplayLabel   string    `gorm:"size:120" json:"display_label"`
 	SavingsText    string    `gorm:"size:120" json:"savings_text"`
 	Price          int64     `gorm:"not null" json:"price"`
 	IsActive       bool      `gorm:"default:true" json:"is_active"`

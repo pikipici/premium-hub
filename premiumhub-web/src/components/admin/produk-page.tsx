@@ -76,7 +76,12 @@ type ProductPriceDraft = {
   id?: string
   duration: number
   account_type: ProductPrice['account_type']
+  price_type: NonNullable<ProductPrice['price_type']>
+  billing_period: string
+  unit_label: string
+  delivery_label: string
   label: string
+  display_label: string
   savings_text: string
   price: number
   is_active: boolean
@@ -97,6 +102,16 @@ const DEFAULT_PREM_APPS_CATEGORY_OPTIONS: CategoryOption[] = [
 ]
 
 const FALLBACK_ACCOUNT_TYPE_CODES = ['shared', 'private']
+
+const PRICE_TYPE_OPTIONS: Array<{ value: ProductPriceDraft['price_type']; label: string }> = [
+  { value: 'subscription', label: 'Subscription' },
+  { value: 'unit', label: 'Per Unit' },
+  { value: 'license', label: 'Lisensi' },
+  { value: 'voucher', label: 'Voucher' },
+  { value: 'digital', label: 'Digital' },
+  { value: 'download', label: 'Download' },
+  { value: 'manual', label: 'Manual' },
+]
 
 const FULFILLMENT_TYPE_OPTIONS: Array<{ value: NonNullable<Product['fulfillment_type']>; label: string; hint: string }> = [
   { value: 'credential', label: 'Credential', hint: 'Email/password atau akses akun' },
@@ -179,7 +194,12 @@ function createPriceDraft(partial?: Partial<ProductPriceDraft>): ProductPriceDra
     local_id: localId,
     duration: 1,
     account_type: 'shared',
+    price_type: 'subscription',
+    billing_period: '1 bulan',
+    unit_label: '1 akun',
+    delivery_label: 'Otomatis',
     label: '1 Bulan',
+    display_label: '1 Bulan',
     savings_text: '',
     price: 10000,
     is_active: true,
@@ -201,7 +221,12 @@ function normalizePriceDrafts(prices: ProductPrice[]): ProductPriceDraft[] {
         id: price.id,
         duration: price.duration,
         account_type: price.account_type,
+        price_type: price.price_type || 'subscription',
+        billing_period: price.billing_period || `${Math.max(price.duration, 1)} bulan`,
+        unit_label: price.unit_label || '',
+        delivery_label: price.delivery_label || '',
         label: price.label || `${price.duration} Bulan`,
+        display_label: price.display_label || price.label || `${price.duration} Bulan`,
         savings_text: price.savings_text || '',
         price: price.price,
         is_active: price.is_active,
@@ -258,6 +283,35 @@ function normalizePriceLabel(label: string, duration: number) {
   const trimmed = label.trim()
   if (trimmed) return trimmed
   return `${Math.max(duration, 1)} Bulan`
+}
+
+function normalizeDisplayPriceLabel(displayLabel: string, label: string, duration: number) {
+  const trimmed = displayLabel.trim()
+  if (trimmed) return trimmed
+  return normalizePriceLabel(label, duration)
+}
+
+function getDefaultPriceType(productType?: string): ProductPriceDraft['price_type'] {
+  if (productType === 'license') return 'license'
+  if (productType === 'digital') return 'voucher'
+  if (productType === 'game') return 'unit'
+  return 'subscription'
+}
+
+function getDefaultBillingPeriod(priceType: ProductPriceDraft['price_type'], duration: number) {
+  if (priceType === 'subscription') return `${Math.max(duration, 1)} bulan`
+  if (priceType === 'license') return 'Sekali beli'
+  if (priceType === 'voucher') return 'Sekali redeem'
+  if (priceType === 'download') return 'Sekali download'
+  return 'Sekali beli'
+}
+
+function getDefaultUnitLabel(priceType: ProductPriceDraft['price_type']) {
+  if (priceType === 'license') return '1 key'
+  if (priceType === 'voucher') return '1 kode'
+  if (priceType === 'download') return '1 file'
+  if (priceType === 'unit') return '1 item'
+  return '1 akun'
 }
 
 function findNextAvailableDuration(rows: ProductPriceDraft[], accountType: string) {
@@ -665,12 +719,27 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
     const primaryType = activeAccountTypeOptions[0]?.value || 'shared'
     const secondaryType = activeAccountTypeOptions[1]?.value || primaryType
 
+    const defaultPriceType = getDefaultPriceType(type)
     const nextDrafts = [
-      createPriceDraft({ account_type: primaryType, duration: 1, price: 25000 }),
+      createPriceDraft({
+        account_type: primaryType,
+        duration: 1,
+        price: 25000,
+        price_type: defaultPriceType,
+        billing_period: getDefaultBillingPeriod(defaultPriceType, 1),
+        unit_label: getDefaultUnitLabel(defaultPriceType),
+      }),
     ]
 
     if (secondaryType !== primaryType) {
-      nextDrafts.push(createPriceDraft({ account_type: secondaryType, duration: 1, price: 50000 }))
+      nextDrafts.push(createPriceDraft({
+        account_type: secondaryType,
+        duration: 1,
+        price: 50000,
+        price_type: defaultPriceType,
+        billing_period: getDefaultBillingPeriod(defaultPriceType, 1),
+        unit_label: getDefaultUnitLabel(defaultPriceType),
+      }))
     }
 
     setPriceDrafts(nextDrafts)
@@ -743,14 +812,29 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
 
     const primaryType = activeAccountTypeOptions[0]?.value || 'shared'
     const secondaryType = activeAccountTypeOptions[1]?.value || primaryType
+    const defaultPriceType = getDefaultPriceType(product.metadata?.product_type as string | undefined)
 
     setPriceDrafts(
       product.prices?.length
         ? normalizePriceDrafts(product.prices)
         : [
-            createPriceDraft({ account_type: primaryType, duration: 1, price: 25000 }),
+            createPriceDraft({
+              account_type: primaryType,
+              duration: 1,
+              price: 25000,
+              price_type: defaultPriceType,
+              billing_period: getDefaultBillingPeriod(defaultPriceType, 1),
+              unit_label: getDefaultUnitLabel(defaultPriceType),
+            }),
             ...(secondaryType !== primaryType
-              ? [createPriceDraft({ account_type: secondaryType, duration: 1, price: 50000 })]
+              ? [createPriceDraft({
+                  account_type: secondaryType,
+                  duration: 1,
+                  price: 50000,
+                  price_type: defaultPriceType,
+                  billing_period: getDefaultBillingPeriod(defaultPriceType, 1),
+                  unit_label: getDefaultUnitLabel(defaultPriceType),
+                })]
               : []),
           ]
     )
@@ -768,6 +852,7 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
     setPriceDrafts((prev) => {
       const accountType = normalizeAccountTypeCode(type) || activeAccountTypeOptions[0]?.value || 'shared'
       const nextDuration = findNextAvailableDuration(prev, accountType)
+      const priceType = getDefaultPriceType(form.metadata?.product_type as string | undefined)
 
       const latestSameType = prev
         .filter((row) => normalizeAccountTypeCode(row.account_type) === accountType)
@@ -781,7 +866,11 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
         createPriceDraft({
           account_type: accountType,
           duration: nextDuration,
+          price_type: priceType,
+          billing_period: getDefaultBillingPeriod(priceType, nextDuration),
+          unit_label: getDefaultUnitLabel(priceType),
           label: normalizePriceLabel('', nextDuration),
+          display_label: normalizePriceLabel('', nextDuration),
           price: seededPrice,
         }),
       ]
@@ -1079,7 +1168,12 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
         const pricePayload = {
           duration: draft.duration,
           account_type: normalizeAccountTypeCode(draft.account_type),
+          price_type: draft.price_type,
+          billing_period: draft.billing_period.trim() || getDefaultBillingPeriod(draft.price_type, draft.duration),
+          unit_label: draft.unit_label.trim(),
+          delivery_label: draft.delivery_label.trim(),
           label: normalizePriceLabel(draft.label, draft.duration),
+          display_label: normalizeDisplayPriceLabel(draft.display_label, draft.label, draft.duration),
           savings_text: draft.savings_text.trim(),
           price: draft.price,
           is_active: draft.is_active,
@@ -2023,7 +2117,22 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
                 <div style={{ border: '1px dashed #E5E7EB', borderRadius: 10, padding: 12, fontSize: 12, color: '#6B7280' }}>Belum ada paket harga.</div>
               ) : priceDrafts.map((row) => (
                 <div key={row.local_id} style={{ border: '1px solid #E5E7EB', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                    <div>
+                      <label className="form-label">Model</label>
+                      <select className="min-h-11 rounded-2xl border bg-neutral-50/70 px-4 text-sm font-bold w-full"
+                        value={row.price_type}
+                        onChange={(e) => {
+                          const priceType = e.target.value as ProductPriceDraft['price_type']
+                          updatePriceRow(row.local_id, {
+                            price_type: priceType,
+                            billing_period: getDefaultBillingPeriod(priceType, row.duration),
+                            unit_label: row.unit_label || getDefaultUnitLabel(priceType),
+                          })
+                        }}>
+                        {PRICE_TYPE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                      </select>
+                    </div>
                     <div>
                       <label className="form-label">Tipe</label>
                       <select className="min-h-11 rounded-2xl border bg-neutral-50/70 px-4 text-sm font-bold w-full"
@@ -2033,16 +2142,28 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
                       </select>
                     </div>
                     <div>
-                      <label className="form-label">Durasi (bulan)</label>
-                      <Input type="number" value={row.duration} onChange={(e) => updatePriceRow(row.local_id, { duration: Number(e.target.value) || 1 })} min={1} />
+                      <label className="form-label">Legacy durasi</label>
+                      <Input type="number" value={row.duration} onChange={(e) => {
+                        const duration = Number(e.target.value) || 1
+                        updatePriceRow(row.local_id, {
+                          duration,
+                          billing_period: row.price_type === 'subscription' ? getDefaultBillingPeriod(row.price_type, duration) : row.billing_period,
+                        })
+                      }} min={1} />
                     </div>
                     <div>
                       <label className="form-label">Harga (Rp)</label>
                       <Input type="number" value={row.price} onChange={(e) => updatePriceRow(row.local_id, { price: Number(e.target.value) || 0 })} min={100} />
                     </div>
                   </div>
+                  <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2">
+                    <div><label className="form-label">Label tampil</label><Input value={row.display_label} onChange={(e) => updatePriceRow(row.local_id, { display_label: e.target.value, label: e.target.value })} placeholder="1 Key Lifetime" /></div>
+                    <div><label className="form-label">Periode / Akses</label><Input value={row.billing_period} onChange={(e) => updatePriceRow(row.local_id, { billing_period: e.target.value })} placeholder="Sekali beli" /></div>
+                    <div><label className="form-label">Unit</label><Input value={row.unit_label} onChange={(e) => updatePriceRow(row.local_id, { unit_label: e.target.value })} placeholder="1 kode" /></div>
+                    <div><label className="form-label">Delivery</label><Input value={row.delivery_label} onChange={(e) => updatePriceRow(row.local_id, { delivery_label: e.target.value })} placeholder="Otomatis" /></div>
+                  </div>
                   <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                    <div><label className="form-label">Label (opsional)</label><Input value={row.label} onChange={(e) => updatePriceRow(row.local_id, { label: e.target.value })} placeholder="Paling hemat" /></div>
+                    <div><label className="form-label">Label legacy</label><Input value={row.label} onChange={(e) => updatePriceRow(row.local_id, { label: e.target.value })} placeholder="Paling hemat" /></div>
                     <div><label className="form-label">Hemat (opsional)</label><Input value={row.savings_text} onChange={(e) => updatePriceRow(row.local_id, { savings_text: e.target.value })} placeholder="Hemat 30%" /></div>
                     <div className="flex items-end"><button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removePriceRow(row.local_id)}>Hapus</button></div>
                   </div>
