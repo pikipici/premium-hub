@@ -2106,10 +2106,16 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#141414' }}>4. Paket Harga</div>
 
             <div className="flex gap-1.5 flex-wrap" style={{ marginBottom: 8 }}>
-              {activeAccountTypeOptions.map((option) => (
-                <button key={option.value} className="inline-flex h-9 items-center rounded-xl border bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={() => addPriceRow(option.value)}>
-                  + Paket {option.label}
-                </button>))}
+              {(form.metadata?.product_type as string) === 'subscription' || !form.metadata?.product_type
+                ? activeAccountTypeOptions.map((option) => (
+                    <button key={option.value} className="inline-flex h-9 items-center rounded-xl border bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={() => addPriceRow(option.value)}>
+                      + Paket {option.label}
+                    </button>))
+                : (
+                    <button className="inline-flex h-9 items-center rounded-xl border bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={() => addPriceRow(activeAccountTypeOptions[0]?.value || 'shared')}>
+                      + Paket Harga
+                    </button>)
+              }
             </div>
 
             <div className="grid gap-2">
@@ -2142,7 +2148,7 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
                       </select>
                     </div>
                     <div>
-                      <label className="form-label">Legacy durasi</label>
+                      <label className="form-label">Durasi</label>
                       <Input type="number" value={row.duration} onChange={(e) => {
                         const duration = Number(e.target.value) || 1
                         updatePriceRow(row.local_id, {
@@ -2162,8 +2168,7 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
                     <div><label className="form-label">Unit</label><Input value={row.unit_label} onChange={(e) => updatePriceRow(row.local_id, { unit_label: e.target.value })} placeholder="1 kode" /></div>
                     <div><label className="form-label">Delivery</label><Input value={row.delivery_label} onChange={(e) => updatePriceRow(row.local_id, { delivery_label: e.target.value })} placeholder="Otomatis" /></div>
                   </div>
-                  <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                    <div><label className="form-label">Label legacy</label><Input value={row.label} onChange={(e) => updatePriceRow(row.local_id, { label: e.target.value })} placeholder="Paling hemat" /></div>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
                     <div><label className="form-label">Hemat (opsional)</label><Input value={row.savings_text} onChange={(e) => updatePriceRow(row.local_id, { savings_text: e.target.value })} placeholder="Hemat 30%" /></div>
                     <div className="flex items-end"><button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removePriceRow(row.local_id)}>Hapus</button></div>
                   </div>
