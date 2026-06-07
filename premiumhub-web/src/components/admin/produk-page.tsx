@@ -419,6 +419,75 @@ const PRODUCT_TYPE_OPTIONS = [
   { value: 'digital', label: 'Voucher / Digital', icon: '🎟', desc: 'Voucher, gift card, download link', defaultFulfillment: 'voucher_code', defaultCategory: 'design' },
 ]
 
+const PRODUCT_TYPE_DETAIL_CONFIG: Record<string, { title: string; description: string; fulfillmentLabel: string }> = {
+  subscription: {
+    title: 'Detail Akun Premium',
+    description: 'Atur catatan akses akun, format credential, garansi, dan instruksi penggunaan.',
+    fulfillmentLabel: 'Credential — Email/password atau akses akun',
+  },
+  game: {
+    title: 'Detail Akun Game',
+    description: 'Atur platform, region, requirement login, keamanan akun, dan delivery manual.',
+    fulfillmentLabel: 'Manual — Instruksi dikirim manual oleh CS/admin',
+  },
+  license: {
+    title: 'Detail Lisensi / Key',
+    description: 'Atur jenis lisensi, batas device, masa berlaku, dan cara aktivasi kode.',
+    fulfillmentLabel: 'License Key — Kode lisensi per pembelian',
+  },
+  digital: {
+    title: 'Detail Voucher / Digital',
+    description: 'Atur jenis digital, nominal, region, masa berlaku, link redeem, dan cara klaim.',
+    fulfillmentLabel: 'Voucher Code — Kode redeem/voucher',
+  },
+}
+
+const PRODUCT_TYPE_DEFAULTS: Record<string, Partial<FormState>> = {
+  subscription: {
+    icon: '👤',
+    tagline: 'Akses akun premium siap pakai',
+    badge_guarantee_text: '🛡 Garansi Akun',
+    shared_note: 'Berbagi dengan pengguna lain sesuai paket',
+    private_note: 'Akun pribadi, akses lebih fleksibel',
+    fulfillment_guide: 'Credential dikirim setelah pembayaran sukses. Ikuti instruksi login yang tersedia di dashboard pembeli.',
+  },
+  game: {
+    icon: '🎮',
+    tagline: 'Akun game dan layanan manual',
+    badge_guarantee_text: '🛡 Bantuan CS',
+    fulfillment_guide: 'Admin/CS akan memproses delivery manual setelah pembayaran sukses. Pastikan data login atau ID game sudah benar.',
+  },
+  license: {
+    icon: '🔑',
+    tagline: 'Kode lisensi siap aktivasi',
+    badge_guarantee_text: '🛡 Garansi Aktivasi',
+    fulfillment_guide: 'Kode lisensi dikirim setelah pembayaran sukses. Ikuti panduan aktivasi sesuai produk.',
+  },
+  digital: {
+    icon: '🎟',
+    tagline: 'Voucher dan file digital siap klaim',
+    badge_guarantee_text: '🛡 Garansi Redeem',
+    fulfillment_guide: 'Kode atau link redeem dikirim setelah pembayaran sukses. Klaim sesuai instruksi produk.',
+  },
+}
+
+function createDefaultMetadataForType(type: string): Record<string, unknown> {
+  if (type === 'subscription') {
+    return { product_type: type, access_type: '', credential_format: '', account_warranty: '' }
+  }
+  if (type === 'game') {
+    return { product_type: type, platform: '', region: '', login_requirement: '', account_security: '', game_info: '' }
+  }
+  if (type === 'license') {
+    return { product_type: type, license_type: '', device_limit: '', license_expiry: '', license_info: '' }
+  }
+  if (type === 'digital') {
+    return { product_type: type, digital_type: '', voucher_value: '', region: '', voucher_expiry: '', voucher_info: '', download_link: '' }
+  }
+
+  return { product_type: type }
+}
+
   const currentTemplate = CATEGORY_TEMPLATES[form.category]
   const showField = (field: string) => !currentTemplate?.hiddenFields.includes(field)
 
@@ -587,9 +656,10 @@ const PRODUCT_TYPE_OPTIONS = [
 
     setForm({
       ...createDefaultForm(),
+      ...PRODUCT_TYPE_DEFAULTS[type],
       category: defaultCategory,
       fulfillment_type: (opt?.defaultFulfillment as Product['fulfillment_type']) || 'credential',
-      metadata: { product_type: type },
+      metadata: createDefaultMetadataForType(type),
     })
 
     const primaryType = activeAccountTypeOptions[0]?.value || 'shared'
@@ -887,9 +957,53 @@ const PRODUCT_TYPE_OPTIONS = [
     return ''
   }
 
+  const validateProductTypeDetails = () => {
+    const productType = form.metadata?.product_type as string | undefined
+    if (!productType) {
+      return 'Tipe produk wajib dipilih sebelum menyimpan produk.'
+    }
+
+    if (productType === 'subscription') {
+      if (!form.shared_note.trim() && !form.private_note.trim() && !form.fulfillment_guide.trim()) {
+        return 'Detail Akun Premium wajib punya minimal catatan akun atau panduan credential.'
+      }
+    }
+
+    if (productType === 'game') {
+      const platform = String(form.metadata?.platform || '').trim()
+      const gameInfo = String(form.metadata?.game_info || '').trim()
+      if (!platform && !gameInfo) {
+        return 'Detail Akun Game wajib punya Platform / Server atau Requirement / Info Game.'
+      }
+    }
+
+    if (productType === 'license') {
+      const licenseInfo = String(form.metadata?.license_info || '').trim()
+      if (!licenseInfo) {
+        return 'Detail Lisensi wajib mengisi Informasi Lisensi.'
+      }
+    }
+
+    if (productType === 'digital') {
+      const voucherInfo = String(form.metadata?.voucher_info || '').trim()
+      const downloadLink = String(form.metadata?.download_link || '').trim()
+      if (!voucherInfo && !downloadLink) {
+        return 'Detail Voucher / Digital wajib punya Info Voucher atau Link Download / Redeem.'
+      }
+    }
+
+    return ''
+  }
+
   const submitForm = async () => {
     if (!form.name.trim()) {
       setError('Nama produk wajib diisi')
+      return
+    }
+
+    const productTypeError = validateProductTypeDetails()
+    if (productTypeError) {
+      setError(productTypeError)
       return
     }
 
@@ -934,6 +1048,7 @@ const PRODUCT_TYPE_OPTIONS = [
       seo_description: form.seo_description.trim(),
       fulfillment_type: form.fulfillment_type || 'credential',
       fulfillment_guide: form.fulfillment_guide.trim(),
+      metadata: form.metadata,
       sort_priority: Number(form.sort_priority) || 0,
       is_popular: form.is_popular,
       is_active: form.is_active,
@@ -1517,7 +1632,7 @@ const PRODUCT_TYPE_OPTIONS = [
                 ) : (
                   <select className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
                     value={(form.metadata?.product_type as string) || ''}
-                    onChange={(event) => { const type = event.target.value; const opt = PRODUCT_TYPE_OPTIONS.find((o) => o.value === type); if (opt) { setForm((prev) => ({ ...prev, category: opt.defaultCategory, fulfillment_type: opt.defaultFulfillment as Product['fulfillment_type'], metadata: { product_type: type } })) } }}>
+                    onChange={(event) => { const type = event.target.value; const opt = PRODUCT_TYPE_OPTIONS.find((o) => o.value === type); if (opt) { setForm((prev) => ({ ...prev, category: opt.defaultCategory, fulfillment_type: opt.defaultFulfillment as Product['fulfillment_type'], metadata: { ...createDefaultMetadataForType(type), ...prev.metadata, product_type: type } })) } }}>
                     <option value="">-- Pilih Tipe Produk --</option>
                     {PRODUCT_TYPE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>)}
                   </select>
@@ -1539,14 +1654,36 @@ const PRODUCT_TYPE_OPTIONS = [
 
           {/* ===== SECTION 2: DETAIL PER TIPE ===== */}
           <div style={{ padding: 14, borderRadius: 12, border: '1px solid #E5E7EB', background: '#FAFAFA' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#141414' }}>2. Detail Produk</div>
+            {(() => {
+              const detailConfig = PRODUCT_TYPE_DETAIL_CONFIG[(form.metadata?.product_type as string) || '']
+              return (
+                <>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: '#141414' }}>2. {detailConfig?.title || 'Detail Produk'}</div>
+                  {detailConfig && <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 10 }}>{detailConfig.description}</div>}
+                </>
+              )
+            })()}
 
             {/* Tipe: Akun Premium */}
             {form.metadata?.product_type === 'subscription' && (
               <div style={{ display: 'grid', gap: 10 }}>
                 <div>
                   <label className="form-label">Tipe Fulfillment (auto)</label>
-                  <Input value="Credential — Email/password atau akses akun" disabled style={{ opacity: 0.7 }} />
+                  <Input value={PRODUCT_TYPE_DETAIL_CONFIG.subscription.fulfillmentLabel} disabled style={{ opacity: 0.7 }} />
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="form-label">Jenis Akses Utama</label>
+                    <Input value={(form.metadata?.access_type as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, access_type: e.target.value } }))}
+                      placeholder="Contoh: Shared, Private, Family" />
+                  </div>
+                  <div>
+                    <label className="form-label">Format Credential</label>
+                    <Input value={(form.metadata?.credential_format as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, credential_format: e.target.value } }))}
+                      placeholder="Contoh: Email + password + profil" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
@@ -1563,6 +1700,12 @@ const PRODUCT_TYPE_OPTIONS = [
                   </div>
                 </div>
                 <div>
+                  <label className="form-label">Garansi Akun</label>
+                  <Input value={(form.metadata?.account_warranty as string) || ''}
+                    onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, account_warranty: e.target.value } }))}
+                    placeholder="Contoh: Garansi replace selama masa aktif" />
+                </div>
+                <div>
                   <label className="form-label">Panduan / Instruksi (opsional)</label>
                   <Textarea className="min-h-[60px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
                     value={form.fulfillment_guide} onChange={(e) => setForm((prev) => ({ ...prev, fulfillment_guide: e.target.value }))}
@@ -1576,20 +1719,35 @@ const PRODUCT_TYPE_OPTIONS = [
               <div style={{ display: 'grid', gap: 10 }}>
                 <div>
                   <label className="form-label">Tipe Fulfillment (auto)</label>
-                  <Input value="Manual — Instruksi dikirim manual oleh CS/admin" disabled style={{ opacity: 0.7 }} />
+                  <Input value={PRODUCT_TYPE_DETAIL_CONFIG.game.fulfillmentLabel} disabled style={{ opacity: 0.7 }} />
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="form-label">Platform / Server</label>
+                    <Input value={(form.metadata?.platform as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, platform: e.target.value } }))}
+                      placeholder="Contoh: Steam, Mobile Legends, Garena" />
+                  </div>
+                  <div>
+                    <label className="form-label">Region</label>
+                    <Input value={(form.metadata?.region as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, region: e.target.value } }))}
+                      placeholder="Contoh: Indonesia, Global, SEA" />
+                  </div>
                 </div>
                 <div>
-                  <label className="form-label">Platform / Server</label>
-                  <Input value={(form.metadata?.platform as string) || ''}
-                    onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, platform: e.target.value } }))}
-                    placeholder="Contoh: Steam, Mobile Legends, Garena" />
-                </div>
-                <div>
-                  <label className="form-label">Requirement / Info Game</label>
+                  <label className="form-label">Requirement Login / Info Game</label>
                   <Textarea className="min-h-[60px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
                     value={(form.metadata?.game_info as string) || ''}
                     onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, game_info: e.target.value } }))}
                     placeholder="Contoh: Butuh login via Google, wajib ada akun game level 10+" />
+                </div>
+                <div>
+                  <label className="form-label">Info Keamanan Akun</label>
+                  <Textarea className="min-h-[60px] rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 py-3 text-sm font-medium resize-y w-full" rows={2}
+                    value={(form.metadata?.account_security as string) || ''}
+                    onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, account_security: e.target.value } }))}
+                    placeholder="Contoh: Jangan ubah email/password tanpa konfirmasi CS" />
                 </div>
                 <div>
                   <label className="form-label">Panduan Delivery</label>
@@ -1605,7 +1763,27 @@ const PRODUCT_TYPE_OPTIONS = [
               <div style={{ display: 'grid', gap: 10 }}>
                 <div>
                   <label className="form-label">Tipe Fulfillment (auto)</label>
-                  <Input value="License Key — Kode lisensi per pembelian" disabled style={{ opacity: 0.7 }} />
+                  <Input value={PRODUCT_TYPE_DETAIL_CONFIG.license.fulfillmentLabel} disabled style={{ opacity: 0.7 }} />
+                </div>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="form-label">Jenis Lisensi</label>
+                    <Input value={(form.metadata?.license_type as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, license_type: e.target.value } }))}
+                      placeholder="Lifetime, subscription, trial" />
+                  </div>
+                  <div>
+                    <label className="form-label">Jumlah Device</label>
+                    <Input value={(form.metadata?.device_limit as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, device_limit: e.target.value } }))}
+                      placeholder="Contoh: 1 device" />
+                  </div>
+                  <div>
+                    <label className="form-label">Masa Berlaku</label>
+                    <Input value={(form.metadata?.license_expiry as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, license_expiry: e.target.value } }))}
+                      placeholder="Contoh: 1 tahun" />
+                  </div>
                 </div>
                 <div>
                   <label className="form-label">Informasi Lisensi</label>
@@ -1628,7 +1806,35 @@ const PRODUCT_TYPE_OPTIONS = [
               <div style={{ display: 'grid', gap: 10 }}>
                 <div>
                   <label className="form-label">Tipe Fulfillment (auto)</label>
-                  <Input value="Voucher Code — Kode redeem/voucher" disabled style={{ opacity: 0.7 }} />
+                  <Input value={PRODUCT_TYPE_DETAIL_CONFIG.digital.fulfillmentLabel} disabled style={{ opacity: 0.7 }} />
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="form-label">Jenis Digital</label>
+                    <Input value={(form.metadata?.digital_type as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, digital_type: e.target.value } }))}
+                      placeholder="Gift card, voucher, file, template" />
+                  </div>
+                  <div>
+                    <label className="form-label">Nominal / Paket</label>
+                    <Input value={(form.metadata?.voucher_value as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, voucher_value: e.target.value } }))}
+                      placeholder="Contoh: IDR 50.000" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="form-label">Region</label>
+                    <Input value={(form.metadata?.region as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, region: e.target.value } }))}
+                      placeholder="Contoh: Indonesia" />
+                  </div>
+                  <div>
+                    <label className="form-label">Masa Berlaku</label>
+                    <Input value={(form.metadata?.voucher_expiry as string) || ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, metadata: { ...prev.metadata, voucher_expiry: e.target.value } }))}
+                      placeholder="Contoh: Berlaku 12 bulan" />
+                  </div>
                 </div>
                 <div>
                   <label className="form-label">Info Voucher / Digital</label>
