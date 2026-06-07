@@ -1501,13 +1501,27 @@ const PRODUCT_TYPE_OPTIONS = [
             <div className="grid grid-cols-2 gap-2.5" style={{ marginTop: 10 }}>
               <div>
                 <label className="form-label">Tipe Produk</label>
-                <select className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
-                  value={(form.metadata?.product_type as string) || ''}
-                  onChange={(event) => { const type = event.target.value; const opt = PRODUCT_TYPE_OPTIONS.find((o) => o.value === type); if (opt) { setForm((prev) => ({ ...prev, category: opt.defaultCategory, fulfillment_type: opt.defaultFulfillment as Product['fulfillment_type'], metadata: { product_type: type } })) } }}>
-                  <option value="">-- Pilih Tipe Produk --</option>
-                  {PRODUCT_TYPE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>)}
-                </select>
-                {(() => { const sel = PRODUCT_TYPE_OPTIONS.find((o) => o.value === form.metadata?.product_type); return sel ? <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>{sel.desc}</div> : null })()}
+                {formMode === 'create' ? (
+                  (() => {
+                    const sel = PRODUCT_TYPE_OPTIONS.find((o) => o.value === form.metadata?.product_type)
+                    return (
+                      <div className="flex items-center gap-2.5 min-h-11 rounded-2xl border border-neutral-200 bg-neutral-100/70 px-4">
+                        <span className="text-lg">{sel?.icon || '📦'}</span>
+                        <div>
+                          <div className="text-sm font-bold text-neutral-900">{sel?.label || 'Tidak dipilih'}</div>
+                          {sel && <div className="text-xs text-neutral-500">{sel.desc}</div>}
+                        </div>
+                      </div>
+                    )
+                  })()
+                ) : (
+                  <select className="min-h-11 rounded-2xl border border-neutral-200 bg-neutral-50/70 px-4 text-sm font-bold w-full"
+                    value={(form.metadata?.product_type as string) || ''}
+                    onChange={(event) => { const type = event.target.value; const opt = PRODUCT_TYPE_OPTIONS.find((o) => o.value === type); if (opt) { setForm((prev) => ({ ...prev, category: opt.defaultCategory, fulfillment_type: opt.defaultFulfillment as Product['fulfillment_type'], metadata: { product_type: type } })) } }}>
+                    <option value="">-- Pilih Tipe Produk --</option>
+                    {PRODUCT_TYPE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>)}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="form-label">Icon Emoji</label>
