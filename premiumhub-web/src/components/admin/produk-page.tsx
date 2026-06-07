@@ -2105,78 +2105,140 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
           <div style={{ padding: 14, borderRadius: 12, border: '1px solid #E5E7EB', background: '#FAFAFA' }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#141414' }}>4. Paket Harga</div>
 
-            <div className="flex gap-1.5 flex-wrap" style={{ marginBottom: 8 }}>
-              {(form.metadata?.product_type as string) === 'subscription' || !form.metadata?.product_type
-                ? activeAccountTypeOptions.map((option) => (
-                    <button key={option.value} className="inline-flex h-9 items-center rounded-xl border bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={() => addPriceRow(option.value)}>
-                      + Paket {option.label}
-                    </button>))
-                : (
-                    <button className="inline-flex h-9 items-center rounded-xl border bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={() => addPriceRow(activeAccountTypeOptions[0]?.value || 'shared')}>
-                      + Paket Harga
-                    </button>)
-              }
-            </div>
+            {/* --- SUBSCRIPTION: tombol Shared/Private --- */}
+            {(((form.metadata?.product_type as string) === 'subscription' || !form.metadata?.product_type)) && (
+              <div className="flex gap-1.5 flex-wrap" style={{ marginBottom: 8 }}>
+                {activeAccountTypeOptions.map((option) => (
+                  <button key={option.value} className="inline-flex h-9 items-center rounded-xl border bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={() => addPriceRow(option.value)}>
+                    + Paket {option.label}
+                  </button>))}
+              </div>
+            )}
+
+            {/* --- NON-SUBSCRIPTION: satu tombol --- */}
+            {!(((form.metadata?.product_type as string) === 'subscription' || !form.metadata?.product_type)) && (
+              <div className="flex gap-1.5 flex-wrap" style={{ marginBottom: 8 }}>
+                <button className="inline-flex h-9 items-center rounded-xl border bg-white px-4 text-xs font-bold text-neutral-700 hover:bg-neutral-50 transition" type="button" onClick={() => addPriceRow(activeAccountTypeOptions[0]?.value || 'shared')}>
+                  + Paket Harga
+                </button>
+              </div>
+            )}
 
             <div className="grid gap-2">
               {priceDrafts.length === 0 ? (
                 <div style={{ border: '1px dashed #E5E7EB', borderRadius: 10, padding: 12, fontSize: 12, color: '#6B7280' }}>Belum ada paket harga.</div>
               ) : priceDrafts.map((row) => (
                 <div key={row.local_id} style={{ border: '1px solid #E5E7EB', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
-                    <div>
-                      <label className="form-label">Model</label>
-                      <select className="min-h-11 rounded-2xl border bg-neutral-50/70 px-4 text-sm font-bold w-full"
-                        value={row.price_type}
-                        onChange={(e) => {
-                          const priceType = e.target.value as ProductPriceDraft['price_type']
-                          updatePriceRow(row.local_id, {
-                            price_type: priceType,
-                            billing_period: getDefaultBillingPeriod(priceType, row.duration),
-                            unit_label: row.unit_label || getDefaultUnitLabel(priceType),
-                          })
-                        }}>
-                        {PRICE_TYPE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="form-label">Tipe</label>
-                      <select className="min-h-11 rounded-2xl border bg-neutral-50/70 px-4 text-sm font-bold w-full"
-                        value={normalizeAccountTypeCode(row.account_type)}
-                        onChange={(e) => updatePriceRow(row.local_id, { account_type: e.target.value })}>
-                        {activeAccountTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="form-label">Durasi</label>
-                      <Input type="number" value={row.duration} onChange={(e) => {
-                        const duration = Number(e.target.value) || 1
-                        updatePriceRow(row.local_id, {
-                          duration,
-                          billing_period: row.price_type === 'subscription' ? getDefaultBillingPeriod(row.price_type, duration) : row.billing_period,
-                        })
-                      }} min={1} />
-                    </div>
-                    <div>
-                      <label className="form-label">Harga (Rp)</label>
-                      <Input type="number" value={row.price} onChange={(e) => updatePriceRow(row.local_id, { price: Number(e.target.value) || 0 })} min={100} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2">
-                    <div><label className="form-label">Label tampil</label><Input value={row.display_label} onChange={(e) => updatePriceRow(row.local_id, { display_label: e.target.value, label: e.target.value })} placeholder="1 Key Lifetime" /></div>
-                    <div><label className="form-label">Periode / Akses</label><Input value={row.billing_period} onChange={(e) => updatePriceRow(row.local_id, { billing_period: e.target.value })} placeholder="Sekali beli" /></div>
-                    <div><label className="form-label">Unit</label><Input value={row.unit_label} onChange={(e) => updatePriceRow(row.local_id, { unit_label: e.target.value })} placeholder="1 kode" /></div>
-                    <div><label className="form-label">Delivery</label><Input value={row.delivery_label} onChange={(e) => updatePriceRow(row.local_id, { delivery_label: e.target.value })} placeholder="Otomatis" /></div>
-                  </div>
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
-                    <div><label className="form-label">Hemat (opsional)</label><Input value={row.savings_text} onChange={(e) => updatePriceRow(row.local_id, { savings_text: e.target.value })} placeholder="Hemat 30%" /></div>
-                    <div className="flex items-end"><button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removePriceRow(row.local_id)}>Hapus</button></div>
-                  </div>
+
+                  {/* ===== SUBSCRIPTION CARD ===== */}
+                  {(((form.metadata?.product_type as string) === 'subscription' || !form.metadata?.product_type)) && (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                        <div>
+                          <label className="form-label">Tipe</label>
+                          <select className="min-h-11 rounded-2xl border bg-neutral-50/70 px-4 text-sm font-bold w-full"
+                            value={normalizeAccountTypeCode(row.account_type)}
+                            onChange={(e) => updatePriceRow(row.local_id, { account_type: e.target.value })}>
+                            {activeAccountTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="form-label">Durasi</label>
+                          <Input type="number" value={row.duration} onChange={(e) => {
+                            const duration = Number(e.target.value) || 1
+                            updatePriceRow(row.local_id, { duration, billing_period: `${Math.max(duration, 1)} bulan` })
+                          }} min={1} />
+                        </div>
+                        <div>
+                          <label className="form-label">Label tampil</label>
+                          <Input value={row.display_label} onChange={(e) => updatePriceRow(row.local_id, { display_label: e.target.value, label: e.target.value })} placeholder="1 Bulan" />
+                        </div>
+                        <div>
+                          <label className="form-label">Harga (Rp)</label>
+                          <Input type="number" value={row.price} onChange={(e) => updatePriceRow(row.local_id, { price: Number(e.target.value) || 0 })} min={100} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                        <div><label className="form-label">Hemat (opsional)</label><Input value={row.savings_text} onChange={(e) => updatePriceRow(row.local_id, { savings_text: e.target.value })} placeholder="Hemat 30%" /></div>
+                        <div className="flex items-end"><button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removePriceRow(row.local_id)}>Hapus</button></div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* ===== LICENSE CARD ===== */}
+                  {(form.metadata?.product_type as string) === 'license' && (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                        <div>
+                          <label className="form-label">Label tampil</label>
+                          <Input value={row.display_label} onChange={(e) => updatePriceRow(row.local_id, { display_label: e.target.value, label: e.target.value })} placeholder="1 Key Lifetime" />
+                        </div>
+                        <div>
+                          <label className="form-label">Unit</label>
+                          <Input value={row.unit_label} onChange={(e) => updatePriceRow(row.local_id, { unit_label: e.target.value })} placeholder="1 key" />
+                        </div>
+                        <div>
+                          <label className="form-label">Harga (Rp)</label>
+                          <Input type="number" value={row.price} onChange={(e) => updatePriceRow(row.local_id, { price: Number(e.target.value) || 0 })} min={100} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                        <div><label className="form-label">Delivery</label><Input value={row.delivery_label} onChange={(e) => updatePriceRow(row.local_id, { delivery_label: e.target.value })} placeholder="Otomatis" /></div>
+                        <div className="flex items-end"><button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removePriceRow(row.local_id)}>Hapus</button></div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* ===== DIGITAL / VOUCHER CARD ===== */}
+                  {(form.metadata?.product_type as string) === 'digital' && (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                        <div>
+                          <label className="form-label">Label tampil</label>
+                          <Input value={row.display_label} onChange={(e) => updatePriceRow(row.local_id, { display_label: e.target.value, label: e.target.value })} placeholder="1 Voucher" />
+                        </div>
+                        <div>
+                          <label className="form-label">Nominal</label>
+                          <Input value={row.unit_label} onChange={(e) => updatePriceRow(row.local_id, { unit_label: e.target.value })} placeholder="100K GoPay" />
+                        </div>
+                        <div>
+                          <label className="form-label">Harga (Rp)</label>
+                          <Input type="number" value={row.price} onChange={(e) => updatePriceRow(row.local_id, { price: Number(e.target.value) || 0 })} min={100} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                        <div><label className="form-label">Delivery</label><Input value={row.delivery_label} onChange={(e) => updatePriceRow(row.local_id, { delivery_label: e.target.value })} placeholder="Otomatis" /></div>
+                        <div className="flex items-end"><button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removePriceRow(row.local_id)}>Hapus</button></div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* ===== GAME CARD ===== */}
+                  {(form.metadata?.product_type as string) === 'game' && (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                        <div>
+                          <label className="form-label">Label tampil</label>
+                          <Input value={row.display_label} onChange={(e) => updatePriceRow(row.local_id, { display_label: e.target.value, label: e.target.value })} placeholder="Joki Rank" />
+                        </div>
+                        <div>
+                          <label className="form-label">Unit</label>
+                          <Input value={row.unit_label} onChange={(e) => updatePriceRow(row.local_id, { unit_label: e.target.value })} placeholder="1 sesi" />
+                        </div>
+                        <div>
+                          <label className="form-label">Harga (Rp)</label>
+                          <Input type="number" value={row.price} onChange={(e) => updatePriceRow(row.local_id, { price: Number(e.target.value) || 0 })} min={100} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                        <div><label className="form-label">Delivery</label><Input value={row.delivery_label} onChange={(e) => updatePriceRow(row.local_id, { delivery_label: e.target.value })} placeholder="Manual / CS" /></div>
+                        <div className="flex items-end"><button className="inline-flex h-9 items-center rounded-lg border px-3 text-[11px] font-bold" type="button" style={{ color: '#EF4444', borderColor: '#FECACA' }} onClick={() => removePriceRow(row.local_id)}>Hapus</button></div>
+                      </div>
+                    </>
+                  )}
                 </div>))}
             </div>
-          </div>
-
-          {/* ===== SECTION 5: STATUS ===== */}
+          </div>{/* ===== SECTION 5: STATUS ===== */}
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '0 4px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
               <input type="checkbox" checked={form.is_popular} onChange={(e) => setForm((prev) => ({ ...prev, is_popular: e.target.checked }))} />
