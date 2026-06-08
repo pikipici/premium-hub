@@ -59,8 +59,9 @@ export default function AdminStyles() {
       .nav-item:hover { background: rgba(255,255,255,.08); color: rgba(255,255,255,.92); transform: translateX(2px); }
       .nav-item.active { background: #fff; color: var(--dark); box-shadow: 0 14px 32px rgba(0,0,0,.22); }
       .nav-item.active::before { content: ''; position: absolute; left: -7px; top: 11px; bottom: 11px; width: 3px; border-radius: 999px; background: var(--orange); }
-      .nav-icon { font-size: 13px; opacity: .82; flex-shrink: 0; width: 25px; height: 25px; border-radius: 9px; background: rgba(255,255,255,.08); display: inline-flex; align-items: center; justify-content: center; text-align: center; }
-      .nav-item.active .nav-icon { background: var(--orange-soft); color: var(--orange); opacity: 1; }
+      .nav-icon { flex-shrink: 0; width: 25px; height: 25px; border-radius: 9px; background: rgba(255,255,255,.08); display: inline-flex; align-items: center; justify-content: center; text-align: center; color: rgba(255,255,255,.6); }
+      .nav-item.active .nav-icon { background: var(--orange-soft); color: var(--orange); }
+      .nav-icon-svg { width: 14px; height: 14px; }
       .nav-text { min-width: 0; }
       .sidebar-bottom { margin-top: auto; padding: 12px 12px 0; border-top: 1px solid rgba(255,255,255,.08); }
       .admin-profile { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 16px; cursor: pointer; transition: background .15s, border-color .15s; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
@@ -363,11 +364,15 @@ export default function AdminStyles() {
         padding: 2px 7px;
       }
       .admin-mobile-drawer-icon {
-        width: 18px;
-        text-align: center;
-        opacity: .85;
+        width: 20px;
+        height: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         flex-shrink: 0;
+        opacity: .85;
       }
+      .drawer-icon-svg { width: 16px; height: 16px; }
       .admin-mobile-drawer-actions {
         margin-top: auto;
         border-top: 1px solid rgba(255,255,255,.08);

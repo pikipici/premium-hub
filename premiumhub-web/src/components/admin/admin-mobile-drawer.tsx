@@ -3,6 +3,19 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
+import {
+  Database,
+  LayoutDashboard,
+  Megaphone,
+  MessageCircle,
+  Package,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  Users,
+  Wallet,
+  RefreshCw,
+} from 'lucide-react'
 
 import type { AdminSidebarBadgeCounts } from '@/components/admin/admin-sidebar'
 import { isDigiConnectFrontendEnabled, isDigiConnectHref } from '@/lib/featureFlags'
@@ -10,7 +23,7 @@ import { isDigiConnectFrontendEnabled, isDigiConnectHref } from '@/lib/featureFl
 type DrawerItem = {
   href: string
   label: string
-  icon: string
+  icon: React.ComponentType<{ className?: string }>
 }
 
 type DrawerSection = {
@@ -22,38 +35,38 @@ const DRAWER_SECTIONS: DrawerSection[] = [
   {
     label: 'Overview',
     items: [
-      { href: '/admin', label: 'Dashboard', icon: 'DB' },
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     ],
   },
   {
     label: 'Transaksi',
     items: [
-      { href: '/admin/order', label: 'Order', icon: 'OR' },
-      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: 'SO' },
-      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: 'WR' },
-      { href: '/admin/convert', label: 'Control Convert', icon: 'CV' },
-      { href: '/admin/garansi', label: 'Klaim Garansi', icon: 'KG' },
+      { href: '/admin/order', label: 'Order', icon: ShoppingCart },
+      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: Megaphone },
+      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: Wallet },
+      { href: '/admin/convert', label: 'Control Convert', icon: RefreshCw },
+      { href: '/admin/garansi', label: 'Klaim Garansi', icon: ShieldCheck },
     ],
   },
   {
     label: 'Support',
     items: [
-      { href: '/admin/chat', label: 'Chat Support', icon: 'CS' },
+      { href: '/admin/chat', label: 'Chat Support', icon: MessageCircle },
     ],
   },
   {
     label: 'Katalog',
     items: [
-      { href: '/admin/produk', label: 'Produk', icon: 'PR' },
-      { href: '/admin/sosmed', label: 'DigiSosmed', icon: 'DS' },
-      { href: '/admin/stok', label: 'Stok Produk', icon: 'ST' },
+      { href: '/admin/produk', label: 'Produk', icon: Package },
+      { href: '/admin/sosmed', label: 'DigiSosmed', icon: Megaphone },
+      { href: '/admin/stok', label: 'Stok Produk', icon: Database },
     ],
   },
   {
     label: 'Akun',
     items: [
-      { href: '/admin/pengguna', label: 'Pengguna', icon: 'US' },
-      { href: '/admin/pengaturan', label: 'Pengaturan', icon: 'PG' },
+      { href: '/admin/pengguna', label: 'Pengguna', icon: Users },
+      { href: '/admin/pengaturan', label: 'Pengaturan', icon: Settings },
     ],
   },
 ]
@@ -172,7 +185,9 @@ export default function AdminMobileDrawer({
                       className={`admin-mobile-drawer-item${isActive(pathname, item.href) ? ' active' : ''}`}
                       onClick={onClose}
                     >
-                      <span className="admin-mobile-drawer-icon">{item.icon}</span>
+                      <span className="admin-mobile-drawer-icon">
+                        <item.icon className="drawer-icon-svg" />
+                      </span>
                       <span>{item.label}</span>
                       {showBadge ? (
                         <span className={`admin-mobile-drawer-item-badge${badgeClassNameForHref(item.href)}`}>

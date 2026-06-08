@@ -2,13 +2,32 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import {
+  Box,
+  Cpu,
+  Database,
+  LayoutDashboard,
+  Megaphone,
+  MessageCircle,
+  Package,
+  RefreshCw,
+  Settings,
+  ShieldCheck,
+  ShieldOff,
+  ShoppingCart,
+  TrendingUp,
+  Users,
+  Wallet,
+  CheckCircle2,
+  DollarSign,
+} from 'lucide-react'
 
 import { isDigiConnectFrontendEnabled, isDigiConnectHref } from '@/lib/featureFlags'
 
 type NavItem = {
   href: string
   label: string
-  icon: string
+  icon: React.ComponentType<{ className?: string }>
 }
 
 type NavSection = {
@@ -20,50 +39,50 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Overview',
     items: [
-      { href: '/admin', label: 'Dashboard', icon: 'DB' },
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     ],
   },
   {
     label: 'Katalog',
     items: [
-      { href: '/admin/produk', label: 'Produk', icon: 'PR' },
-      { href: '/admin/sosmed', label: 'DigiSosmed', icon: 'DS' },
-      { href: '/admin/stok', label: 'Stok Produk', icon: 'ST' },
+      { href: '/admin/produk', label: 'Produk', icon: Package },
+      { href: '/admin/sosmed', label: 'DigiSosmed', icon: Megaphone },
+      { href: '/admin/stok', label: 'Stok Produk', icon: Database },
     ],
   },
   {
     label: 'Transaksi',
     items: [
-      { href: '/admin/order', label: 'Order', icon: 'OR' },
-      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: 'SO' },
-      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: 'WR' },
-      { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: 'WD' },
-      { href: '/admin/digiconnect', label: 'DigiConnect', icon: 'DC' },
-      { href: '/admin/convert', label: 'Control Convert', icon: 'CV' },
-      { href: '/admin/garansi', label: 'Klaim Garansi', icon: 'KG' },
+      { href: '/admin/order', label: 'Order', icon: ShoppingCart },
+      { href: '/admin/sosmed/orders', label: 'Order DigiSosmed', icon: Megaphone },
+      { href: '/admin/wallet-reconciliation', label: 'Rekon Wallet', icon: Wallet },
+      { href: '/admin/wallet/withdrawals', label: 'Penarikan', icon: DollarSign },
+      { href: '/admin/digiconnect', label: 'DigiConnect', icon: Cpu },
+      { href: '/admin/convert', label: 'Control Convert', icon: RefreshCw },
+      { href: '/admin/garansi', label: 'Klaim Garansi', icon: ShieldCheck },
     ],
   },
   {
     label: 'Gmail',
     items: [
-      { href: '/admin/gmail/verifikasi', label: 'Verifikasi Setoran', icon: 'GV' },
-      { href: '/admin/gmail/inventory', label: 'Inventory', icon: 'GI' },
-      { href: '/admin/gmail/pricing', label: 'Pricing', icon: 'GP' },
-      { href: '/admin/gmail/strikes', label: 'Strike Users', icon: 'GS' },
-      { href: '/admin/gmail/analytics', label: 'Analytics', icon: 'GA' },
+      { href: '/admin/gmail/verifikasi', label: 'Verifikasi Setoran', icon: CheckCircle2 },
+      { href: '/admin/gmail/inventory', label: 'Inventory', icon: Box },
+      { href: '/admin/gmail/pricing', label: 'Pricing', icon: DollarSign },
+      { href: '/admin/gmail/strikes', label: 'Strike Users', icon: ShieldOff },
+      { href: '/admin/gmail/analytics', label: 'Analytics', icon: TrendingUp },
     ],
   },
   {
     label: 'Support',
     items: [
-      { href: '/admin/chat', label: 'Chat Support', icon: 'CS' },
+      { href: '/admin/chat', label: 'Chat Support', icon: MessageCircle },
     ],
   },
   {
     label: 'Akun',
     items: [
-      { href: '/admin/pengguna', label: 'Pengguna', icon: 'US' },
-      { href: '/admin/pengaturan', label: 'Pengaturan', icon: 'PG' },
+      { href: '/admin/pengguna', label: 'Pengguna', icon: Users },
+      { href: '/admin/pengaturan', label: 'Pengaturan', icon: Settings },
     ],
   },
 ]
@@ -144,7 +163,9 @@ export default function AdminSidebar({ collapsed = false, badges, loadingBadges 
                   title={collapsed ? item.label : undefined}
                   aria-label={item.label}
                 >
-                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-icon">
+                    <item.icon className="nav-icon-svg" />
+                  </span>
                   <span className="nav-text">{item.label}</span>
                   {showBadge ? (
                     <span className={`nav-badge${badgeClassNameForHref(item.href)}`}>
