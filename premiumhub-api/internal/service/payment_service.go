@@ -158,7 +158,7 @@ func (s *PaymentService) CreateGuestTransaction(input CreatePaymentInput, token 
 	if err != nil {
 		return nil, fmt.Errorf("order tidak ditemukan")
 	}
-	if order.User.Role != "guest" || strings.TrimSpace(token) == "" || token != order.GuestAccessToken || order.GuestAccessExpiresAt == nil || time.Now().After(*order.GuestAccessExpiresAt) {
+	if !s.orderSvc.ValidateGuestAccess(order, token) {
 		return nil, fmt.Errorf("order tidak ditemukan")
 	}
 	return s.createTransactionForOrder(order, input, false)
@@ -347,7 +347,7 @@ func (s *PaymentService) GetGuestStatus(orderID uuid.UUID, token string) (*model
 	if err != nil {
 		return nil, fmt.Errorf("order tidak ditemukan")
 	}
-	if order.User.Role != "guest" || strings.TrimSpace(token) == "" || token != order.GuestAccessToken || order.GuestAccessExpiresAt == nil || time.Now().After(*order.GuestAccessExpiresAt) {
+	if !s.orderSvc.ValidateGuestAccess(order, token) {
 		return nil, fmt.Errorf("order tidak ditemukan")
 	}
 	return order, nil

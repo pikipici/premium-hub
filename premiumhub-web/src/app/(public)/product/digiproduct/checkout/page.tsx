@@ -2,7 +2,7 @@
 
 import axios from 'axios'
 import type { ReactNode } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CreditCard, Landmark, QrCode, ShieldCheck, Wallet, Zap } from 'lucide-react'
 
@@ -10,6 +10,7 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatRupiah } from '@/lib/utils'
 import { fulfillmentTypeLabel, isCredentialFulfillment } from '@/lib/fulfillment'
+import { clearCheckoutIdempotencyKey, getOrCreateCheckoutIdempotencyKey } from '@/lib/checkoutIdempotency'
 import { orderService } from '@/services/orderService'
 import { paymentService } from '@/services/paymentService'
 import { walletService } from '@/services/walletService'
@@ -40,6 +41,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false)
   const [redirectingAfterCheckout, setRedirectingAfterCheckout] = useState(false)
   const [error, setError] = useState('')
+  const checkoutSessionKey = useRef<string>('')
 
   useEffect(() => {
     if (!authReady) return
@@ -79,13 +81,18 @@ export default function CheckoutPage() {
       return
     }
     const email = guestEmail.trim()
-    if (!isAuthenticated && (!email || !email.includes('@'))) {
-      setError('Isi email aktif dulu buat menerima detail order.')
+    if (!isAuthenticated && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Isi email aktif yang valid dulu buat menerima detail order.')
       return
     }
 
     setLoading(true)
     setError('')
+    const idempotencyKey = getOrCreateCheckoutIdempotencyKey({
+      flow: 'digiproduct-checkout',
+      fingerprint: item.priceId,
+    })
+    checkoutSessionKey.current = idempotencyKey
     try {
       const orderRes = isAuthenticated
         ? await orderService.create({ price_id: item.priceId, payment_method: checkoutMethod })
@@ -130,6 +137,10 @@ export default function CheckoutPage() {
       }
     } finally {
       setLoading(false)
+      if (checkoutSessionKey.current) {
+        clearCheckoutIdempotencyKey({ flow: 'digiproduct-checkout', fingerprint: item?.priceId || '' })
+        checkoutSessionKey.current = ''
+      }
     }
   }
 

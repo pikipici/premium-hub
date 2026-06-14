@@ -27,7 +27,10 @@ export const paymentService = {
 
   createGuest: async (data: { order_id: string; payment_method?: string; token: string }) => {
     const { token, ...payload } = data
-    const res = await api.post<ApiResponse<CreatePaymentResponse>>('/public/payment/create', payload, { params: { token } })
+    const res = await api.post<ApiResponse<CreatePaymentResponse>>('/public/payment/create', payload, {
+      params: { token },
+      headers: { 'X-Guest-Token': token },
+    })
     return res.data
   },
 
@@ -37,7 +40,10 @@ export const paymentService = {
   },
 
   getGuestStatus: async (orderId: string, token: string) => {
-    const res = await api.get<ApiResponse<{ order_id: string; payment_status: string; order_status: string; total_price: number }>>(`/public/payment/status/${orderId}`, { params: { token } })
+    const res = await api.get<ApiResponse<{ order_id: string; payment_status: string; order_status: string; total_price: number }>>(`/public/payment/status/${orderId}`, {
+      params: { token },
+      headers: { 'X-Guest-Token': token },
+    })
     return res.data
   },
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, RefreshCcw } from 'lucide-react'
@@ -10,6 +10,23 @@ import Footer from '@/components/layout/Footer'
 import GatewayPaymentDisplay from '@/components/payment/GatewayPaymentDisplay'
 import { paymentService } from '@/services/paymentService'
 import { formatDate, formatRupiah } from '@/lib/utils'
+
+function stashGuestToken(token: string) {
+  if (!token) return
+  try {
+    sessionStorage.setItem('guest_invoice_token', token)
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function getStashedGuestToken(): string {
+  try {
+    return sessionStorage.getItem('guest_invoice_token') || ''
+  } catch {
+    return ''
+  }
+}
 
 export default function CheckoutInvoicePage() {
   return (
@@ -33,6 +50,12 @@ function CheckoutInvoiceContent() {
   const amount = Number(search.get('amount') || 0)
   const token = search.get('token') || ''
 
+  useEffect(() => {
+    if (token) {
+      stashGuestToken(token)
+    }
+  }, [token])
+
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
 
@@ -45,12 +68,13 @@ function CheckoutInvoiceContent() {
     if (!orderId) return
     setChecking(true)
     setError('')
+    const activeToken = token || getStashedGuestToken()
     try {
       let res
       try {
         res = await paymentService.getStatus(orderId)
       } catch {
-        res = await paymentService.getGuestStatus(orderId, token)
+        res = await paymentService.getGuestStatus(orderId, activeToken)
       }
       if (!res.success) {
         setError(res.message || 'Gagal cek status pembayaran')
@@ -58,7 +82,7 @@ function CheckoutInvoiceContent() {
       }
 
       if (res.data.payment_status === 'paid' || res.data.order_status === 'active') {
-        router.push(`/product/digiproduct/checkout/success?id=${orderId}&token=${encodeURIComponent(token)}`)
+        router.push(`/product/digiproduct/checkout/success?id=${orderId}&token=${encodeURIComponent(activeToken)}`)
         return
       }
 

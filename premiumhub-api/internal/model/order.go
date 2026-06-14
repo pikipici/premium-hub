@@ -19,6 +19,7 @@ type Order struct {
 	GatewayOrderID       string       `gorm:"size:120;index" json:"gateway_order_id"`
 	PaymentPayload       string       `gorm:"type:text" json:"payment_payload,omitempty"`
 	GuestAccessToken     string       `gorm:"size:96;index" json:"guest_access_token,omitempty"`
+	GuestAccessTokenHash string       `gorm:"size:64;index" json:"-"`
 	GuestAccessExpiresAt *time.Time   `json:"guest_access_expires_at,omitempty"`
 	PaidAt               *time.Time   `json:"paid_at"`
 	ExpiresAt            *time.Time   `json:"expires_at"`

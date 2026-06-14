@@ -36,7 +36,10 @@ export const orderService = {
   },
 
   getGuestByID: async (id: string, token: string) => {
-    const res = await api.get<ApiResponse<Order>>(`/public/orders/${id}`, { params: { token } })
+    const res = await api.get<ApiResponse<Order>>(`/public/orders/${id}`, {
+      params: { token },
+      headers: { 'X-Guest-Token': token },
+    })
     return res.data
   },
 

@@ -2,11 +2,13 @@ package service
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/smtp"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -151,9 +153,38 @@ func newGuestAccessToken() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
+func hashGuestToken(token string) string {
+	if token == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
 func guestAccessExpiry() time.Time {
 	return time.Now().Add(30 * 24 * time.Hour)
 }
+
+func (s *OrderService) ValidateGuestAccess(order *model.Order, token string) bool {
+	if order == nil || order.User.Role != "guest" || strings.TrimSpace(token) == "" {
+		return false
+	}
+	if order.GuestAccessExpiresAt == nil || time.Now().After(*order.GuestAccessExpiresAt) {
+		return false
+	}
+	if order.GuestAccessTokenHash != "" {
+		if hashGuestToken(token) == order.GuestAccessTokenHash {
+			return true
+		}
+	}
+	// backward compat: plaintext match
+	if token == order.GuestAccessToken {
+		return true
+	}
+	return false
+}
+
+var emailRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
 func (s *OrderService) CreateGuest(input CreateGuestOrderInput) (*model.Order, error) {
 	if s.userRepo == nil {
@@ -161,7 +192,7 @@ func (s *OrderService) CreateGuest(input CreateGuestOrderInput) (*model.Order, e
 	}
 
 	email := strings.ToLower(strings.TrimSpace(input.Email))
-	if email == "" || !strings.Contains(email, "@") {
+	if email == "" || !emailRegex.MatchString(email) {
 		return nil, errors.New("email tidak valid")
 	}
 	paymentMethod := strings.ToLower(strings.TrimSpace(input.PaymentMethod))
@@ -189,12 +220,15 @@ func (s *OrderService) CreateGuest(input CreateGuestOrderInput) (*model.Order, e
 		return nil, errors.New("gagal membuat token guest")
 	}
 	order.GuestAccessToken = token
+	order.GuestAccessTokenHash = hashGuestToken(token)
 	expiresAt := guestAccessExpiry()
 	order.GuestAccessExpiresAt = &expiresAt
 	if err := s.orderRepo.Update(order); err != nil {
 		return nil, errors.New("gagal menyimpan token guest")
 	}
-	_ = s.SendGuestInvoiceLink(order)
+	if err := s.SendGuestInvoiceLink(order); err != nil {
+		fmt.Printf("[guest-checkout] failed to send invoice email for order %s: %v\n", order.ID.String(), err)
+	}
 	return order, nil
 }
 
@@ -217,10 +251,10 @@ func (s *OrderService) guestInvoiceURL(order *model.Order) string {
 
 func (s *OrderService) SendGuestInvoiceLink(order *model.Order) error {
 	if s.cfg == nil || strings.TrimSpace(s.cfg.SMTPHost) == "" || strings.TrimSpace(s.cfg.SMTPUser) == "" || strings.TrimSpace(s.cfg.SMTPPass) == "" {
-		return nil
+		return errors.New("konfigurasi SMTP tidak tersedia")
 	}
 	if order == nil || order.User.Role != "guest" || strings.TrimSpace(order.User.Email) == "" || strings.TrimSpace(order.GuestAccessToken) == "" || order.GuestAccessExpiresAt == nil {
-		return nil
+		return errors.New("data order tidak lengkap untuk kirim email")
 	}
 	addr := strings.TrimSpace(s.cfg.SMTPHost) + ":" + strings.TrimSpace(s.cfg.SMTPPort)
 	auth := smtp.PlainAuth("", strings.TrimSpace(s.cfg.SMTPUser), strings.TrimSpace(s.cfg.SMTPPass), strings.TrimSpace(s.cfg.SMTPHost))
@@ -245,6 +279,7 @@ func (s *OrderService) ResendGuestInvoice(input ResendGuestInvoiceInput) error {
 		}
 		expiresAt := guestAccessExpiry()
 		order.GuestAccessToken = token
+		order.GuestAccessTokenHash = hashGuestToken(token)
 		order.GuestAccessExpiresAt = &expiresAt
 		if err := s.orderRepo.Update(order); err != nil {
 			return nil
@@ -301,7 +336,7 @@ func (s *OrderService) GetGuestByID(id uuid.UUID, token string) (*model.Order, e
 	if err != nil {
 		return nil, errors.New("order tidak ditemukan")
 	}
-	if order.User.Role != "guest" || strings.TrimSpace(token) == "" || token != order.GuestAccessToken || order.GuestAccessExpiresAt == nil || time.Now().After(*order.GuestAccessExpiresAt) {
+	if !s.ValidateGuestAccess(order, token) {
 		return nil, errors.New("order tidak ditemukan")
 	}
 

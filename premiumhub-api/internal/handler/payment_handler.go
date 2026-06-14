@@ -41,7 +41,11 @@ func (h *PaymentHandler) CreateGuest(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	res, err := h.paymentSvc.CreateGuestTransaction(input, c.Query("token"))
+	token := c.Query("token")
+	if token == "" {
+		token = c.GetHeader("X-Guest-Token")
+	}
+	res, err := h.paymentSvc.CreateGuestTransaction(input, token)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -134,7 +138,11 @@ func (h *PaymentHandler) GetGuestStatus(c *gin.Context) {
 		response.BadRequest(c, "ID tidak valid")
 		return
 	}
-	order, err := h.paymentSvc.GetGuestStatus(orderID, c.Query("token"))
+	token := c.Query("token")
+	if token == "" {
+		token = c.GetHeader("X-Guest-Token")
+	}
+	order, err := h.paymentSvc.GetGuestStatus(orderID, token)
 	if err != nil {
 		response.NotFound(c, err.Error())
 		return

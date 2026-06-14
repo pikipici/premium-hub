@@ -23,6 +23,23 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
 
+function stashGuestToken(token: string) {
+  if (!token) return
+  try {
+    sessionStorage.setItem('guest_invoice_token', token)
+  } catch {
+    // ignore
+  }
+}
+
+function getStashedGuestToken(): string {
+  try {
+    return sessionStorage.getItem('guest_invoice_token') || ''
+  } catch {
+    return ''
+  }
+}
+
 function accountTypeLabel(value?: string) {
   const normalized = (value || '').trim().toLowerCase()
   if (!normalized) return '-'
@@ -69,7 +86,13 @@ export default function OrderSuksesPage() {
 function OrderSuksesContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('id')
-  const token = searchParams.get('token') || ''
+  const rawToken = searchParams.get('token') || ''
+
+  useEffect(() => {
+    if (rawToken) {
+      stashGuestToken(rawToken)
+    }
+  }, [rawToken])
 
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(() => Boolean(orderId))
@@ -84,9 +107,10 @@ function OrderSuksesContent() {
       return
     }
 
+    const activeToken = rawToken || getStashedGuestToken()
     orderService
       .getByID(orderId)
-      .catch(() => orderService.getGuestByID(orderId, token))
+      .catch(() => orderService.getGuestByID(orderId, activeToken))
       .then((res) => {
         if (cancelled) return
         if (res.success) {
@@ -107,7 +131,7 @@ function OrderSuksesContent() {
     return () => {
       cancelled = true
     }
-  }, [orderId, token])
+  }, [orderId, rawToken])
 
   useEffect(() => {
     if (!toast) return

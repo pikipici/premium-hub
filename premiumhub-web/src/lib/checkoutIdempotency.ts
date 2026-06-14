@@ -1,6 +1,6 @@
 export const CHECKOUT_IDEMPOTENCY_MAX_LENGTH = 80
 
-export type CheckoutIdempotencyFlow = 'sosmed-order' | 'sosmed-bundle'
+export type CheckoutIdempotencyFlow = 'sosmed-order' | 'sosmed-bundle' | 'digiproduct-checkout'
 
 type CreateCheckoutIdempotencyKeyOptions = {
   randomUUID?: () => string

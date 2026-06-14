@@ -95,7 +95,11 @@ func (h *OrderHandler) GetGuestByID(c *gin.Context) {
 		response.BadRequest(c, "ID tidak valid")
 		return
 	}
-	order, err := h.orderSvc.GetGuestByID(id, c.Query("token"))
+	token := c.Query("token")
+	if token == "" {
+		token = c.GetHeader("X-Guest-Token")
+	}
+	order, err := h.orderSvc.GetGuestByID(id, token)
 	if err != nil {
 		response.NotFound(c, err.Error())
 		return

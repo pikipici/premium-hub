@@ -6,7 +6,7 @@ import { orderService } from '@/services/orderService'
 import type { GuestOrderStatus } from '@/services/orderService'
 import { formatRupiah } from '@/lib/utils'
 import { useState } from 'react'
-import { Loader2, Search, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { Loader2, Search, Clock, CheckCircle2, XCircle, AlertCircle, Mail, Send } from 'lucide-react'
 
 function statusBadge(status: string) {
   switch (status) {
@@ -42,6 +42,9 @@ export default function LacakPesananPage() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<GuestOrderStatus | null>(null)
   const [error, setError] = useState('')
+  const [resendEmail, setResendEmail] = useState('')
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendSent, setResendSent] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,6 +74,29 @@ export default function LacakPesananPage() {
 
   const orderStatus = status ? statusBadge(status.payment_status) : null
   const shortID = status?.order_id ? status.order_id.split('-')[0]?.toUpperCase() : ''
+
+  const handleResend = async () => {
+    if (!status?.order_id) return
+    const email = resendEmail.trim()
+    if (!email) {
+      setError('Masukkan email yang dipakai saat checkout.')
+      return
+    }
+    setResendLoading(true)
+    setError('')
+    try {
+      const res = await orderService.resendGuestInvoice({ order_id: status.order_id, email })
+      if (res.success) {
+        setResendSent(true)
+      } else {
+        setError(res.message || 'Gagal kirim ulang invoice')
+      }
+    } catch {
+      setError('Gagal kirim ulang invoice')
+    } finally {
+      setResendLoading(false)
+    }
+  }
 
   return (
     <>
@@ -161,10 +187,41 @@ export default function LacakPesananPage() {
                 <div className="mx-5 h-px bg-[#EEEEEA] sm:mx-6" />
               )}
               {status.payment_status === 'paid' && (
-                <div className="px-5 py-3 sm:px-6 sm:py-4 text-center">
+                <div className="px-5 py-4 sm:px-6 sm:py-5 space-y-3">
                   <p className="text-xs text-[#888]">
                     Cek email yang dipakai saat checkout untuk link detail pesanan lengkap.
                   </p>
+                  {resendSent ? (
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 text-center flex items-center justify-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Link invoice sudah dikirim ulang ke email kamu.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-[#555]">
+                        <Mail className="h-3.5 w-3.5" />
+                        Kirim ulang invoice
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={resendEmail}
+                          onChange={(e) => setResendEmail(e.target.value)}
+                          placeholder="nama@email.com"
+                          className="flex-1 rounded-xl border border-[#E5E5E5] px-3 py-2 text-xs outline-none focus:border-[#FF5733]"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleResend}
+                          disabled={resendLoading}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-[#FF5733] px-4 py-2 text-xs font-bold text-white hover:bg-[#e64d2e] disabled:opacity-50"
+                        >
+                          {resendLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                          Kirim
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
