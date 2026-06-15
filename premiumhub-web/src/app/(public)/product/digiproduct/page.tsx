@@ -4,6 +4,7 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
 import ProductCard from '@/components/shared/ProductCard'
+import BannerSlider from '@/components/shared/BannerSlider'
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { productService } from '@/services/productService'
@@ -128,37 +129,40 @@ function DigiProductContent() {
     <>
       <Navbar />
 
-      {/* Hero strip */}
-      <section className="bg-white border-b border-[#EBEBEB]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-            <div className="flex-1 max-w-2xl">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF3EF] border border-[#FFE2CF] px-3 py-1 text-[11px] font-bold text-[#FF5733] mb-3">
-                <Zap className="h-3 w-3" /> Produk Digital Siap Pakai
-              </div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-[#141414]">
-                DigiProduct
-              </h1>
-              <p className="mt-2 text-sm sm:text-base text-[#888] max-w-lg">
-                Lisensi, akun game, voucher, tools — pilih, bayar, langsung aktif.
-              </p>
-            </div>
+      {/* Banner slider */}
+      <BannerSlider />
 
-            <div className="flex gap-3 lg:gap-4 flex-wrap items-center">
-              {[
-                { icon: <Zap className="h-4 w-4" />, text: 'Pengiriman Instan' },
-                { icon: <ShieldCheck className="h-4 w-4" />, text: 'Garansi Aktif' },
-                { icon: <CreditCard className="h-4 w-4" />, text: 'QRIS / VA / Wallet' },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-xl bg-[#F7F7F5] border border-[#EBEBEB] px-4 py-2.5 text-xs font-semibold text-[#555]">
-                  <span className="text-[#FF5733]">{item.icon}</span>
-                  {item.text}
-                </div>
-              ))}
-              <Link href="/lacak-pesanan" className="inline-flex items-center gap-1.5 rounded-full bg-[#141414] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#2A2A2A] transition-colors">
-                <Search className="h-3.5 w-3.5" />
-                Lacak Pesanan
-              </Link>
+      {/* Hero strip */}
+      <section className="relative bg-[#141414] border-b border-white/10 overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 sm:w-96 h-64 sm:h-96 bg-[#FF5733] opacity-[0.06] rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-48 sm:w-72 h-48 sm:h-72 bg-[#FF5733] opacity-[0.04] rounded-full blur-[80px] pointer-events-none" />
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+            <div className="max-w-2xl">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+                Gas Cek katalog DigiProduct
+              </h1>
+              <p className="mt-2 text-sm sm:text-base text-white/60 max-w-lg">
+                Lisensi, akun game, voucher, tools. Pilih, bayar, langsung aktif.
+              </p>
+
+              <div className="flex gap-2 mt-5 flex-wrap">
+                {[
+                  { icon: <Zap className="h-3.5 w-3.5" />, text: 'Pengiriman Instan' },
+                  { icon: <ShieldCheck className="h-3.5 w-3.5" />, text: 'Garansi Aktif' },
+                  { icon: <CreditCard className="h-3.5 w-3.5" />, text: 'QRIS, VA, Wallet' },
+                ].map((item, i) => (
+                  <div key={i} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/80">
+                    <span className="text-[#FF5733]">{item.icon}</span>
+                    {item.text}
+                  </div>
+                ))}
+                <Link href="/lacak-pesanan" className="inline-flex items-center gap-1.5 rounded-full bg-[#FF5733] px-3.5 py-1.5 text-[11px] font-bold text-white hover:bg-[#e64d2e] transition-colors">
+                  <Search className="h-3 w-3" />
+                  Lacak Pesanan
+                </Link>
+              </div>
             </div>
           </div>
         </div>
