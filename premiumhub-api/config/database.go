@@ -63,6 +63,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.FiveSimOrder{},
 		&model.FiveSimOrderIdempotency{},
 		&model.NokosLandingSummary{},
+		&model.SiteBanner{},
 		&model.ConvertOrder{},
 		&model.ConvertOrderEvent{},
 		&model.ConvertProof{},

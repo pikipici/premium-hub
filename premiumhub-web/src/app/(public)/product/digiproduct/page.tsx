@@ -147,7 +147,7 @@ function DigiProductContent() {
 
             {/* Banner slider inline */}
             <div className="mt-8 sm:mt-10">
-              <BannerSlider products={allProducts} />
+              <BannerSlider />
             </div>
 
             {/* Trust + action pills */}
