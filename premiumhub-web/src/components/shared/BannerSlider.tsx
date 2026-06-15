@@ -64,67 +64,58 @@ export default function BannerSlider({ banners = DEFAULT_BANNERS }: Props) {
   if (!banners.length) return null
 
   return (
-    <section className="bg-[#141414]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-10">
-        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10" ref={emblaRef}>
-          <div className="flex">
-            {banners.map((banner, index) => (
-              <Link
-                key={index}
-                href={banner.href}
-                className="flex-[0_0_100%] min-w-0 bg-[#1C1C1E] relative overflow-hidden group"
-              >
-                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-white/[0.03] to-transparent pointer-events-none" />
-
-                <div className="px-6 sm:px-10 py-8 sm:py-10 flex items-center gap-5 sm:gap-8">
-                  <div
-                    className="hidden sm:flex shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl items-center justify-center text-2xl sm:text-3xl"
-                    style={{ backgroundColor: `${banner.accentColor}15` }}
-                  >
-                    {banner.emoji}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-white leading-tight">
-                      {banner.title}
-                    </h3>
-                    <p className="mt-1.5 text-sm text-white/50 max-w-md">
-                      {banner.subtitle}
-                    </p>
-                    <span className="mt-3 sm:mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/10 px-4 py-2 text-xs font-semibold text-white group-hover:bg-white/15 transition-colors">
-                      {banner.cta}
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </span>
-                  </div>
+    <div>
+      <div className="overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10" ref={emblaRef}>
+        <div className="flex">
+          {banners.map((banner, index) => (
+            <Link
+              key={index}
+              href={banner.href}
+              className="flex-[0_0_100%] min-w-0 bg-white/5 relative overflow-hidden group"
+            >
+              <div className="px-6 sm:px-10 py-8 sm:py-10 flex items-center gap-5 sm:gap-8">
+                <div
+                  className="hidden sm:flex shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl items-center justify-center text-2xl sm:text-3xl"
+                  style={{ backgroundColor: `${banner.accentColor}15` }}
+                >
+                  {banner.emoji}
                 </div>
 
-                <div
-                  className="absolute -bottom-6 -right-6 w-32 h-32 rounded-full blur-[60px] opacity-[0.08] pointer-events-none"
-                  style={{ backgroundColor: banner.accentColor }}
-                />
-              </Link>
-            ))}
-          </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-white leading-tight">
+                    {banner.title}
+                  </h3>
+                  <p className="mt-1.5 text-sm text-white/50 max-w-md">
+                    {banner.subtitle}
+                  </p>
+                  <span className="mt-3 sm:mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#FF5733] px-4 py-2 text-xs font-bold text-white group-hover:bg-[#e64d2e] transition-colors">
+                    {banner.cta}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
-
-        {banners.length > 1 && (
-          <div className="flex justify-center gap-2 mt-4">
-            {banners.map((_, index) => (
-              <button
-                key={index}
-                type="button"
-                className={`h-1.5 rounded-full transition-all ${
-                  index === selectedIndex
-                    ? 'w-5 bg-[#FF5733]'
-                    : 'w-1.5 bg-white/20 hover:bg-white/30'
-                }`}
-                onClick={() => emblaApi?.scrollTo(index)}
-                aria-label={`Slide ${index + 1}`}
-              />
-            ))}
-          </div>
-        )}
       </div>
-    </section>
+
+      {banners.length > 1 && (
+        <div className="flex justify-center gap-2 mt-4">
+          {banners.map((_, index) => (
+            <button
+              key={index}
+              type="button"
+              className={`h-1.5 rounded-full transition-all ${
+                index === selectedIndex
+                  ? 'w-5 bg-[#FF5733]'
+                  : 'w-1.5 bg-white/20 hover:bg-white/30'
+              }`}
+              onClick={() => emblaApi?.scrollTo(index)}
+              aria-label={`Slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
