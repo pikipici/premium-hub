@@ -8,8 +8,8 @@ import Link from 'next/link'
 
 type Banner = {
   href: string
-  gradient: string
   accentColor: string
+  emoji: string
   title: string
   subtitle: string
   cta: string
@@ -18,24 +18,24 @@ type Banner = {
 const DEFAULT_BANNERS: Banner[] = [
   {
     href: '/product/digiproduct?category=streaming',
-    gradient: 'from-[#1a1a2e] via-[#16213e] to-[#0f3460]',
-    accentColor: '#e94560',
+    accentColor: '#FF5733',
+    emoji: '🎬',
     title: 'Akun Premium Streaming',
-    subtitle: 'Netflix, Spotify, Disney+, YouTube Premium — semua akun instant delivery.',
+    subtitle: 'Netflix, Spotify, Disney+, YouTube Premium — instant delivery.',
     cta: 'Cek Streaming',
   },
   {
     href: '/product/digiproduct?category=gaming',
-    gradient: 'from-[#0d1117] via-[#161b22] to-[#21262d]',
     accentColor: '#FF5733',
+    emoji: '🎮',
     title: 'Akun Game & Top Up',
     subtitle: 'Steam Wallet, Mobile Legends, Genshin, dan ratusan game lainnya.',
     cta: 'Cek Gaming',
   },
   {
     href: '/product/digiproduct?category=productivity',
-    gradient: 'from-[#0f0c29] via-[#302b63] to-[#24243e]',
-    accentColor: '#7c3aed',
+    accentColor: '#FF5733',
+    emoji: '⚡',
     title: 'Tools & Lisensi',
     subtitle: 'Microsoft 365, Canva Pro, antivirus, Windows license — harga terbaik.',
     cta: 'Cek Tools',
@@ -65,27 +65,33 @@ export default function BannerSlider({ banners = DEFAULT_BANNERS }: Props) {
 
   return (
     <section className="bg-[#141414]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-5 pb-3 sm:pb-4">
-        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl" ref={emblaRef}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-10">
+        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10" ref={emblaRef}>
           <div className="flex">
             {banners.map((banner, index) => (
               <Link
                 key={index}
                 href={banner.href}
-                className={`flex-[0_0_100%] min-w-0 bg-gradient-to-r ${banner.gradient} relative overflow-hidden`}
+                className="flex-[0_0_100%] min-w-0 bg-[#1C1C1E] relative overflow-hidden group"
               >
-                <div className="px-6 sm:px-10 py-8 sm:py-12 lg:py-14">
-                  <div className="max-w-xl">
-                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white leading-tight">
+                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-white/[0.03] to-transparent pointer-events-none" />
+
+                <div className="px-6 sm:px-10 py-8 sm:py-10 flex items-center gap-5 sm:gap-8">
+                  <div
+                    className="hidden sm:flex shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl items-center justify-center text-2xl sm:text-3xl"
+                    style={{ backgroundColor: `${banner.accentColor}15` }}
+                  >
+                    {banner.emoji}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-white leading-tight">
                       {banner.title}
                     </h3>
-                    <p className="mt-2 text-sm sm:text-base text-white/70 max-w-md">
+                    <p className="mt-1.5 text-sm text-white/50 max-w-md">
                       {banner.subtitle}
                     </p>
-                    <span
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs sm:text-sm font-bold text-white transition-colors hover:opacity-90"
-                      style={{ backgroundColor: banner.accentColor }}
-                    >
+                    <span className="mt-3 sm:mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/10 px-4 py-2 text-xs font-semibold text-white group-hover:bg-white/15 transition-colors">
                       {banner.cta}
                       <ArrowRight className="h-3.5 w-3.5" />
                     </span>
@@ -93,11 +99,7 @@ export default function BannerSlider({ banners = DEFAULT_BANNERS }: Props) {
                 </div>
 
                 <div
-                  className="absolute top-0 right-0 w-48 sm:w-72 h-full opacity-[0.12] pointer-events-none rounded-full blur-[60px]"
-                  style={{ backgroundColor: banner.accentColor }}
-                />
-                <div
-                  className="absolute bottom-0 right-1/4 w-32 sm:w-48 h-1/2 opacity-[0.08] pointer-events-none rounded-full blur-[50px]"
+                  className="absolute -bottom-6 -right-6 w-32 h-32 rounded-full blur-[60px] opacity-[0.08] pointer-events-none"
                   style={{ backgroundColor: banner.accentColor }}
                 />
               </Link>
@@ -106,17 +108,16 @@ export default function BannerSlider({ banners = DEFAULT_BANNERS }: Props) {
         </div>
 
         {banners.length > 1 && (
-          <div className="flex justify-center gap-1.5 mt-3">
-            {banners.map((banner, index) => (
+          <div className="flex justify-center gap-2 mt-4">
+            {banners.map((_, index) => (
               <button
                 key={index}
                 type="button"
                 className={`h-1.5 rounded-full transition-all ${
                   index === selectedIndex
-                    ? 'w-5 opacity-90'
-                    : 'w-1.5 opacity-30 hover:opacity-50'
+                    ? 'w-5 bg-[#FF5733]'
+                    : 'w-1.5 bg-white/20 hover:bg-white/30'
                 }`}
-                style={{ backgroundColor: banner.accentColor }}
                 onClick={() => emblaApi?.scrollTo(index)}
                 aria-label={`Slide ${index + 1}`}
               />
