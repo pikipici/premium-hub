@@ -5,12 +5,16 @@ import Footer from '@/components/layout/Footer'
 import { DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
 import ProductCard from '@/components/shared/ProductCard'
 import BannerSlider from '@/components/shared/BannerSlider'
+import CountdownTimer from '@/components/shared/CountdownTimer'
+import FlashSaleCard from '@/components/shared/FlashSaleCard'
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { productService } from '@/services/productService'
 import { productCategoryService } from '@/services/productCategoryService'
 import { heroBgService } from '@/services/heroBgService'
+import { flashSaleService } from '@/services/flashSaleService'
 import type { Product } from '@/types/product'
+import type { SiteFlashSale } from '@/types/flashSale'
 import { CreditCard, Search, ShieldCheck, Zap } from 'lucide-react'
 import Link from 'next/link'
 
@@ -60,6 +64,7 @@ function DigiProductContent() {
   const [loading, setLoading] = useState(true)
   const [heroBgColor, setHeroBgColor] = useState('#141414')
   const [heroBgImage, setHeroBgImage] = useState<string | null>(null)
+  const [flashSales, setFlashSales] = useState<SiteFlashSale[]>([])
 
   useEffect(() => {
     let alive = true
@@ -93,6 +98,13 @@ function DigiProductContent() {
         setHeroBgColor(res.data.background_color || '#141414')
         setHeroBgImage(res.data.background_image_url || null)
       }
+    }).catch(() => {})
+  }, [])
+
+  // Fetch active flash sales
+  useEffect(() => {
+    flashSaleService.getPublicActive().then((res) => {
+      if (res.success) setFlashSales(res.data ?? [])
     }).catch(() => {})
   }, [])
 
@@ -171,6 +183,23 @@ function DigiProductContent() {
             <div className="mt-8 sm:mt-10">
               <BannerSlider />
             </div>
+
+            {/* Flash Sale section */}
+            {flashSales.length > 0 && (
+              <div className="mt-8 sm:mt-10">
+                <div className="flex items-center gap-3 mb-4">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-white">
+                    ⚡ Flash Sale
+                  </h2>
+                  <CountdownTimer endsAt={flashSales[0].ends_at} />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {flashSales.map((fs) => (
+                    <FlashSaleCard key={fs.id} flashSale={fs} />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Trust + action pills */}
             <div className="mt-8 flex gap-2 flex-wrap justify-center sm:justify-start">

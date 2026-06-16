@@ -65,6 +65,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.NokosLandingSummary{},
 		&model.SiteBanner{},
 		&model.SiteHeroBg{},
+		&model.SiteFlashSale{},
 		&model.ConvertOrder{},
 		&model.ConvertOrderEvent{},
 		&model.ConvertProof{},

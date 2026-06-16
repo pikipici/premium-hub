@@ -1,15 +1,19 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { Loader2, Palette, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Palette, Plus, Trash2, Zap } from 'lucide-react'
 import { bannerService } from '@/services/bannerService'
 import { heroBgService } from '@/services/heroBgService'
+import { flashSaleService } from '@/services/flashSaleService'
+import { productService } from '@/services/productService'
 import type { SiteBanner } from '@/types/banner'
+import type { SiteFlashSale } from '@/types/flashSale'
+import type { Product } from '@/types/product'
 
 const PAGE_KEY = 'digiproduct'
 
 export default function AdminBannersPage() {
-  const [activeTab, setActiveTab] = useState<'banners' | 'hero'>('banners')
+  const [activeTab, setActiveTab] = useState<'banners' | 'hero' | 'flash'>('banners')
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -42,9 +46,20 @@ export default function AdminBannersPage() {
           <Palette className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
           Hero Background
         </button>
+        <button
+          onClick={() => setActiveTab('flash')}
+          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+            activeTab === 'flash'
+              ? 'bg-white text-[#141414] shadow-sm'
+              : 'text-[#888] hover:text-[#555]'
+          }`}
+        >
+          <Zap className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+          Flash Sale
+        </button>
       </div>
 
-      {activeTab === 'banners' ? <BannersTab /> : <HeroBgTab />}
+      {activeTab === 'banners' ? <BannersTab /> : activeTab === 'hero' ? <HeroBgTab /> : <FlashSaleTab />}
     </div>
   )
 }
@@ -345,6 +360,238 @@ function HeroBgTab() {
           {saving ? 'Menyimpan...' : 'Simpan Background'}
         </button>
       </div>
+    </div>
+  )
+}
+
+function FlashSaleTab() {
+  const [items, setItems] = useState<SiteFlashSale[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<SiteFlashSale | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [sortOrder, setSortOrder] = useState(0)
+  const [isActive, setIsActive] = useState(true)
+
+  const fetchData = () => {
+    setLoading(true)
+    Promise.all([
+      flashSaleService.adminList(),
+      productService.list({ limit: 100 }),
+    ]).then(([fsRes, prodRes]) => {
+      if (fsRes.success) setItems(fsRes.data ?? [])
+      if (prodRes.success) setProducts(prodRes.data ?? [])
+    }).catch(() => setError('Gagal memuat data'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { fetchData() }, [])
+
+  const toLocalDatetime = (iso: string) => {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    return d.toISOString().slice(0, 16)
+  }
+
+  const openCreate = () => {
+    setEditing(null)
+    setSelectedProductId('')
+    setDeadline('')
+    setSortOrder(items.length)
+    setIsActive(true)
+    setFormOpen(true)
+  }
+
+  const openEdit = (item: SiteFlashSale) => {
+    setEditing(item)
+    setSelectedProductId(item.product_id)
+    setDeadline(toLocalDatetime(item.ends_at))
+    setSortOrder(item.sort_order)
+    setIsActive(item.is_active)
+    setFormOpen(true)
+  }
+
+  const resetForm = () => {
+    setFormOpen(false)
+    setEditing(null)
+    setError('')
+  }
+
+  const handleSave = async () => {
+    if (!selectedProductId) {
+      setError('Pilih produk')
+      return
+    }
+    if (!deadline) {
+      setError('Atur deadline')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const payload: Record<string, unknown> = {
+        product_id: selectedProductId,
+        ends_at: new Date(deadline).toISOString(),
+        sort_order: sortOrder,
+        is_active: isActive,
+      }
+      const res = editing
+        ? await flashSaleService.adminUpdate(editing.id, payload as Partial<SiteFlashSale>)
+        : await flashSaleService.adminCreate(payload as Partial<SiteFlashSale>)
+      if (res.success) {
+        setMessage(editing ? 'Flash sale diperbarui' : 'Flash sale dibuat')
+        resetForm()
+        fetchData()
+      } else {
+        setError(res.message || 'Gagal menyimpan')
+      }
+    } catch {
+      setError('Gagal menyimpan flash sale')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Hapus dari flash sale?')) return
+    try {
+      const res = await flashSaleService.adminDelete(id)
+      if (res.success) {
+        setMessage('Dihapus dari flash sale')
+        fetchData()
+      } else {
+        setError(res.message || 'Gagal menghapus')
+      }
+    } catch {
+      setError('Gagal menghapus flash sale')
+    }
+  }
+
+  const getProductName = (productId: string) => {
+    return products.find((p) => p.id === productId)?.name || productId
+  }
+
+  if (loading) {
+    return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#888]" /></div>
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-[#888]">Produk yang tampil di section Flash Sale katalog DigiProduct.</p>
+        <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-full bg-[#141414] px-4 py-2 text-xs font-bold text-white hover:bg-[#2A2A2A]">
+          <Plus className="h-3.5 w-3.5" /> Tambah
+        </button>
+      </div>
+
+      {error && (
+        <div className="rounded-xl bg-red-50 text-red-600 text-sm px-4 py-2.5 font-medium">{error}</div>
+      )}
+      {message && (
+        <div className="rounded-xl bg-emerald-50 text-emerald-700 text-sm px-4 py-2.5 font-medium">{message}</div>
+      )}
+
+      {items.length === 0 ? (
+        <div className="text-center py-16 rounded-2xl border border-dashed border-[#D5D5D0] bg-white">
+          <p className="text-sm text-[#888]">Belum ada produk flash sale. Klik Tambah.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item) => {
+            const product = item.product
+            const img = product?.cover_images?.[0] || product?.icon_image_url
+            return (
+              <div key={item.id} className="flex items-center gap-4 rounded-xl border border-[#EBEBEB] bg-white p-4">
+                <div className="h-14 w-24 rounded-lg shrink-0 bg-[#F7F7F5] flex items-center justify-center overflow-hidden">
+                  {img ? (
+                    <img src={img} alt={product?.name || ''} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-2xl">{product?.icon || '📦'}</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-[#141414] truncate">
+                    {product?.name || getProductName(item.product_id)}
+                  </div>
+                  <div className="text-[11px] text-[#888]">
+                    Deadline: {new Date(item.ends_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-[10px]">
+                    <span className={`rounded-full px-2 py-0.5 font-bold ${item.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'}`}>
+                      {item.is_active ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                    <span className="text-[#AAA]">Urutan {item.sort_order}</span>
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => openEdit(item)} className="rounded-lg border border-[#E5E5E5] px-3 py-1.5 text-[11px] font-semibold hover:bg-[#F7F7F5]">
+                    Edit
+                  </button>
+                  <button onClick={() => handleDelete(item.id)} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] text-red-600 hover:bg-red-50">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {formOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" onClick={resetForm}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-extrabold">{editing ? 'Edit Flash Sale' : 'Tambah Flash Sale'}</h2>
+
+            <label className="block text-xs font-bold text-[#555]">
+              Produk
+              <select
+                value={selectedProductId}
+                onChange={(e) => setSelectedProductId(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733] bg-white"
+              >
+                <option value="">-- Pilih Produk --</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-xs font-bold text-[#555]">
+              Deadline
+              <input
+                type="datetime-local"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]"
+              />
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-xs font-bold text-[#555]">
+                Urutan
+                <input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
+              </label>
+              <label className="flex items-center gap-2 mt-5 cursor-pointer">
+                <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="accent-[#FF5733]" />
+                <span className="text-xs font-bold text-[#555]">Aktif</span>
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button onClick={resetForm} className="flex-1 rounded-full border border-[#E5E5E5] py-3 text-sm font-semibold">Batal</button>
+              <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-[#141414] py-3 text-sm font-bold text-white disabled:opacity-50">
+                {saving ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
