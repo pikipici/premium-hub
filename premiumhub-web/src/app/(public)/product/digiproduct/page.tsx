@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { productService } from '@/services/productService'
 import { productCategoryService } from '@/services/productCategoryService'
+import { heroBgService } from '@/services/heroBgService'
 import type { Product } from '@/types/product'
 import { CreditCard, Search, ShieldCheck, Zap } from 'lucide-react'
 import Link from 'next/link'
@@ -57,6 +58,8 @@ function DigiProductContent() {
   const [categories, setCategories] = useState<CategoryOption[]>(FALLBACK_CATEGORIES)
   const [category, setCategory] = useState(searchParams.get('category') || '')
   const [loading, setLoading] = useState(true)
+  const [heroBgColor, setHeroBgColor] = useState('#141414')
+  const [heroBgImage, setHeroBgImage] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -81,6 +84,16 @@ function DigiProductContent() {
       if (alive) setLoading(false)
     })
     return () => { alive = false }
+  }, [])
+
+  // Fetch hero background customization
+  useEffect(() => {
+    heroBgService.getPublicHeroBg('digiproduct').then((res) => {
+      if (res.success && res.data) {
+        setHeroBgColor(res.data.background_color || '#141414')
+        setHeroBgImage(res.data.background_image_url || null)
+      }
+    }).catch(() => {})
   }, [])
 
   const effectiveCategory = categories.some((item) => item.value === category) ? category : ''
@@ -129,8 +142,17 @@ function DigiProductContent() {
     <>
       <Navbar />
 
-      {/* Hero + Banner — unified dark section */}
-      <section className="bg-[#141414]">
+      {/* Hero + Banner — unified dark section with dynamic background */}
+      <section
+        style={{
+          backgroundColor: heroBgColor,
+          ...(heroBgImage ? {
+            backgroundImage: `url(${heroBgImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          } : {}),
+        }}
+      >
         <div className="relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 sm:w-96 h-64 sm:h-96 bg-[#FF5733] opacity-[0.06] rounded-full blur-[100px] pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-48 sm:w-72 h-48 sm:h-72 bg-[#FF5733] opacity-[0.04] rounded-full blur-[80px] pointer-events-none" />
@@ -170,7 +192,7 @@ function DigiProductContent() {
           </div>
         </div>
 
-        <div className="h-8 sm:h-12 bg-gradient-to-b from-[#141414] to-[#F4F5F8]" />
+        <div className="h-8 sm:h-12" style={{ background: `linear-gradient(to bottom, ${heroBgColor}, #F4F5F8)` }} />
       </section>
 
       {/* Category pills + content */}

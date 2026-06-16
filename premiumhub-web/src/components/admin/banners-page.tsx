@@ -1,11 +1,55 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Palette, Plus, Trash2 } from 'lucide-react'
 import { bannerService } from '@/services/bannerService'
+import { heroBgService } from '@/services/heroBgService'
 import type { SiteBanner } from '@/types/banner'
 
+const PAGE_KEY = 'digiproduct'
+
 export default function AdminBannersPage() {
+  const [activeTab, setActiveTab] = useState<'banners' | 'hero'>('banners')
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[#141414]">Tampilan Situs</h1>
+          <p className="text-xs text-[#888] mt-0.5">Kelola banner dan background hero katalog DigiProduct.</p>
+        </div>
+      </div>
+
+      <div className="flex gap-1 mb-6 bg-[#F4F5F8] rounded-xl p-1">
+        <button
+          onClick={() => setActiveTab('banners')}
+          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+            activeTab === 'banners'
+              ? 'bg-white text-[#141414] shadow-sm'
+              : 'text-[#888] hover:text-[#555]'
+          }`}
+        >
+          Banner
+        </button>
+        <button
+          onClick={() => setActiveTab('hero')}
+          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+            activeTab === 'hero'
+              ? 'bg-white text-[#141414] shadow-sm'
+              : 'text-[#888] hover:text-[#555]'
+          }`}
+        >
+          <Palette className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+          Hero Background
+        </button>
+      </div>
+
+      {activeTab === 'banners' ? <BannersTab /> : <HeroBgTab />}
+    </div>
+  )
+}
+
+function BannersTab() {
   const [banners, setBanners] = useState<SiteBanner[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -92,12 +136,9 @@ export default function AdminBannersPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-[#141414]">Banner Situs</h1>
-          <p className="text-xs text-[#888] mt-0.5">Kelola banner yang tampil di halaman katalog DigiProduct.</p>
-        </div>
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-[#888]">Banner yang tampil di slider hero katalog DigiProduct.</p>
         <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-full bg-[#141414] px-4 py-2 text-xs font-bold text-white hover:bg-[#2A2A2A]">
           <Plus className="h-3.5 w-3.5" /> Tambah
         </button>
@@ -178,6 +219,132 @@ export default function AdminBannersPage() {
           </div>
         </div>
       )}
+    </>
+  )
+}
+
+function HeroBgTab() {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+
+  const [bgColor, setBgColor] = useState('#141414')
+  const [bgImage, setBgImage] = useState('')
+  const [isActive, setIsActive] = useState(true)
+
+  useEffect(() => {
+    heroBgService.adminGetHeroBg(PAGE_KEY)
+      .then((res) => {
+        if (res.success && res.data) {
+          setBgColor(res.data.background_color || '#141414')
+          setBgImage(res.data.background_image_url || '')
+          setIsActive(res.data.is_active)
+        }
+      })
+      .catch(() => setError('Gagal memuat data'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setError('')
+    setMessage('')
+    try {
+      const res = await heroBgService.adminSaveHeroBg({
+        page_key: PAGE_KEY,
+        background_color: bgColor,
+        background_image_url: bgImage.trim(),
+        is_active: isActive,
+      })
+      if (res.success) {
+        setMessage('Hero background berhasil disimpan')
+      } else {
+        setError(res.message || 'Gagal menyimpan')
+      }
+    } catch {
+      setError('Gagal menyimpan hero background')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#888]" /></div>
+  }
+
+  return (
+    <div className="space-y-5">
+      <p className="text-xs text-[#888]">Atur warna background dan gambar untuk section hero katalog DigiProduct.</p>
+
+      {error && (
+        <div className="rounded-xl bg-red-50 text-red-600 text-sm px-4 py-2.5 font-medium">{error}</div>
+      )}
+      {message && (
+        <div className="rounded-xl bg-emerald-50 text-emerald-700 text-sm px-4 py-2.5 font-medium">{message}</div>
+      )}
+
+      <div className="rounded-2xl border border-[#EBEBEB] bg-white p-5 space-y-4">
+        <label className="block">
+          <span className="text-xs font-bold text-[#555]">Warna Background</span>
+          <div className="flex items-center gap-3 mt-1.5">
+            <input
+              type="color"
+              value={/^#[0-9a-fA-F]{6}$/.test(bgColor) ? bgColor : '#141414'}
+              onChange={(e) => setBgColor(e.target.value)}
+              className="h-10 w-14 rounded-lg border border-[#E5E5E5] cursor-pointer bg-transparent"
+            />
+            <input
+              value={bgColor}
+              onChange={(e) => setBgColor(e.target.value)}
+              placeholder="#141414"
+              className="flex-1 rounded-xl border border-[#E5E5E5] px-4 py-2.5 text-sm font-mono outline-none focus:border-[#FF5733]"
+            />
+          </div>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-bold text-[#555]">URL Gambar Background (opsional)</span>
+          <input
+            value={bgImage}
+            onChange={(e) => setBgImage(e.target.value)}
+            placeholder="https://..."
+            className="mt-1.5 w-full rounded-xl border border-[#E5E5E5] px-4 py-2.5 text-sm outline-none focus:border-[#FF5733]"
+          />
+          <p className="text-[10px] text-[#AAA] mt-1">Kosongkan kalau cuma mau pakai warna solid.</p>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="accent-[#FF5733]" />
+          <span className="text-xs font-bold text-[#555]">Aktif</span>
+        </label>
+
+        {/* Preview */}
+        <div className="rounded-xl overflow-hidden border border-[#EBEBEB]">
+          <div className="text-[10px] font-bold text-[#AAA] px-3 py-1.5 bg-[#F9F9F9] border-b border-[#EBEBEB]">Preview Hero</div>
+          <div
+            className="h-24 flex items-center justify-center"
+            style={{
+              backgroundColor: bgColor,
+              ...(bgImage.trim() ? {
+                backgroundImage: `url(${bgImage.trim()})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              } : {}),
+            }}
+          >
+            <span className="text-sm font-bold text-white/70 drop-shadow-md">Gas Cek katalog DigiProduct</span>
+          </div>
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full rounded-full bg-[#141414] py-3 text-sm font-bold text-white hover:bg-[#2A2A2A] disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Menyimpan...' : 'Simpan Background'}
+        </button>
+      </div>
     </div>
   )
 }
