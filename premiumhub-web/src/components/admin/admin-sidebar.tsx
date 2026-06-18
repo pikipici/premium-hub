@@ -6,6 +6,7 @@ import {
   Box,
   Cpu,
   Database,
+  Image,
   LayoutDashboard,
   Megaphone,
   MessageCircle,
@@ -48,6 +49,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/produk', label: 'Produk', icon: Package },
       { href: '/admin/sosmed', label: 'DigiSosmed', icon: Megaphone },
       { href: '/admin/stok', label: 'Stok Produk', icon: Database },
+      { href: '/admin/banners', label: 'Banner & Flash Sale', icon: Image },
     ],
   },
   {
