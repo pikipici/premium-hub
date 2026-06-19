@@ -316,6 +316,8 @@ function HeroBgTab() {
   const [bgColor, setBgColor] = useState('#141414')
   const [bgImage, setBgImage] = useState('')
   const [isActive, setIsActive] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     heroBgService.adminGetHeroBg(PAGE_KEY)
@@ -329,6 +331,27 @@ function HeroBgTab() {
       .catch(() => setError('Gagal memuat data'))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setError('')
+    try {
+      const res = await heroBgService.adminUploadImage(file)
+      if (res.success && res.data?.url) {
+        setBgImage(res.data.url)
+      } else {
+        setError(res.message || 'Gagal upload gambar')
+      }
+    } catch {
+      setError('Gagal upload gambar')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -388,14 +411,50 @@ function HeroBgTab() {
         </label>
 
         <label className="block">
-          <span className="text-xs font-bold text-[#555]">URL Gambar Background (opsional)</span>
-          <input
-            value={bgImage}
-            onChange={(e) => setBgImage(e.target.value)}
-            placeholder="https://..."
-            className="mt-1.5 w-full rounded-xl border border-[#E5E5E5] px-4 py-2.5 text-sm outline-none focus:border-[#FF5733]"
-          />
-          <p className="text-[10px] text-[#AAA] mt-1">Kosongkan kalau cuma mau pakai warna solid.</p>
+          <span className="text-xs font-bold text-[#555]">Gambar Background (opsional)</span>
+          <div className="mt-1.5">
+            {bgImage ? (
+              <div className="relative rounded-xl overflow-hidden border border-[#E5E5E5]">
+                <img src={bgImage} alt="Preview" className="h-32 w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute top-1.5 left-1.5 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[#141414] hover:bg-white"
+                >
+                  Ganti
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBgImage('')}
+                  className="absolute top-1.5 right-1.5 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#D5D5D0] bg-[#F9F9F9] px-4 py-6 hover:border-[#FF5733] hover:bg-[#FFF8F5] transition-colors"
+              >
+                {uploading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-[#888]" />
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#AAA]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span className="mt-2 text-xs font-medium text-[#888]">Klik untuk upload gambar</span>
+                    <span className="mt-0.5 text-[10px] text-[#AAA]">PNG, JPG, WebP — kosongkan kalau cuma warna solid</span>
+                  </>
+                )}
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleUploadImage}
+              className="hidden"
+            />
+          </div>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">

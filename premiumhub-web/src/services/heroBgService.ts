@@ -17,4 +17,11 @@ export const heroBgService = {
     const res = await api.put<ApiResponse<SiteHeroBg>>('/admin/hero-bg', data)
     return res.data
   },
+
+  adminUploadImage: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.post<ApiResponse<{ url: string }>>('/admin/hero-bg/upload-image', formData)
+    return res.data
+  },
 }
