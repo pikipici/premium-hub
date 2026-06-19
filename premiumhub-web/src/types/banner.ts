@@ -1,6 +1,7 @@
 export interface SiteBanner {
   id: string
   title: string
+  description?: string
   image_url: string
   link_url: string
   is_active: boolean

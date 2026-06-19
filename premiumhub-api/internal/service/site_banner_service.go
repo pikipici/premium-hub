@@ -20,23 +20,25 @@ func NewSiteBannerService(repo *repository.SiteBannerRepo) *SiteBannerService {
 }
 
 type CreateBannerInput struct {
-	Title     string `json:"title" binding:"required"`
-	ImageURL  string `json:"image_url" binding:"required"`
-	LinkURL   string `json:"link_url"`
-	IsActive  *bool  `json:"is_active"`
-	SortOrder int    `json:"sort_order"`
-	StartsAt  string `json:"starts_at"`
-	EndsAt    string `json:"ends_at"`
+	Title       string `json:"title" binding:"required"`
+	Description string `json:"description"`
+	ImageURL    string `json:"image_url" binding:"required"`
+	LinkURL     string `json:"link_url"`
+	IsActive    *bool  `json:"is_active"`
+	SortOrder   int    `json:"sort_order"`
+	StartsAt    string `json:"starts_at"`
+	EndsAt      string `json:"ends_at"`
 }
 
 type UpdateBannerInput struct {
-	Title     string `json:"title"`
-	ImageURL  string `json:"image_url"`
-	LinkURL   string `json:"link_url"`
-	IsActive  *bool  `json:"is_active"`
-	SortOrder *int   `json:"sort_order"`
-	StartsAt  string `json:"starts_at"`
-	EndsAt    string `json:"ends_at"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	ImageURL    string `json:"image_url"`
+	LinkURL     string `json:"link_url"`
+	IsActive    *bool  `json:"is_active"`
+	SortOrder   *int   `json:"sort_order"`
+	StartsAt    string `json:"starts_at"`
+	EndsAt      string `json:"ends_at"`
 }
 
 func parseOptionalTime(raw string) (*time.Time, error) {
@@ -66,10 +68,11 @@ func (s *SiteBannerService) Create(input CreateBannerInput) (*model.SiteBanner, 
 	}
 
 	banner := &model.SiteBanner{
-		Title:     title,
-		ImageURL:  imageURL,
-		LinkURL:   strings.TrimSpace(input.LinkURL),
-		SortOrder: input.SortOrder,
+		Title:       title,
+		Description: strings.TrimSpace(input.Description),
+		ImageURL:    imageURL,
+		LinkURL:     strings.TrimSpace(input.LinkURL),
+		SortOrder:   input.SortOrder,
 	}
 
 	if input.IsActive != nil {
@@ -107,6 +110,9 @@ func (s *SiteBannerService) Update(id uuid.UUID, input UpdateBannerInput) (*mode
 
 	if v := strings.TrimSpace(input.Title); v != "" {
 		banner.Title = v
+	}
+	if input.Description != "" {
+		banner.Description = strings.TrimSpace(input.Description)
 	}
 	if v := strings.TrimSpace(input.ImageURL); v != "" {
 		banner.ImageURL = v

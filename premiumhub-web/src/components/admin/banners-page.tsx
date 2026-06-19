@@ -75,6 +75,7 @@ function BannersTab() {
   const [uploading, setUploading] = useState(false)
 
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [imageURL, setImageURL] = useState('')
   const [linkURL, setLinkURL] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
@@ -116,6 +117,7 @@ function BannersTab() {
   const openCreate = () => {
     setEditing(null)
     setTitle('')
+    setDescription('')
     setImageURL('')
     setLinkURL('')
     setSortOrder(0)
@@ -127,6 +129,7 @@ function BannersTab() {
   const openEdit = (b: SiteBanner) => {
     setEditing(b)
     setTitle(b.title)
+    setDescription(b.description || '')
     setImageURL(b.image_url)
     setLinkURL(b.link_url)
     setSortOrder(b.sort_order)
@@ -147,7 +150,7 @@ function BannersTab() {
     setSaving(true)
     setError('')
     try {
-      const payload = { title: title.trim(), image_url: imageURL.trim(), link_url: linkURL.trim(), sort_order: sortOrder, is_active: isActive }
+      const payload = { title: title.trim(), description: description.trim(), image_url: imageURL.trim(), link_url: linkURL.trim(), sort_order: sortOrder, is_active: isActive }
       const res = editing
         ? await bannerService.adminUpdate(editing.id, payload)
         : await bannerService.adminCreate(payload)
@@ -230,6 +233,10 @@ function BannersTab() {
             <label className="block text-xs font-bold text-[#555]">
               Judul
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Promo Spesial Juni" className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
+            </label>
+            <label className="block text-xs font-bold text-[#555]">
+              Deskripsi
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Deskripsi singkat banner..." rows={2} className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733] resize-none" />
             </label>
             <label className="block text-xs font-bold text-[#555]">
               Gambar

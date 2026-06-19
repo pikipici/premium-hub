@@ -87,6 +87,11 @@ export default function BannerSlider() {
                       <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white leading-tight drop-shadow-lg">
                         {banner.title}
                       </h3>
+                      {banner.description && (
+                        <p className="mt-1.5 text-sm text-white/60 max-w-md line-clamp-2">
+                          {banner.description}
+                        </p>
+                      )}
                       <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#FF5733] px-4 py-2 text-xs sm:text-sm font-bold text-white group-hover:bg-[#e64d2e] transition-colors">
                         Lihat Detail
                         <ArrowRight className="h-3.5 w-3.5" />
