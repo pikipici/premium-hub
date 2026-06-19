@@ -75,6 +75,19 @@ function DigiProductContent() {
     price_desc: 'Termahal',
   }
 
+  // Close sort dropdown on outside click
+  useEffect(() => {
+    if (!sortOpen) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-sort-dropdown]')) {
+        setSortOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [sortOpen])
+
   const effectiveCategory = categories.some((item) => item.value === category) ? category : ''
 
   useEffect(() => {
@@ -269,11 +282,10 @@ function DigiProductContent() {
 
               <div className="flex items-center gap-2 sm:gap-1.5 overflow-x-auto scrollbar-hide">
                 {/* Sort dropdown */}
-                <div className="relative shrink-0">
+                <div className="relative shrink-0" data-sort-dropdown>
                   <button
                     type="button"
                     onClick={() => setSortOpen(!sortOpen)}
-                    onBlur={() => setTimeout(() => setSortOpen(false), 150)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-[#666] border border-[#E5E5E5] hover:border-[#FF5733] hover:text-[#FF5733] transition-all"
                   >
                     <ArrowUpDown className="h-3.5 w-3.5" />
