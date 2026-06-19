@@ -247,11 +247,11 @@ function DigiProductContent() {
       {/* Category pills + content */}
       <section className="bg-[#F4F5F8] py-6 sm:py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Sticky bar: search + sort + category pills */}
-          <div className="sticky top-0 z-30 bg-[#F4F5F8] shadow-[0_2px_12px_rgba(0,0,0,0.04)] -mx-4 sm:mx-0 px-4 sm:px-0 py-3 mb-6">
-            {/* Search row — full width on mobile, shrinks on desktop */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-              <div className="relative w-full sm:w-56 lg:w-64">
+          {/* Sticky bar — 2 rows: toolbar + filters */}
+          <div className="sticky top-0 z-30 bg-[#F4F5F8] shadow-[0_2px_12px_rgba(0,0,0,0.04)] -mx-4 sm:mx-0 px-4 sm:px-0 py-3 mb-6 space-y-2.5">
+            {/* Row 1: Search + Sort */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:flex-none sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#AAA] pointer-events-none" />
                 <input
                   type="text"
@@ -267,78 +267,75 @@ function DigiProductContent() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2 sm:gap-1.5 overflow-x-auto scrollbar-hide">
-                {/* Sort button — opens modal on click */}
-                <div className="shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setSortOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-[#666] border border-[#E5E5E5] hover:border-[#FF5733] hover:text-[#FF5733] transition-all"
-                  >
-                    <ArrowUpDown className="h-3.5 w-3.5" />
-                    {sortLabel[sortBy]}
-                  </button>
-                </div>
+              {/* Sort button */}
+              <div className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSortOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold bg-white text-[#666] border border-[#E5E5E5] hover:border-[#FF5733] hover:text-[#FF5733] transition-all whitespace-nowrap shadow-sm"
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  {sortLabel[sortBy]}
+                </button>
+              </div>
+            </div>
 
-                {/* Sort modal */}
-                {sortOpen && (
-                  <div
-                    className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center"
-                    onClick={() => setSortOpen(false)}
-                  >
-                    <div
-                      className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-xs p-5 sm:p-6"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <h3 className="text-sm font-extrabold text-[#141414] mb-3">Urutkan</h3>
-                      <div className="space-y-1">
-                        {[
-                          { key: 'popular', label: 'Populer' },
-                          { key: 'price_asc', label: '↑ Termurah' },
-                          { key: 'price_desc', label: '↓ Termahal' },
-                        ].map((opt) => (
-                          <button
-                            key={opt.key}
-                            type="button"
-                            onClick={() => {
-                              setSortBy(opt.key as typeof sortBy)
-                              setSortOpen(false)
-                            }}
-                            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
-                              sortBy === opt.key
-                                ? 'bg-[#FFF8F5] text-[#FF5733]'
-                                : 'text-[#666] hover:bg-[#F7F7F5] hover:text-[#141414]'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+            {/* Sort modal */}
+            {sortOpen && (
+              <div
+                className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center"
+                onClick={() => setSortOpen(false)}
+              >
+                <div
+                  className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-xs p-5 sm:p-6"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 className="text-sm font-extrabold text-[#141414] mb-3">Urutkan</h3>
+                  <div className="space-y-1">
+                    {[
+                      { key: 'popular', label: 'Populer' },
+                      { key: 'price_asc', label: '↑ Termurah' },
+                      { key: 'price_desc', label: '↓ Termahal' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => {
+                          setSortBy(opt.key as typeof sortBy)
+                          setSortOpen(false)
+                        }}
+                        className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
+                          sortBy === opt.key
+                            ? 'bg-[#FFF8F5] text-[#FF5733]'
+                            : 'text-[#666] hover:bg-[#F7F7F5] hover:text-[#141414]'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
-                )}
-
-                {/* Divider */}
-                <div className="hidden sm:block w-px h-5 bg-[#D5D5D0] shrink-0 mx-1" />
-
-                {/* Category pills */}
-                <div className="flex gap-2 min-w-max">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.value || 'all'}
-                      type="button"
-                      onClick={() => handleCategoryChange(cat.value)}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs sm:text-sm font-semibold transition-all shrink-0 ${
-                        effectiveCategory === cat.value
-                          ? 'bg-[#141414] text-white shadow-md'
-                          : 'bg-white text-[#666] ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900'
-                      }`}
-                    >
-                      {cat.emoji && <span>{cat.emoji}</span>}
-                      {cat.label}
-                    </button>
-                  ))}
                 </div>
+              </div>
+            )}
+
+            {/* Row 2: Category pills */}
+            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+              <div className="flex gap-2 min-w-max pb-0.5">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.value || 'all'}
+                    type="button"
+                    onClick={() => handleCategoryChange(cat.value)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs sm:text-sm font-semibold transition-all shrink-0 ${
+                      effectiveCategory === cat.value
+                        ? 'bg-[#141414] text-white shadow-md'
+                        : 'bg-white text-[#666] ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    {cat.emoji && <span>{cat.emoji}</span>}
+                    {cat.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
