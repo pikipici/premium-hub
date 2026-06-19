@@ -218,6 +218,12 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	sosmedPaymentHandler := handler.NewSosmedPaymentHandler(sosmedPaymentSvc)
 	maintenanceHandler := handler.NewMaintenanceHandler(maintenanceSvc)
 	siteBannerHandler := handler.NewSiteBannerHandler(siteBannerSvc)
+
+	bannerAssetStorage, err := storage.NewBannerAssetStorage(cfg)
+	if err != nil {
+		panic(fmt.Errorf("gagal inisialisasi banner asset storage: %w", err))
+	}
+	siteBannerHandler.SetBannerAssetStorage(bannerAssetStorage)
 	siteHeroBgHandler := handler.NewSiteHeroBgHandler(siteHeroBgSvc)
 	siteFlashSaleHandler := handler.NewSiteFlashSaleHandler(siteFlashSaleSvc)
 	userSidebarMenuSettingHandler := handler.NewUserSidebarMenuSettingHandler(userSidebarMenuSettingSvc)
@@ -658,6 +664,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	admin.GET("/banners", siteBannerHandler.AdminList)
 	admin.POST("/banners", siteBannerHandler.AdminCreate)
+	admin.POST("/banners/upload-image", siteBannerHandler.UploadImage)
 	admin.PUT("/banners/:id", siteBannerHandler.AdminUpdate)
 	admin.DELETE("/banners/:id", siteBannerHandler.AdminDelete)
 	admin.GET("/hero-bg", siteHeroBgHandler.AdminGet)

@@ -27,4 +27,11 @@ export const bannerService = {
     const res = await api.delete<ApiResponse<null>>(`/admin/banners/${id}`)
     return res.data
   },
+
+  adminUploadImage: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.post<ApiResponse<{ url: string }>>('/admin/banners/upload-image', formData)
+    return res.data
+  },
 }

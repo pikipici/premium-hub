@@ -3,6 +3,7 @@ package handler
 import (
 	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/service"
+	"premiumhub-api/internal/storage"
 	"premiumhub-api/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -10,11 +11,17 @@ import (
 )
 
 type SiteBannerHandler struct {
-	svc *service.SiteBannerService
+	svc            *service.SiteBannerService
+	bannerAssets   *storage.BannerAssetStorage
 }
 
 func NewSiteBannerHandler(svc *service.SiteBannerService) *SiteBannerHandler {
 	return &SiteBannerHandler{svc: svc}
+}
+
+func (h *SiteBannerHandler) SetBannerAssetStorage(s *storage.BannerAssetStorage) *SiteBannerHandler {
+	h.bannerAssets = s
+	return h
 }
 
 func (h *SiteBannerHandler) PublicActive(c *gin.Context) {
@@ -85,4 +92,25 @@ func (h *SiteBannerHandler) AdminDelete(c *gin.Context) {
 		return
 	}
 	response.Success(c, "Banner dihapus", nil)
+}
+
+func (h *SiteBannerHandler) UploadImage(c *gin.Context) {
+	if h.bannerAssets == nil {
+		response.InternalError(c)
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.BadRequest(c, "File gambar tidak ditemukan")
+		return
+	}
+
+	url, err := h.bannerAssets.Store(c.Request.Context(), file)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Gambar berhasil diupload", gin.H{"url": url})
 }

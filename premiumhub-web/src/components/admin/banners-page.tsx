@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2, Palette, Plus, Trash2, Zap } from 'lucide-react'
 import { bannerService } from '@/services/bannerService'
 import { heroBgService } from '@/services/heroBgService'
@@ -72,12 +72,15 @@ function BannersTab() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<SiteBanner | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   const [title, setTitle] = useState('')
   const [imageURL, setImageURL] = useState('')
   const [linkURL, setLinkURL] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
   const [isActive, setIsActive] = useState(true)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchBanners = () => {
     setLoading(true)
@@ -89,6 +92,27 @@ function BannersTab() {
 
   useEffect(() => { fetchBanners() }, [])
 
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setError('')
+    try {
+      const res = await bannerService.adminUploadImage(file)
+      if (res.success && res.data?.url) {
+        setImageURL(res.data.url)
+      } else {
+        setError(res.message || 'Gagal upload gambar')
+      }
+    } catch {
+      setError('Gagal upload gambar')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   const openCreate = () => {
     setEditing(null)
     setTitle('')
@@ -96,6 +120,7 @@ function BannersTab() {
     setLinkURL('')
     setSortOrder(0)
     setIsActive(true)
+    setError('')
     setFormOpen(true)
   }
 
@@ -116,7 +141,7 @@ function BannersTab() {
 
   const handleSave = async () => {
     if (!title.trim() || !imageURL.trim()) {
-      setError('Judul dan URL gambar wajib diisi')
+      setError('Judul dan gambar wajib diisi')
       return
     }
     setSaving(true)
@@ -207,8 +232,52 @@ function BannersTab() {
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Promo Spesial Juni" className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
             </label>
             <label className="block text-xs font-bold text-[#555]">
-              URL Gambar
-              <input value={imageURL} onChange={(e) => setImageURL(e.target.value)} placeholder="https://..." className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
+              Gambar
+              <div className="mt-1">
+                {imageURL ? (
+                  <div className="relative rounded-xl overflow-hidden border border-[#E5E5E5]">
+                    <img src={imageURL} alt="Preview" className="h-32 w-full object-cover" />
+                    <div className="absolute inset-0 bg-black/0 hover:bg-black/30 transition-colors flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="opacity-0 hover:opacity-100 transition-opacity rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[#141414]"
+                      >
+                        Ganti Gambar
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setImageURL('')}
+                      className="absolute top-1.5 right-1.5 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#D5D5D0] bg-[#F9F9F9] px-4 py-6 hover:border-[#FF5733] hover:bg-[#FFF8F5] transition-colors"
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-[#888]" />
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#AAA]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span className="mt-2 text-xs font-medium text-[#888]">Klik untuk upload gambar</span>
+                        <span className="mt-0.5 text-[10px] text-[#AAA]">PNG, JPG, WebP — min 640x360, maks 5MB</span>
+                      </>
+                    )}
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleUploadImage}
+                  className="hidden"
+                />
+              </div>
             </label>
             <label className="block text-xs font-bold text-[#555]">
               Link Tujuan
