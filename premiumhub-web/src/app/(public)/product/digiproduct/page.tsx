@@ -15,7 +15,7 @@ import { heroBgService } from '@/services/heroBgService'
 import { flashSaleService } from '@/services/flashSaleService'
 import type { Product } from '@/types/product'
 import type { SiteFlashSale } from '@/types/flashSale'
-import { CreditCard, Search, SearchX, ShieldCheck, X, Zap } from 'lucide-react'
+import { ArrowUpDown, CreditCard, Search, SearchX, ShieldCheck, X, Zap } from 'lucide-react'
 import Link from 'next/link'
 
 type CategoryOption = {
@@ -67,6 +67,13 @@ function DigiProductContent() {
   const [flashSales, setFlashSales] = useState<SiteFlashSale[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'popular' | 'price_asc' | 'price_desc'>('popular')
+  const [sortOpen, setSortOpen] = useState(false)
+
+  const sortLabel: Record<string, string> = {
+    popular: 'Populer',
+    price_asc: 'Termurah',
+    price_desc: 'Termahal',
+  }
 
   const effectiveCategory = categories.some((item) => item.value === category) ? category : ''
 
@@ -261,26 +268,43 @@ function DigiProductContent() {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-1.5 overflow-x-auto scrollbar-hide">
-                {/* Sort buttons */}
-                <div className="flex gap-1 shrink-0">
-                  {[
-                    { key: 'popular', label: 'Populer' },
-                    { key: 'price_asc', label: '↑ Termurah' },
-                    { key: 'price_desc', label: '↓ Termahal' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setSortBy(opt.key as typeof sortBy)}
-                      className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
-                        sortBy === opt.key
-                          ? 'bg-[#141414] text-white shadow-sm'
-                          : 'bg-white text-[#666] border border-[#E5E5E5] hover:border-[#FF5733] hover:text-[#FF5733]'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                {/* Sort dropdown */}
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSortOpen(!sortOpen)}
+                    onBlur={() => setTimeout(() => setSortOpen(false), 150)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-[#666] border border-[#E5E5E5] hover:border-[#FF5733] hover:text-[#FF5733] transition-all"
+                  >
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    {sortLabel[sortBy]}
+                  </button>
+                  {sortOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-40 rounded-xl bg-white border border-[#E5E5E5] shadow-lg z-40 py-1 overflow-hidden">
+                      {[
+                        { key: 'popular', label: 'Populer' },
+                        { key: 'price_asc', label: '↑ Termurah' },
+                        { key: 'price_desc', label: '↓ Termahal' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setSortBy(opt.key as typeof sortBy)
+                            setSortOpen(false)
+                          }}
+                          className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors ${
+                            sortBy === opt.key
+                              ? 'bg-[#FFF8F5] text-[#FF5733]'
+                              : 'text-[#666] hover:bg-[#F7F7F5] hover:text-[#141414]'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Divider */}
