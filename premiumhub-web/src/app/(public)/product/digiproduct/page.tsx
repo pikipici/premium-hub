@@ -200,8 +200,13 @@ function DigiProductContent() {
             </div>
 
             {/* Banner slider inline */}
-            <div className="mt-8 sm:mt-10">
+            <div className="mt-8 sm:mt-10 relative">
               <BannerSlider />
+              {/* Gradient passthrough: banner → hero bg */}
+              <div
+                className="absolute bottom-0 left-0 right-0 h-16 sm:h-24 pointer-events-none z-10"
+                style={{ background: `linear-gradient(to bottom, transparent, ${heroBgColor})` }}
+              />
             </div>
 
             {/* Flash Sale section */}
