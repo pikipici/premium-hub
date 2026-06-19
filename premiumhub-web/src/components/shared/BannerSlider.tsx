@@ -63,8 +63,8 @@ export default function BannerSlider() {
   if (loading) return null
 
   return (
-    <div>
-      <div className="overflow-hidden rounded-2xl sm:rounded-3xl shadow-[0_8px_40px_rgba(0,0,0,0.35)] ring-1 ring-white/[0.06]" ref={emblaRef}>
+    <div className="my-1 sm:my-2">
+      <div className="overflow-hidden rounded-2xl sm:rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] ring-1 ring-white/[0.08]" ref={emblaRef}>
         <div className="flex">
           {hasRealBanners
             ? banners.map((banner) => (
