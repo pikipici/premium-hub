@@ -200,12 +200,11 @@ function DigiProductContent() {
             </div>
 
             {/* Banner slider inline */}
-            <div className="mt-8 sm:mt-10 relative">
+            <div className="mt-8 sm:mt-12 relative">
               <BannerSlider />
-              {/* Gradient passthrough: banner → hero bg */}
-              <div
-                className="absolute bottom-0 left-0 right-0 h-16 sm:h-24 pointer-events-none z-10"
-                style={{ background: `linear-gradient(to bottom, transparent, ${heroBgColor})` }}
+              {/* Brand glow accent at banner bottom */}
+              <div className="absolute -bottom-3 left-[10%] right-[10%] h-6 pointer-events-none z-10"
+                style={{ background: `radial-gradient(ellipse at center, rgba(255,87,51,0.15) 0%, transparent 70%)` }}
               />
             </div>
 
