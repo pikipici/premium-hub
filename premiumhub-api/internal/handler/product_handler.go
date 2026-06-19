@@ -21,11 +21,13 @@ func NewProductHandler(productSvc *service.ProductService) *ProductHandler {
 
 func (h *ProductHandler) List(c *gin.Context) {
 	category := c.Query("category")
+	q := c.Query("q")
+	sortBy := c.Query("sort_by")
 	page, limit := parsePageLimit(c, DefaultPublicPageLimit, MaxPageLimit)
 
-	products, total, err := h.productSvc.List(category, page, limit)
+	products, total, err := h.productSvc.List(category, page, limit, q, sortBy)
 	if err != nil {
-		response.InternalError(c)
+		response.BadRequest(c, err.Error())
 		return
 	}
 

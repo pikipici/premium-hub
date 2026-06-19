@@ -137,7 +137,7 @@ func (s *ProductService) attachPriceAvailableStock(product *model.Product) error
 	return nil
 }
 
-func (s *ProductService) List(category string, page, limit int) ([]model.Product, int64, error) {
+func (s *ProductService) List(category string, page, limit int, q, sortBy string) ([]model.Product, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -145,7 +145,16 @@ func (s *ProductService) List(category string, page, limit int) ([]model.Product
 		limit = 12
 	}
 
-	products, total, err := s.productRepo.List(category, page, limit)
+	// Validate sortBy
+	validSorts := map[string]bool{"price_asc": true, "price_desc": true, "popular": true}
+	if sortBy != "" && !validSorts[sortBy] {
+		return nil, 0, errors.New("sort_by tidak valid")
+	}
+	if sortBy == "popular" {
+		sortBy = ""
+	}
+
+	products, total, err := s.productRepo.List(category, q, sortBy, page, limit)
 	if err != nil {
 		return nil, 0, err
 	}

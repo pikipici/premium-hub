@@ -59,7 +59,7 @@ export interface AdminProductPricePayload {
 }
 
 export const productService = {
-  list: async (params?: { category?: string; page?: number; limit?: number }) => {
+  list: async (params?: { category?: string; page?: number; limit?: number; q?: string; sort_by?: string }) => {
     const res = await api.get<ApiResponse<Product[]>>('/products', { params })
     return res.data
   },

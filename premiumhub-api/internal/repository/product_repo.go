@@ -33,17 +33,30 @@ func (r *ProductRepo) FindByID(id uuid.UUID) (*model.Product, error) {
 	return &p, err
 }
 
-func (r *ProductRepo) List(category string, page, limit int) ([]model.Product, int64, error) {
+func (r *ProductRepo) List(category, q, sortBy string, page, limit int) ([]model.Product, int64, error) {
 	var products []model.Product
 	var total int64
-	q := r.db.Model(&model.Product{}).Where("is_active = ?", true)
+	db := r.db.Model(&model.Product{}).Where("is_active = ?", true)
 	if category != "" {
-		q = q.Where("category = ?", category)
+		db = db.Where("category = ?", category)
 	}
-	q.Count(&total)
-	err := q.Preload("Prices", "is_active = ?", true).
+	if q = strings.TrimSpace(q); q != "" {
+		db = db.Where("LOWER(name) LIKE ?", "%"+strings.ToLower(q)+"%")
+	}
+
+	db.Count(&total)
+
+	order := "sort_priority DESC, is_popular DESC, created_at DESC"
+	switch sortBy {
+	case "price_asc":
+		order = "(SELECT COALESCE(MIN(CASE WHEN pp.is_active THEN pp.price END), 0) FROM product_prices pp WHERE pp.product_id = products.id) ASC"
+	case "price_desc":
+		order = "(SELECT COALESCE(MIN(CASE WHEN pp.is_active THEN pp.price END), 0) FROM product_prices pp WHERE pp.product_id = products.id) DESC"
+	}
+
+	err := db.Preload("Prices", "is_active = ?", true).
 		Offset((page - 1) * limit).Limit(limit).
-		Order("sort_priority DESC, is_popular DESC, created_at DESC").
+		Order(order).
 		Find(&products).Error
 	return products, total, err
 }

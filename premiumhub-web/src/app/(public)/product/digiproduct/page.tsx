@@ -15,7 +15,7 @@ import { heroBgService } from '@/services/heroBgService'
 import { flashSaleService } from '@/services/flashSaleService'
 import type { Product } from '@/types/product'
 import type { SiteFlashSale } from '@/types/flashSale'
-import { CreditCard, Search, ShieldCheck, Zap } from 'lucide-react'
+import { CreditCard, Search, SearchX, ShieldCheck, X, Zap } from 'lucide-react'
 import Link from 'next/link'
 
 type CategoryOption = {
@@ -65,31 +65,29 @@ function DigiProductContent() {
   const [heroBgColor, setHeroBgColor] = useState('#141414')
   const [heroBgImage, setHeroBgImage] = useState<string | null>(null)
   const [flashSales, setFlashSales] = useState<SiteFlashSale[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<'popular' | 'price_asc' | 'price_desc'>('popular')
+
+  const effectiveCategory = categories.some((item) => item.value === category) ? category : ''
 
   useEffect(() => {
     let alive = true
-    Promise.all([
-      productService.list({ limit: 50 }),
-      productCategoryService.list({ scope: 'prem_apps' }),
-    ]).then(([prodRes, catRes]) => {
-      if (!alive) return
-      if (prodRes.success) setAllProducts(prodRes.data)
-      if (catRes.success) {
-        const opts: CategoryOption[] = [
-          { value: '', label: 'Semua', emoji: '' },
-          ...(catRes.data || []).map((item) => ({
-            value: item.code,
-            label: item.label?.trim() || item.code,
-            emoji: CATEGORY_EMOJI_MAP[item.code] || '',
-          })),
-        ]
-        setCategories(opts)
-      }
-    }).catch(() => {}).finally(() => {
-      if (alive) setLoading(false)
-    })
-    return () => { alive = false }
-  }, [])
+    const timer = setTimeout(() => {
+      setLoading(true)
+      productService.list({
+        category: effectiveCategory || undefined,
+        limit: 50,
+        q: searchQuery.trim() || undefined,
+        sort_by: sortBy,
+      }).then((res) => {
+        if (!alive) return
+        if (res.success) setAllProducts(res.data ?? [])
+      }).catch(() => {}).finally(() => {
+        if (alive) setLoading(false)
+      })
+    }, searchQuery ? 300 : 0)
+    return () => { alive = false; clearTimeout(timer) }
+  }, [effectiveCategory, searchQuery, sortBy])
 
   // Fetch hero background customization
   useEffect(() => {
@@ -101,14 +99,29 @@ function DigiProductContent() {
     }).catch(() => {})
   }, [])
 
+  // Fetch categories
+  useEffect(() => {
+    productCategoryService.list({ scope: 'prem_apps' }).then((res) => {
+      if (res.success) {
+        const opts: CategoryOption[] = [
+          { value: '', label: 'Semua', emoji: '' },
+          ...(res.data || []).map((item) => ({
+            value: item.code,
+            label: item.label?.trim() || item.code,
+            emoji: CATEGORY_EMOJI_MAP[item.code] || '',
+          })),
+        ]
+        setCategories(opts)
+      }
+    }).catch(() => {})
+  }, [])
+
   // Fetch active flash sales
   useEffect(() => {
     flashSaleService.getPublicActive().then((res) => {
       if (res.success) setFlashSales(res.data ?? [])
     }).catch(() => {})
   }, [])
-
-  const effectiveCategory = categories.some((item) => item.value === category) ? category : ''
 
   // Build section groups when "Semua" is selected
   const sections = useMemo((): SectionGroup[] => {
@@ -227,35 +240,96 @@ function DigiProductContent() {
       {/* Category pills + content */}
       <section className="bg-[#F4F5F8] py-6 sm:py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Category pills — scrollable horizontal */}
-          <div className="mb-8 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
-            <div className="flex gap-2 pb-1 min-w-max">
-              {categories.map((cat) => (
-                <button
-                  key={cat.value || 'all'}
-                  type="button"
-                  onClick={() => handleCategoryChange(cat.value)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-all shrink-0 ${
-                    effectiveCategory === cat.value
-                      ? 'bg-[#141414] text-white shadow-md'
-                      : 'bg-white text-[#666] ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  {cat.emoji && <span>{cat.emoji}</span>}
-                  {cat.label}
-                </button>
-              ))}
+          {/* Sticky bar: search + sort + category pills */}
+          <div className="sticky top-0 z-30 bg-[#F4F5F8] shadow-[0_2px_12px_rgba(0,0,0,0.04)] -mx-4 px-4 sm:mx-0 sm:px-0 py-3 mb-6">
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              {/* Search */}
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#AAA] pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari produk..."
+                  className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-[#E5E5E5] text-sm outline-none focus:border-[#FF5733] bg-white"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#AAA] hover:text-[#666]">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Sort buttons */}
+              <div className="flex gap-1 shrink-0">
+                {[
+                  { key: 'popular', label: 'Populer' },
+                  { key: 'price_asc', label: '↑ Termurah' },
+                  { key: 'price_desc', label: '↓ Termahal' },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setSortBy(opt.key as typeof sortBy)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      sortBy === opt.key
+                        ? 'bg-[#141414] text-white shadow-sm'
+                        : 'bg-white text-[#666] border border-[#E5E5E5] hover:border-[#FF5733] hover:text-[#FF5733]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Category pills */}
+              <div className="overflow-x-auto flex-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+                <div className="flex gap-2 pb-1 min-w-max">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.value || 'all'}
+                      type="button"
+                      onClick={() => handleCategoryChange(cat.value)}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-all shrink-0 ${
+                        effectiveCategory === cat.value
+                          ? 'bg-[#141414] text-white shadow-md'
+                          : 'bg-white text-[#666] ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      {cat.emoji && <span>{cat.emoji}</span>}
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Result count when searching */}
+          {searchQuery && !loading && (
+            <p className="text-xs text-[#888] mb-4">
+              Menampilkan {allProducts.length} produk untuk &quot;{searchQuery}&quot;
+            </p>
+          )}
 
           {/* Content */}
           {loading ? (
             <DigiLoadingCardGrid count={6} />
           ) : allProducts.length === 0 ? (
             <div className="text-center py-20">
-              <Search className="w-12 h-12 text-[#D5D5D0] mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-[#888] mb-1">Tidak ada produk</h3>
-              <p className="text-sm text-[#AAA]">Belum ada produk di kategori ini.</p>
+              {searchQuery ? (
+                <>
+                  <SearchX className="w-12 h-12 text-[#D5D5D0] mx-auto mb-4" />
+                  <h3 className="text-lg font-bold text-[#888] mb-1">Produk tidak ditemukan</h3>
+                  <p className="text-sm text-[#AAA]">Coba kata kunci lain atau hapus filter.</p>
+                </>
+              ) : (
+                <>
+                  <Search className="w-12 h-12 text-[#D5D5D0] mx-auto mb-4" />
+                  <h3 className="text-lg font-bold text-[#888] mb-1">Tidak ada produk</h3>
+                  <p className="text-sm text-[#AAA]">Belum ada produk di kategori ini.</p>
+                </>
+              )}
             </div>
           ) : effectiveCategory !== '' ? (
             /* Single category — flat grid */
