@@ -75,19 +75,6 @@ function DigiProductContent() {
     price_desc: 'Termahal',
   }
 
-  // Close sort dropdown on outside click
-  useEffect(() => {
-    if (!sortOpen) return
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (!target.closest('[data-sort-dropdown]')) {
-        setSortOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [sortOpen])
-
   const effectiveCategory = categories.some((item) => item.value === category) ? category : ''
 
   useEffect(() => {
@@ -281,43 +268,55 @@ function DigiProductContent() {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-1.5 overflow-x-auto scrollbar-hide">
-                {/* Sort dropdown */}
-                <div className="relative shrink-0" data-sort-dropdown>
+                {/* Sort button — opens modal on click */}
+                <div className="shrink-0">
                   <button
                     type="button"
-                    onClick={() => setSortOpen(!sortOpen)}
+                    onClick={() => setSortOpen(true)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-[#666] border border-[#E5E5E5] hover:border-[#FF5733] hover:text-[#FF5733] transition-all"
                   >
                     <ArrowUpDown className="h-3.5 w-3.5" />
                     {sortLabel[sortBy]}
                   </button>
-                  {sortOpen && (
-                    <div className="absolute left-0 top-full mt-1 w-40 rounded-xl bg-white border border-[#E5E5E5] shadow-lg z-40 py-1 overflow-hidden">
-                      {[
-                        { key: 'popular', label: 'Populer' },
-                        { key: 'price_asc', label: '↑ Termurah' },
-                        { key: 'price_desc', label: '↓ Termahal' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.key}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setSortBy(opt.key as typeof sortBy)
-                            setSortOpen(false)
-                          }}
-                          className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors ${
-                            sortBy === opt.key
-                              ? 'bg-[#FFF8F5] text-[#FF5733]'
-                              : 'text-[#666] hover:bg-[#F7F7F5] hover:text-[#141414]'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
+
+                {/* Sort modal */}
+                {sortOpen && (
+                  <div
+                    className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center"
+                    onClick={() => setSortOpen(false)}
+                  >
+                    <div
+                      className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-xs p-5 sm:p-6"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <h3 className="text-sm font-extrabold text-[#141414] mb-3">Urutkan</h3>
+                      <div className="space-y-1">
+                        {[
+                          { key: 'popular', label: 'Populer' },
+                          { key: 'price_asc', label: '↑ Termurah' },
+                          { key: 'price_desc', label: '↓ Termahal' },
+                        ].map((opt) => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => {
+                              setSortBy(opt.key as typeof sortBy)
+                              setSortOpen(false)
+                            }}
+                            className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${
+                              sortBy === opt.key
+                                ? 'bg-[#FFF8F5] text-[#FF5733]'
+                                : 'text-[#666] hover:bg-[#F7F7F5] hover:text-[#141414]'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Divider */}
                 <div className="hidden sm:block w-px h-5 bg-[#D5D5D0] shrink-0 mx-1" />
