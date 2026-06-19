@@ -82,7 +82,7 @@ export default function BannerSlider() {
                   </div>
                   <div className="absolute inset-0 z-10 bg-gradient-to-r from-[#141414]/85 via-[#141414]/50 to-transparent" />
                   <div className="absolute inset-0 z-10 bg-gradient-to-t from-[#141414]/60 via-transparent to-transparent" />
-                  <div className="relative z-20 px-6 sm:px-10 py-10 sm:py-12 lg:py-14 flex flex-col justify-end h-full min-h-[220px] sm:min-h-[280px]">
+                  <div className="relative z-20 px-6 sm:px-10 py-10 sm:py-12 lg:py-16 flex flex-col justify-end h-full min-h-[220px] sm:min-h-[300px] lg:min-h-[380px] xl:min-h-[420px]">
                     <div className="max-w-lg">
                       <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white leading-tight drop-shadow-lg">
                         {banner.title}
@@ -102,7 +102,7 @@ export default function BannerSlider() {
                   className="flex-[0_0_100%] min-w-0 relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#1C1C1E] to-[#2A2A2D]" />
-                  <div className="relative z-20 px-6 sm:px-10 py-10 sm:py-12 lg:py-14 flex flex-col justify-end h-full min-h-[220px] sm:min-h-[280px]">
+                  <div className="relative z-20 px-6 sm:px-10 py-10 sm:py-12 lg:py-16 flex flex-col justify-end h-full min-h-[220px] sm:min-h-[300px] lg:min-h-[380px] xl:min-h-[420px]">
                     <div className="max-w-lg">
                       <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white leading-tight">
                         {item.title}
