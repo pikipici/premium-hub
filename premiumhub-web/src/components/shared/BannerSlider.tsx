@@ -11,19 +11,19 @@ import { bannerService } from '@/services/bannerService'
 const FALLBACK_BANNERS = [
   {
     title: 'Selamat Datang di DigiProduct',
-    tagline: 'Lisensi software, akun premium, voucher digital. Cek katalog sekarang.',
+    description: 'Lisensi software, akun premium, voucher digital. Cek katalog sekarang.',
     cta: 'Lihat Katalog',
     href: '/product/digiproduct',
   },
   {
     title: 'Update Maintenance',
-    tagline: 'Beberapa layanan sedang maintenance singkat. Cek status terbaru.',
+    description: 'Beberapa layanan sedang maintenance singkat. Cek status terbaru.',
     cta: 'Info Lebih Lanjut',
     href: '/lacak-pesanan',
   },
   {
     title: 'Garansi 30 Hari',
-    tagline: 'Semua produk DigiMarket dilengkapi garansi. Belanja tenang, aman.',
+    description: 'Semua produk DigiMarket dilengkapi garansi. Belanja tenang, aman.',
     cta: 'Cara Klaim',
     href: '/dashboard/klaim-garansi',
   },
@@ -113,7 +113,7 @@ export default function BannerSlider() {
                         {item.title}
                       </h3>
                       <p className="mt-1.5 text-sm text-white/60 max-w-md">
-                        {item.tagline}
+                        {item.description}
                       </p>
                       <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#FF5733] px-4 py-2 text-xs sm:text-sm font-bold text-white group-hover:bg-[#e64d2e] transition-colors">
                         {item.cta}
