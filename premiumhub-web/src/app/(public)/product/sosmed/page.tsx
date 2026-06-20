@@ -215,8 +215,17 @@ export default function ProductSosmedLandingPage() {
   const toggleExpand = (id: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      const wasExpanded = next.has(id)
+      if (wasExpanded) {
+        next.delete(id)
+      } else {
+        next.add(id)
+        // Smooth scroll to section after expand
+        setTimeout(() => {
+          const el = document.getElementById(id === 'layanan' ? 'layanan' : id)
+          el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 50)
+      }
       return next
     })
   }
