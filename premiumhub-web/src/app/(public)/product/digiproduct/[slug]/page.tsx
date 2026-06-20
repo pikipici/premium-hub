@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { Check, ChevronDown, ChevronUp, Package, ShieldCheck, Zap } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, ShoppingCart, MessageCircle } from 'lucide-react'
 
 import Footer from '@/components/layout/Footer'
 import { DigiLoading } from '@/components/shared/DigiLoading'
@@ -13,13 +14,7 @@ import { formatRupiah } from '@/lib/utils'
 import { fulfillmentTypeLabel, isCredentialFulfillment } from '@/lib/fulfillment'
 import { productService } from '@/services/productService'
 import { useCartStore } from '@/store/cartStore'
-import type { Product, ProductFAQItem, ProductPrice, ProductSpecItem, ProductTrustBadge } from '@/types/product'
-
-const DEFAULT_TRUST_BADGES: ProductTrustBadge[] = [
-  { icon: '🛡', text: 'Garansi 30 Hari' },
-  { icon: '⚡', text: 'Pengiriman Instan' },
-  { icon: '💬', text: 'Support 24/7' },
-]
+import type { Product, ProductFAQItem, ProductPrice, ProductSpecItem } from '@/types/product'
 
 const DEFAULT_FEATURE_ITEMS = [
   'Produk dari stok terverifikasi',
@@ -37,25 +32,6 @@ const DEFAULT_FAQ_ITEMS: ProductFAQItem[] = [
     answer: 'Pengiriman biasanya instan setelah pembayaran terkonfirmasi. Di jam sibuk tetap diproses secepat mungkin.',
   },
 ]
-
-function normalizeTrustBadges(product: Product): ProductTrustBadge[] {
-  const fromBadges = (product.trust_badges || [])
-    .map((item) => ({ icon: item.icon?.trim() || '✨', text: item.text?.trim() || '' }))
-    .filter((item) => item.text)
-    .slice(0, 6)
-  if (fromBadges.length > 0) return fromBadges
-
-  const fromTrustItems = (product.trust_items || [])
-    .map((text, index) => ({
-      icon: DEFAULT_TRUST_BADGES[index % DEFAULT_TRUST_BADGES.length]?.icon || '✨',
-      text: text.trim(),
-    }))
-    .filter((item) => item.text)
-    .slice(0, 6)
-  if (fromTrustItems.length > 0) return fromTrustItems
-
-  return DEFAULT_TRUST_BADGES
-}
 
 function normalizeFeatureItems(product: Product): string[] {
   const fromProduct = (product.feature_items || []).map((item) => item.trim()).filter(Boolean).slice(0, 12)
@@ -111,14 +87,6 @@ function normalizeWaNumber(raw?: string) {
   return raw.replace(/\D/g, '').slice(0, 20)
 }
 
-function hasCoverImages(product: Product): boolean {
-  return !!(product.cover_images && product.cover_images.length > 0)
-}
-
-function hasHeroImage(product: Product): boolean {
-  return !!(product.icon_image_url || hasCoverImages(product))
-}
-
 function buildWaLink(product: Product, priceLabel: string | null) {
   const waNumber = normalizeWaNumber(product.whatsapp_number)
   if (!waNumber) return ''
@@ -126,6 +94,17 @@ function buildWaLink(product: Product, priceLabel: string | null) {
     ? `Halo admin, saya mau tanya ${product.name} (${priceLabel} - ${formatRupiah(0)}).`
     : `Halo admin, saya mau tanya produk ${product.name}.`
   return `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`
+}
+
+function formatPriceLabel(price: ProductPrice) {
+  return price.display_label?.trim() || price.label?.trim() || `${formatAccountTypeLabel(price.account_type)} ${price.duration} bln`
+}
+
+function formatMetaText(price: ProductPrice) {
+  return [price.unit_label, price.billing_period, price.delivery_label]
+    .map((item) => item?.trim())
+    .filter(Boolean)
+    .join(' · ')
 }
 
 export default function DigiProductDetailPage() {
@@ -234,26 +213,23 @@ export default function DigiProductDetailPage() {
     return accountTypeOptions.find((item) => item.stock > 0)?.code || accountTypeOptions[0]?.code || ''
   }, [accountType, accountTypeOptions])
 
-  const filteredPrices = useMemo(
-    () => {
-      if (!showAccountTypeSelector) return selectablePrices
-      return selectablePrices.filter(
-        (item) => normalizeAccountType(item.account_type) === normalizeAccountType(activeAccountType)
-      )
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeAccountType, selectablePrices, product?.fulfillment_type]
-  )
+  const filteredPrices = useMemo(() => {
+    if (!showAccountTypeSelector) return selectablePrices
+    return selectablePrices.filter(
+      (item) => normalizeAccountType(item.account_type) === normalizeAccountType(activeAccountType)
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAccountType, selectablePrices, product?.fulfillment_type])
 
   const inStockFilteredPrices = useMemo(
     () => filteredPrices.filter((item) => (priceStockByID.get(item.id) || 0) > 0),
     [filteredPrices, priceStockByID]
   )
 
-  const trustBadges = useMemo(() => {
-    if (!product) return DEFAULT_TRUST_BADGES
-    return normalizeTrustBadges(product)
-  }, [product])
+  const lowestPrice = useMemo(() => {
+    if (inStockFilteredPrices.length === 0) return null
+    return inStockFilteredPrices.reduce((min, p) => (p.price < min.price ? p : min), inStockFilteredPrices[0])
+  }, [inStockFilteredPrices])
 
   const featureItems = useMemo(() => {
     if (!product) return DEFAULT_FEATURE_ITEMS
@@ -279,9 +255,7 @@ export default function DigiProductDetailPage() {
     return inStockFilteredPrices[0]
   }, [inStockFilteredPrices, selectedPrice])
 
-  const selectedPriceLabel = effectiveSelectedPrice
-    ? effectiveSelectedPrice.display_label?.trim() || `${formatAccountTypeLabel(effectiveSelectedPrice.account_type)} ${effectiveSelectedPrice.duration} bln`
-    : null
+  const selectedPriceLabel = effectiveSelectedPrice ? formatPriceLabel(effectiveSelectedPrice) : null
 
   const handleBuy = () => {
     if (!effectiveSelectedPrice || !product) return
@@ -320,7 +294,6 @@ export default function DigiProductDetailPage() {
   }
 
   const popularBadge = product.badge_popular_text?.trim() || '🔥 Terlaris'
-  const guaranteeBadge = product.badge_guarantee_text?.trim() || '🛡 Garansi 30 Hari'
   const availableStock = typeof product.available_stock === 'number' ? Math.max(0, product.available_stock) : null
   const hasAnyStock = showAccountTypeSelector
     ? accountTypeOptions.some((item) => item.stock > 0)
@@ -334,17 +307,34 @@ export default function DigiProductDetailPage() {
   const coverImages = product.cover_images?.length ? product.cover_images : null
   const mainImage = product.icon_image_url || null
 
+  // Parse original price & discount
+  const originalPriceText = product.price_original_text?.trim()
+  const parsedOriginalPrice = originalPriceText ? parseInt(originalPriceText.replace(/\D/g, '')) || null : null
+  const discountText = product.discount_badge_text?.trim()
+  const soldText = product.sold_text?.trim()
+
   return (
     <>
       <Navbar />
 
-      <section className="py-8 md:py-14">
-        <div className="max-w-5xl mx-auto px-4 pb-48 sm:px-6 sm:pb-44 lg:px-8 lg:pb-36">
-          
-          {/* ─── HERO: Visual + Info ─── */}
+      <section className="py-6 md:py-10">
+        <div className="max-w-5xl mx-auto px-4 pb-36 sm:px-6 lg:px-8">
+
+          {/* ─── BREADCRUMB ─── */}
+          <nav className="flex items-center gap-1.5 text-xs font-medium text-[#888] mb-6 flex-wrap">
+            <Link href="/" className="hover:text-[#FF5733] transition">Beranda</Link>
+            <span className="text-[#ccc]">/</span>
+            <Link href="/product/digiproduct" className="hover:text-[#FF5733] transition">DigiProduct</Link>
+            <span className="text-[#ccc]">/</span>
+            <span className="text-[#555] capitalize">{product.category}</span>
+            <span className="text-[#ccc]">/</span>
+            <span className="text-[#141414] font-semibold truncate max-w-[180px] sm:max-w-[300px]">{product.name}</span>
+          </nav>
+
+          {/* ─── HERO: 2-COLUMN GRID ─── */}
           <div className="grid lg:grid-cols-2 gap-6 lg:gap-10 mb-10">
-            
-            {/* Left: Visual */}
+
+            {/* LEFT: Visual */}
             <div className="relative">
               {coverImages ? (
                 <div className="aspect-square rounded-2xl overflow-hidden bg-[#F7F7F5] border border-[#EBEBEB] shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
@@ -360,7 +350,7 @@ export default function DigiProductDetailPage() {
                 </div>
               )}
 
-              {/* Badge overlay top-left */}
+              {/* Badge overlay */}
               <div className="absolute top-3 left-3 flex flex-col gap-1.5">
                 {product.is_popular && (
                   <span className="text-[10px] font-extrabold px-3 py-1.5 rounded-full bg-[#141414] text-white shadow">
@@ -375,77 +365,141 @@ export default function DigiProductDetailPage() {
               </div>
             </div>
 
-            {/* Right: Info */}
-            <div className="flex flex-col justify-center">
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                <span className="text-[11px] font-semibold text-[#888] capitalize">{product.category}</span>
-                {showAccountTypeSelector && (
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#F3F4F6] text-[#1F2937]">
-                    {guaranteeBadge}
+            {/* RIGHT: Info + Price + CTA */}
+            <div className="flex flex-col">
+
+              {/* Tags row */}
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#141414] text-white">
+                  {product.category}
+                </span>
+                {availableStock !== null && (
+                  <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+                    availableStock > 0 ? 'bg-[#ECFDF3] text-[#166534]' : 'bg-[#FEF2F2] text-[#B91C1C]'
+                  }`}>
+                    {availableStock > 0 ? `${availableStock} item` : 'Habis'}
                   </span>
                 )}
               </div>
 
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-[#141414] tracking-tight mb-3 leading-tight">
+              {/* Title */}
+              <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold text-[#141414] tracking-tight mb-4 leading-tight">
                 {product.name}
               </h1>
 
-              <p className="text-sm text-[#666] leading-relaxed mb-4 line-clamp-3 lg:line-clamp-4">
-                {product.description}
-              </p>
-
-              {/* Trust strip */}
-              <div className="flex flex-wrap gap-1.5 mb-4">
-                {trustBadges.slice(0, 4).map((item, index) => (
-                  <span key={`${item.text}-${index}`}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-[#555] bg-[#F8FAFC] border border-[#E5E7EB] px-2.5 py-1 rounded-full">
-                    <span className="text-xs">{item.icon}</span>
-                    {item.text}
-                  </span>
-                ))}
-              </div>
-
-              {/* Stat pills */}
-              <div className="grid grid-cols-3 gap-2 mb-5">
-                {availableStock !== null && (
-                  <div className={`rounded-xl p-2.5 text-center ${availableStock > 0 ? 'bg-[#ECFDF3]' : 'bg-[#FEF2F2]'}`}>
-                    <Package className={`w-4 h-4 mx-auto mb-0.5 ${availableStock > 0 ? 'text-[#166534]' : 'text-[#B91C1C]'}`} />
-                    <div className="text-[10px] font-semibold text-[#555]">Stok</div>
-                    <div className={`text-xs font-extrabold ${availableStock > 0 ? 'text-[#166534]' : 'text-[#B91C1C]'}`}>
-                      {availableStock > 0 ? `${availableStock} item` : 'Habis'}
-                    </div>
-                  </div>
+              {/* Price Box — like Rikka Store */}
+              <div className="rounded-2xl border border-[#EBEBEB] bg-white p-5 mb-5 shadow-sm">
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  {effectiveSelectedPrice ? (
+                    <span className="text-3xl lg:text-4xl font-extrabold text-[#141414]">
+                      {formatRupiah(effectiveSelectedPrice.price)}
+                    </span>
+                  ) : lowestPrice ? (
+                    <span className="text-3xl lg:text-4xl font-extrabold text-[#141414]">
+                      {formatRupiah(lowestPrice.price)}
+                    </span>
+                  ) : (
+                    <span className="text-xl font-bold text-[#888]">Harga tidak tersedia</span>
+                  )}
+                  {parsedOriginalPrice && effectiveSelectedPrice && parsedOriginalPrice > effectiveSelectedPrice.price && (
+                    <>
+                      <span className="text-sm text-[#999] line-through">{formatRupiah(parsedOriginalPrice)}</span>
+                      {discountText && (
+                        <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-[#ECFDF3] text-[#0F766E]">
+                          {discountText}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+                {soldText && (
+                  <div className="mt-2 text-xs text-[#888]">{soldText}</div>
                 )}
-                <div className="rounded-xl p-2.5 text-center bg-[#F0F9FF]">
-                  <Zap className="w-4 h-4 mx-auto mb-0.5 text-[#0369A1]" />
-                  <div className="text-[10px] font-semibold text-[#555]">Kirim</div>
-                  <div className="text-xs font-extrabold text-[#0369A1]">Instan</div>
-                </div>
-                <div className="rounded-xl p-2.5 text-center bg-[#F5F3FF]">
-                  <ShieldCheck className="w-4 h-4 mx-auto mb-0.5 text-[#6D28D9]" />
-                  <div className="text-[10px] font-semibold text-[#555]">Garansi</div>
-                  <div className="text-xs font-extrabold text-[#6D28D9]">30 Hari</div>
-                </div>
               </div>
 
-              {/* Desktop CTAs */}
-              <div className="hidden lg:flex items-center gap-3">
+              {/* Desktop CTA Buttons */}
+              <div className="hidden lg:flex items-center gap-3 mb-5">
                 <button
                   onClick={handleBuy}
                   disabled={!effectiveSelectedPrice || !hasAnyStock}
-                  className="flex-1 rounded-full bg-[#FF5733] px-8 py-3.5 text-sm font-extrabold text-white transition-all hover:bg-[#e64d2e] disabled:cursor-not-allowed disabled:opacity-50 shadow-[0_6px_20px_rgba(255,87,51,0.35)]"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-full bg-[#FF5733] px-8 py-3.5 text-sm font-extrabold text-white transition-all hover:bg-[#e64d2e] disabled:cursor-not-allowed disabled:opacity-50 shadow-[0_6px_20px_rgba(255,87,51,0.35)]"
                 >
+                  <ShoppingCart className="w-4 h-4" />
                   {hasAnyStock ? 'Beli Sekarang' : 'Stok Habis'}
                 </button>
                 {showWaButton && waLink && (
                   <a href={waLink} target="_blank" rel="noreferrer"
-                    className="rounded-full border border-[#D1D5DB] px-6 py-3.5 text-sm font-semibold text-[#111827] hover:bg-[#F9FAFB] transition">
+                    className="flex items-center gap-2 rounded-full border border-[#D1D5DB] px-6 py-3.5 text-sm font-semibold text-[#111827] hover:bg-[#F9FAFB] transition">
+                    <MessageCircle className="w-4 h-4" />
                     Tanya CS
                   </a>
                 )}
               </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-3 gap-2">
+                {availableStock !== null && (
+                  <div className="rounded-xl bg-[#F8FAFC] border border-[#EBEBEB] p-3 text-center">
+                    <div className="text-[10px] font-medium text-[#888] mb-0.5">Stok</div>
+                    <div className={`text-sm font-extrabold ${availableStock > 0 ? 'text-[#166534]' : 'text-[#B91C1C]'}`}>
+                      {availableStock > 0 ? `${availableStock} item` : 'Habis'}
+                    </div>
+                  </div>
+                )}
+                <div className="rounded-xl bg-[#F8FAFC] border border-[#EBEBEB] p-3 text-center">
+                  <div className="text-[10px] font-medium text-[#888] mb-0.5">Kirim</div>
+                  <div className="text-sm font-extrabold text-[#0369A1]">Instan</div>
+                </div>
+                <div className="rounded-xl bg-[#F8FAFC] border border-[#EBEBEB] p-3 text-center">
+                  <div className="text-[10px] font-medium text-[#888] mb-0.5">Garansi</div>
+                  <div className="text-sm font-extrabold text-[#6D28D9]">30 Hari</div>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* ─── DESCRIPTION SECTION (full-width) ─── */}
+          <div className="mb-8 rounded-2xl border border-[#EBEBEB] bg-white p-5 md:p-6">
+            <h2 className="text-sm font-black text-[#141414] mb-3 tracking-tight">Deskripsi</h2>
+            {product.description && (
+              <p className="text-sm text-[#555] leading-relaxed mb-4">{product.description}</p>
+            )}
+            <div className="rounded-xl bg-[#F9FAFB] border border-[#F1F1F1] p-4">
+              <p className="text-xs text-[#666] leading-relaxed">{deliveryDescription}</p>
+            </div>
+            {/* Type-specific metadata */}
+            {product.metadata && Object.keys(product.metadata).length > 0 && (
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {Object.entries(product.metadata)
+                  .filter(([key]) => key !== 'product_type')
+                  .map(([key, value]) => {
+                    if (!value) return null
+                    return (
+                      <div key={key} className="flex items-center gap-2 text-xs">
+                        <span className="text-[#888] capitalize">{key.replace(/_/g, ' ')}:</span>
+                        <span className="font-semibold text-[#141414]">{String(value)}</span>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+          </div>
+
+          {/* ─── FEATURES ─── */}
+          {featureItems.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-sm font-black text-[#141414] mb-3 tracking-tight">Fitur Produk</h3>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {featureItems.map((item, index) => (
+                  <div key={`${item}-${index}`}
+                    className="flex items-start gap-2.5 rounded-xl bg-[#F9FAFB] border border-[#F1F1F1] p-3.5 text-sm text-[#3B3B3B]">
+                    <Check className="w-4 h-4 text-[#FF5733] mt-0.5 shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ─── NON-CREDENTIAL DELIVERY NOTE ─── */}
           {!showAccountTypeSelector && (
@@ -498,12 +552,9 @@ export default function DigiProductDetailPage() {
                 </div>
               ) : (
                 filteredPrices.map((price) => {
-                  const label = price.display_label?.trim() || price.label?.trim() || `${price.duration} Bulan`
+                  const label = formatPriceLabel(price)
                   const savingsText = price.savings_text?.trim() || ''
-                  const metaText = [price.unit_label, price.billing_period, price.delivery_label]
-                    .map((item) => item?.trim())
-                    .filter(Boolean)
-                    .join(' · ')
+                  const metaText = formatMetaText(price)
                   const stockCount = priceStockByID.get(price.id) || 0
                   const disabled = stockCount <= 0
                   const isSelected = effectiveSelectedPrice?.id === price.id && !disabled
@@ -554,22 +605,6 @@ export default function DigiProductDetailPage() {
             )}
           </div>
 
-          {/* ─── FEATURES ─── */}
-          {featureItems.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-sm font-black text-[#141414] mb-3 tracking-tight">Fitur Produk</h3>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {featureItems.map((item, index) => (
-                  <div key={`${item}-${index}`}
-                    className="flex items-start gap-2.5 rounded-xl bg-[#F9FAFB] border border-[#F1F1F1] p-3.5 text-sm text-[#3B3B3B]">
-                    <Check className="w-4 h-4 text-[#FF5733] mt-0.5 shrink-0" />
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* ─── SPECS ─── */}
           {specItems.length > 0 && (
             <div className="mb-8">
@@ -614,7 +649,7 @@ export default function DigiProductDetailPage() {
             </div>
           )}
 
-          {/* ─── FLOATING CTA ─── */}
+          {/* ─── FLOATING CTA (mobile) ─── */}
           <div className={`lg:hidden fixed inset-x-0 bottom-3 z-[60] pointer-events-none transition-all duration-200 ${
             hideFloatingCta ? 'translate-y-[120%] opacity-0' : 'translate-y-0 opacity-100'
           }`}>
