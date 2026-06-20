@@ -159,6 +159,18 @@ export default function DigiProductDetailPage() {
     return () => observer.disconnect()
   }, [])
 
+  // Fetch related products in same category
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([])
+  useEffect(() => {
+    if (!product?.category) return
+    productService.list({ category: product.category, limit: 5 })
+      .then((res) => {
+        if (!res.success) return
+        setRelatedProducts((res.data || []).filter((p) => p.slug !== product.slug))
+      })
+      .catch(() => {})
+  }, [product?.category, product?.slug])
+
   const selectablePrices = useMemo(() => {
     if (!product) return []
     return getSelectablePrices(product)
@@ -338,7 +350,7 @@ export default function DigiProductDetailPage() {
             <div className="relative">
               {coverImages ? (
                 <div className="aspect-square rounded-2xl overflow-hidden bg-[#F7F7F5] border border-[#EBEBEB] shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
-                  <EmblaCarousel images={coverImages} alt={product.name} aspectClass="aspect-square" />
+                  <EmblaCarousel images={coverImages} alt={product.name} aspectClass="aspect-square" showThumbs />
                 </div>
               ) : mainImage ? (
                 <div className="aspect-square rounded-2xl overflow-hidden bg-[#F7F7F5] border border-[#EBEBEB] shadow-[0_4px_16px_rgba(15,23,42,0.06)] relative flex items-center justify-center">
@@ -646,6 +658,31 @@ export default function DigiProductDetailPage() {
                   )}
                 </button>
               )}
+            </div>
+          )}
+
+          {/* ─── RELATED PRODUCTS ─── */}
+          {relatedProducts.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-sm font-black text-[#141414] mb-3 tracking-tight">Produk Terkait</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {relatedProducts.slice(0, 4).map((item) => {
+                  const minPrice = (item.prices || []).filter((p) => p.is_active).sort((a, b) => a.price - b.price)[0]
+                  return (
+                    <Link
+                      key={item.slug}
+                      href={`/product/digiproduct/${item.slug}`}
+                      className="rounded-2xl border border-[#EBEBEB] bg-white p-4 hover:border-[#FF5733]/40 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-all"
+                    >
+                      <div className="text-2xl mb-2">{item.icon || '📦'}</div>
+                      <div className="text-xs font-semibold text-[#141414] line-clamp-2 mb-1">{item.name}</div>
+                      {minPrice && (
+                        <div className="text-sm font-extrabold text-[#FF5733]">{formatRupiah(minPrice.price)}</div>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
           )}
 
