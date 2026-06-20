@@ -18,12 +18,14 @@ import {
   writeNavbarMenuCache,
 } from '@/lib/navbarMenuCache'
 import { navbarMenuSettingService } from '@/services/navbarMenuSettingService'
+import { maintenanceService } from '@/services/maintenanceService'
 import { sosmedService } from '@/services/sosmedService'
 
 const formatNumber = (value: number) => new Intl.NumberFormat('id-ID').format(value)
 
 export default function HomePage() {
   const [sosmedServicesCount, setSosmedServicesCount] = useState<number | null>(null)
+  const [maintenancePaths, setMaintenancePaths] = useState<Set<string>>(new Set())
   const [visibleProductCards, setVisibleProductCards] = useState<HomeProductCardHref[]>(
     () => fallbackHomeProductCardsFromDefaultMenu()
   )
@@ -44,6 +46,22 @@ export default function HomePage() {
     return () => {
       canceled = true
     }
+  }, [])
+
+  // Check maintenance status for product pages
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      const paths = ['/product/sosmed', '/product/digiproduct']
+      const activePaths = new Set<string>()
+      await Promise.allSettled(
+        paths.map(async (path) => {
+          const res = await maintenanceService.evaluate(path)
+          if (res.success && res.data?.active) activePaths.add(path)
+        })
+      )
+      setMaintenancePaths(activePaths)
+    }
+    checkMaintenance()
   }, [])
 
   useEffect(() => {
@@ -150,6 +168,7 @@ Semua kebutuhan ada disini
             </div>
           </header>
 
+          {/* ─── MOBILE CARDS ─── */}
           <div className="sm:hidden">
             <div className="mb-3 flex items-end justify-between gap-3">
               <div className="text-left">
@@ -163,35 +182,63 @@ Semua kebutuhan ada disini
 
             <div className="grid grid-cols-2 gap-3">
               {showSosmedCard ? (
-                <Link
-                  href="/product/sosmed"
-                  className="group relative overflow-hidden rounded-3xl bg-[#2853A6] p-4 text-white shadow-[0_16px_30px_rgba(40,83,166,0.22)]"
-                >
-                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/12" />
-                  <BarChart3 className="relative h-6 w-6" />
-                  <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiSosmed</p>
-                  <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Naikin sosial</h3>
-                  <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/78">{smmMiniStatLabel}</p>
-                  <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold">
-                    Buka <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                  </span>
-                </Link>
+                maintenancePaths.has('/product/sosmed') ? (
+                  <div className="relative overflow-hidden rounded-3xl bg-[#2853A6]/70 p-4 text-white/70 shadow-none">
+                    <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/8" />
+                    <BarChart3 className="relative h-6 w-6" />
+                    <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiSosmed</p>
+                    <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Naikin sosial</h3>
+                    <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/60">{smmMiniStatLabel}</p>
+                    <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold text-white/60">
+                      <span className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />
+                      Sedang Maintenance
+                    </span>
+                  </div>
+                ) : (
+                  <Link
+                    href="/product/sosmed"
+                    className="group relative overflow-hidden rounded-3xl bg-[#2853A6] p-4 text-white shadow-[0_16px_30px_rgba(40,83,166,0.22)]"
+                  >
+                    <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/12" />
+                    <BarChart3 className="relative h-6 w-6" />
+                    <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiSosmed</p>
+                    <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Naikin sosial</h3>
+                    <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/78">{smmMiniStatLabel}</p>
+                    <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold">
+                      Buka <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                    </span>
+                  </Link>
+                )
               ) : null}
 
               {showDigiProductCard ? (
-                <Link
-                  href="/product/digiproduct"
-                  className="group relative overflow-hidden rounded-3xl bg-[#237A44] p-4 text-white shadow-[0_16px_30px_rgba(35,122,68,0.18)]"
-                >
-                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/12" />
-                  <PackageCheck className="relative h-6 w-6" />
-                  <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiProduct</p>
-                  <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Produk digital</h3>
-                  <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/78">Lisensi, tools, akses</p>
-                  <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold">
-                    Buka <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                  </span>
-                </Link>
+                maintenancePaths.has('/product/digiproduct') ? (
+                  <div className="relative overflow-hidden rounded-3xl bg-[#237A44]/70 p-4 text-white/70 shadow-none">
+                    <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/8" />
+                    <PackageCheck className="relative h-6 w-6" />
+                    <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiProduct</p>
+                    <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Produk digital</h3>
+                    <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/60">Lisensi, tools, akses</p>
+                    <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold text-white/60">
+                      <span className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />
+                      Sedang Maintenance
+                    </span>
+                  </div>
+                ) : (
+                  <Link
+                    href="/product/digiproduct"
+                    className="group relative overflow-hidden rounded-3xl bg-[#237A44] p-4 text-white shadow-[0_16px_30px_rgba(35,122,68,0.18)]"
+                  >
+                    <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/12" />
+                    <PackageCheck className="relative h-6 w-6" />
+                    <p className="relative mt-5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/70">DigiProduct</p>
+                    <h3 className="relative mt-1 text-lg font-black leading-tight tracking-tight">Produk digital</h3>
+                    <p className="relative mt-2 min-h-[32px] text-xs font-semibold leading-snug text-white/78">Lisensi, tools, akses</p>
+                    <span className="relative mt-4 inline-flex items-center gap-1 text-xs font-extrabold">
+                      Buka <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                    </span>
+                  </Link>
+                )
               ) : null}
 
               {showDigiConnectCard ? (
@@ -229,6 +276,7 @@ Semua kebutuhan ada disini
             </div>
           </div>
 
+          {/* ─── DESKTOP / TABLET CARDS ─── */}
           <div className={desktopCardsGridClass}>
             {showDigiConnectCard ? (
               <article className={productCardClass}>
@@ -302,13 +350,20 @@ Semua kebutuhan ada disini
                   </p>
                 </div>
 
-                <Link
-                  href="/product/sosmed"
-                  className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-[#2853A6] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#204486] sm:mt-5 sm:px-5 sm:py-3"
-                >
-                  Lihat detail
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+                {maintenancePaths.has('/product/sosmed') ? (
+                  <span className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2.5 text-sm font-extrabold text-amber-700 sm:mt-5 sm:px-5 sm:py-3">
+                    <span className="inline-flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                    Sedang Maintenance
+                  </span>
+                ) : (
+                  <Link
+                    href="/product/sosmed"
+                    className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-[#2853A6] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#204486] sm:mt-5 sm:px-5 sm:py-3"
+                  >
+                    Lihat detail
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                )}
               </article>
             ) : null}
 
@@ -343,13 +398,20 @@ Semua kebutuhan ada disini
                   </p>
                 </div>
 
-                <Link
-                  href="/product/digiproduct"
-                  className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-[#237A44] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#1D6638] sm:mt-5 sm:px-5 sm:py-3"
-                >
-                  Lihat detail
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+                {maintenancePaths.has('/product/digiproduct') ? (
+                  <span className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2.5 text-sm font-extrabold text-amber-700 sm:mt-5 sm:px-5 sm:py-3">
+                    <span className="inline-flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                    Sedang Maintenance
+                  </span>
+                ) : (
+                  <Link
+                    href="/product/digiproduct"
+                    className="relative mt-3 inline-flex items-center gap-2 rounded-full bg-[#237A44] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#1D6638] sm:mt-5 sm:px-5 sm:py-3"
+                  >
+                    Lihat detail
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                )}
               </article>
             ) : null}
 
