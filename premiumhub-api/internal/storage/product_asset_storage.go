@@ -16,6 +16,7 @@ import (
 
 	"premiumhub-api/config"
 
+	"github.com/google/uuid"
 	_ "golang.org/x/image/webp"
 )
 
@@ -43,6 +44,23 @@ func NewProductAssetStorage(cfg *config.Config) (*ProductAssetStorage, error) {
 }
 
 func (s *ProductAssetStorage) Store(ctx context.Context, productID, kind string, file *multipart.FileHeader) (string, error) {
+	return s.prepareAndStore(ctx, kind, file, func(kind, ext string) string {
+		return fmt.Sprintf("%s/%s/%d%s", strings.TrimSpace(productID), kind, time.Now().UnixNano(), ext)
+	})
+}
+
+// StoreTemp uploads a file to a temporary path without needing a product ID.
+// Path: premiumhub/products/temp/{uuid}/{kind}/{timestamp}.{ext}
+func (s *ProductAssetStorage) StoreTemp(ctx context.Context, kind string, file *multipart.FileHeader) (string, error) {
+	tempID := strings.ReplaceAll(uuid.NewString(), "-", "")
+	return s.prepareAndStore(ctx, kind, file, func(kind, ext string) string {
+		return fmt.Sprintf("temp/%s/%s/%d%s", tempID, kind, time.Now().UnixNano(), ext)
+	})
+}
+
+// prepareAndStore handles common validation and upload logic, using pathFn to build the final object key.
+// pathFn receives (kind, ext) and must return the full R2 object path.
+func (s *ProductAssetStorage) prepareAndStore(ctx context.Context, kind string, file *multipart.FileHeader, pathFn func(kind, ext string) string) (string, error) {
 	if s == nil || s.proofStorage == nil {
 		return "", fmt.Errorf("storage product asset belum siap")
 	}
@@ -100,8 +118,8 @@ func (s *ProductAssetStorage) Store(ctx context.Context, productID, kind string,
 		ext = extFromProductMime(mimeType)
 	}
 
-	objectName := fmt.Sprintf("%s/%s/%d%s", strings.TrimSpace(productID), kind, time.Now().UnixNano(), ext)
-	return s.proofStorage.storeR2(ctx, opened, objectName, mimeType, file.Size)
+	fullPath := pathFn(kind, ext)
+	return s.proofStorage.storeR2(ctx, opened, fullPath, mimeType, file.Size)
 }
 
 func validateProductAssetDimensions(kind string, width, height int) error {

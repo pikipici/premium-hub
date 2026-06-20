@@ -706,6 +706,21 @@ func (s *ProductService) UploadAsset(productID uuid.UUID, kind string, file *mul
 	return assetURL, nil
 }
 
+// UploadTempAsset uploads a product asset to a temporary R2 path without requiring a product ID.
+// Used during create mode before the product exists in the database.
+func (s *ProductService) UploadTempAsset(kind string, file *multipart.FileHeader) (string, error) {
+	if s.productAssets == nil {
+		return "", errors.New("storage asset produk belum dikonfigurasi")
+	}
+
+	assetURL, err := s.productAssets.StoreTemp(context.Background(), kind, file)
+	if err != nil {
+		return "", err
+	}
+
+	return assetURL, nil
+}
+
 func (s *ProductService) DeleteCoverImage(productID uuid.UUID, coverURL string) (*model.Product, error) {
 	if coverURL == "" {
 		return nil, errors.New("url cover wajib diisi")

@@ -141,4 +141,13 @@ export const productService = {
     const res = await api.post<ApiResponse<{ url: string }>>(`/admin/products/${productId}/assets`, formData)
     return res.data
   },
+
+  adminUploadTempAsset: async (kind: 'icon' | 'hero' | 'cover', file: File) => {
+    const formData = new FormData()
+    formData.append('kind', kind)
+    formData.append('file', file)
+
+    const res = await api.post<ApiResponse<{ url: string }>>('/admin/products/assets/upload', formData)
+    return res.data
+  },
 }

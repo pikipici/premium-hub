@@ -1289,16 +1289,14 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
 
   const handleUploadAsset = async (kind: 'icon' | 'hero' | 'cover', file?: File) => {
     if (!file) return
-    if (!editingId || formMode !== 'edit') {
-      setError('Upload gambar hanya bisa setelah produk dibuat (mode edit).')
-      return
-    }
 
     try {
       setUploadingAssetKind(kind)
       setError('')
 
-      const res = await productService.adminUploadAsset(editingId, kind, file)
+      const res = editingId
+        ? await productService.adminUploadAsset(editingId, kind, file)
+        : await productService.adminUploadTempAsset(kind, file)
       if (!res.success) {
         setError(res.message || 'Gagal upload gambar produk')
         return
@@ -1320,10 +1318,6 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
 
   const handleUploadCover = async (file?: File) => {
     if (!file) return
-    if (!editingId || formMode !== 'edit') {
-      setError('Upload cover hanya bisa setelah produk dibuat (mode edit).')
-      return
-    }
     if (form.cover_images.length >= 8) {
       setError('Maksimal 8 cover images per produk.')
       return
@@ -1333,7 +1327,9 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
       setUploadingCover(true)
       setError('')
 
-      const res = await productService.adminUploadAsset(editingId, 'cover', file)
+      const res = editingId
+        ? await productService.adminUploadAsset(editingId, 'cover', file)
+        : await productService.adminUploadTempAsset('cover', file)
       if (!res.success) {
         setError(res.message || 'Gagal upload cover image')
         return
@@ -1961,7 +1957,7 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
           </div>
 
           {/* ===== SECTION 3: TAMPILAN & MARKETING (collapsible) ===== */}
-          <details style={{ border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+          <details open style={{ border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
             <summary style={{ padding: '12px 16px', background: '#FAFAFA', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#141414', userSelect: 'none' }}>
               3. Tampilan & Marketing (Opsional)
             </summary>
@@ -2006,24 +2002,30 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
 
               {/* Icon Image */}
               <div>
-                <label className="form-label">Icon Image URL (R2)</label>
-                <Input value={form.icon_image_url} onChange={(e) => setForm((prev) => ({ ...prev, icon_image_url: e.target.value }))} placeholder="https://..." />
-                {formMode === 'edit' && <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => void handleUploadAsset('icon', e.target.files?.[0])} disabled={uploadingAssetKind === 'icon'} style={{ marginTop: 8, fontSize: 12 }} />}
+                <label className="form-label">Icon (R2)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <label className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold cursor-pointer" style={{ opacity: uploadingAssetKind === 'icon' ? 0.5 : 1 }}>{uploadingAssetKind === 'icon' ? 'Uploading...' : 'Pilih Gambar'}<input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={(e) => void handleUploadAsset('icon', e.target.files?.[0])} disabled={uploadingAssetKind === 'icon'} /></label>
+                  {formMode !== 'create' && <Input value={form.icon_image_url} onChange={(e) => setForm((prev) => ({ ...prev, icon_image_url: e.target.value }))} placeholder="https://..." />}
+                </div>
+                {form.icon_image_url && <div style={{ marginTop: 6, width: 80, height: 80, borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F7F7F5' }}><img src={form.icon_image_url} alt="icon" style={{ objectFit: 'contain', padding: 4, width: '100%', height: '100%' }} /></div>}
                 <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>Rasio 1:1, min 256x256.</div>
               </div>
 
               {/* Hero */}
               <div>
-                <label className="form-label">Hero Background URL (R2)</label>
-                <Input value={form.hero_bg_url} onChange={(e) => setForm((prev) => ({ ...prev, hero_bg_url: e.target.value }))} placeholder="https://..." />
-                {formMode === 'edit' && <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => void handleUploadAsset('hero', e.target.files?.[0])} disabled={uploadingAssetKind === 'hero'} style={{ marginTop: 8, fontSize: 12 }} />}
+                <label className="form-label">Hero Background (R2)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <label className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold cursor-pointer" style={{ opacity: uploadingAssetKind === 'hero' ? 0.5 : 1 }}>{uploadingAssetKind === 'hero' ? 'Uploading...' : 'Pilih Gambar'}<input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={(e) => void handleUploadAsset('hero', e.target.files?.[0])} disabled={uploadingAssetKind === 'hero'} /></label>
+                  {formMode !== 'create' && <Input value={form.hero_bg_url} onChange={(e) => setForm((prev) => ({ ...prev, hero_bg_url: e.target.value }))} placeholder="https://..." />}
+                </div>
+                {form.hero_bg_url && <div style={{ marginTop: 6, width: 160, height: 90, borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F7F7F5' }}><img src={form.hero_bg_url} alt="hero" style={{ objectFit: 'cover', width: '100%', height: '100%' }} /></div>}
                 <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>Rasio 16:9, min 1280x720.</div>
               </div>
 
               {/* Cover */}
               <div>
                 <div className="flex justify-between items-center"><label className="form-label">Cover Images (Carousel)</label>
-                  {formMode === 'edit' && <label className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold cursor-pointer" style={{ opacity: uploadingCover ? 0.5 : 1 }}>{uploadingCover ? 'Uploading...' : '+ Upload'}<input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={(e) => void handleUploadCover(e.target.files?.[0])} disabled={uploadingCover} /></label>}
+                  <label className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold cursor-pointer" style={{ opacity: uploadingCover ? 0.5 : 1 }}>{uploadingCover ? 'Uploading...' : '+ Upload'}<input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={(e) => void handleUploadCover(e.target.files?.[0])} disabled={uploadingCover} /></label>
                 </div>
                 {form.cover_images.length === 0 ? <div style={{ border: '1px dashed #E5E7EB', borderRadius: 10, padding: 12, fontSize: 12, color: '#6B7280' }}>Belum ada cover.</div> :
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 6 }}>

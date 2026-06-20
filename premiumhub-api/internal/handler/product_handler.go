@@ -138,6 +138,23 @@ func (h *ProductHandler) UploadAsset(c *gin.Context) {
 	response.Success(c, "Asset produk berhasil diupload", gin.H{"url": assetURL})
 }
 
+func (h *ProductHandler) UploadAssetTemp(c *gin.Context) {
+	kind := strings.TrimSpace(c.PostForm("kind"))
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.BadRequest(c, "file asset wajib diisi")
+		return
+	}
+
+	assetURL, err := h.productSvc.UploadTempAsset(kind, file)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, "Asset berhasil diupload", gin.H{"url": assetURL})
+}
+
 func (h *ProductHandler) DeleteCoverAsset(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
