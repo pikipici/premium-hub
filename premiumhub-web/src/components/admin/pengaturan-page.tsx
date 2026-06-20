@@ -3,6 +3,7 @@
 import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 
+import MaintenanceQuickToggle from '@/components/admin/maintenance-quick-toggle'
 import MaintenanceSettingsCard from '@/components/admin/maintenance-settings-card'
 import NavbarMenuSettingsCard from '@/components/admin/navbar-menu-settings-card'
 import ProductCategorySettingsCard from '@/components/admin/product-category-settings-card'
@@ -441,6 +442,7 @@ export default function PengaturanPage() {
       <ProductCategorySettingsCard />
       <NavbarMenuSettingsCard />
       <UserSidebarMenuSettingsCard />
+      <MaintenanceQuickToggle />
       <MaintenanceSettingsCard />
 
       {formOpen && (
