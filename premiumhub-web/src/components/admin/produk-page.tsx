@@ -2002,23 +2002,23 @@ function createDefaultMetadataForType(type: string): Record<string, unknown> {
 
               {/* Icon Image */}
               <div>
-                <label className="form-label">Icon (R2)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <label className="form-label">Icon</label>
+                <div>
                   <label className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold cursor-pointer" style={{ opacity: uploadingAssetKind === 'icon' ? 0.5 : 1 }}>{uploadingAssetKind === 'icon' ? 'Uploading...' : 'Pilih Gambar'}<input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={(e) => void handleUploadAsset('icon', e.target.files?.[0])} disabled={uploadingAssetKind === 'icon'} /></label>
-                  {formMode !== 'create' && <Input value={form.icon_image_url} onChange={(e) => setForm((prev) => ({ ...prev, icon_image_url: e.target.value }))} placeholder="https://..." />}
                 </div>
-                {form.icon_image_url && <div style={{ marginTop: 6, width: 80, height: 80, borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F7F7F5' }}><img src={form.icon_image_url} alt="icon" style={{ objectFit: 'contain', padding: 4, width: '100%', height: '100%' }} /></div>}
+                {form.icon_image_url ? <div style={{ marginTop: 6, width: 80, height: 80, borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F7F7F5' }}><img src={form.icon_image_url} alt="icon" style={{ objectFit: 'contain', padding: 4, width: '100%', height: '100%' }} /></div>
+                  : <div style={{ marginTop: 6, fontSize: 11, color: '#9CA3AF' }}>Belum ada icon.</div>}
                 <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>Rasio 1:1, min 256x256.</div>
               </div>
 
               {/* Hero */}
               <div>
-                <label className="form-label">Hero Background (R2)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <label className="form-label">Hero Background</label>
+                <div>
                   <label className="inline-flex h-8 items-center rounded-lg border px-3 text-[11px] font-bold cursor-pointer" style={{ opacity: uploadingAssetKind === 'hero' ? 0.5 : 1 }}>{uploadingAssetKind === 'hero' ? 'Uploading...' : 'Pilih Gambar'}<input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={(e) => void handleUploadAsset('hero', e.target.files?.[0])} disabled={uploadingAssetKind === 'hero'} /></label>
-                  {formMode !== 'create' && <Input value={form.hero_bg_url} onChange={(e) => setForm((prev) => ({ ...prev, hero_bg_url: e.target.value }))} placeholder="https://..." />}
                 </div>
-                {form.hero_bg_url && <div style={{ marginTop: 6, width: 160, height: 90, borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F7F7F5' }}><img src={form.hero_bg_url} alt="hero" style={{ objectFit: 'cover', width: '100%', height: '100%' }} /></div>}
+                {form.hero_bg_url ? <div style={{ marginTop: 6, width: 160, height: 90, borderRadius: 8, border: '1px solid #E5E7EB', overflow: 'hidden', background: '#F7F7F5' }}><img src={form.hero_bg_url} alt="hero" style={{ objectFit: 'cover', width: '100%', height: '100%' }} /></div>
+                  : <div style={{ marginTop: 6, fontSize: 11, color: '#9CA3AF' }}>Belum ada hero background.</div>}
                 <div style={{ marginTop: 4, fontSize: 11, color: '#6B7280' }}>Rasio 16:9, min 1280x720.</div>
               </div>
 
