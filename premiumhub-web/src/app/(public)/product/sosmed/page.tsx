@@ -318,7 +318,7 @@ export default function ProductSosmedLandingPage() {
           />
 
           {/* Trust badges row */}
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] font-semibold sm:mt-5 sm:text-[13px]">
+          <div className="mt-4 sm:mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl bg-white px-4 py-3 text-[12px] font-semibold shadow-[0_4px_12px_rgba(0,0,0,0.04)] ring-1 ring-black/5 sm:text-[13px]">
             <span className="inline-flex items-center gap-1.5 text-[#2F6B1A]">
               <ShieldCheck className="h-3.5 w-3.5" /> Tanpa password
             </span>
@@ -332,13 +332,13 @@ export default function ProductSosmedLandingPage() {
 
           {/* Platform filter chip strip */}
           {platforms.length > 1 ? (
-            <div className="mt-5 flex w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="mx-auto flex gap-2 px-1">
+            <div className="mt-4 sm:mt-5 flex w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mx-auto flex gap-1.5 px-1">
                 {platforms.map((p) => (
                   <button
                     key={p}
                     onClick={() => setActivePlatform(p)}
-                    className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+                    className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition-all sm:px-3.5 sm:text-xs ${
                       activePlatform === p
                         ? 'bg-[#141414] text-white shadow-md'
                         : 'bg-white text-gray-500 ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900'
@@ -352,8 +352,13 @@ export default function ProductSosmedLandingPage() {
           ) : null}
 
           {/* Layanan section (Produk koprol) */}
-          <section id="layanan" className="mt-6 sm:mt-8">
+          <section id="layanan" className="mt-7 sm:mt-10">
             <SectionHeader
+              icon={
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gray-800 text-white">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+              }
               title="Layanan"
               action={
                 shouldOfferSeeAll(layananCards.length) ? (
