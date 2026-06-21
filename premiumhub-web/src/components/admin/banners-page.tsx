@@ -1,19 +1,21 @@
 "use client"
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Palette, Plus, Trash2, Zap } from 'lucide-react'
+import { Loader2, Palette, Plus, Sparkles, Trash2, Zap } from 'lucide-react'
 import { bannerService } from '@/services/bannerService'
 import { heroBgService } from '@/services/heroBgService'
 import { flashSaleService } from '@/services/flashSaleService'
 import { productService } from '@/services/productService'
+import { sosmedHeroSlideService } from '@/services/sosmedHeroSlideService'
 import type { SiteBanner } from '@/types/banner'
 import type { SiteFlashSale } from '@/types/flashSale'
 import type { Product } from '@/types/product'
 
+
 const PAGE_KEY = 'digiproduct'
 
 export default function AdminBannersPage() {
-  const [activeTab, setActiveTab] = useState<'banners' | 'hero' | 'flash'>('banners')
+  const [activeTab, setActiveTab] = useState<'banners' | 'hero' | 'flash' | 'sosmed-hero'>('banners')
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -57,9 +59,20 @@ export default function AdminBannersPage() {
           <Zap className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
           Flash Sale
         </button>
+        <button
+          onClick={() => setActiveTab('sosmed-hero')}
+          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+            activeTab === 'sosmed-hero'
+              ? 'bg-white text-[#141414] shadow-sm'
+              : 'text-[#888] hover:text-[#555]'
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+          Sosmed Hero
+        </button>
       </div>
 
-      {activeTab === 'banners' ? <BannersTab /> : activeTab === 'hero' ? <HeroBgTab /> : <FlashSaleTab />}
+      {activeTab === 'banners' ? <BannersTab /> : activeTab === 'hero' ? <HeroBgTab /> : activeTab === 'flash' ? <FlashSaleTab /> : <SosmedHeroTab />}
     </div>
   )
 }
@@ -727,6 +740,213 @@ function FlashSaleTab() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const SOSMED_HERO_ICONS = [
+  { value: 'Sparkles', label: '✨ Sparkles' },
+  { value: 'Flame', label: '🔥 Flame' },
+  { value: 'Megaphone', label: '📢 Megaphone' },
+  { value: 'Zap', label: '⚡ Zap' },
+  { value: 'Star', label: '⭐ Star' },
+  { value: 'Rocket', label: '🚀 Rocket' },
+  { value: 'Crown', label: '👑 Crown' },
+  { value: 'TrendingUp', label: '📈 TrendingUp' },
+]
+
+function SosmedHeroTab() {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const [title, setTitle] = useState('')
+  const [subtitle, setSubtitle] = useState('')
+  const [ctaLabel, setCtaLabel] = useState('')
+  const [ctaHref, setCtaHref] = useState('')
+  const [icon, setIcon] = useState('Sparkles')
+  const [bgColor, setBgColor] = useState('#141414')
+  const [bgImageURL, setBgImageURL] = useState('')
+  const [isActive, setIsActive] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    sosmedHeroSlideService.adminGet().then((res) => {
+      if (res.success && res.data) {
+        setTitle(res.data.title || '')
+        setSubtitle(res.data.subtitle || '')
+        setCtaLabel(res.data.cta_label || '')
+        setCtaHref(res.data.cta_href || '')
+        setIcon(res.data.icon || 'Sparkles')
+        setBgColor(res.data.background_color || '#141414')
+        setBgImageURL(res.data.background_image_url || '')
+        setIsActive(res.data.is_active ?? true)
+      }
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  const handleUpload = async (file: File) => {
+    setUploading(true)
+    setError('')
+    try {
+      const res = await sosmedHeroSlideService.adminUploadImage(file)
+      if (res.success && res.data?.url) {
+        setBgImageURL(res.data.url)
+      } else {
+        setError(res.message || 'Gagal upload gambar')
+      }
+    } catch {
+      setError('Gagal upload gambar')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!title.trim()) { setError('Judul wajib diisi'); return }
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await sosmedHeroSlideService.adminSave({
+        title: title.trim(),
+        subtitle: subtitle.trim(),
+        cta_label: ctaLabel.trim(),
+        cta_href: ctaHref.trim(),
+        icon,
+        background_color: bgColor,
+        background_image_url: bgImageURL,
+        is_active: isActive,
+      })
+      if (res.success) {
+        setSuccess('Hero slide sosmed berhasil disimpan')
+      } else {
+        setError(res.message || 'Gagal menyimpan')
+      }
+    } catch {
+      setError('Gagal menyimpan')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-[#888]" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-[#EBEBEB] bg-white p-6">
+        <h3 className="text-sm font-bold mb-1">Hero Slide Sosmed</h3>
+        <p className="text-xs text-[#888] mb-5">Atur tampilan hero di halaman utama DigiSosmed.</p>
+
+        {/* Preview */}
+        <div
+          className="mb-6 rounded-2xl p-5 text-white"
+          style={{ backgroundColor: bgColor }}
+        >
+          {bgImageURL && (
+            <img src={bgImageURL} alt="" className="mb-3 h-32 w-full rounded-xl object-cover" />
+          )}
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+            {icon && <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white/20 text-white"><Sparkles className="h-3.5 w-3.5" /></span>}
+            DigiSosmed
+          </div>
+          <h4 className="mt-2 text-lg font-extrabold">{title || 'Sosmed Murah, Aman, Cepat'}</h4>
+          <p className="mt-1 text-sm text-white/80">{subtitle || 'Followers, Likes, Views, dan engagement asli...'}</p>
+          {(ctaLabel || ctaHref) && (
+            <span className="mt-3 inline-block rounded-full bg-white/20 px-4 py-2 text-xs font-bold">
+              {ctaLabel || 'Mulai Order'} →
+            </span>
+          )}
+        </div>
+
+        {/* Form */}
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-xs font-bold text-[#555]">
+              Judul
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Sosmed Murah, Aman, Cepat" className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
+            </label>
+            <label className="block text-xs font-bold text-[#555]">
+              Icon
+              <select value={icon} onChange={(e) => setIcon(e.target.value)} className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]">
+                {SOSMED_HERO_ICONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="block text-xs font-bold text-[#555]">
+            Subtitle
+            <textarea value={subtitle} onChange={(e) => setSubtitle(e.target.value)} rows={2} placeholder="Followers, Likes, Views, dan engagement asli buat akun lo..." className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-xs font-bold text-[#555]">
+              Tombol CTA
+              <input value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder="Mulai Order" className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
+            </label>
+            <label className="block text-xs font-bold text-[#555]">
+              Link CTA
+              <input value={ctaHref} onChange={(e) => setCtaHref(e.target.value)} placeholder="#layanan" className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
+            </label>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-xs font-bold text-[#555]">
+              Warna Background
+              <div className="mt-1 flex gap-2">
+                <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="h-11 w-11 cursor-pointer rounded-xl border border-[#E5E5E5]" />
+                <input value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="flex-1 rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
+              </div>
+            </label>
+            <label className="block text-xs font-bold text-[#555]">
+              Gambar Background
+              <div className="mt-1 flex gap-2">
+                <label className="flex-1 cursor-pointer rounded-xl border border-dashed border-[#E5E5E5] px-4 py-3 text-center text-sm font-semibold text-[#888] hover:border-[#FF5733]">
+                  {uploading ? 'Uploading...' : 'Pilih Gambar'}
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handleUpload(file)
+                  }} />
+                </label>
+                {bgImageURL && (
+                  <button onClick={() => setBgImageURL('')} className="rounded-xl border border-red-200 px-3 text-xs font-bold text-red-600 hover:bg-red-50">
+                    Hapus
+                  </button>
+                )}
+              </div>
+              {bgImageURL && (
+                <img src={bgImageURL} alt="Preview" className="mt-2 h-20 w-full rounded-xl object-cover" />
+              )}
+            </label>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="accent-[#FF5733]" />
+            <span className="text-xs font-bold text-[#555]">Aktif</span>
+          </label>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{error}</div>
+      )}
+      {success && (
+        <div className="rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-600">{success}</div>
+      )}
+
+      <button onClick={handleSave} disabled={saving} className="w-full rounded-full bg-[#141414] py-3.5 text-sm font-bold text-white disabled:opacity-50">
+        {saving ? 'Menyimpan...' : 'Simpan Hero Slide'}
+      </button>
     </div>
   )
 }

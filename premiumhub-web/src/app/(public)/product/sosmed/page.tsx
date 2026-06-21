@@ -7,15 +7,21 @@ import {
   ArrowLeft,
   ArrowRight,
   Clock3,
+  Crown,
   Flame,
   Megaphone,
-  Sparkles,
+  Rocket,
   ShieldCheck,
+  Sparkles,
+  Star,
   Tag,
+  TrendingUp,
   Users,
+  Zap,
   PackageCheck,
 } from 'lucide-react'
 
+import { sosmedHeroSlideService } from '@/services/sosmedHeroSlideService'
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
@@ -308,6 +314,44 @@ export default function ProductSosmedLandingPage() {
     })
   }, [allCards])
 
+  const HERO_SLIDE_DEFAULT = useMemo(() => ({
+    key: 'sosmed-hero',
+    title: 'Sosmed Murah, Aman, Cepat',
+    subtitle: 'Followers, Likes, Views, dan engagement asli buat akun lo. Tanpa password, langsung masuk wallet.',
+    ctaLabel: 'Mulai Order',
+    ctaHref: '#layanan',
+    Icon: Sparkles as ComponentType<SVGProps<SVGSVGElement>>,
+  }), [])
+
+  const heroIconMap: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = useMemo(() => ({
+    Sparkles, Flame, Megaphone, Zap, Star, Rocket, Crown, TrendingUp,
+  }), [])
+
+  const [heroSlide, setHeroSlide] = useState<typeof HERO_SLIDE_DEFAULT | null>(null)
+  const [heroBgColor, setHeroBgColor] = useState('#141414')
+  const [heroBgImage, setHeroBgImage] = useState('')
+
+  useEffect(() => {
+    sosmedHeroSlideService.getPublic().then((res) => {
+      if (res.success && res.data?.is_active) {
+        const data = res.data
+        const IconComp = heroIconMap[data.icon] || Sparkles
+        setHeroSlide({
+          key: data.page_key,
+          title: data.title,
+          subtitle: data.subtitle,
+          ctaLabel: data.cta_label,
+          ctaHref: data.cta_href || '#layanan',
+          Icon: IconComp as ComponentType<SVGProps<SVGSVGElement>>,
+        })
+        if (data.background_color) setHeroBgColor(data.background_color)
+        if (data.background_image_url) setHeroBgImage(data.background_image_url)
+      }
+    }).catch(() => {})
+  }, [heroIconMap])
+
+  const slide = heroSlide || HERO_SLIDE_DEFAULT
+
   return (
     <>
       <Navbar />
@@ -316,15 +360,10 @@ export default function ProductSosmedLandingPage() {
         <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           {/* Hero strip — koprol layout: 3+2 columns */}
           <HeroStripPanel
-            slide={{
-              key: 'sosmed-hero',
-              title: 'Sosmed Murah, Aman, Cepat',
-              subtitle: 'Followers, Likes, Views, dan engagement asli buat akun lo. Tanpa password, langsung masuk wallet.',
-              ctaLabel: 'Mulai Order',
-              ctaHref: '#layanan',
-              Icon: Sparkles,
-            }}
+            slide={slide}
             featured={heroFeatured}
+            bgColor={heroBgColor}
+            bgImage={heroBgImage}
           />
 
           {/* Trust badges row */}

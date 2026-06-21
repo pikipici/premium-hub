@@ -29,6 +29,8 @@ export type HeroStripPanelProps = {
   slide: HeroSlideContent
   featured: FeaturedMiniItem[]
   platformIconLookup?: (key: SosmedPlatformIconKey) => IconComp
+  bgColor?: string
+  bgImage?: string
 }
 
 /**
@@ -42,13 +44,19 @@ export type HeroStripPanelProps = {
  *     col-span-3: dark hero panel (180-220px) with icon chip + title + subtitle + CTA pill
  *     col-span-2: 2 mini featured cards stacked (avatar + name + price + chevron)
  */
-export function HeroStripPanel({ slide, featured }: HeroStripPanelProps) {
+export function HeroStripPanel({ slide, featured, bgColor, bgImage }: HeroStripPanelProps) {
   const HeroIcon = slide.Icon
   return (
     <section className="grid grid-cols-5 gap-3 sm:gap-4">
       <article
-        className="relative col-span-3 overflow-hidden rounded-3xl bg-[#141414] shadow-[0_18px_42px_rgba(20,20,20,0.20)] ring-1 ring-black/5"
-        style={{ minHeight: 180 }}
+        className="relative col-span-3 overflow-hidden rounded-3xl shadow-[0_18px_42px_rgba(20,20,20,0.20)] ring-1 ring-black/5"
+        style={{
+          backgroundColor: bgColor || '#141414',
+          backgroundImage: bgImage ? `url(${bgImage})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          minHeight: 180,
+        }}
       >
         {/* subtle orange glow accents */}
         <span aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#FF5733]/30 blur-3xl" />
