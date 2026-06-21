@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"premiumhub-api/internal/model"
 	"premiumhub-api/internal/service"
 	"premiumhub-api/internal/storage"
 	"premiumhub-api/pkg/response"
@@ -23,37 +24,64 @@ func (h *SosmedHeroSlideHandler) SetBannerAssetStorage(s *storage.BannerAssetSto
 }
 
 func (h *SosmedHeroSlideHandler) PublicGet(c *gin.Context) {
-	slide, err := h.svc.GetByPageKey("sosmed-hero")
-	if err != nil {
-		response.Success(c, "OK", nil)
+	slides, err := h.svc.ListActive("sosmed-hero")
+	if err != nil || slides == nil {
+		response.Success(c, "OK", []model.SosmedHeroSlide{})
 		return
 	}
-	response.Success(c, "OK", slide)
+	response.Success(c, "OK", slides)
 }
 
-func (h *SosmedHeroSlideHandler) AdminGet(c *gin.Context) {
-	slide, err := h.svc.GetByPageKeyAll("sosmed-hero")
-	if err != nil {
-		response.Success(c, "OK", nil)
+func (h *SosmedHeroSlideHandler) AdminList(c *gin.Context) {
+	slides, err := h.svc.ListAll("sosmed-hero")
+	if err != nil || slides == nil {
+		response.Success(c, "OK", []model.SosmedHeroSlide{})
 		return
 	}
-	response.Success(c, "OK", slide)
+	response.Success(c, "OK", slides)
 }
 
-func (h *SosmedHeroSlideHandler) AdminSave(c *gin.Context) {
-	var input service.SaveSosmedHeroSlideInput
+func (h *SosmedHeroSlideHandler) AdminCreate(c *gin.Context) {
+	var input service.CreateSosmedHeroSlideInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 	input.PageKey = "sosmed-hero"
 
-	slide, err := h.svc.Save(input)
+	slide, err := h.svc.Create(input)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	response.Success(c, "Hero slide sosmed disimpan", slide)
+	response.Success(c, "Hero slide sosmed ditambahkan", slide)
+}
+
+func (h *SosmedHeroSlideHandler) AdminUpdate(c *gin.Context) {
+	id := c.Param("id")
+
+	var input service.UpdateSosmedHeroSlideInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	slide, err := h.svc.Update(id, input)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "Hero slide sosmed diperbarui", slide)
+}
+
+func (h *SosmedHeroSlideHandler) AdminDelete(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.svc.Delete(id); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "Hero slide sosmed dihapus", nil)
 }
 
 func (h *SosmedHeroSlideHandler) AdminUploadImage(c *gin.Context) {

@@ -4,17 +4,27 @@ import type { SosmedHeroSlide } from '@/types/sosmedHeroSlide'
 
 export const sosmedHeroSlideService = {
   getPublic: async () => {
-    const res = await api.get<ApiResponse<SosmedHeroSlide | null>>('/public/sosmed-hero')
+    const res = await api.get<ApiResponse<SosmedHeroSlide[]>>('/public/sosmed-hero')
     return res.data
   },
 
-  adminGet: async () => {
-    const res = await api.get<ApiResponse<SosmedHeroSlide | null>>('/admin/sosmed-hero')
+  adminList: async () => {
+    const res = await api.get<ApiResponse<SosmedHeroSlide[]>>('/admin/sosmed-hero')
     return res.data
   },
 
-  adminSave: async (data: Partial<SosmedHeroSlide>) => {
-    const res = await api.put<ApiResponse<SosmedHeroSlide>>('/admin/sosmed-hero', data)
+  adminCreate: async (data: Partial<SosmedHeroSlide>) => {
+    const res = await api.post<ApiResponse<SosmedHeroSlide>>('/admin/sosmed-hero', data)
+    return res.data
+  },
+
+  adminUpdate: async (id: string, data: Partial<SosmedHeroSlide>) => {
+    const res = await api.put<ApiResponse<SosmedHeroSlide>>(`/admin/sosmed-hero/${id}`, data)
+    return res.data
+  },
+
+  adminDelete: async (id: string) => {
+    const res = await api.delete<ApiResponse<null>>(`/admin/sosmed-hero/${id}`)
     return res.data
   },
 

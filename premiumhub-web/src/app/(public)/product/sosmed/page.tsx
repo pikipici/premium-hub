@@ -25,7 +25,7 @@ import { sosmedHeroSlideService } from '@/services/sosmedHeroSlideService'
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
-import HeroStripPanel from '@/components/sosmed-koprol/HeroStripPanel'
+import HeroStripPanel, { type HeroSlideContent } from '@/components/sosmed-koprol/HeroStripPanel'
 import SectionHeader from '@/components/sosmed-koprol/SectionHeader'
 import ServiceCardCompact from '@/components/sosmed-koprol/ServiceCardCompact'
 import HotPickCard from '@/components/sosmed-koprol/HotPickCard'
@@ -327,30 +327,29 @@ export default function ProductSosmedLandingPage() {
     Sparkles, Flame, Megaphone, Zap, Star, Rocket, Crown, TrendingUp,
   }), [])
 
-  const [heroSlide, setHeroSlide] = useState<typeof HERO_SLIDE_DEFAULT | null>(null)
-  const [heroBgColor, setHeroBgColor] = useState('#141414')
-  const [heroBgImage, setHeroBgImage] = useState('')
+  const [heroSlides, setHeroSlides] = useState<HeroSlideContent[]>([])
 
   useEffect(() => {
     sosmedHeroSlideService.getPublic().then((res) => {
-      if (res.success && res.data?.is_active) {
-        const data = res.data
-        const IconComp = heroIconMap[data.icon] || Sparkles
-        setHeroSlide({
-          key: data.page_key,
-          title: data.title,
-          subtitle: data.subtitle,
-          ctaLabel: data.cta_label,
-          ctaHref: data.cta_href || '#layanan',
-          Icon: IconComp as ComponentType<SVGProps<SVGSVGElement>>,
-        })
-        if (data.background_color) setHeroBgColor(data.background_color)
-        if (data.background_image_url) setHeroBgImage(data.background_image_url)
-      }
+      if (!res.success || !res.data?.length) return
+      const mapped = res.data.map((item) => {
+        const IconComp = (heroIconMap[item.icon] || Sparkles) as ComponentType<SVGProps<SVGSVGElement>>
+        return {
+          key: item.id || item.page_key,
+          title: item.title,
+          subtitle: item.subtitle || '',
+          ctaLabel: item.cta_label || '',
+          ctaHref: item.cta_href || '#layanan',
+          Icon: IconComp,
+          bgColor: item.background_color || '#141414',
+          bgImage: item.background_image_url || '',
+        }
+      })
+      setHeroSlides(mapped)
     }).catch(() => {})
   }, [heroIconMap])
 
-  const slide = heroSlide || HERO_SLIDE_DEFAULT
+  const displaySlides = heroSlides.length > 0 ? heroSlides : [HERO_SLIDE_DEFAULT]
 
   return (
     <>
@@ -360,10 +359,8 @@ export default function ProductSosmedLandingPage() {
         <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           {/* Hero strip — koprol layout: 3+2 columns */}
           <HeroStripPanel
-            slide={slide}
+            slides={displaySlides}
             featured={heroFeatured}
-            bgColor={heroBgColor}
-            bgImage={heroBgImage}
           />
 
           {/* Trust badges row */}
