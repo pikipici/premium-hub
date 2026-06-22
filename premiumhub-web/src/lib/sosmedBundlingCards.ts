@@ -265,7 +265,7 @@ export function buildSosmedBundleCards(bundles: SosmedBundlePackage[]): SosmedBu
         summary: bundle.description || bundle.subtitle || 'Paket bundling sosmed hemat dari katalog terbaru Premium Hub.',
         targetAudience: targetAudienceForBundle(bundle),
         bestFor: bundle.subtitle || 'Cocok buat boost awal dengan beberapa layanan sekaligus.',
-        badge: bundle.badge,
+        badge: bundle.badge ?? '',
         tone: toneForBundle(bundle),
         startingPriceLabel: startingPrice > 0 ? formatBundleRupiah(startingPrice) : 'Cek harga',
         isHighlighted: bundle.is_highlighted,
