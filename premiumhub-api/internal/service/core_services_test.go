@@ -321,7 +321,7 @@ func TestProductService_AllBranches(t *testing.T) {
 		t.Fatalf("set inactive: %v", err)
 	}
 
-	list, total, err := svc.List("", 0, 999)
+	list, total, err := svc.List("", 0, 999, "", "")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -333,7 +333,7 @@ func TestProductService_AllBranches(t *testing.T) {
 	}
 
 	musicProduct, _ := seedProductAndPrice(t, db, "Music One", "music", "shared", 15000, 1)
-	filtered, _, err := svc.List("music", 1, 10)
+	filtered, _, err := svc.List("music", 1, 10, "", "")
 	if err != nil {
 		t.Fatalf("list by category: %v", err)
 	}

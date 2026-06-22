@@ -1,7 +1,7 @@
 import type { SosmedService } from '@/types/sosmedService'
 
-export type SosmedOrderPaymentStatus = 'pending' | 'paid' | 'failed' | 'expired'
-export type SosmedOrderStatus = 'pending_payment' | 'processing' | 'success' | 'failed' | 'canceled' | 'expired'
+export type SosmedOrderPaymentStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'hold'
+export type SosmedOrderStatus = 'pending_payment' | 'pending_verification' | 'processing' | 'success' | 'failed' | 'canceled' | 'expired'
 
 export interface SosmedRefillAttempt {
   id: string

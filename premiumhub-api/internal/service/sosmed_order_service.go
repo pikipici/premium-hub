@@ -20,8 +20,11 @@ import (
 )
 
 const (
-	sosmedOrderStatusPendingPayment = "pending_payment"
-	sosmedOrderStatusProcessing     = "processing"
+	sosmedOrderStatusPendingPayment       = "pending_payment"
+	sosmedOrderStatusProcessing           = "processing"
+	sosmedOrderStatusPendingVerification  = "pending_verification"
+
+	sosmedPaymentStatusHold = "hold"
 	sosmedOrderStatusSuccess        = "success"
 	sosmedOrderStatusFailed         = "failed"
 	sosmedOrderStatusCanceled       = "canceled"
@@ -71,6 +74,7 @@ type SosmedJAPOrderProvider interface {
 	GetOrderStatus(ctx context.Context, orderID string) (*JAPOrderStatusResponse, error)
 	RequestRefill(ctx context.Context, orderID string) (*JAPRefillResponse, error)
 	GetRefillStatus(ctx context.Context, refillID string) (*JAPRefillStatusResponse, error)
+	GetBalance(ctx context.Context) (*JAPBalanceResponse, error)
 }
 
 type SosmedJAPOrderCancelProvider interface {
@@ -531,6 +535,9 @@ func (s *SosmedOrderService) Create(ctx context.Context, userID uuid.UUID, input
 	totalPrice := int64(totalPriceFloat)
 
 	if s.walletRepo != nil {
+		if isJAPSosmedService(sosmedService) {
+			return s.createPendingVerificationOrder(ctx, userID, sosmedService, targetLink, quantity, unitPrice, totalPrice, input)
+		}
 		return s.createWalletPaidOrder(ctx, userID, sosmedService, targetLink, quantity, unitPrice, totalPrice, input)
 	}
 
@@ -588,6 +595,284 @@ func (s *SosmedOrderService) createPendingPaymentOrder(
 		return nil, errors.New("gagal memuat order sosmed")
 	}
 	return s.buildDetail(stored)
+}
+
+func (s *SosmedOrderService) createPendingVerificationOrder(
+	ctx context.Context,
+	userID uuid.UUID,
+	sosmedService *model.SosmedService,
+	targetLink string,
+	quantity int64,
+	unitPrice int64,
+	totalPrice int64,
+	input CreateSosmedOrderInput,
+) (*SosmedOrderDetail, error) {
+	idempotencyKey, err := normalizeSosmedOrderIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		return nil, err
+	}
+	idempotencyRequestHash := buildSosmedOrderIdempotencyRequestHash(sosmedService.ID, targetLink, quantity, input)
+	if existing, err := s.repo.FindByUserAndIdempotencyKey(userID, idempotencyKey); err == nil {
+		if strings.TrimSpace(existing.IdempotencyRequestHash) != idempotencyRequestHash {
+			return nil, errors.New("idempotency_key sudah dipakai untuk checkout sosmed berbeda")
+		}
+		return s.buildDetail(existing)
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("gagal cek idempotency checkout sosmed")
+	}
+
+	now := time.Now()
+	order := &model.SosmedOrder{
+		ID:                     uuid.New(),
+		UserID:                 userID,
+		ServiceID:              sosmedService.ID,
+		ServiceCode:            strings.TrimSpace(sosmedService.Code),
+		ServiceTitle:           strings.TrimSpace(sosmedService.Title),
+		TargetLink:             targetLink,
+		Quantity:               quantity,
+		UnitPrice:              unitPrice,
+		TotalPrice:             totalPrice,
+		PaymentMethod:          "wallet",
+		PaymentStatus:          sosmedPaymentStatusHold,
+		OrderStatus:            sosmedOrderStatusPendingVerification,
+		IdempotencyKey:         &idempotencyKey,
+		IdempotencyRequestHash: idempotencyRequestHash,
+		ProviderCode:           strings.TrimSpace(sosmedService.ProviderCode),
+		ProviderServiceID:      strings.TrimSpace(sosmedService.ProviderServiceID),
+		Notes:                  strings.TrimSpace(input.Notes),
+		PendingVerificationAt:  &now,
+	}
+
+	populateSosmedOrderRefill(order, sosmedService)
+
+	if err := s.repo.Create(order); err != nil {
+		return nil, errors.New("gagal membuat order sosmed")
+	}
+
+	event := &model.SosmedOrderEvent{
+		OrderID:    order.ID,
+		FromStatus: "",
+		ToStatus:   sosmedOrderStatusPendingVerification,
+		Reason:     "order dibuat, menunggu verifikasi saldo provider",
+		ActorType:  "system",
+		CreatedAt:  now,
+	}
+	if err := s.repo.CreateEvent(event); err != nil {
+		return nil, errors.New("gagal mencatat event order sosmed")
+	}
+
+	if s.notifRepo != nil {
+		s.notifRepo.Create(&model.Notification{
+			UserID:  userID,
+			Title:   "Order Sosmed Diterima",
+			Message: fmt.Sprintf("Order sosmed %s sedang dalam antrean verifikasi. Sistem akan memproses secara otomatis.", shortSosmedWalletRef(order.ID.String())),
+			Type:    "order",
+		})
+	}
+
+	stored, err := s.repo.FindByID(order.ID)
+	if err != nil {
+		return nil, errors.New("gagal memuat order sosmed")
+	}
+	return s.buildDetail(stored)
+}
+
+type PendingVerificationResult struct {
+	Processed int
+	Skipped   int
+	Failed    int
+}
+
+func (s *SosmedOrderService) ProcessPendingVerificationOrders(ctx context.Context, limit int) (*PendingVerificationResult, error) {
+	result := &PendingVerificationResult{}
+
+	orders, err := s.repo.FindPendingVerificationOrders(2*time.Hour, limit)
+	if err != nil {
+		return nil, fmt.Errorf("gagal mencari order pending verification: %w", err)
+	}
+
+	for _, order := range orders {
+		select {
+		case <-ctx.Done():
+			return result, ctx.Err()
+		default:
+		}
+
+		if err := s.confirmPendingVerificationOrder(ctx, &order); err != nil {
+			result.Failed++
+			continue
+		}
+		result.Processed++
+	}
+
+	return result, nil
+}
+
+func (s *SosmedOrderService) confirmPendingVerificationOrder(ctx context.Context, order *model.SosmedOrder) error {
+	// Cek saldo JAP
+	if s.japOrderProvider == nil {
+		return errors.New("jap provider tidak tersedia")
+	}
+
+	balanceResp, err := s.japOrderProvider.GetBalance(ctx)
+	if err != nil {
+		return fmt.Errorf("gagal cek saldo JAP: %w", err)
+	}
+
+	// Kalau saldo JAP kurang dari total price order, skip dulu
+	japBalance, err := strconv.ParseFloat(balanceResp.Balance, 64)
+	if err != nil {
+		return fmt.Errorf("gagal parse saldo JAP: %w", err)
+	}
+	if japBalance < float64(order.TotalPrice) {
+		return errors.New("saldo JAP tidak mencukupi")
+	}
+
+	orderID := order.ID
+	userID := order.UserID
+	totalPrice := order.TotalPrice
+	chargeRef := sosmedOrderWalletChargeRef(orderID)
+	now := time.Now()
+
+	err = s.walletRepo.Transaction(func(tx *gorm.DB) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		user, err := s.walletRepo.LockUserByIDTx(tx, userID)
+		if err != nil {
+			return fmt.Errorf("user tidak ditemukan: %w", err)
+		}
+		if !user.IsActive {
+			return errors.New("akun diblokir")
+		}
+
+		if user.WalletBalance < totalPrice {
+			return errors.New("saldo wallet user tidak cukup")
+		}
+
+		// Cek apakah order masih pending verification
+		var current model.SosmedOrder
+		if err := tx.Where("id = ? AND order_status = ?", orderID, sosmedOrderStatusPendingVerification).First(&current).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("order sudah diproses")
+			}
+			return fmt.Errorf("gagal memuat order: %w", err)
+		}
+
+		before := user.WalletBalance
+		after := before - totalPrice
+		user.WalletBalance = after
+		if err := s.walletRepo.SaveUserTx(tx, user); err != nil {
+			return fmt.Errorf("gagal update saldo wallet: %w", err)
+		}
+
+		// Update payment status jadi paid
+		if err := tx.Model(&current).Updates(map[string]interface{}{
+			"payment_status": "paid",
+			"order_status":   sosmedOrderStatusProcessing,
+			"provider_status": "queued",
+			"paid_at":        &now,
+		}).Error; err != nil {
+			return fmt.Errorf("gagal update order: %w", err)
+		}
+
+		ledger := &model.WalletLedger{
+			ID:            uuid.New(),
+			UserID:        user.ID,
+			Type:          "debit",
+			Category:      "sosmed_purchase",
+			Amount:        totalPrice,
+			BalanceBefore: before,
+			BalanceAfter:  after,
+			Reference:     chargeRef,
+			Description:   fmt.Sprintf("Pembelian layanan sosmed order %s via wallet (pending verification)", shortSosmedWalletRef(orderID.String())),
+		}
+		if err := s.walletRepo.CreateLedgerTx(tx, ledger); err != nil {
+			return fmt.Errorf("gagal menulis ledger wallet: %w", err)
+		}
+
+		event := &model.SosmedOrderEvent{
+			OrderID:    orderID,
+			FromStatus: sosmedOrderStatusPendingVerification,
+			ToStatus:   sosmedOrderStatusProcessing,
+			Reason:     "saldo provider tersedia, order dikonfirmasi",
+			ActorType:  "system",
+			CreatedAt:  now,
+		}
+		if err := tx.Create(event).Error; err != nil {
+			return fmt.Errorf("gagal mencatat event: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Kirim ke JAP setelah wallet sukses dipotong
+	if err := s.fulfillJAPOrder(ctx, orderID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type ExpireResult struct {
+	Expired int
+}
+
+func (s *SosmedOrderService) ExpireStalePendingVerificationOrders(ctx context.Context, limit int) (*ExpireResult, error) {
+	result := &ExpireResult{}
+
+	cutoff := time.Now().Add(-2 * time.Hour)
+	orders, err := s.repo.FindExpiredPendingVerificationOrders(cutoff, limit)
+	if err != nil {
+		return nil, fmt.Errorf("gagal mencari order pending verification kadaluwarsa: %w", err)
+	}
+
+	for _, order := range orders {
+		select {
+		case <-ctx.Done():
+			return result, ctx.Err()
+		default:
+		}
+
+		now := time.Now()
+		order.OrderStatus = sosmedOrderStatusExpired
+		if err := s.repo.Update(&order); err != nil {
+			result.Expired++
+			continue
+		}
+
+		event := &model.SosmedOrderEvent{
+			OrderID:    order.ID,
+			FromStatus: sosmedOrderStatusPendingVerification,
+			ToStatus:   sosmedOrderStatusExpired,
+			Reason:     "order kadaluwarsa karena melebihi batas waktu verifikasi",
+			ActorType:  "system",
+			CreatedAt:  now,
+		}
+		if err := s.repo.CreateEvent(event); err != nil {
+			result.Expired++
+			continue
+		}
+
+		if s.notifRepo != nil {
+			s.notifRepo.Create(&model.Notification{
+				UserID:  order.UserID,
+				Title:   "Order Sosmed Kadaluwarsa",
+				Message: fmt.Sprintf("Order sosmed %s dibatalkan karena melebihi batas waktu verifikasi. Silakan order ulang.", shortSosmedWalletRef(order.ID.String())),
+				Type:    "order",
+			})
+		}
+
+		result.Expired++
+	}
+
+	return result, nil
 }
 
 func (s *SosmedOrderService) createWalletPaidOrder(

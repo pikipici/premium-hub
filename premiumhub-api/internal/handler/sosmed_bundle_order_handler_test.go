@@ -46,6 +46,10 @@ func (f *fakeBundleHandlerJAPOrderProvider) GetRefillStatus(context.Context, str
 	return nil, nil
 }
 
+func (f *fakeBundleHandlerJAPOrderProvider) GetBalance(_ context.Context) (*service.JAPBalanceResponse, error) {
+	return &service.JAPBalanceResponse{Balance: 999999999, Currency: "IDR"}, nil
+}
+
 type bundleOrderHandlerEnvelope struct {
 	Success bool                    `json:"success"`
 	Message string                  `json:"message"`

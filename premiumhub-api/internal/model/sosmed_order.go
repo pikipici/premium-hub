@@ -55,6 +55,8 @@ type SosmedOrder struct {
 	RefillEligible        bool                       `gorm:"default:false" json:"refill_eligible"`
 	RefillPeriodDays      int                        `gorm:"default:0" json:"refill_period_days"`
 	RefillDeadline        *time.Time                 `json:"refill_deadline"`
+	PendingVerificationAt *time.Time                 `gorm:"column:pending_verification_at;type:timestamptz" json:"pending_verification_at"`
+
 	RefillStatus          string                     `gorm:"size:30;default:none;index" json:"refill_status"`
 	RefillProviderOrderID string                     `gorm:"size:80" json:"refill_provider_order_id,omitempty"`
 	RefillProviderStatus  string                     `gorm:"size:40" json:"refill_provider_status,omitempty"`

@@ -92,6 +92,11 @@ type Config struct {
 	SosmedProviderSyncWorkerEnabled                                             bool
 	SosmedProviderSyncWorkerInterval, SosmedProviderSyncWorkerBatchLimit        string
 	SosmedProviderSyncWorkerStaleAfter, SosmedProviderSyncWorkerTimeout         string
+	SosmedPendingVerificationWorkerEnabled                                      bool
+	SosmedPendingVerificationWorkerInterval, SosmedPendingVerificationWorkerBatchLimit string
+	SosmedPendingVerificationWorkerTimeout                                      string
+	SosmedPendingVerificationExpiryInterval, SosmedPendingVerificationExpiryBatchLimit string
+	SosmedPendingVerificationExpiryTimeout                                      string
 	RedisAddr, RedisPassword, RedisDB                                           string
 	ChatRedisChannel                                                            string
 	DigiConnectRouterBaseURL, DigiConnectRouterHealthPath                       string
@@ -247,6 +252,13 @@ func Load() *Config {
 		SosmedProviderSyncWorkerBatchLimit:   e("SOSMED_PROVIDER_SYNC_WORKER_BATCH_LIMIT", "20"),
 		SosmedProviderSyncWorkerStaleAfter:   e("SOSMED_PROVIDER_SYNC_WORKER_STALE_AFTER", "30m"),
 		SosmedProviderSyncWorkerTimeout:      e("SOSMED_PROVIDER_SYNC_WORKER_TIMEOUT", "45s"),
+		SosmedPendingVerificationWorkerEnabled:      eb("SOSMED_PENDING_VERIFICATION_WORKER_ENABLED", false),
+		SosmedPendingVerificationWorkerInterval:     e("SOSMED_PENDING_VERIFICATION_WORKER_INTERVAL", "60s"),
+		SosmedPendingVerificationWorkerBatchLimit:   e("SOSMED_PENDING_VERIFICATION_WORKER_BATCH_LIMIT", "20"),
+		SosmedPendingVerificationWorkerTimeout:      e("SOSMED_PENDING_VERIFICATION_WORKER_TIMEOUT", "45s"),
+		SosmedPendingVerificationExpiryInterval:     e("SOSMED_PENDING_VERIFICATION_EXPIRY_INTERVAL", "5m"),
+		SosmedPendingVerificationExpiryBatchLimit:   e("SOSMED_PENDING_VERIFICATION_EXPIRY_BATCH_LIMIT", "20"),
+		SosmedPendingVerificationExpiryTimeout:      e("SOSMED_PENDING_VERIFICATION_EXPIRY_TIMEOUT", "30s"),
 		RedisAddr:                            e("REDIS_ADDR", ""),
 		RedisPassword:                        e("REDIS_PASSWORD", ""),
 		RedisDB:                              e("REDIS_DB", "0"),

@@ -233,6 +233,39 @@ func (r *SosmedOrderRepo) AdminOpsSummary(staleBefore time.Time) (*SosmedOrderOp
 	return summary, nil
 }
 
+func (r *SosmedOrderRepo) FindPendingVerificationOrders(olderThan time.Duration, limit int) ([]model.SosmedOrder, error) {
+	var orders []model.SosmedOrder
+
+	cutoff := time.Now().Add(-olderThan)
+	q := r.db.Model(&model.SosmedOrder{}).
+		Where("order_status = ?", "pending_verification").
+		Where("pending_verification_at > ?", cutoff).
+		Order("pending_verification_at ASC")
+
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+
+	err := q.Find(&orders).Error
+	return orders, err
+}
+
+func (r *SosmedOrderRepo) FindExpiredPendingVerificationOrders(before time.Time, limit int) ([]model.SosmedOrder, error) {
+	var orders []model.SosmedOrder
+
+	q := r.db.Model(&model.SosmedOrder{}).
+		Where("order_status = ?", "pending_verification").
+		Where("pending_verification_at < ?", before).
+		Order("pending_verification_at ASC")
+
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+
+	err := q.Find(&orders).Error
+	return orders, err
+}
+
 func (r *SosmedOrderRepo) CreateEvent(event *model.SosmedOrderEvent) error {
 	return r.db.Create(event).Error
 }

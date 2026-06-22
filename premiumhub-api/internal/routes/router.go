@@ -175,6 +175,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	service.StartWalletTopupReconcileWorker(cfg, walletSvc)
 	service.StartNokosLandingSummaryWorker(cfg, nokosLandingSvc)
 	service.StartSosmedProviderSyncWorker(cfg, sosmedOrderSvc)
+	service.StartSosmedPendingVerificationWorker(cfg, sosmedOrderSvc)
+	service.StartSosmedPendingVerificationExpiryWorker(cfg, sosmedOrderSvc)
 	service.StartDigiConnectReconcileWorker(cfg, digiConnectSvc)
 
 	convertProofStorage, err := storage.NewConvertProofStorage(cfg)

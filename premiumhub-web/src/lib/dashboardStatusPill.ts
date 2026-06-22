@@ -86,6 +86,7 @@ export function sosmedOrderTone(status: string): { tone: StatusTone; label: stri
   const s = (status || '').toLowerCase()
   if (s === 'success') return { tone: 'success', label: 'Sukses' }
   if (s === 'processing') return { tone: 'info', label: 'Diproses' }
+  if (s === 'pending_verification') return { tone: 'process', label: 'Menunggu Konfirmasi' }
   if (s === 'failed') return { tone: 'fail', label: 'Gagal' }
   if (s === 'canceled' || s === 'cancelled') return { tone: 'neutral', label: 'Dibatalkan' }
   if (s === 'expired') return { tone: 'neutral', label: 'Expired' }

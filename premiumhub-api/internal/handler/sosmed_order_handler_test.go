@@ -45,6 +45,10 @@ func (f *fakeHandlerJAPOrderProvider) GetRefillStatus(_ context.Context, _ strin
 	return &service.JAPRefillStatusResponse{Status: "Processing"}, nil
 }
 
+func (f *fakeHandlerJAPOrderProvider) GetBalance(_ context.Context) (*service.JAPBalanceResponse, error) {
+	return &service.JAPBalanceResponse{Balance: 999999999, Currency: "IDR"}, nil
+}
+
 type handlerSmokeEnvelope struct {
 	Message string                    `json:"message"`
 	Data    handlerSmokeOrderResponse `json:"data"`

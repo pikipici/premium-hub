@@ -15,6 +15,8 @@ import type { SosmedOrderDetail } from '@/types/sosmedOrder'
 
 function orderStatusText(status?: string) {
   switch (status) {
+    case 'pending_verification':
+      return 'Menunggu Konfirmasi'
     case 'processing':
       return 'Diproses'
     case 'partial':
@@ -125,6 +127,7 @@ function SosmedCheckoutSuccessContent() {
   }, [bundleOrderNumber, isBundleOrder, orderID, router])
 
   const order = detail?.order
+  const isPendingVerification = order?.order_status === 'pending_verification'
   const status = useMemo(() => orderStatusText(isBundleOrder ? bundleDetail?.status : order?.order_status), [bundleDetail?.status, isBundleOrder, order?.order_status])
 
   return (
@@ -134,9 +137,13 @@ function SosmedCheckoutSuccessContent() {
         <div className="max-w-xl mx-auto px-4">
           <div className="rounded-2xl border border-[#D6F5DF] bg-[#ECFFF2] p-6 text-center">
             <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-emerald-600" />
-            <h1 className="text-2xl font-extrabold text-[#141414]">Pembayaran Wallet Berhasil</h1>
+            <h1 className="text-2xl font-extrabold text-[#141414]">
+              {isPendingVerification ? 'Order Diterima' : 'Pembayaran Wallet Berhasil'}
+            </h1>
             <p className="mt-2 text-sm text-[#3A7A4A]">
-              Yeayy !! Pembelian kamu berhasil, Order kamu akan segera di proses, Mohon menunggu 🙏🙏
+              {isPendingVerification
+                ? 'Order kamu sedang dalam antrean verifikasi. Sistem akan memproses secara otomatis saat layanan tersedia.'
+                : 'Yeayy !! Pembelian kamu berhasil, Order kamu akan segera di proses, Mohon menunggu 🙏🙏'}
             </p>
           </div>
 

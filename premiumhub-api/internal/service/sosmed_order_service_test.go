@@ -35,6 +35,7 @@ type fakeSosmedJAPOrderProvider struct {
 	cancelInputs       []string
 	cancelRes          *JAPCancelOrderResponse
 	cancelErr          error
+	balanceAmount      string
 }
 
 func (f *fakeSosmedJAPOrderProvider) AddOrder(_ context.Context, input JAPAddOrderInput) (*JAPAddOrderResponse, error) {
@@ -124,6 +125,14 @@ func (f *fakeSosmedJAPOrderProvider) CancelOrder(_ context.Context, orderID stri
 		return res, nil
 	}
 	return &JAPCancelOrderResponse{Order: JAPFlexibleValue(orderID), Cancel: JAPCancelResult{Accepted: true}}, nil
+}
+
+func (f *fakeSosmedJAPOrderProvider) GetBalance(_ context.Context) (*JAPBalanceResponse, error) {
+	amount := f.balanceAmount
+	if amount == "" {
+		amount = "999999999"
+	}
+	return &JAPBalanceResponse{Balance: amount, Currency: "IDR"}, nil
 }
 
 func TestSosmedOrderService_CancelJAPProcessingOrderRequestsProviderAndRefundsOnCanceledStatus(t *testing.T) {
@@ -2203,5 +2212,381 @@ func TestSosmedOrderService_AdminRetryProviderOrderRefundsOnFailure(t *testing.T
 	}
 	if retryRefundCount != 1 {
 		t.Fatalf("expected 1 retry refund ledger, got %d", retryRefundCount)
+	}
+}
+
+func TestSosmedOrderService_CreateJAPServiceCreatesPendingVerification(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.ProductCategory{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+		&model.Notification{},
+		&model.WalletLedger{},
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:            uuid.New(),
+		Name:          "Buyer Pending",
+		Email:         "buyer-pending@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 50000,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	svcRow := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-pending-1",
+		Title:             "JAP Pending Test",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     12000,
+		IsActive:          true,
+	}
+	if err := db.Create(svcRow).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{}
+	svc := NewSosmedOrderService(
+		repository.NewSosmedOrderRepo(db),
+		repository.NewSosmedServiceRepo(db),
+		repository.NewNotificationRepo(db),
+	).SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(fakeJAP)
+
+	result, err := svc.Create(context.Background(), buyer.ID, CreateSosmedOrderInput{
+		ServiceID:             svcRow.ID.String(),
+		TargetLink:            "https://instagram.com/test",
+		Quantity:              1,
+		TargetPublicConfirmed: true,
+		IdempotencyKey:        uuid.NewString(),
+	})
+	if err != nil {
+		t.Fatalf("create pending verification order: %v", err)
+	}
+	if result == nil || result.Order == nil {
+		t.Fatal("expected order detail, got nil")
+	}
+
+	order := result.Order
+	if order.OrderStatus != sosmedOrderStatusPendingVerification {
+		t.Fatalf("expected order status %q, got %q", sosmedOrderStatusPendingVerification, order.OrderStatus)
+	}
+	if order.PaymentStatus != sosmedPaymentStatusHold {
+		t.Fatalf("expected payment status %q, got %q", sosmedPaymentStatusHold, order.PaymentStatus)
+	}
+	if order.PendingVerificationAt == nil {
+		t.Fatal("expected pending_verification_at to be set")
+	}
+	if order.PaidAt != nil {
+		t.Fatal("expected paid_at to be nil (wallet not charged yet)")
+	}
+
+	// Wallet should NOT be deducted
+	var buyerAfter model.User
+	if err := db.First(&buyerAfter, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("load buyer: %v", err)
+	}
+	if buyerAfter.WalletBalance != 50000 {
+		t.Fatalf("expected wallet unchanged at 50000, got %d", buyerAfter.WalletBalance)
+	}
+}
+
+func TestSosmedOrderService_ProcessPendingVerificationWithSufficientBalance(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.ProductCategory{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+		&model.Notification{},
+		&model.WalletLedger{},
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:            uuid.New(),
+		Name:          "Buyer Process",
+		Email:         "buyer-process@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 50000,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	svcRow := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-process-1",
+		Title:             "JAP Process Test",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     12000,
+		IsActive:          true,
+	}
+	if err := db.Create(svcRow).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	now := time.Now()
+	order := &model.SosmedOrder{
+		ID:                    uuid.New(),
+		UserID:                buyer.ID,
+		ServiceID:             svcRow.ID,
+		ServiceCode:           svcRow.Code,
+		ServiceTitle:          svcRow.Title,
+		TargetLink:            "https://instagram.com/test",
+		Quantity:              1,
+		UnitPrice:             12000,
+		TotalPrice:            12000,
+		PaymentMethod:         "wallet",
+		PaymentStatus:         sosmedPaymentStatusHold,
+		OrderStatus:           sosmedOrderStatusPendingVerification,
+		ProviderCode:          "jap",
+		ProviderServiceID:     "6331",
+		Notes:                 "",
+		PendingVerificationAt: &now,
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create pending order: %v", err)
+	}
+
+	fakeJAP := &fakeSosmedJAPOrderProvider{res: &JAPAddOrderResponse{Order: "JAP-PROC-7788"}}
+	svc := NewSosmedOrderService(
+		repository.NewSosmedOrderRepo(db),
+		repository.NewSosmedServiceRepo(db),
+		nil,
+	).SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(fakeJAP)
+
+	result, err := svc.ProcessPendingVerificationOrders(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("process pending orders: %v", err)
+	}
+	if result.Processed != 1 {
+		t.Fatalf("expected 1 processed order, got %d (failed=%d)", result.Processed, result.Failed)
+	}
+
+	// Wallet should be deducted
+	var buyerAfter model.User
+	if err := db.First(&buyerAfter, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("load buyer: %v", err)
+	}
+	if buyerAfter.WalletBalance != 38000 {
+		t.Fatalf("expected wallet 38000 (50000-12000), got %d", buyerAfter.WalletBalance)
+	}
+
+	// Order should be processing
+	var orderAfter model.SosmedOrder
+	if err := db.First(&orderAfter, "id = ?", order.ID).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if orderAfter.OrderStatus != sosmedOrderStatusProcessing {
+		t.Fatalf("expected order status %q, got %q", sosmedOrderStatusProcessing, orderAfter.OrderStatus)
+	}
+	if orderAfter.PaymentStatus != "paid" {
+		t.Fatalf("expected payment status 'paid', got %q", orderAfter.PaymentStatus)
+	}
+	if orderAfter.PaidAt == nil {
+		t.Fatal("expected paid_at to be set")
+	}
+	if orderAfter.ProviderOrderID != "JAP-PROC-7788" {
+		t.Fatalf("expected provider order ID JAP-PROC-7788, got %q", orderAfter.ProviderOrderID)
+	}
+}
+
+func TestSosmedOrderService_ProcessPendingVerificationWithInsufficientJAPBalance(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.ProductCategory{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.SosmedOrderRefillAttempt{},
+		&model.Notification{},
+		&model.WalletLedger{},
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:            uuid.New(),
+		Name:          "Buyer Skip",
+		Email:         "buyer-skip@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 50000,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	svcRow := &model.SosmedService{
+		ID:                uuid.New(),
+		CategoryCode:      "followers",
+		Code:              "jap-skip-1",
+		Title:             "JAP Skip Test",
+		ProviderCode:      "jap",
+		ProviderServiceID: "6331",
+		CheckoutPrice:     12000,
+		IsActive:          true,
+	}
+	if err := db.Create(svcRow).Error; err != nil {
+		t.Fatalf("create service: %v", err)
+	}
+
+	now := time.Now()
+	order := &model.SosmedOrder{
+		ID:                    uuid.New(),
+		UserID:                buyer.ID,
+		ServiceID:             svcRow.ID,
+		ServiceCode:           svcRow.Code,
+		ServiceTitle:          svcRow.Title,
+		TargetLink:            "https://instagram.com/test",
+		Quantity:              1,
+		UnitPrice:             12000,
+		TotalPrice:            12000,
+		PaymentMethod:         "wallet",
+		PaymentStatus:         sosmedPaymentStatusHold,
+		OrderStatus:           sosmedOrderStatusPendingVerification,
+		ProviderCode:          "jap",
+		ProviderServiceID:     "6331",
+		Notes:                 "",
+		PendingVerificationAt: &now,
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create pending order: %v", err)
+	}
+
+	// Fake JAP with very low balance — not enough for the order
+	fakeJAP := &fakeSosmedJAPOrderProvider{balanceAmount: "500"}
+	svc := NewSosmedOrderService(
+		repository.NewSosmedOrderRepo(db),
+		repository.NewSosmedServiceRepo(db),
+		nil,
+	).SetWalletRepo(repository.NewWalletRepo(db)).
+		SetJAPOrderProvider(fakeJAP)
+
+	result, err := svc.ProcessPendingVerificationOrders(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("process pending orders: %v", err)
+	}
+	// Should be skipped (failed count includes orders that couldn't be processed)
+	// Failed here because confirmPendingVerificationOrder returns error for insufficient balance
+	if result.Processed != 0 {
+		t.Fatalf("expected 0 processed orders (skipped due to low balance), got %d", result.Processed)
+	}
+
+	// Wallet should NOT be deducted
+	var buyerAfter model.User
+	if err := db.First(&buyerAfter, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("load buyer: %v", err)
+	}
+	if buyerAfter.WalletBalance != 50000 {
+		t.Fatalf("expected wallet unchanged at 50000, got %d", buyerAfter.WalletBalance)
+	}
+
+	// Order should still be pending_verification
+	var orderAfter model.SosmedOrder
+	if err := db.First(&orderAfter, "id = ?", order.ID).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if orderAfter.OrderStatus != sosmedOrderStatusPendingVerification {
+		t.Fatalf("expected order status %q, got %q", sosmedOrderStatusPendingVerification, orderAfter.OrderStatus)
+	}
+}
+
+func TestSosmedOrderService_ExpireStalePendingVerificationOrders(t *testing.T) {
+	db := setupCoreDB(t)
+	if err := db.AutoMigrate(
+		&model.ProductCategory{},
+		&model.SosmedService{},
+		&model.SosmedOrder{},
+		&model.SosmedOrderEvent{},
+		&model.Notification{},
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	buyer := &model.User{
+		ID:            uuid.New(),
+		Name:          "Buyer Expire",
+		Email:         "buyer-expire@example.com",
+		Password:      "hashed",
+		Role:          "user",
+		IsActive:      true,
+		WalletBalance: 50000,
+	}
+	if err := db.Create(buyer).Error; err != nil {
+		t.Fatalf("create buyer: %v", err)
+	}
+
+	longAgo := time.Now().Add(-3 * time.Hour)
+	order := &model.SosmedOrder{
+		ID:                    uuid.New(),
+		UserID:                buyer.ID,
+		ServiceID:             uuid.New(),
+		ServiceCode:           "jap-expire-1",
+		ServiceTitle:          "Expired Test",
+		TargetLink:            "https://instagram.com/expired",
+		Quantity:              1,
+		UnitPrice:             12000,
+		TotalPrice:            12000,
+		PaymentMethod:         "wallet",
+		PaymentStatus:         sosmedPaymentStatusHold,
+		OrderStatus:           sosmedOrderStatusPendingVerification,
+		ProviderCode:          "jap",
+		ProviderServiceID:     "6331",
+		PendingVerificationAt: &longAgo,
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create stale order: %v", err)
+	}
+
+	svc := NewSosmedOrderService(
+		repository.NewSosmedOrderRepo(db),
+		repository.NewSosmedServiceRepo(db),
+		nil,
+	)
+
+	result, err := svc.ExpireStalePendingVerificationOrders(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("expire stale orders: %v", err)
+	}
+	if result.Expired != 1 {
+		t.Fatalf("expected 1 expired order, got %d", result.Expired)
+	}
+
+	var orderAfter model.SosmedOrder
+	if err := db.First(&orderAfter, "id = ?", order.ID).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if orderAfter.OrderStatus != sosmedOrderStatusExpired {
+		t.Fatalf("expected order status %q, got %q", sosmedOrderStatusExpired, orderAfter.OrderStatus)
+	}
+
+	// Wallet should NOT be deducted (no wallet transaction happened)
+	var buyerAfter model.User
+	if err := db.First(&buyerAfter, "id = ?", buyer.ID).Error; err != nil {
+		t.Fatalf("load buyer: %v", err)
+	}
+	if buyerAfter.WalletBalance != 50000 {
+		t.Fatalf("expected wallet unchanged at 50000, got %d", buyerAfter.WalletBalance)
 	}
 }
