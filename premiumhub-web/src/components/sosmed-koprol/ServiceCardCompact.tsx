@@ -37,7 +37,7 @@ export function ServiceCardCompact({ href, title, Icon, platformLabel, priceLabe
         {platformLabel ? (
           <span className="truncate text-[11px] font-semibold text-[#888] sm:text-xs">{platformLabel}</span>
         ) : null}
-        <h3 className="line-clamp-1 text-[13px] font-semibold leading-snug text-[#141414] sm:text-sm">{title}</h3>
+        <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug text-[#141414] sm:text-sm">{title}</h3>
         {priceLabel ? (
           <span className="text-[12px] font-bold text-[#FF5733] sm:text-[13px]">{priceLabel}</span>
         ) : null}
