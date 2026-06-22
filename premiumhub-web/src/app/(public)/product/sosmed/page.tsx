@@ -32,7 +32,7 @@ import HotPickCard from '@/components/sosmed-koprol/HotPickCard'
 import PromoSavingCard from '@/components/sosmed-koprol/PromoSavingCard'
 import BundlePromoCard from '@/components/sosmed-koprol/BundlePromoCard'
 import { buildSosmedBundleProductCards, type SosmedBundleProductCard } from '@/lib/sosmedBundlingCards'
-import { buildSosmedServiceCards, type SosmedPlatformIconKey, type SosmedProductCard } from '@/lib/sosmedProductCards'
+import { buildSosmedServiceCards, platformIconKeyFor, type SosmedPlatformIconKey, type SosmedProductCard } from '@/lib/sosmedProductCards'
 import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
 import type { SosmedBundlePackage } from '@/types/sosmedBundle'
@@ -283,6 +283,14 @@ export default function ProductSosmedLandingPage() {
     return ['Semua', ...unique.sort()]
   }, [allCards])
 
+  const platformCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const c of allCards) {
+      counts[c.platform] = (counts[c.platform] || 0) + 1
+    }
+    return counts
+  }, [allCards])
+
   const filteredCards = useMemo(() => {
     if (activePlatform === 'Semua') return allCards
     return allCards.filter((c) => c.platform === activePlatform)
@@ -436,22 +444,39 @@ export default function ProductSosmedLandingPage() {
 
           {/* Platform filter chip strip */}
           {platforms.length > 1 && !sectionFilter ? (
-            <div className="mt-4 sm:mt-5 flex w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="mx-auto flex gap-1.5 px-1">
-                {platforms.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setActivePlatform(p)}
-                    className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition-all sm:px-3.5 sm:text-xs ${
-                      activePlatform === p
-                        ? 'bg-[#141414] text-white shadow-md'
-                        : 'bg-white text-gray-500 ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
+            <div className="relative mt-4 sm:mt-5">
+              <div className="flex w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="mx-auto flex gap-1.5 px-1">
+                  {platforms.map((p) => {
+                    const count = p === 'Semua' ? allCards.length : (platformCounts[p] || 0)
+                    const iconKey = p === 'Semua' ? null : platformIconKeyFor(p)
+                    const IconComp = iconKey ? (PLATFORM_ICON_COMPONENTS[iconKey] ?? null) : null
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setActivePlatform(p)}
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all sm:px-3.5 sm:text-xs ${
+                          activePlatform === p
+                            ? 'bg-[#141414] text-white shadow-md'
+                            : 'bg-white text-gray-500 ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900'
+                        }`}
+                      >
+                        {IconComp ? <IconComp className="h-3.5 w-3.5" /> : null}
+                        <span>{p}</span>
+                        <span className={`ml-0.5 rounded-full px-1.5 py-[1px] text-[9px] font-semibold sm:text-[10px] ${
+                          activePlatform === p
+                            ? 'bg-white/20 text-white/80'
+                            : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
+              {/* Scroll hint fade */}
+              <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[#F4F5F8] to-transparent" />
             </div>
           ) : null}
 
