@@ -390,23 +390,33 @@ export default function ProductSosmedLandingPage() {
 
           {/* Featured product cards */}
           {heroFeatured.length > 0 ? (
-            <div className="mt-4 sm:mt-5 grid grid-cols-2 gap-3">
-              {heroFeatured.map((item) => {
-                const Icon = item.Icon
-                return (
-                  <ServiceCardCompact
-                    key={item.key}
-                    href={item.href}
-                    title={item.title}
-                    platformLabel={item.platformLabel}
-                    priceLabel={item.priceLabel}
-                    badgeText={item.badgeText}
-                    Icon={Icon}
-                    toneClass={item.toneClass}
-                  />
-                )
-              })}
-            </div>
+            <section className="mt-7 sm:mt-10">
+              <SectionHeader
+                icon={
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#FF5733] text-white">
+                    <Star className="h-4 w-4" />
+                  </span>
+                }
+                title="Produk Unggulan"
+              />
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-5">
+                {heroFeatured.map((item) => {
+                  const Icon = item.Icon
+                  return (
+                    <ServiceCardCompact
+                      key={item.key}
+                      href={item.href}
+                      title={item.title}
+                      platformLabel={item.platformLabel}
+                      priceLabel={item.priceLabel}
+                      badgeText={item.badgeText}
+                      Icon={Icon}
+                      toneClass={item.toneClass}
+                    />
+                  )
+                })}
+              </div>
+            </section>
           ) : null}
 
           {/* Section filter banner */}
