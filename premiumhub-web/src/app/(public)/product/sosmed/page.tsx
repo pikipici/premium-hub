@@ -267,7 +267,7 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
         className="flex w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ paddingLeft: canScrollLeft ? 36 : 4, paddingRight: canScrollRight ? 36 : 4 }}
       >
-        <div className="mx-auto flex gap-1.5">
+        <div className="mx-auto flex min-w-max gap-1.5">
           {platforms.map((p) => {
             const count = p === 'Semua' ? allCardsLength : (platformCounts[p] || 0)
             const iconKey = p === 'Semua' ? null : platformIconKeyFor(p)
