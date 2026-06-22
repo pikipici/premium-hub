@@ -256,14 +256,18 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
-          className="absolute -left-1.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50"
+          className="absolute left-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50"
           aria-label="Scroll kiri"
         >
           <ChevronLeft className="h-4 w-4 text-gray-500" />
         </button>
       )}
-      <div ref={scrollRef} className="flex w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="mx-auto flex gap-1.5 px-1">
+      <div
+        ref={scrollRef}
+        className="flex w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ paddingLeft: canScrollLeft ? 36 : 4, paddingRight: canScrollRight ? 36 : 4 }}
+      >
+        <div className="mx-auto flex gap-1.5">
           {platforms.map((p) => {
             const count = p === 'Semua' ? allCardsLength : (platformCounts[p] || 0)
             const iconKey = p === 'Semua' ? null : platformIconKeyFor(p)
@@ -295,7 +299,7 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
       {canScrollRight && (
         <button
           onClick={() => scroll('right')}
-          className="absolute -right-1.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50"
+          className="absolute right-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50"
           aria-label="Scroll kanan"
         >
           <ChevronRight className="h-4 w-4 text-gray-500" />
