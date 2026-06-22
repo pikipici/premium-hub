@@ -774,7 +774,6 @@ function SosmedHeroTab() {
   const [icon, setIcon] = useState('Sparkles')
   const [bgColor, setBgColor] = useState('#141414')
   const [bgImageURL, setBgImageURL] = useState('')
-  const [featuredServiceCodes, setFeaturedServiceCodes] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
   const [formActive, setFormActive] = useState(true)
 
@@ -791,7 +790,7 @@ function SosmedHeroTab() {
   const resetForm = () => {
     setEditing(null); setFormOpen(false)
     setTitle(''); setSubtitle(''); setCtaLabel(''); setCtaHref('')
-    setIcon('Sparkles'); setBgColor('#141414'); setBgImageURL(''); setFeaturedServiceCodes('')
+    setIcon('Sparkles'); setBgColor('#141414'); setBgImageURL('')
     setSortOrder(0); setFormActive(true)
     setError(''); setSuccess('')
   }
@@ -802,7 +801,6 @@ function SosmedHeroTab() {
     setEditing(s)
     setTitle(s.title); setSubtitle(s.subtitle || ''); setCtaLabel(s.cta_label || ''); setCtaHref(s.cta_href || '')
     setIcon(s.icon || 'Sparkles'); setBgColor(s.background_color || '#141414'); setBgImageURL(s.background_image_url || '')
-    setFeaturedServiceCodes((s.featured_service_codes || []).join(', '))
     setSortOrder(s.sort_order || 0); setFormActive(s.is_active ?? true)
     setFormOpen(true)
   }
@@ -820,7 +818,7 @@ function SosmedHeroTab() {
     if (!title.trim()) { setError('Judul wajib diisi'); return }
     setSaving(true); setError(''); setSuccess('')
     try {
-      const payload = { title: title.trim(), subtitle: subtitle.trim(), cta_label: ctaLabel.trim(), cta_href: ctaHref.trim(), icon, background_color: bgColor, background_image_url: bgImageURL, featured_service_codes: featuredServiceCodes.split(',').map(s => s.trim()).filter(Boolean), sort_order: sortOrder, is_active: formActive }
+      const payload = { title: title.trim(), subtitle: subtitle.trim(), cta_label: ctaLabel.trim(), cta_href: ctaHref.trim(), icon, background_color: bgColor, background_image_url: bgImageURL, sort_order: sortOrder, is_active: formActive }
       const res = editing ? await sosmedHeroSlideService.adminUpdate(editing.id, payload) : await sosmedHeroSlideService.adminCreate(payload)
       if (res.success) { resetForm(); fetchSlides(); setSuccess('Slide berhasil disimpan') }
       else setError(res.message || 'Gagal menyimpan')
@@ -916,12 +914,6 @@ function SosmedHeroTab() {
               <label className="block text-xs font-bold text-[#555]">
                 Subtitle
                 <textarea value={subtitle} onChange={(e) => setSubtitle(e.target.value)} rows={2} placeholder="Subtitle slide..." className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
-              </label>
-
-              <label className="block text-xs font-bold text-[#555]">
-                Produk Unggulan (kode produk, pisahkan dengan koma)
-                <input value={featuredServiceCodes} onChange={(e) => setFeaturedServiceCodes(e.target.value)} placeholder="jap-6331, jap-10242, jap-8695" className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]" />
-                <p className="mt-1 text-[10px] text-[#999]">Kode produk yang tampil sebagai card di samping hero slide. Isi 2 kode biar pas.</p>
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
