@@ -390,29 +390,20 @@ export default function ProductSosmedLandingPage() {
 
           {/* Featured product cards */}
           {heroFeatured.length > 0 ? (
-            <div className="mt-4 sm:mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-4 sm:mt-5 grid grid-cols-2 gap-3">
               {heroFeatured.map((item) => {
                 const Icon = item.Icon
                 return (
-                  <Link
+                  <ServiceCardCompact
                     key={item.key}
                     href={item.href}
-                    className="group relative flex items-center gap-3 rounded-2xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-transparent transition-all duration-200 hover:-translate-y-0.5 hover:ring-[#FF5733]/30 active:scale-[0.98] sm:rounded-3xl sm:p-4"
-                  >
-                    {item.badgeText ? (
-                      <span className="absolute -right-2 -top-2 z-10 inline-flex max-w-[80px] items-center truncate rounded-full bg-[#FF5733] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm sm:max-w-[100px] sm:text-[10px]">
-                        {item.badgeText}
-                      </span>
-                    ) : null}
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br sm:h-14 sm:w-14 ${item.toneClass ?? 'from-[#F5F5F5] to-[#EBEBEB]'}`}>
-                      <Icon className="h-5 w-5 text-[#141414] sm:h-7 sm:w-7" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug text-[#141414] sm:text-sm">{item.title}</h3>
-                      <p className="mt-0.5 truncate text-[11px] font-bold text-[#FF5733] sm:text-xs">{item.priceLabel}</p>
-                    </div>
-                    <ArrowRight className="hidden h-5 w-5 shrink-0 text-gray-400 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#FF5733] sm:block" />
-                  </Link>
+                    title={item.title}
+                    platformLabel={item.platformLabel}
+                    priceLabel={item.priceLabel}
+                    badgeText={item.badgeText}
+                    Icon={Icon}
+                    toneClass={item.toneClass}
+                  />
                 )
               })}
             </div>
