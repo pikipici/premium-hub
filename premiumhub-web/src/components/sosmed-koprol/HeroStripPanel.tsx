@@ -59,8 +59,8 @@ export function HeroStripPanel({ slides, featured }: HeroStripPanelProps) {
   const currentSlide = slides[selectedIndex] || slides[0]
 
   return (
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-5 sm:gap-4">
-      <div className="relative col-span-1 overflow-hidden rounded-3xl shadow-[0_18px_42px_rgba(20,20,20,0.20)] ring-1 ring-black/5 sm:col-span-3"
+    <section className="grid grid-cols-5 gap-2 sm:gap-4">
+      <div className="relative col-span-3 overflow-hidden rounded-2xl shadow-[0_18px_42px_rgba(20,20,20,0.20)] ring-1 ring-black/5 sm:rounded-3xl"
         style={{
           backgroundColor: currentSlide?.bgColor || '#141414',
           backgroundImage: currentSlide?.bgImage ? `url(${currentSlide.bgImage})` : undefined,
@@ -127,29 +127,29 @@ export function HeroStripPanel({ slides, featured }: HeroStripPanelProps) {
         )}
       </div>
 
-      <div className="col-span-1 flex flex-col gap-2 sm:col-span-2 sm:gap-3">
+      <div className="col-span-2 flex flex-col gap-1.5 sm:gap-3">
         {featured.slice(0, 2).map((item) => {
           const Icon = item.Icon
           return (
             <Link
               key={item.key}
               href={item.href}
-              className="group relative flex flex-1 items-center gap-2.5 rounded-3xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-transparent transition-all duration-200 hover:-translate-y-0.5 hover:ring-[#FF5733]/30 active:scale-[0.98] sm:gap-3 sm:p-4"
+              className="group relative flex flex-1 items-center gap-1.5 rounded-2xl bg-white p-2 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-transparent transition-all duration-200 hover:-translate-y-0.5 hover:ring-[#FF5733]/30 active:scale-[0.98] sm:gap-3 sm:rounded-3xl sm:p-4"
             >
               {item.badgeText ? (
-                <span className="absolute -right-2 -top-2 z-10 inline-flex max-w-[80px] items-center truncate rounded-full bg-[#FF5733] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm sm:max-w-[100px] sm:text-[10px]">
+                <span className="absolute -right-1.5 -top-1.5 z-10 inline-flex max-w-[60px] items-center truncate rounded-full bg-[#FF5733] px-1 py-[1px] text-[6px] font-bold uppercase tracking-wide text-white shadow-sm sm:-right-2 sm:-top-2 sm:max-w-[100px] sm:px-1.5 sm:py-0.5 sm:text-[10px]">
                   {item.badgeText}
                 </span>
               ) : null}
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-gray-100 sm:h-12 sm:w-12 ${item.toneClass ?? 'from-[#F5F5F5] to-[#EBEBEB]'}`}>
-                <Icon className="h-5 w-5 text-[#141414] sm:h-5.5 sm:w-5.5" />
+              <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ring-1 ring-gray-100 sm:h-12 sm:w-12 sm:rounded-xl ${item.toneClass ?? 'from-[#F5F5F5] to-[#EBEBEB]'}`}>
+                <Icon className="h-3 w-3 text-[#141414] sm:h-5.5 sm:w-5.5" />
               </div>
               <div className="min-w-0 flex-1">
                 {item.platformLabel ? (
-                  <span className="truncate text-[10px] font-semibold text-[#888] sm:text-[11px]">{item.platformLabel}</span>
+                  <span className="truncate text-[8px] font-semibold text-[#888] sm:text-[11px]">{item.platformLabel}</span>
                 ) : null}
-                <h3 className="line-clamp-1 text-[12px] font-semibold leading-snug text-[#141414] sm:text-[13px]">{item.title}</h3>
-                <span className="mt-0.5 inline-block text-[11px] font-bold text-[#FF5733] sm:text-[12px]">{item.priceLabel}</span>
+                <h3 className="line-clamp-1 text-[10px] font-semibold leading-snug text-[#141414] sm:text-[13px]">{item.title}</h3>
+                <span className="inline-block text-[9px] font-bold text-[#FF5733] sm:text-[12px]">{item.priceLabel}</span>
               </div>
               <ArrowRight className="hidden h-4 w-4 shrink-0 text-gray-400 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#FF5733] sm:block" />
             </Link>
