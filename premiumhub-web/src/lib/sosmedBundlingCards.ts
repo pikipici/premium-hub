@@ -62,7 +62,7 @@ export const BUNDLING_PACKAGES: SosmedBundleCard[] = [
     summary: 'Meningkatkan social proof supaya toko terlihat lebih terpercaya di mata calon pembeli.',
     targetAudience: 'Pemilik toko online, pedagang lokal, reseller/dropshipper.',
     bestFor: 'Cocok buat UMKM yang baru bikin akun Instagram bisnis.',
-    badge: 'Paket Launching',
+    badge: '',
     tone: 'from-[#EEF8FF] to-[#DCEFFF]', // Blue
     startingPriceLabel: 'Rp 6.500', // Estimasi jual x2.5
     features: [
@@ -128,7 +128,7 @@ export const BUNDLING_PACKAGES: SosmedBundleCard[] = [
     summary: 'Bantu lewatin fase awal monetisasi dan tingkatkan kredibilitas channel.',
     targetAudience: 'YouTuber pemula, edukator, vlogger, brand.',
     bestFor: 'Buat yang ngejar 1.000 Subs dan lolos syarat monetisasi YouTube.',
-    badge: 'Monetisasi',
+    badge: '',
     tone: 'from-[#FFFBEA] to-[#FFF3C9]', // Yellow
     startingPriceLabel: 'Rp 146.000',
     features: [
