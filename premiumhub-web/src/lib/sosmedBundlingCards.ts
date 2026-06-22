@@ -95,7 +95,7 @@ export const BUNDLING_PACKAGES: SosmedBundleCard[] = [
     summary: 'Mendapatkan engagement awal agar konten masuk For You Page (FYP).',
     targetAudience: 'Content creator TikTok, pemilik TikTok Shop, Brand lokal.',
     bestFor: 'Bikin video lo berpeluang viral & gampang masuk FYP.',
-    badge: 'Trending',
+    badge: '',
     tone: 'from-[#FFF1F3] to-[#FFE1E7]', // Pink
     startingPriceLabel: 'Rp 20.500',
     features: [
@@ -265,7 +265,7 @@ export function buildSosmedBundleCards(bundles: SosmedBundlePackage[]): SosmedBu
         summary: bundle.description || bundle.subtitle || 'Paket bundling sosmed hemat dari katalog terbaru Premium Hub.',
         targetAudience: targetAudienceForBundle(bundle),
         bestFor: bundle.subtitle || 'Cocok buat boost awal dengan beberapa layanan sekaligus.',
-        badge: bundle.badge || (bundle.is_highlighted ? 'Paling Direkomendasikan' : 'Paket Hemat'),
+        badge: bundle.badge,
         tone: toneForBundle(bundle),
         startingPriceLabel: startingPrice > 0 ? formatBundleRupiah(startingPrice) : 'Cek harga',
         isHighlighted: bundle.is_highlighted,
@@ -300,10 +300,10 @@ export function buildSosmedBundleProductCards(bundles: SosmedBundlePackage[]): S
   const sourceBundles = bundles.length ? buildSosmedBundleCards(bundles) : BUNDLING_PACKAGES
 
   return sourceBundles.flatMap((bundle) => {
-    const isRecommendedBundle = Boolean(bundle.isHighlighted) || bundle.badge.toLowerCase().includes('rekomendasi') || bundle.key === 'toko-online-pro'
-    return bundle.packages.map((variant, index) => {
+    const isRecommendedBundle = Boolean(bundle.isHighlighted) || bundle.badge.toLowerCase().includes('rekomendasi')
+    return bundle.packages.map((variant) => {
       const variantKey = variant.key
-      const isRecommended = isRecommendedBundle || index === 1
+      const isRecommended = isRecommendedBundle
       const benefits = [
         ...variant.items.slice(0, 3),
         'Tanpa perlu password',

@@ -451,8 +451,6 @@ export default function ProductSosmedLandingPage() {
                       <ServiceCardCompact
                         href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                         title={card.buyerTitle}
-                        categoryLabel={card.badge || card.platform}
-                        isHighlight={card.isRecommended}
                         Icon={Icon}
                         toneClass={card.tone}
                       />

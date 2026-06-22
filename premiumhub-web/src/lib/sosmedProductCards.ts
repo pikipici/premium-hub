@@ -49,7 +49,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     buyerTitle: 'Paket Followers Instagram',
     summary: 'Followers awet dengan garansi isi ulang. Cocok buat naikin kredibilitas brand/toko.',
     bestFor: 'Cocok buat akun baru, test awal, atau naik pelan-pelan dengan budget hemat.',
-    badge: 'Paling Laris',
+    badge: '',
     tone: 'from-[#EEF8FF] to-[#DCEFFF]',
     startTime: '5-15 menit',
     refill: '30 hari',
@@ -65,7 +65,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     ],
     trustBadges: ['Tanpa Password', 'Garansi 30 Hari', 'Natural'],
     checkoutPrice: 28000,
-    isRecommended: true,
+    isRecommended: false,
   },
   {
     code: 'ig-likes-cheap',
@@ -75,7 +75,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     buyerTitle: 'Paket Likes Instagram',
     summary: 'Likes instan harga super miring untuk nge-boost interaksi post kamu.',
     bestFor: 'Cocok buat test market singkat dengan harga ringan tanpa garansi refill.',
-    badge: 'Paling Murah',
+    badge: '',
     tone: 'from-[#FFF1F3] to-[#FFE1E7]',
     startTime: 'Instan',
     refill: 'Tidak ada',
@@ -101,7 +101,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     buyerTitle: 'Paket Views TikTok',
     summary: 'Boost views video TikTok biar FYP makin gampang, lengkap dengan auto refill.',
     bestFor: 'Cocok buat content creator atau TikTok Shop affiliate yang butuh push traffic.',
-    badge: 'Trending',
+    badge: '',
     tone: 'from-[#F4F4F2] to-[#ECECEA]',
     startTime: '10 menit',
     refill: '7 hari',
@@ -127,7 +127,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     buyerTitle: 'Paket Followers TikTok',
     summary: 'Kejar syarat live TikTok atau nambah kredibilitas jualan dengan follower awet.',
     bestFor: 'Cocok buat akun baru yang butuh fitur live streaming.',
-    badge: 'Live Syarat',
+    badge: '',
     tone: 'from-[#F4F4F2] to-[#ECECEA]',
     startTime: '1-3 jam',
     refill: '30 hari',
@@ -143,7 +143,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     ],
     trustBadges: ['Tanpa Password', 'Garansi 30 Hari', 'Natural'],
     checkoutPrice: 45000,
-    isRecommended: true,
+    isRecommended: false,
   },
   {
     code: 'yt-subscribers',
@@ -153,7 +153,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     buyerTitle: 'Paket YouTube Subs',
     summary: 'Syarat monetisasi YouTube makin deket dengan tambahan subscriber berkualitas.',
     bestFor: 'Cocok buat YouTuber pemula yang butuh boost awal biar channel kliatan pro.',
-    badge: 'Monetisasi',
+    badge: '',
     tone: 'from-[#FFF1F3] to-[#FFE1E7]',
     startTime: '12-24 jam',
     refill: 'Tidak ada',
@@ -179,7 +179,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     buyerTitle: 'Paket Views Twitter',
     summary: 'Bikin tweet kamu kelihatan viral dan trending dengan ribuan views instan.',
     bestFor: 'Cocok buat bikin akun Twitter/X terlihat lebih kredibel saat validasi awal.',
-    badge: 'Viral Boost',
+    badge: '',
     tone: 'from-[#EEF8FF] to-[#DCEFFF]',
     startTime: 'Instan',
     refill: 'Tidak ada',
@@ -205,7 +205,7 @@ const FALLBACK_SERVICES: SosmedServicePreset[] = [
     buyerTitle: 'Paket Views Shopee',
     summary: 'Ramein room Shopee Live kamu biar makin di-push algoritma ke calon pembeli.',
     bestFor: 'Cocok untuk seller Shopee Live yang butuh pancingan traffic awal.',
-    badge: 'Seller Pro',
+    badge: '',
     tone: 'from-[#FFF4EC] to-[#FFE8D8]',
     startTime: '10-30 menit',
     refill: 'Tidak ada',
@@ -304,7 +304,7 @@ function readableBadge(platform: string, title: string, badge: string) {
   if (combined.includes('prioritas')) return 'Paling Direkomendasikan'
   if (combined.includes('hemat')) return 'Paling Murah'
   if (platform.toLowerCase().includes('twitter')) return 'Cocok Buat Test'
-  return badge || 'Siap Checkout'
+  return badge
 }
 
 function buyerTitleFor(platform: string, unit: string) {
