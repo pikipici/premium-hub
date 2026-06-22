@@ -8,6 +8,7 @@ export interface SosmedHeroSlide {
   icon: string
   background_color: string
   background_image_url: string
+  featured_service_codes: string[]
   sort_order: number
   starts_at: string | null
   ends_at: string | null

@@ -15,8 +15,11 @@ export type FeaturedMiniItem = {
   key: string
   href: string
   title: string
+  platformLabel?: string
   priceLabel: string
+  badgeText?: string
   Icon: IconComp
+  toneClass?: string
 }
 
 export type HeroSlideContent = {
@@ -131,16 +134,22 @@ export function HeroStripPanel({ slides, featured }: HeroStripPanelProps) {
             <Link
               key={item.key}
               href={item.href}
-              className="group flex flex-1 min-w-0 items-center gap-2.5 rounded-3xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-transparent transition-all duration-200 hover:-translate-y-0.5 hover:ring-[#FF5733]/30 active:scale-[0.98] sm:gap-3 sm:p-4"
+              className="group relative flex flex-1 items-center gap-2.5 rounded-3xl bg-white p-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-transparent transition-all duration-200 hover:-translate-y-0.5 hover:ring-[#FF5733]/30 active:scale-[0.98] sm:gap-3 sm:p-4"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F5F5F5] text-[#141414] ring-1 ring-gray-200 sm:h-12 sm:w-12">
-                <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+              {item.badgeText ? (
+                <span className="absolute -right-2 -top-2 z-10 inline-flex max-w-[80px] items-center truncate rounded-full bg-[#FF5733] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm sm:max-w-[100px] sm:text-[10px]">
+                  {item.badgeText}
+                </span>
+              ) : null}
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-gray-100 sm:h-12 sm:w-12 ${item.toneClass ?? 'from-[#F5F5F5] to-[#EBEBEB]'}`}>
+                <Icon className="h-5 w-5 text-[#141414] sm:h-5.5 sm:w-5.5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-xs font-semibold text-[#141414] sm:text-sm">{item.title}</h3>
-                <p className="mt-0.5 truncate text-[11px] font-semibold tracking-wide text-[#FF5733] sm:text-xs">
-                  {item.priceLabel}
-                </p>
+                {item.platformLabel ? (
+                  <span className="truncate text-[10px] font-semibold text-[#888] sm:text-[11px]">{item.platformLabel}</span>
+                ) : null}
+                <h3 className="line-clamp-1 text-[12px] font-semibold leading-snug text-[#141414] sm:text-[13px]">{item.title}</h3>
+                <span className="mt-0.5 inline-block text-[11px] font-bold text-[#FF5733] sm:text-[12px]">{item.priceLabel}</span>
               </div>
               <ArrowRight className="hidden h-4 w-4 shrink-0 text-gray-400 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#FF5733] sm:block" />
             </Link>

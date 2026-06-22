@@ -300,19 +300,29 @@ export default function ProductSosmedLandingPage() {
     return filteredCards.filter((c) => !featuredKeys.has(c.key))
   }, [filteredCards, hotCards, promoCards])
 
+  const [heroSlideCodes, setHeroSlideCodes] = useState<string[]>([])
+
   const heroFeatured = useMemo(() => {
-    const top = allCards.slice(0, 2)
-    return top.map((card) => {
+    const codes = heroSlideCodes.length > 0
+      ? new Set(heroSlideCodes)
+      : null
+    const featured = codes
+      ? allCards.filter((c) => codes.has(c.code))
+      : allCards.slice(0, 2)
+    return featured.slice(0, 2).map((card) => {
       const Icon = iconForPlatform(card.platformIcon)
       return {
         key: card.key,
         href: `/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`,
         title: card.buyerTitle,
+        platformLabel: card.platform,
         priceLabel: card.priceLabel,
+        badgeText: card.badge,
+        toneClass: card.tone,
         Icon,
       }
     })
-  }, [allCards])
+  }, [allCards, heroSlideCodes])
 
   const HERO_SLIDE_DEFAULT = useMemo(() => ({
     key: 'sosmed-hero',
@@ -346,6 +356,9 @@ export default function ProductSosmedLandingPage() {
         }
       })
       setHeroSlides(mapped)
+      if (res.data[0]?.featured_service_codes?.length) {
+        setHeroSlideCodes(res.data[0].featured_service_codes)
+      }
     }).catch(() => {})
   }, [heroIconMap])
 
