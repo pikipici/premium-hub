@@ -161,7 +161,7 @@ export const BUNDLING_PACKAGES: SosmedBundleCard[] = [
     summary: 'Kombinasi layanan IG + Shopee buat toko yang aktif di dua platform sekaligus.',
     targetAudience: 'Reseller, dropshipper Shopee, UMKM IG + Shopee.',
     bestFor: 'Tampilan Instagram profesional & boost performa toko Shopee.',
-    badge: 'All in One',
+    badge: '',
     tone: 'from-[#FFF4EC] to-[#FFE8D8]', // Orange
     startingPriceLabel: 'Rp 11.800',
     features: [
