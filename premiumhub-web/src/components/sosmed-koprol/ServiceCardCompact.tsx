@@ -24,7 +24,12 @@ export type ServiceCardCompactProps = {
  */
 export function ServiceCardCompact({ href, title, Icon, platformLabel, priceLabel, badgeText, toneClass }: ServiceCardCompactProps) {
   const inner = (
-    <div className="flex h-full gap-3 rounded-2xl bg-white px-3 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-black/5 transition-all duration-200 hover:shadow-[0_12px_32px_rgba(20,20,20,0.10)] active:scale-[0.97] sm:gap-3.5 sm:px-4 sm:py-3.5">
+    <div className="relative flex h-full gap-3 rounded-2xl bg-white px-3 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-black/5 transition-all duration-200 hover:shadow-[0_12px_32px_rgba(20,20,20,0.10)] active:scale-[0.97] sm:gap-3.5 sm:px-4 sm:py-3.5">
+      {badgeText ? (
+        <span className="absolute -right-2 -top-2 z-10 inline-flex max-w-[100px] items-center truncate rounded-full bg-[#FF5733] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm sm:text-[10px]">
+          {badgeText}
+        </span>
+      ) : null}
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ring-1 ring-gray-100 sm:h-12 sm:w-12 ${toneClass ?? 'from-[#F5F5F5] to-[#EBEBEB]'}`}>
         <Icon className="h-5 w-5 text-[#141414] sm:h-5.5 sm:w-5.5" />
       </div>
@@ -33,16 +38,9 @@ export function ServiceCardCompact({ href, title, Icon, platformLabel, priceLabe
           <span className="truncate text-[11px] font-semibold text-[#888] sm:text-xs">{platformLabel}</span>
         ) : null}
         <h3 className="line-clamp-1 text-[13px] font-semibold leading-snug text-[#141414] sm:text-sm">{title}</h3>
-        <div className="mt-0.5 flex items-center gap-2">
-          {priceLabel ? (
-            <span className="text-[12px] font-bold text-[#FF5733] sm:text-[13px]">{priceLabel}</span>
-          ) : null}
-          {badgeText ? (
-            <span className="inline-flex max-w-[100px] items-center truncate rounded-full bg-[#FF5733] px-1.5 py-0.5 text-[9px] font-semibold text-white sm:text-[10px]">
-              {badgeText}
-            </span>
-          ) : null}
-        </div>
+        {priceLabel ? (
+          <span className="text-[12px] font-bold text-[#FF5733] sm:text-[13px]">{priceLabel}</span>
+        ) : null}
       </div>
     </div>
   )
