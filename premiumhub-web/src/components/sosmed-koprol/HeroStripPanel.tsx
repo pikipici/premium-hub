@@ -59,8 +59,8 @@ export function HeroStripPanel({ slides, featured }: HeroStripPanelProps) {
   const currentSlide = slides[selectedIndex] || slides[0]
 
   return (
-    <section className="grid grid-cols-5 gap-3 sm:gap-4">
-      <div className="relative col-span-3 overflow-hidden rounded-3xl shadow-[0_18px_42px_rgba(20,20,20,0.20)] ring-1 ring-black/5"
+    <section className="grid grid-cols-1 gap-3 sm:grid-cols-5 sm:gap-4">
+      <div className="relative col-span-1 overflow-hidden rounded-3xl shadow-[0_18px_42px_rgba(20,20,20,0.20)] ring-1 ring-black/5 sm:col-span-3"
         style={{
           backgroundColor: currentSlide?.bgColor || '#141414',
           backgroundImage: currentSlide?.bgImage ? `url(${currentSlide.bgImage})` : undefined,
@@ -127,7 +127,7 @@ export function HeroStripPanel({ slides, featured }: HeroStripPanelProps) {
         )}
       </div>
 
-      <div className="col-span-2 flex flex-col gap-2 sm:gap-3">
+      <div className="col-span-1 flex flex-col gap-2 sm:col-span-2 sm:gap-3">
         {featured.slice(0, 2).map((item) => {
           const Icon = item.Icon
           return (
