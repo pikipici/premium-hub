@@ -20,32 +20,34 @@ func NewSosmedHeroSlideService(repo *repository.SosmedHeroSlideRepo) *SosmedHero
 }
 
 type CreateSosmedHeroSlideInput struct {
-	PageKey            string  `json:"page_key"`
-	Title              string  `json:"title"`
-	Subtitle           string  `json:"subtitle"`
-	CTALabel           string  `json:"cta_label"`
-	CTAHref            string  `json:"cta_href"`
-	Icon               string  `json:"icon"`
-	BackgroundColor    string  `json:"background_color"`
-	BackgroundImageURL string  `json:"background_image_url"`
-	SortOrder          int     `json:"sort_order"`
-	StartsAt           string  `json:"starts_at"`
-	EndsAt             string  `json:"ends_at"`
-	IsActive           *bool   `json:"is_active"`
+	PageKey              string   `json:"page_key"`
+	Title                string   `json:"title"`
+	Subtitle             string   `json:"subtitle"`
+	CTALabel             string   `json:"cta_label"`
+	CTAHref              string   `json:"cta_href"`
+	Icon                 string   `json:"icon"`
+	BackgroundColor      string   `json:"background_color"`
+	BackgroundImageURL   string   `json:"background_image_url"`
+	FeaturedServiceCodes []string `json:"featured_service_codes"`
+	SortOrder            int      `json:"sort_order"`
+	StartsAt             string   `json:"starts_at"`
+	EndsAt               string   `json:"ends_at"`
+	IsActive             *bool    `json:"is_active"`
 }
 
 type UpdateSosmedHeroSlideInput struct {
-	Title              string  `json:"title"`
-	Subtitle           string  `json:"subtitle"`
-	CTALabel           string  `json:"cta_label"`
-	CTAHref            string  `json:"cta_href"`
-	Icon               string  `json:"icon"`
-	BackgroundColor    string  `json:"background_color"`
-	BackgroundImageURL string  `json:"background_image_url"`
-	SortOrder          *int    `json:"sort_order"`
-	StartsAt           string  `json:"starts_at"`
-	EndsAt             string  `json:"ends_at"`
-	IsActive           *bool   `json:"is_active"`
+	Title                string   `json:"title"`
+	Subtitle             string   `json:"subtitle"`
+	CTALabel             string   `json:"cta_label"`
+	CTAHref              string   `json:"cta_href"`
+	Icon                 string   `json:"icon"`
+	BackgroundColor      string   `json:"background_color"`
+	BackgroundImageURL   string   `json:"background_image_url"`
+	FeaturedServiceCodes []string `json:"featured_service_codes"`
+	SortOrder            *int     `json:"sort_order"`
+	StartsAt             string   `json:"starts_at"`
+	EndsAt               string   `json:"ends_at"`
+	IsActive             *bool    `json:"is_active"`
 }
 
 func parseHeroSlideTime(s string) *time.Time {
@@ -57,6 +59,19 @@ func parseHeroSlideTime(s string) *time.Time {
 		return nil
 	}
 	return &t
+}
+
+func cleanServiceCodes(codes []string) []string {
+	var out []string
+	seen := make(map[string]bool)
+	for _, c := range codes {
+		trimmed := strings.TrimSpace(c)
+		if trimmed != "" && !seen[trimmed] {
+			out = append(out, trimmed)
+			seen[trimmed] = true
+		}
+	}
+	return out
 }
 
 func (s *SosmedHeroSlideService) ListActive(pageKey string) ([]model.SosmedHeroSlide, error) {
@@ -92,17 +107,18 @@ func (s *SosmedHeroSlideService) Create(input CreateSosmedHeroSlideInput) (*mode
 	}
 
 	slide := &model.SosmedHeroSlide{
-		PageKey:            pageKey,
-		Title:              title,
-		Subtitle:           strings.TrimSpace(input.Subtitle),
-		CTALabel:           strings.TrimSpace(input.CTALabel),
-		CTAHref:            strings.TrimSpace(input.CTAHref),
-		Icon:               icon,
-		BackgroundColor:    bgColor,
-		BackgroundImageURL: strings.TrimSpace(input.BackgroundImageURL),
-		SortOrder:          input.SortOrder,
-		StartsAt:           parseHeroSlideTime(input.StartsAt),
-		EndsAt:             parseHeroSlideTime(input.EndsAt),
+		PageKey:              pageKey,
+		Title:                title,
+		Subtitle:             strings.TrimSpace(input.Subtitle),
+		CTALabel:             strings.TrimSpace(input.CTALabel),
+		CTAHref:              strings.TrimSpace(input.CTAHref),
+		Icon:                 icon,
+		BackgroundColor:      bgColor,
+		BackgroundImageURL:   strings.TrimSpace(input.BackgroundImageURL),
+		FeaturedServiceCodes: cleanServiceCodes(input.FeaturedServiceCodes),
+		SortOrder:            input.SortOrder,
+		StartsAt:             parseHeroSlideTime(input.StartsAt),
+		EndsAt:               parseHeroSlideTime(input.EndsAt),
 	}
 
 	if input.IsActive != nil {
@@ -147,6 +163,10 @@ func (s *SosmedHeroSlideService) Update(id string, input UpdateSosmedHeroSlideIn
 
 	if input.BackgroundImageURL != "" {
 		existing.BackgroundImageURL = strings.TrimSpace(input.BackgroundImageURL)
+	}
+
+	if input.FeaturedServiceCodes != nil {
+		existing.FeaturedServiceCodes = cleanServiceCodes(input.FeaturedServiceCodes)
 	}
 
 	if input.SortOrder != nil {

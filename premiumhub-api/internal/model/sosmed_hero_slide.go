@@ -8,21 +8,22 @@ import (
 )
 
 type SosmedHeroSlide struct {
-	ID                 uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
-	PageKey            string     `gorm:"size:100;index;not null" json:"page_key"`
-	Title              string     `gorm:"size:160;not null" json:"title"`
-	Subtitle           string     `gorm:"size:500" json:"subtitle"`
-	CTALabel           string     `gorm:"size:80" json:"cta_label"`
-	CTAHref            string     `gorm:"size:300" json:"cta_href"`
-	Icon               string     `gorm:"size:50;default:'Sparkles'" json:"icon"`
-	BackgroundColor    string     `gorm:"size:30;not null;default:'#141414'" json:"background_color"`
-	BackgroundImageURL string     `gorm:"size:500" json:"background_image_url"`
-	SortOrder          int        `gorm:"default:0" json:"sort_order"`
-	StartsAt           *time.Time `json:"starts_at"`
-	EndsAt             *time.Time `json:"ends_at"`
-	IsActive           bool       `gorm:"not null;default:true" json:"is_active"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                   uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	PageKey              string     `gorm:"size:100;index;not null" json:"page_key"`
+	Title                string     `gorm:"size:160;not null" json:"title"`
+	Subtitle             string     `gorm:"size:500" json:"subtitle"`
+	CTALabel             string     `gorm:"size:80" json:"cta_label"`
+	CTAHref              string     `gorm:"size:300" json:"cta_href"`
+	Icon                 string     `gorm:"size:50;default:'Sparkles'" json:"icon"`
+	BackgroundColor      string     `gorm:"size:30;not null;default:'#141414'" json:"background_color"`
+	BackgroundImageURL   string     `gorm:"size:500" json:"background_image_url"`
+	FeaturedServiceCodes []string   `gorm:"serializer:json" json:"featured_service_codes,omitempty"`
+	SortOrder            int        `gorm:"default:0" json:"sort_order"`
+	StartsAt             *time.Time `json:"starts_at"`
+	EndsAt               *time.Time `json:"ends_at"`
+	IsActive             bool       `gorm:"not null;default:true" json:"is_active"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
 func (s *SosmedHeroSlide) BeforeCreate(_ *gorm.DB) error {
