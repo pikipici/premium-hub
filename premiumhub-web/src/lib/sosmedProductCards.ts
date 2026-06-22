@@ -300,10 +300,6 @@ function platformBestFor(platform: string, title: string, badge: string, refill:
 }
 
 function readableBadge(platform: string, title: string, badge: string) {
-  const combined = `${title} ${badge}`.toLowerCase()
-  if (combined.includes('prioritas')) return 'Paling Direkomendasikan'
-  if (combined.includes('hemat')) return 'Paling Murah'
-  if (platform.toLowerCase().includes('twitter')) return 'Cocok Buat Test'
   return badge
 }
 
