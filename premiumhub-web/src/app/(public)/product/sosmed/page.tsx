@@ -251,57 +251,39 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
     el.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' })
   }
 
+  const slotLeft = canScrollLeft ? (
+    <button key="scroll-left" onClick={() => scroll('left')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50" aria-label="Scroll kiri">
+      <ChevronLeft className="h-4 w-4 text-gray-500" />
+    </button>
+  ) : null
+  const slotRight = canScrollRight ? (
+    <button key="scroll-right" onClick={() => scroll('right')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50" aria-label="Scroll kanan">
+      <ChevronRight className="h-4 w-4 text-gray-500" />
+    </button>
+  ) : null
+
+  const pills = platforms.map((p) => {
+    const count = p === 'Semua' ? allCardsLength : (platformCounts[p] || 0)
+    const iconKey = p === 'Semua' ? null : platformIconKeyFor(p)
+    const IconComp = iconKey ? (PLATFORM_ICON_COMPONENTS[iconKey] ?? null) : null
+    return (
+      <button key={p} onClick={() => setActivePlatform(p)}
+        className={'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all sm:px-3.5 sm:text-xs' + (activePlatform === p ? ' bg-[#141414] text-white shadow-md' : ' bg-white text-gray-500 ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900')}
+      >
+        {IconComp ? <IconComp className="h-3.5 w-3.5" /> : null}
+        <span>{p}</span>
+        <span className={'ml-0.5 rounded-full px-1.5 py-[1px] text-[9px] font-semibold sm:text-[10px]' + (activePlatform === p ? ' bg-white/20 text-white/80' : ' bg-gray-100 text-gray-400')}>{count}</span>
+      </button>
+    )
+  })
+
   return (
     <div className="mt-4 flex items-center gap-1 sm:mt-5">
-        {canScrollLeft && (
-          <button
-            onClick={() => scroll('left')}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50"
-            aria-label="Scroll kiri"
-          >
-            <ChevronLeft className="h-4 w-4 text-gray-500" />
-          </button>
-        )}
-        <div ref={scrollRef} className="flex flex-1 overflow-x-auto">
-          <div className="flex min-w-max justify-center gap-1.5">
-            {platforms.map((p) => {
-              const count = p === 'Semua' ? allCardsLength : (platformCounts[p] || 0)
-              const iconKey = p === 'Semua' ? null : platformIconKeyFor(p)
-              const IconComp = iconKey ? (PLATFORM_ICON_COMPONENTS[iconKey] ?? null) : null
-              return (
-                <button
-                  key={p}
-                  onClick={() => setActivePlatform(p)}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all sm:px-3.5 sm:text-xs ${
-                    activePlatform === p
-                      ? 'bg-[#141414] text-white shadow-md'
-                      : 'bg-white text-gray-500 ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  {IconComp ? <IconComp className="h-3.5 w-3.5" /> : null}
-                  <span>{p}</span>
-                  <span className={`ml-0.5 rounded-full px-1.5 py-[1px] text-[9px] font-semibold sm:text-[10px] ${
-                    activePlatform === p
-                      ? 'bg-white/20 text-white/80'
-                      : 'bg-gray-100 text-gray-400'
-                  }`}>
-                    {count}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-        {canScrollRight && (
-          <button
-            onClick={() => scroll('right')}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50"
-            aria-label="Scroll kanan"
-          >
-            <ChevronRight className="h-4 w-4 text-gray-500" />
-          </button>
-        )}
+      {slotLeft}
+      <div ref={scrollRef} className="flex flex-1 overflow-x-auto">
+        <div className="flex min-w-max justify-center gap-1.5">{pills}</div>
       </div>
+      {slotRight}
     </div>
   )
 }
