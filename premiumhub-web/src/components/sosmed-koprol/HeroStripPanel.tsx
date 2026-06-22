@@ -127,29 +127,26 @@ export function HeroStripPanel({ slides, featured }: HeroStripPanelProps) {
         )}
       </div>
 
-      <div className="col-span-2 flex flex-col gap-1.5 sm:gap-3">
+      <div className="col-span-2 flex flex-col gap-2 sm:gap-3">
         {featured.slice(0, 2).map((item) => {
           const Icon = item.Icon
           return (
             <Link
               key={item.key}
               href={item.href}
-              className="group relative flex flex-1 items-center gap-1.5 rounded-2xl bg-white p-2 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-transparent transition-all duration-200 hover:-translate-y-0.5 hover:ring-[#FF5733]/30 active:scale-[0.98] sm:gap-3 sm:rounded-3xl sm:p-4"
+              className="group relative flex flex-1 items-center gap-2 rounded-2xl bg-white p-2.5 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-transparent transition-all duration-200 hover:-translate-y-0.5 hover:ring-[#FF5733]/30 active:scale-[0.98] sm:gap-3 sm:rounded-3xl sm:p-4"
             >
               {item.badgeText ? (
                 <span className="absolute -right-1.5 -top-1.5 z-10 inline-flex max-w-[60px] items-center truncate rounded-full bg-[#FF5733] px-1 py-[1px] text-[6px] font-bold uppercase tracking-wide text-white shadow-sm sm:-right-2 sm:-top-2 sm:max-w-[100px] sm:px-1.5 sm:py-0.5 sm:text-[10px]">
                   {item.badgeText}
                 </span>
               ) : null}
-              <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ring-1 ring-gray-100 sm:h-12 sm:w-12 sm:rounded-xl ${item.toneClass ?? 'from-[#F5F5F5] to-[#EBEBEB]'}`}>
-                <Icon className="h-3 w-3 text-[#141414] sm:h-5.5 sm:w-5.5" />
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br sm:h-12 sm:w-12 ${item.toneClass ?? 'from-[#F5F5F5] to-[#EBEBEB]'}`}>
+                <Icon className="h-4 w-4 text-[#141414] sm:h-6 sm:w-6" />
               </div>
               <div className="min-w-0 flex-1">
-                {item.platformLabel ? (
-                  <span className="truncate text-[8px] font-semibold text-[#888] sm:text-[11px]">{item.platformLabel}</span>
-                ) : null}
-                <h3 className="line-clamp-1 text-[10px] font-semibold leading-snug text-[#141414] sm:text-[13px]">{item.title}</h3>
-                <span className="inline-block text-[9px] font-bold text-[#FF5733] sm:text-[12px]">{item.priceLabel}</span>
+                <h3 className="truncate text-[11px] font-semibold text-[#141414] sm:text-sm">{item.title}</h3>
+                <p className="truncate text-[10px] font-bold text-[#FF5733] sm:mt-0.5 sm:text-xs">{item.priceLabel}</p>
               </div>
               <ArrowRight className="hidden h-4 w-4 shrink-0 text-gray-400 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-[#FF5733] sm:block" />
             </Link>
