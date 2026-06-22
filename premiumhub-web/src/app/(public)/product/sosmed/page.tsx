@@ -262,7 +262,7 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
             <ChevronLeft className="h-4 w-4 text-gray-500" />
           </button>
         )}
-        <div ref={scrollRef} className="flex flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={scrollRef} className="flex flex-1 overflow-x-auto">
           <div className="flex min-w-max justify-center gap-1.5">
             {platforms.map((p) => {
               const count = p === 'Semua' ? allCardsLength : (platformCounts[p] || 0)
