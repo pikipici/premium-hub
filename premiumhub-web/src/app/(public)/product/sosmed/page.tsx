@@ -252,8 +252,7 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
   }
 
   return (
-    <div className="mt-4 sm:mt-5">
-      <div className="flex items-center gap-1">
+    <div className="mt-4 flex items-center gap-1 sm:mt-5">
         {canScrollLeft && (
           <button
             onClick={() => scroll('left')}
@@ -263,7 +262,7 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
             <ChevronLeft className="h-4 w-4 text-gray-500" />
           </button>
         )}
-        <div ref={scrollRef} className="flex flex-1 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={scrollRef} className="flex flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex min-w-max justify-center gap-1.5">
             {platforms.map((p) => {
               const count = p === 'Semua' ? allCardsLength : (platformCounts[p] || 0)
@@ -303,9 +302,6 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
           </button>
         )}
       </div>
-      {canScrollRight && (
-        <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[#F4F5F8] to-transparent" />
-      )}
     </div>
   )
 }
