@@ -114,6 +114,7 @@ export default function SosmedFeaturedCard() {
           ))}
         </div>
       )}
+      <p className="mb-1 text-[10px] text-[#aaa]">Services: {services.length} | Codes: {parsedCodes.join(', ') || '(kosong)'}</p>
       {parsedCodes.length > 0 && previewCards.length < parsedCodes.length && (
         <p className="mb-2 text-[10px] font-semibold text-amber-600">
           {parsedCodes.length - previewCards.length} kode tidak ditemukan: {parsedCodes.filter(c => !previewCards.some(p => p.code === c)).join(', ')}
