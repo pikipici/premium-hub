@@ -252,12 +252,12 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
   }
 
   const slotLeft = canScrollLeft ? (
-    <button key="scroll-left" onClick={() => scroll('left')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50" aria-label="Scroll kiri">
+    <button key="scroll-left" onClick={() => scroll('left')} className="absolute left-0 top-1/2 z-10 hidden -translate-y-1/2 md:flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50" aria-label="Scroll kiri">
       <ChevronLeft className="h-4 w-4 text-gray-500" />
     </button>
   ) : null
   const slotRight = canScrollRight ? (
-    <button key="scroll-right" onClick={() => scroll('right')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50" aria-label="Scroll kanan">
+    <button key="scroll-right" onClick={() => scroll('right')} className="absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 md:flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50" aria-label="Scroll kanan">
       <ChevronRight className="h-4 w-4 text-gray-500" />
     </button>
   ) : null
@@ -278,12 +278,15 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
   })
 
   return (
-    <div className="mt-4 flex items-center gap-1 sm:mt-5">
+    <div className="relative mt-4 sm:mt-5">
       {slotLeft}
       <div ref={scrollRef} className="flex flex-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max justify-center gap-1.5">{pills}</div>
+        <div className="flex min-w-max justify-center gap-1.5 px-9">{pills}</div>
       </div>
       {slotRight}
+      {/* Fade gradients on edges */}
+      {canScrollLeft ? <div className="pointer-events-none absolute left-0 top-0 hidden h-full w-8 bg-gradient-to-r from-[#F4F5F8] to-transparent md:block" /> : null}
+      {canScrollRight ? <div className="pointer-events-none absolute right-0 top-0 hidden h-full w-8 bg-gradient-to-l from-[#F4F5F8] to-transparent md:block" /> : null}
     </div>
   )
 }
