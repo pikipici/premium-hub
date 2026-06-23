@@ -391,8 +391,8 @@ export default function ProductSosmedLandingPage() {
       : null
     const featured = codes
       ? allCards.filter((c) => codes.has(c.code))
-      : allCards.slice(0, 2)
-    return featured.slice(0, 2).map((card) => {
+      : allCards.slice(0, 4)
+    return featured.slice(0, 4).map((card) => {
       const Icon = iconForPlatform(card.platformIcon)
       return {
         key: card.key,
@@ -482,7 +482,7 @@ export default function ProductSosmedLandingPage() {
                 }
                 title="Produk Unggulan"
               />
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-5">
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-5 lg:grid-cols-4">
                 {heroFeatured.map((item) => {
                   const Icon = item.Icon
                   return (
