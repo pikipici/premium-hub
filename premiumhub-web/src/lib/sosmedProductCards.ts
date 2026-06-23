@@ -1,5 +1,4 @@
 import type { SosmedPromotionPrice, SosmedService } from '@/types/sosmedService'
-
 export type SosmedPlatformIconKey =
   | 'instagram'
   | 'facebook'
@@ -398,7 +397,14 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
       startTime,
       refill,
       eta,
-      priceLabel: checkoutPrice > 0 ? formatRupiah(checkoutPrice) : fallback.priceLabel,
+      priceLabel: (() => {
+        const raw = checkoutPrice > 0 ? formatRupiah(checkoutPrice) : fallback.priceLabel
+        const rawMin = (item.min_order || '1.000').replace(/\./g, '')
+        const minNum = parseInt(rawMin, 10) || 1000
+        const displayMin = minNum >= 1000 ? (minNum / 1000).toLocaleString('id-ID', { maximumFractionDigits: 0 }) + 'K' : minNum.toLocaleString('id-ID')
+        const labels: Record<string, string> = { followers: 'Followers', likes: 'Like', views: 'Views', komentar: 'Komentar', share: 'Share' }
+        return raw + ' / ' + displayMin + ' ' + (labels[unit] || unit)
+      })(),
       packageLabel: packageLabelFor(unit),
       packageExamples: packageExamplesFor(unit),
       benefits: buildBenefits(startTime, refill, eta),
