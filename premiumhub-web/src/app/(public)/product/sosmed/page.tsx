@@ -280,7 +280,7 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
   return (
     <div className="mt-4 flex items-center gap-1 sm:mt-5">
       {slotLeft}
-      <div ref={scrollRef} className="flex flex-1 overflow-x-auto">
+      <div ref={scrollRef} className="flex flex-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max justify-center gap-1.5">{pills}</div>
       </div>
       {slotRight}
