@@ -38,7 +38,9 @@ export default function SosmedFeaturedCard() {
   const previewCards = useMemo(() => {
     if (!parsedCodes.length || !services.length) return []
     const codeSet = new Set(parsedCodes)
-    return buildSosmedServiceCards(services).filter(c => codeSet.has(c.code))
+    try {
+      return buildSosmedServiceCards(services).filter(c => codeSet.has(c.code))
+    } catch { return [] }
   }, [parsedCodes, services])
 
   const handleSave = async () => {
