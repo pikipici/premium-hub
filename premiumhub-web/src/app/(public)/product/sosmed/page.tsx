@@ -225,24 +225,50 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  // Detect desktop: >= 768px. Jalan di client only.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    // Set initial value setelah mount (ini valid — bukan cascade render)
+    const id = setTimeout(() => setIsDesktop(mq.matches), 0)
+    return () => {
+      clearTimeout(id)
+      mq.removeEventListener('change', handler)
+    }
+  }, [])
 
   const checkScroll = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
     setCanScrollLeft(el.scrollLeft > 4)
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
   }, [])
+
+  // Re-check tiap kali platforms berubah (data API masuk, pills bertambah)
+  useEffect(() => {
+    const raf1 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => checkScroll())
+    })
+    return () => cancelAnimationFrame(raf1)
+  }, [platforms, checkScroll])
 
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    checkScroll()
+    // double-rAF on mount: tunggu browser layout selesai
+    const raf1 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => checkScroll())
+    })
     el.addEventListener('scroll', checkScroll, { passive: true })
     window.addEventListener('resize', checkScroll)
-    // ResizeObserver: re-check saat pills selesai render atau container resize
-    const ro = new ResizeObserver(() => checkScroll())
+    const ro = new ResizeObserver(() => requestAnimationFrame(() => checkScroll()))
     ro.observe(el)
     return () => {
+      cancelAnimationFrame(raf1)
+      cancelAnimationFrame(raf2)
       el.removeEventListener('scroll', checkScroll)
       window.removeEventListener('resize', checkScroll)
       ro.disconnect()
@@ -250,21 +276,8 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
   }, [checkScroll])
 
   const scroll = (dir: 'left' | 'right') => {
-    const el = scrollRef.current
-    if (!el) return
-    el.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' })
+    scrollRef.current?.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' })
   }
-
-  const slotLeft = canScrollLeft ? (
-    <button key="scroll-left" onClick={() => scroll('left')} className="absolute left-0 top-1/2 z-20 hidden -translate-y-1/2 md:flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50 active:scale-95" aria-label="Scroll kiri">
-      <ChevronLeft className="h-4 w-4 text-gray-500" />
-    </button>
-  ) : null
-  const slotRight = canScrollRight ? (
-    <button key="scroll-right" onClick={() => scroll('right')} className="absolute right-0 top-1/2 z-20 hidden -translate-y-1/2 md:flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md ring-1 ring-black/5 transition hover:bg-gray-50 active:scale-95" aria-label="Scroll kanan">
-      <ChevronRight className="h-4 w-4 text-gray-500" />
-    </button>
-  ) : null
 
   const pills = platforms.map((p) => {
     const count = p === 'Semua' ? allCardsLength : (platformCounts[p] || 0)
@@ -281,16 +294,67 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
     )
   })
 
+  // Arrow button style: pakai inline style biar ngga konflik Tailwind purge/order
+  const arrowBase: React.CSSProperties = {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: 20,
+    display: isDesktop ? 'flex' : 'none',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: '50%',
+    background: '#fff',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+    border: '1px solid rgba(0,0,0,0.06)',
+    cursor: 'pointer',
+    transition: 'background 0.15s',
+  }
+
   return (
-    <div className="relative mt-4 sm:mt-5">
-      {slotLeft}
-      <div ref={scrollRef} className="flex flex-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max justify-center gap-1.5 px-9">{pills}</div>
+    <div style={{ position: 'relative', marginTop: 16 }}>
+      {/* Left arrow */}
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          style={{ ...arrowBase, left: 0 }}
+          aria-label="Scroll kiri"
+        >
+          <ChevronLeft style={{ width: 16, height: 16, color: '#6b7280' }} />
+        </button>
+      )}
+
+      {/* Scroll container */}
+      <div
+        ref={scrollRef}
+        style={{ overflowX: 'auto', display: 'flex', flex: 1, scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        className="[&::-webkit-scrollbar]:hidden"
+      >
+        <div style={{ display: 'flex', minWidth: 'max-content', gap: 6, padding: '0 36px' }}>
+          {pills}
+        </div>
       </div>
-      {slotRight}
-      {/* Fade gradients on edges */}
-      {canScrollLeft ? <div className="pointer-events-none absolute left-0 top-0 hidden h-full w-8 bg-gradient-to-r from-[#F4F5F8] to-transparent md:block" /> : null}
-      {canScrollRight ? <div className="pointer-events-none absolute right-0 top-0 hidden h-full w-8 bg-gradient-to-l from-[#F4F5F8] to-transparent md:block" /> : null}
+
+      {/* Right arrow */}
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          style={{ ...arrowBase, right: 0 }}
+          aria-label="Scroll kanan"
+        >
+          <ChevronRight style={{ width: 16, height: 16, color: '#6b7280' }} />
+        </button>
+      )}
+
+      {/* Fade gradients — desktop only via inline style */}
+      {canScrollLeft && isDesktop && (
+        <div style={{ pointerEvents: 'none', position: 'absolute', left: 0, top: 0, height: '100%', width: 36, background: 'linear-gradient(to right, #F4F5F8, transparent)' }} />
+      )}
+      {canScrollRight && isDesktop && (
+        <div style={{ pointerEvents: 'none', position: 'absolute', right: 0, top: 0, height: '100%', width: 36, background: 'linear-gradient(to left, #F4F5F8, transparent)' }} />
+      )}
     </div>
   )
 }
