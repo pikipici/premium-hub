@@ -36,10 +36,12 @@ export default function SosmedFeaturedCard() {
   )
 
   const previewCards = useMemo(() => {
-    if (!parsedCodes.length || !services.length) return []
+    if (!services.length) return []
+    const all = buildSosmedServiceCards(services)
+    if (!parsedCodes.length) return all.slice(0, 4)
     const codeSet = new Set(parsedCodes)
     try {
-      return buildSosmedServiceCards(services).filter(c => codeSet.has(c.code))
+      return all.filter(c => codeSet.has(c.code))
     } catch { return [] }
   }, [parsedCodes, services])
 
@@ -116,7 +118,6 @@ export default function SosmedFeaturedCard() {
           ))}
         </div>
       )}
-      <p className="mb-1 text-[10px] text-[#aaa]">Services: {services.length} | Codes: {parsedCodes.join(', ') || '(kosong)'}</p>
       {parsedCodes.length > 0 && previewCards.length < parsedCodes.length && (
         <p className="mb-2 text-[10px] font-semibold text-amber-600">
           {parsedCodes.length - previewCards.length} kode tidak ditemukan: {parsedCodes.filter(c => !previewCards.some(p => p.code === c)).join(', ')}
