@@ -201,13 +201,15 @@ export default function SosmedFeaturedCard() {
         <div className="mb-3 grid grid-cols-2 gap-2">
           {previewCards.map((card) => (
             <div key={card.key} className="group relative flex items-center gap-2 rounded-xl bg-[#F7F7F5] p-2.5">
-              <button
-                onClick={() => toggleProduct(card.code)}
-                className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-[#FF5733] text-white opacity-0 shadow-sm transition group-hover:opacity-100"
-                aria-label={`Hapus ${card.buyerTitle}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
+              {selectedSet.has(card.code) && (
+                <button
+                  onClick={() => toggleProduct(card.code)}
+                  className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-[#FF5733] text-white opacity-0 shadow-sm transition group-hover:opacity-100"
+                  aria-label={`Hapus ${card.buyerTitle}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-black/5">
                 <Package className="h-4 w-4 text-[#666]" />
               </div>
