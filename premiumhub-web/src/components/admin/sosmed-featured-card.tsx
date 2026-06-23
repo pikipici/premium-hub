@@ -105,7 +105,10 @@ export default function SosmedFeaturedCard() {
         targetId = created.data?.id
         if (targetId) setSlide(created.data || null)
       } else {
-        const res = await sosmedHeroSlideService.adminUpdate(targetId, { featured_service_codes: parsed })
+        const res = await sosmedHeroSlideService.adminUpdate(targetId, {
+          title: slide?.title || 'Hero Slide',
+          featured_service_codes: parsed,
+        })
         if (!res.success) {
           setMsg(res.message || 'Gagal menyimpan')
           return
