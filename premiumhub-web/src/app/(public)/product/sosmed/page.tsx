@@ -391,8 +391,8 @@ export default function ProductSosmedLandingPage() {
       : null
     const featured = codes
       ? allCards.filter((c) => codes.has(c.code))
-      : allCards.slice(0, 4)
-    return featured.slice(0, 4).map((card) => {
+      : []
+    return featured.map((card) => {
       const Icon = iconForPlatform(card.platformIcon)
       return {
         key: card.key,

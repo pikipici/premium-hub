@@ -58,7 +58,7 @@ export default function SosmedFeaturedCard() {
 
   const previewCards = useMemo(() => {
     if (!allCards.length) return []
-    if (!parsedCodes.length) return allCards.slice(0, 4)
+    if (!parsedCodes.length) return [] // no fallback — only show when codes are assigned
     return allCards.filter(c => selectedSet.has(c.code))
   }, [allCards, parsedCodes, selectedSet])
 
@@ -82,7 +82,6 @@ export default function SosmedFeaturedCard() {
       setCodes(fallbackCodes.join(', '))
       return
     } else {
-      if (current.size >= 4) return
       current.add(code)
     }
     setCodes(Array.from(current).join(', '))
@@ -132,7 +131,7 @@ export default function SosmedFeaturedCard() {
   return (
     <div className="rounded-2xl border border-[#EBEBEB] bg-white p-5">
       <h3 className="text-sm font-bold mb-1">Produk Unggulan di Hero</h3>
-      <p className="mb-4 text-xs text-[#888]">Pilih 4 produk yang tampil sebagai card di samping hero slide halaman DigiSosmed.</p>
+      <p className="mb-4 text-xs text-[#888]">Pilih produk yang tampil sebagai card di samping hero slide halaman DigiSosmed.</p>
 
       {!slide ? (
         <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700">
@@ -151,7 +150,7 @@ export default function SosmedFeaturedCard() {
           className="inline-flex items-center gap-1.5 rounded-full bg-[#F7F7F5] px-4 py-2 text-[11px] font-semibold text-[#555] ring-1 ring-inset ring-[#E5E5E5] transition hover:bg-[#EEE]"
         >
           <Search className="h-3.5 w-3.5" />
-          Pilih Produk{parsedCodes.length > 0 ? ` (${parsedCodes.length}/4)` : ''}
+          Pilih Produk{parsedCodes.length > 0 ? ` (${parsedCodes.length})` : ''}
         </button>
 
         {pickerOpen && (
@@ -175,7 +174,7 @@ export default function SosmedFeaturedCard() {
                     <button
                       key={card.key}
                       onClick={() => toggleProduct(card.code)}
-                      disabled={!selected && selectedSet.size >= 4}
+                      disabled={false}
                       className={'flex items-center gap-2.5 rounded-xl px-3 py-2 text-left transition ' + (
                         selected
                           ? 'bg-[#FF5733]/10 ring-1 ring-[#FF5733]/30'
@@ -206,7 +205,7 @@ export default function SosmedFeaturedCard() {
 
       {/* Preview cards */}
       {previewCards.length > 0 && (
-        <div className="mb-3 grid grid-cols-2 gap-2">
+        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {previewCards.map((card) => (
             <div key={card.key} className="group relative flex items-center gap-2 rounded-xl bg-[#F7F7F5] p-2.5">
               <button
