@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Loader2, Save } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Loader2, Package, Save } from 'lucide-react'
 import { sosmedHeroSlideService } from '@/services/sosmedHeroSlideService'
+import { sosmedService } from '@/services/sosmedService'
+import { buildSosmedServiceCards } from '@/lib/sosmedProductCards'
 import type { SosmedHeroSlide } from '@/types/sosmedHeroSlide'
+import type { SosmedService } from '@/types/sosmedService'
 
 export default function SosmedFeaturedCard() {
   const [slide, setSlide] = useState<SosmedHeroSlide | null>(null)
@@ -11,20 +14,36 @@ export default function SosmedFeaturedCard() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [services, setServices] = useState<SosmedService[]>([])
 
   useEffect(() => {
-    sosmedHeroSlideService.adminList().then((res) => {
-      if (res.success && res.data?.length) {
-        const first = res.data[0]
+    Promise.all([
+      sosmedHeroSlideService.adminList(),
+      sosmedService.adminList({ include_inactive: true }),
+    ]).then(([heroRes, svcRes]) => {
+      if (heroRes.success && heroRes.data?.length) {
+        const first = heroRes.data[0]
         setSlide(first)
         setCodes((first.featured_service_codes || []).join(', '))
       }
+      if (svcRes.success) setServices(svcRes.data || [])
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
+  const parsedCodes = useMemo(() =>
+    codes.split(',').map(s => s.trim()).filter(Boolean),
+    [codes]
+  )
+
+  const previewCards = useMemo(() => {
+    if (!parsedCodes.length || !services.length) return []
+    const codeSet = new Set(parsedCodes)
+    return buildSosmedServiceCards(services).filter(c => codeSet.has(c.code))
+  }, [parsedCodes, services])
+
   const handleSave = async () => {
     setSaving(true); setMsg('')
-    const parsed = codes.split(',').map(s => s.trim()).filter(Boolean)
+    const parsed = parsedCodes
     try {
       let targetId = slide?.id
       if (!targetId) {
@@ -80,6 +99,26 @@ export default function SosmedFeaturedCard() {
         placeholder="jap-6331, jap-10242"
         className="mb-2 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]"
       />
+      {previewCards.length > 0 && (
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          {previewCards.map((card) => (
+            <div key={card.key} className="flex items-center gap-2 rounded-xl bg-[#F7F7F5] p-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-black/5">
+                <Package className="h-4 w-4 text-[#666]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] font-semibold text-[#141414]">{card.buyerTitle}</p>
+                <p className="truncate text-[10px] text-[#888]">{card.platform} • {card.priceLabel}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {parsedCodes.length > 0 && previewCards.length < parsedCodes.length && (
+        <p className="mb-2 text-[10px] font-semibold text-amber-600">
+          {parsedCodes.length - previewCards.length} kode tidak ditemukan: {parsedCodes.filter(c => !previewCards.some(p => p.code === c)).join(', ')}
+        </p>
+      )}
       {msg && (
         <p className={`mb-2 text-xs font-semibold ${msg.includes('berhasil') ? 'text-green-600' : 'text-red-600'}`}>{msg}</p>
       )}
