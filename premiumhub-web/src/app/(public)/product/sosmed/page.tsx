@@ -607,7 +607,7 @@ export default function ProductSosmedLandingPage() {
                 {layananCards.map((card, idx) => {
                   const Icon = iconForPlatform(card.platformIcon)
                   return (
-                    <div key={card.key} className={cardVisibilityClass(idx, isExpanded('layanan'), null)}>
+                    <div key={card.key} className={cardVisibilityClass(idx, isExpanded('layanan'))}>
                       <ServiceCardCompact
                         href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                         title={card.buyerTitle}
@@ -653,7 +653,7 @@ export default function ProductSosmedLandingPage() {
                   const final = card.checkoutPrice
                   const discount = discountLabelFor(card.promotion, original, final)
                   return (
-                    <div key={`hot-${card.key}`} className={cardVisibilityClass(idx, isExpanded('hot'), null)}>
+                    <div key={`hot-${card.key}`} className={cardVisibilityClass(idx, isExpanded('hot'))}>
                       <HotPickCard
                         href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                         title={card.buyerTitle}
@@ -718,7 +718,7 @@ export default function ProductSosmedLandingPage() {
                     ? `-${bundle.promotion.discount_value}%`
                     : undefined
                   return (
-                    <div key={bundle.key} className={cardVisibilityClass(idx, isExpanded('bundle'), null)}>
+                    <div key={bundle.key} className={cardVisibilityClass(idx, isExpanded('bundle'))}>
                       <BundlePromoCard
                         href={checkoutHref}
                         title={bundle.buyerTitle}
@@ -774,7 +774,7 @@ export default function ProductSosmedLandingPage() {
                   const discount = discountLabelFor(card.promotion, original, final)
                   const saving = savingLabelFor(card.promotion, original, final)
                   return (
-                    <div key={`promo-${card.key}`} className={cardVisibilityClass(idx, isExpanded('promo'), null)}>
+                    <div key={`promo-${card.key}`} className={cardVisibilityClass(idx, isExpanded('promo'))}>
                       <PromoSavingCard
                         href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                         title={card.buyerTitle}
