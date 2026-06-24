@@ -28,7 +28,7 @@ export function ServiceCardCompact({ href, title, Icon, platformLabel, priceLabe
   const inner = (
     <div className="relative flex h-full gap-3 rounded-2xl bg-white px-3 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-black/5 transition-all duration-200 hover:shadow-[0_12px_32px_rgba(20,20,20,0.10)] active:scale-[0.97] sm:gap-3.5 sm:px-4 sm:py-3.5">
       {badgeText ? (
-        <span className="absolute -right-2 -top-2 z-10 inline-flex max-w-[100px] items-center truncate rounded-full bg-[#FF5733] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm sm:text-[10px]">
+        <span className="absolute right-1 top-1 z-10 inline-flex max-w-[100px] items-center truncate rounded-full bg-[#FF5733] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm sm:text-[10px]">
           {badgeText}
         </span>
       ) : null}
