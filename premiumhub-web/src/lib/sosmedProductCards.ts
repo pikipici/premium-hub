@@ -27,7 +27,7 @@ export type SosmedProductCard = {
   refill: string
   eta: string
   priceLabel: string
-  metaLine: string
+  metaLine?: string
   packageLabel: string
   packageExamples: string[]
   benefits: string[]
