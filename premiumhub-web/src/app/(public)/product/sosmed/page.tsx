@@ -483,6 +483,7 @@ export default function ProductSosmedLandingPage() {
         title: card.buyerTitle,
         platformLabel: card.platform,
         priceLabel: card.priceLabel,
+        metaLine: card.metaLine,
         badgeText: card.badge,
         toneClass: card.tone,
         Icon,
