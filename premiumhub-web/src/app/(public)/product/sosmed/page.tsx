@@ -9,25 +9,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Crown,
-  Flame,
-  Megaphone,
-  Rocket,
   ShieldCheck,
   Sparkles,
   Star,
   Tag,
-  TrendingUp,
   Users,
-  Zap,
   PackageCheck,
 } from 'lucide-react'
-
-import { sosmedHeroSlideService } from '@/services/sosmedHeroSlideService'
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
-import HeroStripPanel, { type HeroSlideContent } from '@/components/sosmed-koprol/HeroStripPanel'
+import HeroStripPanel, { type HeroSlide } from '@/components/sosmed-koprol/HeroStripPanel'
 import SectionHeader from '@/components/sosmed-koprol/SectionHeader'
 import ServiceCardCompact from '@/components/sosmed-koprol/ServiceCardCompact'
 import HotPickCard from '@/components/sosmed-koprol/HotPickCard'
@@ -491,45 +483,10 @@ export default function ProductSosmedLandingPage() {
     })
   }, [allCards, heroSlideCodes])
 
-  const HERO_SLIDE_DEFAULT = useMemo(() => ({
-    key: 'sosmed-hero',
-    title: 'Sosmed Murah, Aman, Cepat',
-    subtitle: 'Followers, Likes, Views, dan engagement asli buat akun lo. Tanpa password, langsung masuk wallet.',
-    ctaLabel: 'Mulai Order',
-    ctaHref: '#layanan',
-    Icon: Sparkles as ComponentType<SVGProps<SVGSVGElement>>,
-  }), [])
-
-  const heroIconMap: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = useMemo(() => ({
-    Sparkles, Flame, Megaphone, Zap, Star, Rocket, Crown, TrendingUp,
-  }), [])
-
-  const [heroSlides, setHeroSlides] = useState<HeroSlideContent[]>([])
-
-  useEffect(() => {
-    sosmedHeroSlideService.getPublic().then((res) => {
-      if (!res.success || !res.data?.length) return
-      const mapped = res.data.map((item) => {
-        const IconComp = (heroIconMap[item.icon] || Sparkles) as ComponentType<SVGProps<SVGSVGElement>>
-        return {
-          key: item.id || item.page_key,
-          title: item.title,
-          subtitle: item.subtitle || '',
-          ctaLabel: item.cta_label || '',
-          ctaHref: item.cta_href || '#layanan',
-          Icon: IconComp,
-          bgColor: item.background_color || '#141414',
-          bgImage: item.background_image_url || '',
-        }
-      })
-      setHeroSlides(mapped)
-      if (res.data[0]?.featured_service_codes?.length) {
-        setHeroSlideCodes(res.data[0].featured_service_codes)
-      }
-    }).catch(() => {})
-  }, [heroIconMap])
-
-  const displaySlides = heroSlides.length > 0 ? heroSlides : [HERO_SLIDE_DEFAULT]
+  const displaySlides: HeroSlide[] = useMemo(() => [
+    { key: 'sosmed-banner-1', src: '/images/banner-sosmed-1-opt.webp', alt: 'Banner Sosmed Premium Hub' },
+    { key: 'sosmed-banner-2', src: '/images/banner-sosmed-2-opt.webp', alt: 'Banner Promo Sosmed Premium Hub' },
+  ], [])
 
   return (
     <>
