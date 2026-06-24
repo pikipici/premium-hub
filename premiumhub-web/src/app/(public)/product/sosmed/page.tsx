@@ -31,6 +31,7 @@ import { buildSosmedBundleProductCards, type SosmedBundleProductCard } from '@/l
 import { buildSosmedServiceCards, platformIconKeyFor, type SosmedPlatformIconKey, type SosmedProductCard } from '@/lib/sosmedProductCards'
 import { sosmedBundleService as sosmedBundleServiceApi } from '@/services/sosmedBundleService'
 import { sosmedService as sosmedServiceApi } from '@/services/sosmedService'
+import { sosmedHeroSlideService } from '@/services/sosmedHeroSlideService'
 import type { SosmedBundlePackage } from '@/types/sosmedBundle'
 import type { SosmedService, SosmedPromotionPrice } from '@/types/sosmedService'
 
@@ -485,10 +486,29 @@ export default function ProductSosmedLandingPage() {
     })
   }, [allCards, heroSlideCodes])
 
-  const displaySlides: HeroSlide[] = useMemo(() => [
+  const FALLBACK_SLIDES: HeroSlide[] = useMemo(() => [
     { key: 'sosmed-banner-1', src: '/images/banner-sosmed-1-opt.webp', alt: 'Banner Sosmed Premium Hub' },
     { key: 'sosmed-banner-2', src: '/images/banner-sosmed-2-opt.webp', alt: 'Banner Promo Sosmed Premium Hub' },
   ], [])
+
+  const [displaySlides, setDisplaySlides] = useState<HeroSlide[]>([])
+
+  useEffect(() => {
+    sosmedHeroSlideService.getPublic().then((res) => {
+      if (!res.success || !res.data?.length) return
+      const mapped: HeroSlide[] = res.data
+        .filter((s) => s.background_image_url)
+        .map((s) => ({
+          key: s.id,
+          src: s.background_image_url,
+          alt: s.title || 'Banner Sosmed',
+          href: s.cta_href || undefined,
+        }))
+      if (mapped.length > 0) setDisplaySlides(mapped)
+    }).catch(() => {})
+  }, [])
+
+  const slides = displaySlides.length > 0 ? displaySlides : FALLBACK_SLIDES
 
   return (
     <>
@@ -498,7 +518,7 @@ export default function ProductSosmedLandingPage() {
         <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
           {/* Hero strip — koprol layout: 3+2 columns */}
           <HeroStripPanel
-            slides={displaySlides}
+            slides={slides}
           />
 
           {/* Trust badges row */}
