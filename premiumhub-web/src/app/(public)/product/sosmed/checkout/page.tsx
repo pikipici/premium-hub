@@ -525,7 +525,9 @@ function SosmedCheckoutContent() {
                     min={1}
                     max={maxPackages}
                     presets={quantityPresets}
-                    helper={`1 paket = 1.000 unit layanan.${maxPackages < MAX_SOSMED_PACKAGE_QUANTITY ? ` Maks. ${maxPackages.toLocaleString('id-ID')} paket (${(maxPackages * 1000).toLocaleString('id-ID')} unit).` : ' Contoh: 5 paket berarti sekitar 5.000 followers/unit.'}`}
+                    label={serviceDisplay?.stepperLabel}
+                    unit={serviceDisplay?.quantityUnitLabel ?? 'K'}
+                    helper={serviceDisplay?.helperText ?? `1 paket = 1.000 unit layanan.${maxPackages < MAX_SOSMED_PACKAGE_QUANTITY ? ` Maks. ${maxPackages.toLocaleString('id-ID')} paket (${(maxPackages * 1000).toLocaleString('id-ID')} unit).` : ''}`}
                   />
                 )}
 

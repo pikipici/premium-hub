@@ -9,6 +9,7 @@ interface QuantityStepperProps {
   onChange: (value: number) => void
   presets?: number[]
   unit?: string
+  label?: string
   helper?: string
 }
 
@@ -19,7 +20,8 @@ export function QuantityStepper({
   onChange,
   presets = [1, 5, 10],
   unit = 'K',
-  helper = '1 paket = 1.000 unit layanan. Contoh: 5 paket berarti sekitar 5.000 followers/unit.',
+  label = 'Jumlah Paket 1K',
+  helper = '1 paket = 1.000 Followers. Contoh: 5 paket = sekitar 5.000 Followers.',
 }: QuantityStepperProps) {
   const clamped = (v: number) => Math.min(max, Math.max(min, Math.floor(v)))
 
@@ -36,7 +38,7 @@ export function QuantityStepper({
 
   return (
     <div>
-      <label className="mb-1 block text-xs font-semibold text-[#666]">Jumlah Paket 1K</label>
+      <label className="mb-1 block text-xs font-semibold text-[#666]">{label}</label>
 
       <div className="flex overflow-hidden rounded-xl border border-[#E5E5E5] bg-white">
         <button
