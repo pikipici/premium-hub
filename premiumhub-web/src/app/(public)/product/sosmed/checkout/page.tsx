@@ -604,6 +604,31 @@ function SosmedCheckoutContent() {
             {/* RIGHT COLUMN: Summary + Payment (sticky) */}
             <div className="lg:col-span-2 space-y-6 lg:sticky lg:top-24 lg:self-start">
 
+              {/* Info Produk */}
+              {!isBundleCheckout && serviceDisplay && (
+                <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6">
+                  <h3 className="text-sm font-bold mb-4">Info Produk</h3>
+                  <div className="space-y-2.5 text-sm">
+                    <div className="flex justify-between gap-4">
+                      <span className="text-[#888] shrink-0">⚡ Mulai diproses</span>
+                      <span className="font-semibold text-right">{serviceDisplay.startTime}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-[#888] shrink-0">⏱ Estimasi selesai</span>
+                      <span className="font-semibold text-right">{serviceDisplay.eta}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-[#888] shrink-0">↺ Garansi refill</span>
+                      <span className="font-semibold text-right">{serviceDisplay.refill}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-[#888] shrink-0">📦 Min. order</span>
+                      <span className="font-semibold text-right">{serviceDisplay.minOrderLabel}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Ringkasan Layanan */}
               <div className="bg-white rounded-2xl border border-[#EBEBEB] p-6">
                 <h3 className="text-sm font-bold mb-4">{isBundleCheckout ? 'Ringkasan Paket' : 'Ringkasan Layanan'}</h3>
@@ -654,7 +679,7 @@ function SosmedCheckoutContent() {
                     <>
                       <div className="flex justify-between text-sm gap-4">
                         <span className="text-[#888]">Kategori</span>
-                        <span className="font-semibold text-right">{service?.category_code || '-'}</span>
+                        <span className="font-semibold text-right">{serviceDisplay?.categoryLabel || service?.category_code || '-'}</span>
                       </div>
                       <div className="flex justify-between text-sm gap-4">
                         <span className="text-[#888]">Platform</span>
