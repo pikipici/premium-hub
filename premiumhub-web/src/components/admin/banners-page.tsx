@@ -929,7 +929,7 @@ function SosmedHeroTab() {
                     >
                       Hapus
                     </button>
-                    <span className="text-[10px] text-[#888] ml-auto">Gambar tampil dalam rasio 3:1</span>
+                  <span className="text-[10px] text-[#888] ml-auto">Gambar tampil dalam rasio 3:1 (lebar × tinggi = 3:1)</span>
                   </div>
                 </div>
               ) : (
@@ -943,7 +943,7 @@ function SosmedHeroTab() {
                     <>
                       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#AAA]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                       <span className="mt-2 text-sm font-semibold text-[#888]">Klik untuk upload gambar</span>
-                      <span className="mt-1 text-[11px] text-[#AAA]">PNG, JPG, WebP — Rekomendasi lebar minimal 1400px, rasio 3:1</span>
+                      <span className="mt-1 text-[11px] text-[#AAA]">PNG, JPG, WebP — Rekomendasi lebar minimal 1400px, rasio 3:1 (contoh: 1400×467 atau 2100×700)</span>
                     </>
                   )}
                 </div>
