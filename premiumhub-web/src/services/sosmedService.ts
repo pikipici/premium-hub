@@ -255,6 +255,11 @@ export const sosmedService = {
     }
   },
 
+  adminDeletePromotion: async (id: string) => {
+    const res = await api.delete<ApiResponse<null>>(`/admin/sosmed/promotions/${id}`)
+    return res.data
+  },
+
   adminCreate: async (data: AdminSosmedServicePayload) => {
     const res = await api.post<ApiResponse<SosmedService>>('/admin/sosmed/services', data)
     return res.data

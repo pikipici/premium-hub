@@ -100,6 +100,9 @@ func (s *SosmedPromotionService) Create(ctx context.Context, input SosmedPromoti
 	if err != nil {
 		return nil, err
 	}
+	if err := s.checkOverlap(ctx, item, nil); err != nil {
+		return nil, err
+	}
 	if err := s.repo.Create(ctx, item); err != nil {
 		return nil, errors.New("gagal membuat promo sosmed")
 	}
@@ -115,10 +118,50 @@ func (s *SosmedPromotionService) Update(ctx context.Context, id uuid.UUID, input
 	if err != nil {
 		return nil, err
 	}
+	if err := s.checkOverlap(ctx, updated, &id); err != nil {
+		return nil, err
+	}
 	if err := s.repo.Save(ctx, updated); err != nil {
 		return nil, errors.New("gagal update promo sosmed")
 	}
 	return s.repo.FindByID(ctx, id)
+}
+
+func (s *SosmedPromotionService) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return errors.New("promo sosmed tidak ditemukan")
+	}
+	return s.repo.Delete(ctx, id)
+}
+
+func (s *SosmedPromotionService) checkOverlap(ctx context.Context, item *model.SosmedPromotion, excludeID *uuid.UUID) error {
+	if !item.IsActive {
+		return nil
+	}
+	var targetID uuid.UUID
+	switch item.TargetType {
+	case SosmedPromotionTargetService:
+		if item.ServiceID == nil {
+			return nil
+		}
+		targetID = *item.ServiceID
+	case SosmedPromotionTargetBundleVariant:
+		if item.BundleVariantID == nil {
+			return nil
+		}
+		targetID = *item.BundleVariantID
+	default:
+		return nil
+	}
+	count, err := s.repo.CountActiveOverlap(ctx, item.TargetType, targetID, item.StartsAt, item.EndsAt, excludeID)
+	if err != nil {
+		return errors.New("gagal cek overlap promo")
+	}
+	if count > 0 {
+		return errors.New("produk ini sudah punya promo aktif di periode yang sama")
+	}
+	return nil
 }
 
 func (s *SosmedPromotionService) SetActive(ctx context.Context, id uuid.UUID, active bool) (*model.SosmedPromotion, error) {

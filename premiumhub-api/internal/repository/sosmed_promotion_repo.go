@@ -49,7 +49,7 @@ func (r *SosmedPromotionRepo) ActiveForService(ctx context.Context, serviceID uu
 	var item model.SosmedPromotion
 	err := r.db.WithContext(ctx).
 		Where("target_type = ? AND service_id = ? AND is_active = ? AND starts_at <= ? AND ends_at > ?", "service", serviceID, true, at, at).
-		Order("created_at DESC").First(&item).Error
+		Order("discount_value DESC, created_at DESC").First(&item).Error
 	return &item, err
 }
 
@@ -57,6 +57,27 @@ func (r *SosmedPromotionRepo) ActiveForBundleVariant(ctx context.Context, varian
 	var item model.SosmedPromotion
 	err := r.db.WithContext(ctx).
 		Where("target_type = ? AND bundle_variant_id = ? AND is_active = ? AND starts_at <= ? AND ends_at > ?", "bundle_variant", variantID, true, at, at).
-		Order("created_at DESC").First(&item).Error
+		Order("discount_value DESC, created_at DESC").First(&item).Error
 	return &item, err
+}
+
+func (r *SosmedPromotionRepo) CountActiveOverlap(ctx context.Context, targetType string, targetID uuid.UUID, startsAt, endsAt time.Time, excludeID *uuid.UUID) (int64, error) {
+	query := r.db.WithContext(ctx).Model(&model.SosmedPromotion{}).
+		Where("target_type = ? AND is_active = ? AND starts_at < ? AND ends_at > ?", targetType, true, endsAt, startsAt)
+	switch targetType {
+	case "service":
+		query = query.Where("service_id = ?", targetID)
+	case "bundle_variant":
+		query = query.Where("bundle_variant_id = ?", targetID)
+	}
+	if excludeID != nil {
+		query = query.Where("id != ?", *excludeID)
+	}
+	var count int64
+	err := query.Count(&count).Error
+	return count, err
+}
+
+func (r *SosmedPromotionRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&model.SosmedPromotion{}, "id = ?", id).Error
 }

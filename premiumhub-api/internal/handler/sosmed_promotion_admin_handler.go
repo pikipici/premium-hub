@@ -105,6 +105,18 @@ func (h *SosmedPromotionAdminHandler) SetStatus(c *gin.Context) {
 	response.Success(c, "Status promo sosmed diupdate", toAdminSosmedPromotionResponse(*item))
 }
 
+func (h *SosmedPromotionAdminHandler) Delete(c *gin.Context) {
+	id, ok := parsePromotionID(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, "Promo sosmed dihapus", nil)
+}
+
 func parsePromotionID(c *gin.Context) (uuid.UUID, bool) {
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {

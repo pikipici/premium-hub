@@ -633,6 +633,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.POST("/sosmed/promotions", sosmedPromotionAdminHandler.Create)
 	admin.PUT("/sosmed/promotions/:id", sosmedPromotionAdminHandler.Update)
 	admin.PATCH("/sosmed/promotions/:id/status", sosmedPromotionAdminHandler.SetStatus)
+	admin.DELETE("/sosmed/promotions/:id", sosmedPromotionAdminHandler.Delete)
 	admin.GET("/sosmed/bundles", sosmedBundleAdminHandler.AdminList)
 	admin.POST("/sosmed/bundles", sosmedBundleAdminHandler.AdminCreatePackage)
 	admin.PUT("/sosmed/bundles/:id", sosmedBundleAdminHandler.AdminUpdatePackage)

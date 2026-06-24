@@ -57,6 +57,20 @@ function promoStatusMeta(promo: AdminSosmedPromotion, nowMs: number) {
   return { label: 'Nonaktif', className: 'bg-gray-100 text-gray-500' }
 }
 
+function calcPreview(basePrice: number, discountType: string, discountValue: number): { final: number; saved: number } | null {
+  if (!basePrice || !discountValue) return null
+  if (discountType === 'percent') {
+    const pct = Math.min(Math.max(discountValue, 0), 100)
+    const saved = Math.floor(basePrice * pct / 100)
+    return { final: basePrice - saved, saved }
+  }
+  if (discountType === 'amount') {
+    const saved = Math.min(discountValue, basePrice)
+    return { final: basePrice - saved, saved }
+  }
+  return null
+}
+
 export default function SosmedPromotionCard() {
   const [promotions, setPromotions] = useState<AdminSosmedPromotion[]>([])
   const [services, setServices] = useState<SosmedService[]>([])
@@ -66,6 +80,7 @@ export default function SosmedPromotionCard() {
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 30000)
@@ -100,18 +115,49 @@ export default function SosmedPromotionCard() {
         bundle.variants.map((variant) => ({
           id: variant.id,
           label: `${bundle.title} - ${variant.name} (${formatRupiah(variant.total_price)})`,
+          basePrice: variant.total_price,
         }))
       )
     }
     return services.map((service) => ({
       id: service.id,
       label: `${service.title} (${formatRupiah(service.checkout_price || 0)})`,
+      basePrice: service.checkout_price || 0,
     }))
   }, [bundles, form.target_type, services])
+
+  // base price of selected target for preview
+  const selectedBasePrice = useMemo(() => {
+    if (!form.target_id) return 0
+    return targetOptions.find((o) => o.id === form.target_id)?.basePrice ?? 0
+  }, [form.target_id, targetOptions])
+
+  const pricePreview = useMemo(() =>
+    calcPreview(selectedBasePrice, form.discount_type, form.discount_value),
+    [selectedBasePrice, form.discount_type, form.discount_value]
+  )
+
+  // warn if selected target already has active promo in overlapping period
+  const overlapWarning = useMemo(() => {
+    if (!form.target_id || !form.starts_at || !form.ends_at) return null
+    const startsMs = new Date(fromDatetimeLocal(form.starts_at)).getTime()
+    const endsMs = new Date(fromDatetimeLocal(form.ends_at)).getTime()
+    if (Number.isNaN(startsMs) || Number.isNaN(endsMs)) return null
+    const overlap = promotions.find((p) => {
+      if (!p.is_active) return false
+      if (p.target_id !== form.target_id) return false
+      if (editingId && p.id === editingId) return false
+      const pStart = new Date(p.starts_at).getTime()
+      const pEnd = new Date(p.ends_at).getTime()
+      return startsMs < pEnd && endsMs > pStart
+    })
+    return overlap ? `Produk ini sudah punya promo aktif "${overlap.name}" di periode yang overlap.` : null
+  }, [form.target_id, form.starts_at, form.ends_at, promotions, editingId])
 
   const resetForm = () => {
     setEditingId(null)
     setForm(initialForm)
+    setNotice('')
   }
 
   const submitForm = async () => {
@@ -147,6 +193,7 @@ export default function SosmedPromotionCard() {
 
   const editPromo = (promo: AdminSosmedPromotion) => {
     setEditingId(promo.id)
+    setNotice('')
     setForm({
       name: promo.name,
       target_type: promo.target_type,
@@ -171,12 +218,26 @@ export default function SosmedPromotionCard() {
     }
   }
 
+  const deletePromo = async (id: string) => {
+    setLoading(true)
+    try {
+      await sosmedService.adminDeletePromotion(id)
+      setDeleteConfirmId(null)
+      setNotice('Promo berhasil dihapus')
+      await loadData()
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Gagal hapus promo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <section className="mt-6 rounded-2xl border border-[#FFE2CF] bg-white p-5 shadow-sm">
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.25em] text-[#FF5733]">Promo Sosmed</p>
-          <h2 className="text-xl font-black text-[#141414]">Diskon & Countdown</h2>
+          <h2 className="text-xl font-black text-[#141414]">Diskon &amp; Countdown</h2>
           <p className="text-sm text-gray-500">Setup promo untuk layanan satuan atau paket spesial. Harga checkout ikut harga promo aktif.</p>
         </div>
         <button type="button" onClick={() => void loadData()} className="rounded-full border px-4 py-2 text-sm font-bold" disabled={loading}>
@@ -208,13 +269,13 @@ export default function SosmedPromotionCard() {
         <label className="text-sm font-bold text-gray-700">
           Tipe Diskon
           <select value={form.discount_type} onChange={(event) => setForm((prev) => ({ ...prev, discount_type: event.target.value as AdminSosmedPromotionDiscountType }))} className="mt-1 w-full rounded-xl border px-3 py-2">
-            <option value="percent">Persen</option>
-            <option value="amount">Nominal</option>
+            <option value="percent">Persen (%)</option>
+            <option value="amount">Nominal (Rp)</option>
           </select>
         </label>
         <label className="text-sm font-bold text-gray-700">
           Nilai Diskon
-          <input type="number" min="0" value={form.discount_value} onChange={(event) => setForm((prev) => ({ ...prev, discount_value: Number(event.target.value) }))} className="mt-1 w-full rounded-xl border px-3 py-2" />
+          <input type="number" min="0" max={form.discount_type === 'percent' ? 100 : undefined} value={form.discount_value} onChange={(event) => setForm((prev) => ({ ...prev, discount_value: Number(event.target.value) }))} className="mt-1 w-full rounded-xl border px-3 py-2" />
         </label>
         <label className="text-sm font-bold text-gray-700">
           Mulai
@@ -226,6 +287,23 @@ export default function SosmedPromotionCard() {
         </label>
       </div>
 
+      {/* Price preview */}
+      {pricePreview && selectedBasePrice > 0 ? (
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-sm">
+          <span className="font-bold text-green-700">Preview:</span>
+          <span className="text-gray-500 line-through">{formatRupiah(selectedBasePrice)}</span>
+          <span className="font-black text-green-700">{formatRupiah(pricePreview.final)}</span>
+          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-black text-green-700">hemat {formatRupiah(pricePreview.saved)}</span>
+        </div>
+      ) : null}
+
+      {/* Overlap warning */}
+      {overlapWarning ? (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700">
+          ⚠ {overlapWarning}
+        </div>
+      ) : null}
+
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={() => void submitForm()} disabled={loading} className="rounded-full bg-[#FF5733] px-5 py-2 text-sm font-black text-white disabled:opacity-50">
           {editingId ? 'Update Promo' : 'Buat Promo'}
@@ -234,11 +312,11 @@ export default function SosmedPromotionCard() {
       </div>
 
       <div className="mt-6 overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="text-xs uppercase tracking-wide text-gray-400">
             <tr>
               <th className="py-2">Nama</th>
-              <th>Target</th>
+              <th>Produk</th>
               <th>Diskon</th>
               <th>Periode</th>
               <th>Status</th>
@@ -248,17 +326,41 @@ export default function SosmedPromotionCard() {
           <tbody className="divide-y">
             {promotions.map((promo) => {
               const status = promoStatusMeta(promo, nowMs)
+              const productName = promo.target_type === 'service'
+                ? (promo.service_title || promo.target_id)
+                : promo.bundle_title
+                  ? `${promo.bundle_title} — ${promo.variant_name ?? ''}`
+                  : promo.target_id
 
               return (
                 <tr key={promo.id}>
                   <td className="py-3 font-bold">{promo.name}</td>
-                  <td>{promo.target_type === 'service' ? 'Layanan' : 'Paket'}<br /><span className="text-xs text-gray-400">{promo.target_id}</span></td>
-                  <td>{promo.discount_type === 'percent' ? `${promo.discount_value}%` : formatRupiah(promo.discount_value)}</td>
-                  <td className="text-xs text-gray-500">{new Date(promo.starts_at).toLocaleString('id-ID')}<br />{new Date(promo.ends_at).toLocaleString('id-ID')}</td>
+                  <td>
+                    <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-black text-gray-500 uppercase tracking-wide mb-0.5">
+                      {promo.target_type === 'service' ? 'Layanan' : 'Paket'}
+                    </span>
+                    <br />
+                    <span className="text-xs text-gray-700 font-semibold">{productName}</span>
+                  </td>
+                  <td className="font-bold">{promo.discount_type === 'percent' ? `${promo.discount_value}%` : formatRupiah(promo.discount_value)}</td>
+                  <td className="text-xs text-gray-500">
+                    {new Date(promo.starts_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}<br />
+                    {new Date(promo.ends_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                  </td>
                   <td><span className={`rounded-full px-2 py-1 text-xs font-black ${status.className}`}>{status.label}</span></td>
                   <td className="space-x-2">
                     <button type="button" onClick={() => editPromo(promo)} className="font-bold text-[#FF5733]">Edit</button>
-                    <button type="button" onClick={() => void toggleStatus(promo)} className="font-bold text-gray-600">{promo.is_active ? 'Disable' : 'Enable'}</button>
+                    <button type="button" onClick={() => void toggleStatus(promo)} className="font-bold text-gray-600">
+                      {promo.is_active ? 'Disable' : 'Enable'}
+                    </button>
+                    {deleteConfirmId === promo.id ? (
+                      <>
+                        <button type="button" onClick={() => void deletePromo(promo.id)} disabled={loading} className="font-black text-red-600">Yakin hapus?</button>
+                        <button type="button" onClick={() => setDeleteConfirmId(null)} className="font-bold text-gray-400">Batal</button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => setDeleteConfirmId(promo.id)} className="font-bold text-red-400 hover:text-red-600">Hapus</button>
+                    )}
                   </td>
                 </tr>
               )
