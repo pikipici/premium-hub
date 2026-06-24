@@ -360,12 +360,12 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
         </button>
       )}
 
-      {/* Fade gradients — desktop only, pakai rgba biar aman kalau bg berubah */}
-      {canScrollLeft && isDesktop && (
-        <div style={{ pointerEvents: 'none', position: 'absolute', left: 0, top: 0, height: '100%', width: 48, background: 'linear-gradient(to right, rgba(244,245,248,1) 50%, rgba(244,245,248,0))', zIndex: 10 }} />
+      {/* Fade gradients — semua device, lebar lebih kecil di mobile (24px) vs desktop (48px) */}
+      {canScrollLeft && (
+        <div style={{ pointerEvents: 'none', position: 'absolute', left: 0, top: 0, height: '100%', width: isDesktop ? 48 : 24, background: 'linear-gradient(to right, rgba(244,245,248,1) 50%, rgba(244,245,248,0))', zIndex: 10 }} />
       )}
-      {canScrollRight && isDesktop && (
-        <div style={{ pointerEvents: 'none', position: 'absolute', right: 0, top: 0, height: '100%', width: 48, background: 'linear-gradient(to left, rgba(244,245,248,1) 50%, rgba(244,245,248,0))', zIndex: 10 }} />
+      {canScrollRight && (
+        <div style={{ pointerEvents: 'none', position: 'absolute', right: 0, top: 0, height: '100%', width: isDesktop ? 48 : 24, background: 'linear-gradient(to left, rgba(244,245,248,1) 50%, rgba(244,245,248,0))', zIndex: 10 }} />
       )}
     </div>
   )
