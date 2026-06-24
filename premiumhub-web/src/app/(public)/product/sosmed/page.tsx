@@ -226,8 +226,6 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
-  const [hoverLeft, setHoverLeft] = useState(false)
-  const [hoverRight, setHoverRight] = useState(false)
 
   const checkScroll = useCallback(() => {
     const el = scrollRef.current
@@ -241,7 +239,6 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
     const mq = window.matchMedia('(min-width: 768px)')
     const syncDesktop = (matches: boolean) => {
       setIsDesktop(matches)
-      // Setelah state update, ukur scroll di rAF berikutnya
       requestAnimationFrame(() => requestAnimationFrame(() => checkScroll()))
     }
     syncDesktop(mq.matches)
@@ -260,11 +257,13 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
+    const raf1 = requestAnimationFrame(() => requestAnimationFrame(() => checkScroll()))
     el.addEventListener('scroll', checkScroll, { passive: true })
     window.addEventListener('resize', checkScroll)
     const ro = new ResizeObserver(() => requestAnimationFrame(() => checkScroll()))
     ro.observe(el)
     return () => {
+      cancelAnimationFrame(raf1)
       el.removeEventListener('scroll', checkScroll)
       window.removeEventListener('resize', checkScroll)
       ro.disconnect()
@@ -275,26 +274,39 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
     scrollRef.current?.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' })
   }
 
-  const pills = platforms.map((p) => {
-    const count = p === 'Semua' ? allCardsLength : (platformCounts[p] || 0)
+  // Filter platform dengan 0 produk (kecuali "Semua")
+  const visiblePlatforms = platforms.filter(
+    (p) => p === 'Semua' || (platformCounts[p] ?? 0) > 0
+  )
+
+  const pills = visiblePlatforms.map((p) => {
+    const count = p === 'Semua' ? allCardsLength : (platformCounts[p] ?? 0)
     const iconKey = p === 'Semua' ? null : platformIconKeyFor(p)
     const IconComp = iconKey ? (PLATFORM_ICON_COMPONENTS[iconKey] ?? null) : null
+    const isActive = activePlatform === p
     return (
       <button key={p} onClick={() => setActivePlatform(p)}
-        className={'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all sm:px-3.5 sm:text-xs' + (activePlatform === p ? ' bg-[#141414] text-white shadow-md' : ' bg-white text-gray-500 ring-1 ring-inset ring-gray-200 hover:bg-gray-50 hover:text-gray-900')}
+        className={
+          'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all duration-150 sm:px-3.5 sm:text-xs' +
+          (isActive
+            ? ' scale-[1.04] bg-[#141414] text-white shadow-md ring-2 ring-[#141414]/20 ring-offset-1'
+            : ' bg-white text-gray-500 ring-1 ring-inset ring-gray-200 hover:scale-[1.02] hover:bg-gray-50 hover:text-gray-900')
+        }
       >
         {IconComp ? <IconComp className="h-3.5 w-3.5" /> : null}
         <span>{p}</span>
-        <span className={'ml-0.5 rounded-full px-1.5 py-[1px] text-[9px] font-semibold sm:text-[10px]' + (activePlatform === p ? ' bg-white/20 text-white/80' : ' bg-gray-100 text-gray-400')}>{count}</span>
+        <span className={
+          'ml-0.5 rounded-full px-1.5 py-[1px] text-[9px] font-semibold sm:text-[10px]' +
+          (isActive ? ' bg-white/20 text-white/80' : ' bg-gray-100 text-gray-400')
+        }>{count}</span>
       </button>
     )
   })
 
-  const arrowStyle = (side: 'left' | 'right', hover: boolean): React.CSSProperties => ({
+  const arrowBase: React.CSSProperties = {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
-    [side]: 0,
     zIndex: 20,
     display: isDesktop ? 'flex' : 'none',
     alignItems: 'center',
@@ -302,23 +314,24 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
     width: 32,
     height: 32,
     borderRadius: '50%',
-    background: hover ? '#f3f4f6' : '#fff',
+    background: '#fff',
     boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
     border: '1px solid rgba(0,0,0,0.07)',
     cursor: 'pointer',
-    transition: 'background 0.15s, box-shadow 0.15s',
+    transition: 'background 0.15s',
     outline: 'none',
-  })
+  }
+
+  // Padding pills: 40px di desktop (biar ngga ketutup arrow), 4px di mobile (arrows disembunyiin)
+  const pillsPadding = isDesktop ? '0 40px' : '0 4px'
 
   return (
     <div style={{ position: 'relative', marginTop: 16 }}>
-      {/* Left arrow */}
+      {/* Left arrow — desktop only */}
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
-          onMouseEnter={() => setHoverLeft(true)}
-          onMouseLeave={() => setHoverLeft(false)}
-          style={arrowStyle('left', hoverLeft)}
+          style={{ ...arrowBase, left: 0 }}
           aria-label="Scroll kiri"
         >
           <ChevronLeft style={{ width: 16, height: 16, color: '#374151', flexShrink: 0 }} />
@@ -331,30 +344,28 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
         style={{ overflowX: 'auto', display: 'flex', flex: 1, scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         className="[&::-webkit-scrollbar]:hidden"
       >
-        <div style={{ display: 'flex', minWidth: 'max-content', gap: 6, padding: '0 40px' }}>
+        <div style={{ display: 'flex', minWidth: 'max-content', gap: 6, padding: pillsPadding }}>
           {pills}
         </div>
       </div>
 
-      {/* Right arrow */}
+      {/* Right arrow — desktop only */}
       {canScrollRight && (
         <button
           onClick={() => scroll('right')}
-          onMouseEnter={() => setHoverRight(true)}
-          onMouseLeave={() => setHoverRight(false)}
-          style={arrowStyle('right', hoverRight)}
+          style={{ ...arrowBase, right: 0 }}
           aria-label="Scroll kanan"
         >
           <ChevronRight style={{ width: 16, height: 16, color: '#374151', flexShrink: 0 }} />
         </button>
       )}
 
-      {/* Fade gradients — desktop only, width 48px biar smooth */}
+      {/* Fade gradients — desktop only, pakai rgba biar aman kalau bg berubah */}
       {canScrollLeft && isDesktop && (
-        <div style={{ pointerEvents: 'none', position: 'absolute', left: 0, top: 0, height: '100%', width: 48, background: 'linear-gradient(to right, #F4F5F8 60%, transparent)', zIndex: 10 }} />
+        <div style={{ pointerEvents: 'none', position: 'absolute', left: 0, top: 0, height: '100%', width: 48, background: 'linear-gradient(to right, rgba(244,245,248,1) 50%, rgba(244,245,248,0))', zIndex: 10 }} />
       )}
       {canScrollRight && isDesktop && (
-        <div style={{ pointerEvents: 'none', position: 'absolute', right: 0, top: 0, height: '100%', width: 48, background: 'linear-gradient(to left, #F4F5F8 60%, transparent)', zIndex: 10 }} />
+        <div style={{ pointerEvents: 'none', position: 'absolute', right: 0, top: 0, height: '100%', width: 48, background: 'linear-gradient(to left, rgba(244,245,248,1) 50%, rgba(244,245,248,0))', zIndex: 10 }} />
       )}
     </div>
   )
