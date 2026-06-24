@@ -542,6 +542,19 @@ export default function ProductSosmedLandingPage() {
             slides={displaySlides}
           />
 
+          {/* Trust badges row */}
+          <div className="mt-4 sm:mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-2xl bg-white px-4 py-3 text-[12px] font-semibold shadow-[0_4px_12px_rgba(0,0,0,0.04)] ring-1 ring-black/5 sm:text-[13px]">
+            <span className="inline-flex items-center gap-1.5 text-[#2F6B1A]">
+              <ShieldCheck className="h-3.5 w-3.5" /> Tanpa password
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[#1E4F9B]">
+              <Clock3 className="h-3.5 w-3.5" /> Proses cepat
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[#9A4B16]">
+              <Sparkles className="h-3.5 w-3.5" /> Garansi tersedia
+            </span>
+          </div>
+
           {/* Featured product cards */}
           {heroFeatured.length > 0 ? (
             <section className="mt-7 sm:mt-10">
