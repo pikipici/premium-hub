@@ -1,13 +1,13 @@
 "use client"
 
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type SVGProps } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import {
-  ArrowLeft,
   ArrowRight,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clock3,
   Flame,
   Megaphone,
@@ -197,16 +197,15 @@ function isHotService(card: SosmedProductCard) {
  * and don't reflow when toggling. `h-full` keeps the inner card stretching
  * inside the CSS Grid row when the wrapper div sits between grid and card.
  */
-function cardVisibilityClass(idx: number, expanded: boolean, sectionFilter?: string | null): string {
-  if (expanded || sectionFilter) return 'h-full'
+function cardVisibilityClass(idx: number, expanded: boolean): string {
+  if (expanded) return 'h-full'
   if (idx < 4) return 'h-full'
   if (idx < 6) return 'hidden h-full sm:block lg:hidden'
   return 'hidden'
 }
 
 /** Returns true when section has more cards than the visible cap (4 mobile, 6 tablet, 4 desktop = max 6). */
-function shouldOfferSeeAll(total: number, sectionId?: string | null) {
-  if (sectionId) return false // section filter active, show all
+function shouldOfferSeeAll(total: number) {
   return total > 6
 }
 
@@ -367,29 +366,29 @@ function FilterStrip({ platforms, activePlatform, setActivePlatform, allCardsLen
 }
 
 export default function ProductSosmedLandingPage() {
-  const searchParams = useSearchParams()
-  const sectionFilter = searchParams.get('section')
-
   const [services, setServices] = useState<SosmedService[]>([])
   const [servicesLoading, setServicesLoading] = useState(true)
   const [bundlePackages, setBundlePackages] = useState<SosmedBundlePackage[]>([])
   const [bundleCatalogState, setBundleCatalogState] = useState<'loading' | 'ready' | 'fallback'>('loading')
   const [activePlatform, setActivePlatform] = useState('Semua')
-  const expandedSections = useMemo(() => {
-    return sectionFilter ? new Set([sectionFilter]) : new Set<string>()
-  }, [sectionFilter])
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
   const isExpanded = (id: string) => expandedSections.has(id)
 
-  // Scroll to section when section filter activates
-  useEffect(() => {
-    if (!sectionFilter) return
-    const id = sectionFilter === 'layanan' ? 'layanan' : sectionFilter
-    const timer = setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [sectionFilter])
+  const toggleSection = useCallback((id: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+        setTimeout(() => {
+          document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 50)
+      }
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -566,28 +565,12 @@ export default function ProductSosmedLandingPage() {
             </section>
           ) : null}
 
-          {/* Section filter banner */}
-          {sectionFilter && (
-            <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-[#141414] px-4 py-3 text-white">
-              <div className="text-sm font-bold capitalize">
-                {sectionFilter === 'layanan' ? 'Semua Layanan' :
-                 sectionFilter === 'hot' ? 'Hot Pilihan' :
-                 sectionFilter === 'promo' ? 'Promo Diskon' :
-                 sectionFilter === 'bundle' ? 'Paket Spesial' : 'Semua Produk'}
-              </div>
-              <Link href="/product/sosmed" className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold hover:bg-white/25 transition">
-                <ArrowLeft className="h-3 w-3" /> Kembali
-              </Link>
-            </div>
-          )}
-
           {/* Platform filter chip strip */}
-          {platforms.length > 1 && !sectionFilter ? (
+          {platforms.length > 1 ? (
             <FilterStrip platforms={platforms} activePlatform={activePlatform} setActivePlatform={setActivePlatform} allCardsLength={allCards.length} platformCounts={platformCounts} />
           ) : null}
 
           {/* Layanan section (Produk koprol) */}
-          {(!sectionFilter || sectionFilter === 'layanan') ? (
           <section id="layanan" className="mt-7 sm:mt-10">
             <SectionHeader
               icon={
@@ -597,14 +580,17 @@ export default function ProductSosmedLandingPage() {
               }
               title="Layanan"
               action={
-                shouldOfferSeeAll(layananCards.length, sectionFilter) ? (
-                  <Link
-                    href="?section=layanan"
+                shouldOfferSeeAll(layananCards.length) ? (
+                  <button
+                    onClick={() => toggleSection('layanan')}
                     className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#FF5733] transition hover:bg-[#FFF3EF] sm:text-xs"
                   >
-                    Lihat semua
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
+                    {isExpanded('layanan') ? (
+                      <><ChevronUp className="h-3.5 w-3.5" /> Sembunyikan</>
+                    ) : (
+                      <>Lihat semua <ChevronDown className="h-3.5 w-3.5" /></>
+                    )}
+                  </button>
                 ) : undefined
               }
             />
@@ -621,7 +607,7 @@ export default function ProductSosmedLandingPage() {
                 {layananCards.map((card, idx) => {
                   const Icon = iconForPlatform(card.platformIcon)
                   return (
-                    <div key={card.key} className={cardVisibilityClass(idx, isExpanded('layanan'), sectionFilter)}>
+                    <div key={card.key} className={cardVisibilityClass(idx, isExpanded('layanan'), null)}>
                       <ServiceCardCompact
                         href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                         title={card.buyerTitle}
@@ -638,23 +624,25 @@ export default function ProductSosmedLandingPage() {
               </div>
             )}
           </section>
-          ) : null}
 
           {/* Hot Pilihan section (Hot Produk koprol) */}
-          {(!sectionFilter || sectionFilter === 'hot') && hotCards.length > 0 ? (
+          {hotCards.length > 0 ? (
             <section className="mt-7 sm:mt-10">
               <SectionHeader
                 icon={<Flame className="h-4 w-4 text-orange-500" />}
                 title="Hot Pilihan"
                 action={
-                  shouldOfferSeeAll(hotCards.length, sectionFilter) ? (
-                    <Link
-                      href="?section=hot"
+                  shouldOfferSeeAll(hotCards.length) ? (
+                    <button
+                      onClick={() => toggleSection('hot')}
                       className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#FF5733] transition hover:bg-[#FFF3EF] sm:text-xs"
                     >
-                      Lihat semua
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
+                      {isExpanded('hot') ? (
+                        <><ChevronUp className="h-3.5 w-3.5" /> Sembunyikan</>
+                      ) : (
+                        <>Lihat semua <ChevronDown className="h-3.5 w-3.5" /></>
+                      )}
+                    </button>
                   ) : undefined
                 }
               />
@@ -665,7 +653,7 @@ export default function ProductSosmedLandingPage() {
                   const final = card.checkoutPrice
                   const discount = discountLabelFor(card.promotion, original, final)
                   return (
-                    <div key={`hot-${card.key}`} className={cardVisibilityClass(idx, isExpanded('hot'), sectionFilter)}>
+                    <div key={`hot-${card.key}`} className={cardVisibilityClass(idx, isExpanded('hot'), null)}>
                       <HotPickCard
                         href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                         title={card.buyerTitle}
@@ -684,7 +672,6 @@ export default function ProductSosmedLandingPage() {
           ) : null}
 
           {/* Paket Spesial section (Bundling) */}
-          {(!sectionFilter || sectionFilter === 'bundle') ? (
           <section className="mt-7 sm:mt-10">
             <SectionHeader
               icon={
@@ -694,14 +681,17 @@ export default function ProductSosmedLandingPage() {
               }
               title="Paket Spesial"
               action={
-                shouldOfferSeeAll(bundleCards.length, sectionFilter) ? (
-                  <Link
-                    href="?section=bundle"
+                shouldOfferSeeAll(bundleCards.length) ? (
+                  <button
+                    onClick={() => toggleSection('bundle')}
                     className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#FF5733] transition hover:bg-[#FFF3EF] sm:text-xs"
                   >
-                    Lihat semua
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
+                    {isExpanded('bundle') ? (
+                      <><ChevronUp className="h-3.5 w-3.5" /> Sembunyikan</>
+                    ) : (
+                      <>Lihat semua <ChevronDown className="h-3.5 w-3.5" /></>
+                    )}
+                  </button>
                 ) : undefined
               }
             />
@@ -728,7 +718,7 @@ export default function ProductSosmedLandingPage() {
                     ? `-${bundle.promotion.discount_value}%`
                     : undefined
                   return (
-                    <div key={bundle.key} className={cardVisibilityClass(idx, isExpanded('bundle'), sectionFilter)}>
+                    <div key={bundle.key} className={cardVisibilityClass(idx, isExpanded('bundle'), null)}>
                       <BundlePromoCard
                         href={checkoutHref}
                         title={bundle.buyerTitle}
@@ -750,10 +740,9 @@ export default function ProductSosmedLandingPage() {
               </div>
             )}
           </section>
-          ) : null}
 
           {/* Promo Diskon section */}
-          {(!sectionFilter || sectionFilter === 'promo') && promoCards.length > 0 ? (
+          {promoCards.length > 0 ? (
             <section className="mt-7 sm:mt-10">
               <SectionHeader
                 icon={
@@ -763,14 +752,17 @@ export default function ProductSosmedLandingPage() {
                 }
                 title="Promo Diskon"
                 action={
-                  shouldOfferSeeAll(promoCards.length, sectionFilter) ? (
-                    <Link
-                      href="?section=promo"
+                  shouldOfferSeeAll(promoCards.length) ? (
+                    <button
+                      onClick={() => toggleSection('promo')}
                       className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-rose-500 transition hover:bg-rose-50 sm:text-xs"
                     >
-                      Lihat semua
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
+                      {isExpanded('promo') ? (
+                        <><ChevronUp className="h-3.5 w-3.5" /> Sembunyikan</>
+                      ) : (
+                        <>Lihat semua <ChevronDown className="h-3.5 w-3.5" /></>
+                      )}
+                    </button>
                   ) : undefined
                 }
               />
@@ -782,7 +774,7 @@ export default function ProductSosmedLandingPage() {
                   const discount = discountLabelFor(card.promotion, original, final)
                   const saving = savingLabelFor(card.promotion, original, final)
                   return (
-                    <div key={`promo-${card.key}`} className={cardVisibilityClass(idx, isExpanded('promo'), sectionFilter)}>
+                    <div key={`promo-${card.key}`} className={cardVisibilityClass(idx, isExpanded('promo'), null)}>
                       <PromoSavingCard
                         href={`/product/sosmed/checkout?service=${encodeURIComponent(card.code)}`}
                         title={card.buyerTitle}
