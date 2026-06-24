@@ -32,6 +32,7 @@ export interface SosmedService {
   badge_text?: string
   theme?: SosmedServiceTheme | string
   min_order?: string
+  max_order?: string
   start_time?: string
   refill?: string
   eta?: string

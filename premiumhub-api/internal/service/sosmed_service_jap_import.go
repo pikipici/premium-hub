@@ -514,6 +514,7 @@ func (s *SosmedServiceService) buildJAPDraftService(item JAPServiceItem, sortOrd
 		BadgeText:                 badgeText,
 		Theme:                     theme,
 		MinOrder:                  strings.TrimSpace(string(item.Min)),
+		MaxOrder:                  strings.TrimSpace(string(item.Max)),
 		StartTime:                 startTimeValue,
 		Refill:                    refillLabel,
 		ETA:                       etaValue,
@@ -546,6 +547,7 @@ func mergeImportedJAPDraft(existing *model.SosmedService, draft *model.SosmedSer
 	existing.PriceStart = draft.PriceStart
 	existing.PricePer1K = draft.PricePer1K
 	existing.MinOrder = draft.MinOrder
+	existing.MaxOrder = draft.MaxOrder
 	existing.StartTime = draft.StartTime
 	existing.Refill = draft.Refill
 	existing.ETA = draft.ETA

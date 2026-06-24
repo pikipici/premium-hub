@@ -27,6 +27,7 @@ type SosmedService struct {
 	BadgeText                 string    `gorm:"size:80" json:"badge_text"`
 	Theme                     string    `gorm:"size:24;default:blue" json:"theme"`
 	MinOrder                  string    `gorm:"size:80" json:"min_order"`
+	MaxOrder                  string    `gorm:"size:80" json:"max_order"`
 	StartTime                 string    `gorm:"size:80" json:"start_time"`
 	Refill                    string    `gorm:"size:80" json:"refill"`
 	ETA                       string    `gorm:"size:80" json:"eta"`

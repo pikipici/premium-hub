@@ -32,6 +32,7 @@ type publicSosmedServiceResponse struct {
 	BadgeText     string                        `json:"badge_text"`
 	Theme         string                        `json:"theme"`
 	MinOrder      string                        `json:"min_order"`
+	MaxOrder      string                        `json:"max_order"`
 	StartTime     string                        `json:"start_time"`
 	Refill        string                        `json:"refill"`
 	ETA           string                        `json:"eta"`
@@ -86,6 +87,7 @@ func toPublicSosmedServiceResponse(item model.SosmedService) publicSosmedService
 		BadgeText:     badgeText,
 		Theme:         item.Theme,
 		MinOrder:      item.MinOrder,
+		MaxOrder:      item.MaxOrder,
 		StartTime:     item.StartTime,
 		Refill:        refill,
 		ETA:           item.ETA,

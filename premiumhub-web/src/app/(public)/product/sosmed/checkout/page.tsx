@@ -50,6 +50,32 @@ function originalCheckoutPrice(service: SosmedService | null) {
 
 const MAX_SOSMED_PACKAGE_QUANTITY = 1000
 
+/** Parse max_order string dari API (e.g. "10000", "50000") ke jumlah paket 1K.
+ * Fallback ke MAX_SOSMED_PACKAGE_QUANTITY kalau string kosong / tidak valid.
+ */
+function parseMaxOrderToPackages(maxOrder: string | undefined): number {
+  if (!maxOrder || maxOrder.trim() === '') return MAX_SOSMED_PACKAGE_QUANTITY
+  // Normalize: strip titik/koma ribuan, ambil angka pertama
+  const normalized = maxOrder.replace(/[.,]/g, '').trim()
+  const parsed = parseInt(normalized, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) return MAX_SOSMED_PACKAGE_QUANTITY
+  // Convert unit ke paket 1K, minimal 1
+  return Math.max(1, Math.ceil(parsed / 1000))
+}
+
+/** Generate preset pills yang valid untuk maxPackages.
+ * Default [1, 5, 10] tapi filter yang > maxPackages, tambah maxPackages kalau belum ada.
+ */
+function buildQuantityPresets(maxPackages: number): number[] {
+  const defaults = [1, 5, 10]
+  const filtered = defaults.filter((p) => p <= maxPackages)
+  if (filtered.length === 0) return [1]
+  if (!filtered.includes(maxPackages) && maxPackages <= 10) {
+    filtered.push(maxPackages)
+  }
+  return filtered
+}
+
 function clampSosmedPackageQuantity(value: number) {
   if (!Number.isFinite(value)) return 1
   return Math.min(MAX_SOSMED_PACKAGE_QUANTITY, Math.max(1, Math.floor(value)))
@@ -112,6 +138,10 @@ function SosmedCheckoutContent() {
   const checkoutPrice = useMemo(() => defaultCheckoutPrice(service), [service])
   const checkoutOriginalPrice = useMemo(() => originalCheckoutPrice(service), [service])
   const bundleTotalPrice = bundleVariant?.total_price || 0
+
+  // Derived max packages dari max_order produk, fallback 1000
+  const maxPackages = useMemo(() => parseMaxOrderToPackages(service?.max_order), [service])
+  const quantityPresets = useMemo(() => buildQuantityPresets(maxPackages), [maxPackages])
   const totalPrice = useMemo(
     () => (isBundleCheckout ? bundleTotalPrice : checkoutPrice * packageQuantity),
     [bundleTotalPrice, checkoutPrice, isBundleCheckout, packageQuantity]
@@ -493,8 +523,9 @@ function SosmedCheckoutContent() {
                     value={packageQuantity}
                     onChange={setPackageQuantity}
                     min={1}
-                    max={MAX_SOSMED_PACKAGE_QUANTITY}
-                    presets={[1, 5, 10]}
+                    max={maxPackages}
+                    presets={quantityPresets}
+                    helper={`1 paket = 1.000 unit layanan.${maxPackages < MAX_SOSMED_PACKAGE_QUANTITY ? ` Maks. ${maxPackages.toLocaleString('id-ID')} paket (${(maxPackages * 1000).toLocaleString('id-ID')} unit).` : ' Contoh: 5 paket berarti sekitar 5.000 followers/unit.'}`}
                   />
                 )}
 
