@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Flame,
+  Megaphone,
   ShieldCheck,
   Sparkles,
   Star,
