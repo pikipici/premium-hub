@@ -27,7 +27,7 @@ import { sosmedHeroSlideService } from '@/services/sosmedHeroSlideService'
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
-import HeroStripPanel, { type HeroSlideContent } from '@/components/sosmed-koprol/HeroStripPanel'
+import HeroStripPanel, { type HeroSlideContent, type HeroTrustBadge } from '@/components/sosmed-koprol/HeroStripPanel'
 import SectionHeader from '@/components/sosmed-koprol/SectionHeader'
 import ServiceCardCompact from '@/components/sosmed-koprol/ServiceCardCompact'
 import HotPickCard from '@/components/sosmed-koprol/HotPickCard'
@@ -500,6 +500,12 @@ export default function ProductSosmedLandingPage() {
     Icon: Sparkles as ComponentType<SVGProps<SVGSVGElement>>,
   }), [])
 
+  const HERO_TRUST_BADGES: HeroTrustBadge[] = useMemo(() => [
+    { icon: ShieldCheck, label: 'Tanpa password', color: '#86efac' },
+    { icon: Clock3,      label: 'Proses cepat',   color: '#93c5fd' },
+    { icon: PackageCheck, label: 'Garansi tersedia', color: '#fdba74' },
+  ], [])
+
   const heroIconMap: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = useMemo(() => ({
     Sparkles, Flame, Megaphone, Zap, Star, Rocket, Crown, TrendingUp,
   }), [])
@@ -540,20 +546,8 @@ export default function ProductSosmedLandingPage() {
           {/* Hero strip — koprol layout: 3+2 columns */}
           <HeroStripPanel
             slides={displaySlides}
+            trustBadges={HERO_TRUST_BADGES}
           />
-
-          {/* Trust badges row */}
-          <div className="mt-4 sm:mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-2xl bg-white px-4 py-3 text-[12px] font-semibold shadow-[0_4px_12px_rgba(0,0,0,0.04)] ring-1 ring-black/5 sm:text-[13px]">
-            <span className="inline-flex items-center gap-1.5 text-[#2F6B1A]">
-              <ShieldCheck className="h-3.5 w-3.5" /> Tanpa password
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-[#1E4F9B]">
-              <Clock3 className="h-3.5 w-3.5" /> Proses cepat
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-[#9A4B16]">
-              <Sparkles className="h-3.5 w-3.5" /> Garansi tersedia
-            </span>
-          </div>
 
           {/* Featured product cards */}
           {heroFeatured.length > 0 ? (
