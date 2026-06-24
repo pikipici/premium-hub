@@ -111,6 +111,7 @@ type CreateSosmedOrderInput struct {
 	Notes                 string `json:"notes"`
 	TargetPublicConfirmed bool   `json:"target_public_confirmed"`
 	IdempotencyKey        string `json:"idempotency_key"`
+	PaymentMethod         string `json:"payment_method"` // "wallet" (default) atau kode gateway e.g. "qris"
 }
 
 type AdminUpdateSosmedOrderStatusInput struct {
@@ -534,7 +535,12 @@ func (s *SosmedOrderService) Create(ctx context.Context, userID uuid.UUID, input
 	}
 	totalPrice := int64(totalPriceFloat)
 
-	if s.walletRepo != nil {
+	// Kalau user pilih gateway (bukan wallet), selalu buat pending_payment order
+	// tanpa memotong wallet — pembayaran diurus SosmedPaymentService setelahnya.
+	requestPaymentMethod := strings.ToLower(strings.TrimSpace(input.PaymentMethod))
+	isGatewayPayment := requestPaymentMethod != "" && requestPaymentMethod != "wallet"
+
+	if !isGatewayPayment && s.walletRepo != nil {
 		if isJAPSosmedService(sosmedService) {
 			return s.createPendingVerificationOrder(ctx, userID, sosmedService, targetLink, quantity, unitPrice, totalPrice, input)
 		}
@@ -555,6 +561,11 @@ func (s *SosmedOrderService) createPendingPaymentOrder(
 ) (*SosmedOrderDetail, error) {
 	now := time.Now()
 	expiresAt := now.Add(60 * time.Minute)
+	gatewayMethod := strings.ToLower(strings.TrimSpace(input.PaymentMethod))
+	if gatewayMethod == "" || gatewayMethod == "wallet" {
+		gatewayMethod = ""
+	}
+
 	order := &model.SosmedOrder{
 		ID:            uuid.New(),
 		UserID:        userID,
@@ -565,6 +576,7 @@ func (s *SosmedOrderService) createPendingPaymentOrder(
 		Quantity:      quantity,
 		UnitPrice:     unitPrice,
 		TotalPrice:    totalPrice,
+		PaymentMethod: gatewayMethod,
 		PaymentStatus: "pending",
 		OrderStatus:   sosmedOrderStatusPendingPayment,
 		Notes:         strings.TrimSpace(input.Notes),

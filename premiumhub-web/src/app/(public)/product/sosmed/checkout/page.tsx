@@ -308,7 +308,8 @@ function SosmedCheckoutContent() {
       return
     }
 
-    if (walletBalance !== null && walletBalance < totalPrice) {
+    const isGatewayMethod = selectedPaymentMethod !== null && selectedPaymentMethod.type !== 'wallet'
+    if (!isGatewayMethod && walletBalance !== null && walletBalance < totalPrice) {
       setError('Saldo wallet lu tidak cukup. Top up dulu sebelum checkout sosmed.')
       return
     }
@@ -371,12 +372,16 @@ function SosmedCheckoutContent() {
 
       if (!service) return
 
+      const paymentMethodCode = selectedPaymentMethod?.id ?? 'wallet'
+      const isGateway = paymentMethodCode !== 'wallet'
+
       const idempotencyFingerprint = buildCheckoutIdempotencyFingerprint([
         'order',
         service.id,
         normalizedTargetLink,
         normalizedQuantity,
         normalizedNotes,
+        paymentMethodCode,
         targetPublicConfirmed,
       ])
       const checkoutIdempotencyKey = getOrCreateCheckoutIdempotencyKey({
@@ -390,6 +395,7 @@ function SosmedCheckoutContent() {
         notes: normalizedNotes,
         target_public_confirmed: targetPublicConfirmed,
         idempotency_key: checkoutIdempotencyKey,
+        payment_method: paymentMethodCode,
       })
       if (!orderRes.success) {
         setError(orderRes.message || 'Gagal membuat order sosmed')
@@ -401,6 +407,28 @@ function SosmedCheckoutContent() {
         flow: 'sosmed-order',
         fingerprint: idempotencyFingerprint,
       })
+
+      // Gateway flow: buat invoice ke Pakasir, redirect ke halaman waiting
+      if (isGateway) {
+        const payRes = await sosmedOrderService.createPayment({
+          order_id: order.id,
+          payment_method: paymentMethodCode,
+        })
+        if (!payRes.success) {
+          setError(payRes.message || 'Gagal membuat invoice pembayaran')
+          return
+        }
+        const payData = payRes.data
+        router.push(
+          `/product/sosmed/checkout/waiting?order=${encodeURIComponent(order.id)}` +
+          (payData.payment_url ? `&payment_url=${encodeURIComponent(payData.payment_url)}` : '') +
+          (payData.payment_number ? `&payment_number=${encodeURIComponent(payData.payment_number)}` : '') +
+          (payData.expires_at ? `&expires_at=${encodeURIComponent(payData.expires_at)}` : '') +
+          `&method=${encodeURIComponent(paymentMethodCode)}`
+        )
+        return
+      }
+
       router.push(`/product/sosmed/checkout/success?id=${encodeURIComponent(order.id)}`)
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {

@@ -9,6 +9,7 @@ export interface CreateSosmedOrderPayload {
   notes?: string
   target_public_confirmed?: boolean
   idempotency_key?: string
+  payment_method?: string // 'wallet' (default) | 'qris' | kode gateway lainnya
 }
 
 export interface CreateSosmedPaymentPayload {
