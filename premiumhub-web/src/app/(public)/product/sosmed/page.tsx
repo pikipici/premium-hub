@@ -27,7 +27,7 @@ import { sosmedHeroSlideService } from '@/services/sosmedHeroSlideService'
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
 import { DigiLoadingCardGrid } from '@/components/shared/DigiLoading'
-import HeroStripPanel, { type HeroSlideContent, type HeroTrustBadge } from '@/components/sosmed-koprol/HeroStripPanel'
+import HeroStripPanel, { type HeroSlideContent } from '@/components/sosmed-koprol/HeroStripPanel'
 import SectionHeader from '@/components/sosmed-koprol/SectionHeader'
 import ServiceCardCompact from '@/components/sosmed-koprol/ServiceCardCompact'
 import HotPickCard from '@/components/sosmed-koprol/HotPickCard'
@@ -500,12 +500,6 @@ export default function ProductSosmedLandingPage() {
     Icon: Sparkles as ComponentType<SVGProps<SVGSVGElement>>,
   }), [])
 
-  const HERO_TRUST_BADGES: HeroTrustBadge[] = useMemo(() => [
-    { icon: ShieldCheck, label: 'Tanpa password', color: '#86efac' },
-    { icon: Clock3,      label: 'Proses cepat',   color: '#93c5fd' },
-    { icon: PackageCheck, label: 'Garansi tersedia', color: '#fdba74' },
-  ], [])
-
   const heroIconMap: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = useMemo(() => ({
     Sparkles, Flame, Megaphone, Zap, Star, Rocket, Crown, TrendingUp,
   }), [])
@@ -546,7 +540,6 @@ export default function ProductSosmedLandingPage() {
           {/* Hero strip — koprol layout: 3+2 columns */}
           <HeroStripPanel
             slides={displaySlides}
-            trustBadges={HERO_TRUST_BADGES}
           />
 
           {/* Featured product cards */}
