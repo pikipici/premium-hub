@@ -267,6 +267,8 @@ export function platformIconKeyFor(platform: string): SosmedPlatformIconKey {
 
 function unitFromService(item: Pick<SosmedService, 'category_code' | 'title' | 'platform_label'>) {
   const haystack = `${item.category_code || ''} ${item.title || ''} ${item.platform_label || ''}`.toLowerCase()
+  // 'comment likes' = likes on comments, must be checked before generic 'like' and 'comment'
+  if (haystack.includes('comment like')) return 'likes'
   if (haystack.includes('like')) return 'likes'
   if (haystack.includes('view')) return 'views'
   if (haystack.includes('comment') || haystack.includes('komentar')) return 'komentar'
