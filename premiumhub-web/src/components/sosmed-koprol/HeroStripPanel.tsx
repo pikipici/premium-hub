@@ -53,29 +53,32 @@ export function HeroStripPanel({ slides }: HeroStripPanelProps) {
           <div className="flex">
             {slides.map((slide) => (
               <div key={slide.key} className="relative min-w-0 flex-[0_0_100%]">
-                {slide.href ? (
-                  <a href={slide.href} tabIndex={-1} aria-label={slide.alt}>
+                {/* aspect-ratio 3:1 container — mirip Rikka Store */}
+                <div className="relative w-full" style={{ paddingBottom: '33.33%' }}>
+                  {slide.href ? (
+                    <a href={slide.href} className="absolute inset-0" tabIndex={-1} aria-label={slide.alt}>
+                      <Image
+                        src={slide.src}
+                        alt={slide.alt}
+                        fill
+                        className="object-cover"
+                        priority
+                        draggable={false}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 100vw, 1400px"
+                      />
+                    </a>
+                  ) : (
                     <Image
                       src={slide.src}
                       alt={slide.alt}
-                      width={1400}
-                      height={500}
-                      className="h-auto w-full object-cover"
+                      fill
+                      className="object-cover"
                       priority
                       draggable={false}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1280px) 100vw, 1400px"
                     />
-                  </a>
-                ) : (
-                  <Image
-                    src={slide.src}
-                    alt={slide.alt}
-                    width={1400}
-                    height={500}
-                    className="h-auto w-full object-cover"
-                    priority
-                    draggable={false}
-                  />
-                )}
+                  )}
+                </div>
               </div>
             ))}
           </div>
