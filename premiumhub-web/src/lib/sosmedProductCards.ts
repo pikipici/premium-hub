@@ -27,6 +27,7 @@ export type SosmedProductCard = {
   refill: string
   eta: string
   priceLabel: string
+  metaLine: string
   packageLabel: string
   packageExamples: string[]
   benefits: string[]
@@ -347,6 +348,24 @@ export function normalizeSosmedTrustBadges(items: string[] | null | undefined) {
   }).slice(0, 3)
 }
 
+function buildMetaLine(startTime: string, refill: string): string {
+  const parts: string[] = []
+  // Start time
+  const st = startTime.toLowerCase()
+  if (st === 'instan' || st === 'instant') {
+    parts.push('⚡ Instan')
+  } else {
+    parts.push(`⚡ ${startTime}`)
+  }
+  // Refill
+  if (isNoRefill(refill)) {
+    parts.push('Tanpa refill')
+  } else {
+    parts.push(`↺ Refill ${refill}`)
+  }
+  return parts.join(' • ')
+}
+
 function buildBenefits(startTime: string, refill: string, eta: string) {
   const benefits = ['Tanpa perlu password', `Mulai diproses sekitar ${startTime}`, readableRefill(refill)]
   if (eta) benefits.push(`Proses ${eta.toLowerCase()}`)
@@ -404,6 +423,7 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
         const labels: Record<string, string> = { followers: 'Followers', likes: 'Like', views: 'Views', komentar: 'Komentar', share: 'Share' }
         return raw + ' / 1K ' + (labels[unit] || unit)
       })(),
+      metaLine: buildMetaLine(startTime, refill),
       packageLabel: packageLabelFor(unit),
       packageExamples: packageExamplesFor(unit),
       benefits: buildBenefits(startTime, refill, eta),
@@ -420,6 +440,7 @@ export function buildSosmedServiceCards(items: SosmedService[]): SosmedProductCa
   const missingFallbacks = FALLBACK_SERVICES.filter((f) => !dbCodes.has(f.code)).map((service, index) => ({
     key: `fallback-${service.code}-${index}`,
     ...service,
+    metaLine: buildMetaLine(service.startTime, service.refill),
     platformIcon: platformIconKeyFor(service.platform),
   }))
 

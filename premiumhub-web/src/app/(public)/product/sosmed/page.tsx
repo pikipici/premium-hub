@@ -575,6 +575,7 @@ export default function ProductSosmedLandingPage() {
                       title={item.title}
                       platformLabel={item.platformLabel}
                       priceLabel={item.priceLabel}
+                      metaLine={item.metaLine}
                       badgeText={item.badgeText}
                       Icon={Icon}
                       toneClass={item.toneClass}
@@ -646,6 +647,7 @@ export default function ProductSosmedLandingPage() {
                         title={card.buyerTitle}
                         platformLabel={card.platform}
                         priceLabel={card.priceLabel}
+                        metaLine={card.metaLine}
                         badgeText={card.badge}
                         Icon={Icon}
                         toneClass={card.tone}

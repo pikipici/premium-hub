@@ -13,6 +13,8 @@ export type ServiceCardCompactProps = {
   platformLabel?: string
   /** Label harga, misal "Rp 28.000" */
   priceLabel?: string
+  /** Key differentiator line, misal "⚡ Instan • ↺ Refill 30 hari" */
+  metaLine?: string
   /** Badge text dari admin badge_text. Kosongin kalo ga mau badge. */
   badgeText?: string
   /** Tailwind tone gradient class for icon disc bg, e.g. "from-[#EEF8FF] to-[#DCEFFF]". */
@@ -22,7 +24,7 @@ export type ServiceCardCompactProps = {
 /**
  * Flat compact card for the main catalog section.
  */
-export function ServiceCardCompact({ href, title, Icon, platformLabel, priceLabel, badgeText, toneClass }: ServiceCardCompactProps) {
+export function ServiceCardCompact({ href, title, Icon, platformLabel, priceLabel, metaLine, badgeText, toneClass }: ServiceCardCompactProps) {
   const inner = (
     <div className="relative flex h-full gap-3 rounded-2xl bg-white px-3 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.05)] ring-1 ring-black/5 transition-all duration-200 hover:shadow-[0_12px_32px_rgba(20,20,20,0.10)] active:scale-[0.97] sm:gap-3.5 sm:px-4 sm:py-3.5">
       {badgeText ? (
@@ -40,6 +42,9 @@ export function ServiceCardCompact({ href, title, Icon, platformLabel, priceLabe
         <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug text-[#141414] sm:text-sm">{title}</h3>
         {priceLabel ? (
           <span className="text-[12px] font-bold text-[#FF5733] sm:text-[13px]">{priceLabel}</span>
+        ) : null}
+        {metaLine ? (
+          <span className="mt-0.5 truncate text-[10px] text-gray-400 sm:text-[11px]">{metaLine}</span>
         ) : null}
       </div>
     </div>
