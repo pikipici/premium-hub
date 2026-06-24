@@ -504,6 +504,13 @@ export default function ProductSosmedLandingPage() {
           href: s.cta_href || undefined,
         }))
       if (mapped.length > 0) setDisplaySlides(mapped)
+      // extract featured_service_codes dari semua slide aktif
+      const codes = Array.from(
+        new Set(
+          res.data.flatMap((s) => s.featured_service_codes ?? [])
+        )
+      )
+      setHeroSlideCodes(codes)
     }).catch(() => {})
   }, [])
 
