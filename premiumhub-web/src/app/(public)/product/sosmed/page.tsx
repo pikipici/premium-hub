@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo, type ComponentType, type SVGProps } from 'react'
 import {
   ArrowRight,
   ChevronDown,
