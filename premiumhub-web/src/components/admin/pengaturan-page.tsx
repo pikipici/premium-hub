@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import MaintenanceQuickToggle from '@/components/admin/maintenance-quick-toggle'
 import MaintenanceSettingsCard from '@/components/admin/maintenance-settings-card'
 import NavbarMenuSettingsCard from '@/components/admin/navbar-menu-settings-card'
+import PaymentMethodSettingsCard from '@/components/admin/payment-method-settings-card'
 import ProductCategorySettingsCard from '@/components/admin/product-category-settings-card'
 import UserSidebarMenuSettingsCard from '@/components/admin/user-sidebar-menu-settings-card'
 import {
@@ -441,6 +442,7 @@ export default function PengaturanPage() {
 
       <ProductCategorySettingsCard />
       <NavbarMenuSettingsCard />
+      <PaymentMethodSettingsCard />
       <UserSidebarMenuSettingsCard />
       <MaintenanceQuickToggle />
       <MaintenanceSettingsCard />

@@ -75,6 +75,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&model.ChatConversation{},
 		&model.ChatMessage{},
 		&model.ConvertTrackingToken{},
+		&model.PaymentMethodSetting{},
 	); err != nil {
 		log.Fatal("DB migrate:", err)
 	}

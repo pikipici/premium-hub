@@ -58,6 +58,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	siteFlashSaleRepo := repository.NewSiteFlashSaleRepo(db)
 	userSidebarMenuSettingRepo := repository.NewUserSidebarMenuSettingRepo(db)
 	navbarMenuSettingRepo := repository.NewNavbarMenuSettingRepo(db)
+	paymentMethodSettingRepo := repository.NewPaymentMethodSettingRepo(db)
 	activityRepo := repository.NewActivityRepo(db)
 	chatRepo := repository.NewChatRepo(db)
 	digiConnectRepo := repository.NewDigiConnectRepo(db)
@@ -161,6 +162,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	siteFlashSaleSvc := service.NewSiteFlashSaleService(siteFlashSaleRepo, productRepo)
 	userSidebarMenuSettingSvc := service.NewUserSidebarMenuSettingService(userSidebarMenuSettingRepo)
 	navbarMenuSettingSvc := service.NewNavbarMenuSettingService(navbarMenuSettingRepo)
+	paymentMethodSettingSvc := service.NewPaymentMethodSettingService(paymentMethodSettingRepo)
 	activitySvc := service.NewActivityService(activityRepo)
 	chatHub := service.NewChatHubWithRedis(
 		cfg.RedisAddr,
@@ -235,6 +237,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	siteFlashSaleHandler := handler.NewSiteFlashSaleHandler(siteFlashSaleSvc)
 	userSidebarMenuSettingHandler := handler.NewUserSidebarMenuSettingHandler(userSidebarMenuSettingSvc)
 	navbarMenuSettingHandler := handler.NewNavbarMenuSettingHandler(navbarMenuSettingSvc)
+	paymentMethodSettingHandler := handler.NewPaymentMethodSettingHandler(paymentMethodSettingSvc)
 	activityHandler := handler.NewActivityHandler(activitySvc)
 	chatHandler := handler.NewChatHandler(chatSvc, cfg.FrontendURL)
 	digiConnectHandler := handler.NewDigiConnectHandler(digiConnectSvc)
@@ -278,6 +281,7 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	api.GET("/public/nokos/landing-summary", nokosPublicHandler.GetLandingSummary)
 	api.GET("/public/nokos/countries", nokosPublicHandler.GetCountries)
 	api.GET("/public/navbar-menu", navbarMenuSettingHandler.PublicList)
+	api.GET("/public/payment-method-settings", paymentMethodSettingHandler.PublicList)
 	api.GET("/public/banners", siteBannerHandler.PublicActive)
 	api.GET("/public/hero-bg", siteHeroBgHandler.PublicGet)
 	api.GET("/public/sosmed-hero", sosmedHeroSlideHandler.PublicGet)
@@ -671,6 +675,8 @@ func Setup(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	admin.PUT("/settings/user-sidebar-menu", userSidebarMenuSettingHandler.AdminUpdate)
 	admin.GET("/settings/navbar-menu", navbarMenuSettingHandler.AdminList)
 	admin.PUT("/settings/navbar-menu", navbarMenuSettingHandler.AdminUpdate)
+	admin.GET("/settings/payment-method-settings", paymentMethodSettingHandler.AdminList)
+	admin.PUT("/settings/payment-method-settings", paymentMethodSettingHandler.AdminUpdate)
 
 	admin.GET("/banners", siteBannerHandler.AdminList)
 	admin.POST("/banners", siteBannerHandler.AdminCreate)
