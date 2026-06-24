@@ -896,6 +896,17 @@ func (s *SosmedServiceService) SyncAllJAPMetadata(ctx context.Context) (int, err
 			changed = true
 		}
 
+		minOrderVal := strings.TrimSpace(string(providerItem.Min))
+		if item.MinOrder != minOrderVal {
+			item.MinOrder = minOrderVal
+			changed = true
+		}
+		maxOrderVal := strings.TrimSpace(string(providerItem.Max))
+		if item.MaxOrder != maxOrderVal {
+			item.MaxOrder = maxOrderVal
+			changed = true
+		}
+
 		priceStart, pricePer1K := formatSosmedResellerPriceFields(rateUSD, rateUsed, providerID)
 		if item.PriceStart != priceStart {
 			item.PriceStart = priceStart
