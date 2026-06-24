@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import useEmblaCarousel from 'embla-carousel-react'
 import Autoplay from 'embla-carousel-autoplay'
@@ -25,6 +25,9 @@ export function HeroStripPanel({ slides }: HeroStripPanelProps) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [canScrollPrev, setCanScrollPrev] = useState(false)
   const [canScrollNext, setCanScrollNext] = useState(false)
+  // track pointer-down position to distinguish swipe from click
+  const pointerDownX = useRef<number | null>(null)
+  const DRAG_THRESHOLD = 8 // px
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return
@@ -55,19 +58,35 @@ export function HeroStripPanel({ slides }: HeroStripPanelProps) {
               <div key={slide.key} className="relative min-w-0 flex-[0_0_100%]">
                 {/* aspect-ratio 3:1 container — mirip Rikka Store */}
                 <div className="relative w-full" style={{ paddingBottom: '33.33%' }}>
-                  {slide.href ? (
-                    <a href={slide.href} className="absolute inset-0" tabIndex={-1} aria-label={slide.alt}>
-                      <Image
-                        src={slide.src}
-                        alt={slide.alt}
-                        fill
-                        className="object-cover"
-                        priority
-                        draggable={false}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 100vw, 1400px"
-                      />
-                    </a>
-                  ) : (
+                  {slide.href ? (() => {
+                    const isExternal = /^https?:\/\//.test(slide.href)
+                    return (
+                      <a
+                        href={slide.href}
+                        className="absolute inset-0 cursor-pointer"
+                        aria-label={slide.alt}
+                        target={isExternal ? '_blank' : undefined}
+                        rel={isExternal ? 'noopener noreferrer' : undefined}
+                        onPointerDown={(e) => { pointerDownX.current = e.clientX }}
+                        onClick={(e) => {
+                          if (pointerDownX.current !== null && Math.abs(e.clientX - pointerDownX.current) > DRAG_THRESHOLD) {
+                            e.preventDefault()
+                          }
+                          pointerDownX.current = null
+                        }}
+                      >
+                        <Image
+                          src={slide.src}
+                          alt={slide.alt}
+                          fill
+                          className="object-cover"
+                          priority
+                          draggable={false}
+                          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 100vw, 1400px"
+                        />
+                      </a>
+                    )
+                  })() : (
                     <Image
                       src={slide.src}
                       alt={slide.alt}
