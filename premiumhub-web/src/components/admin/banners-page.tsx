@@ -27,10 +27,11 @@ export default function AdminBannersPage() {
         </div>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-[#F4F5F8] rounded-xl p-1">
+      {/* Tab strip — scrollable on small screens */}
+      <div className="flex gap-1 mb-6 bg-[#F4F5F8] rounded-xl p-1 overflow-x-auto">
         <button
           onClick={() => setActiveTab('banners')}
-          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+          className={`flex-shrink-0 rounded-lg px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-all ${
             activeTab === 'banners'
               ? 'bg-white text-[#141414] shadow-sm'
               : 'text-[#888] hover:text-[#555]'
@@ -40,7 +41,7 @@ export default function AdminBannersPage() {
         </button>
         <button
           onClick={() => setActiveTab('hero')}
-          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+          className={`flex-shrink-0 rounded-lg px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-all ${
             activeTab === 'hero'
               ? 'bg-white text-[#141414] shadow-sm'
               : 'text-[#888] hover:text-[#555]'
@@ -51,7 +52,7 @@ export default function AdminBannersPage() {
         </button>
         <button
           onClick={() => setActiveTab('flash')}
-          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+          className={`flex-shrink-0 rounded-lg px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-all ${
             activeTab === 'flash'
               ? 'bg-white text-[#141414] shadow-sm'
               : 'text-[#888] hover:text-[#555]'
@@ -62,7 +63,7 @@ export default function AdminBannersPage() {
         </button>
         <button
           onClick={() => setActiveTab('sosmed-hero')}
-          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+          className={`flex-shrink-0 rounded-lg px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-all ${
             activeTab === 'sosmed-hero'
               ? 'bg-white text-[#141414] shadow-sm'
               : 'text-[#888] hover:text-[#555]'
@@ -78,10 +79,32 @@ export default function AdminBannersPage() {
   )
 }
 
+// Shared inline confirm — replaces window.confirm across all tabs
+function ConfirmDelete({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [onCancel])
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40" onClick={onCancel}>
+      <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <p className="text-sm font-semibold text-[#141414]">{message}</p>
+        <div className="flex gap-2 mt-5">
+          <button onClick={onCancel} className="flex-1 rounded-full border border-[#E5E5E5] py-2.5 text-sm font-semibold">Batal</button>
+          <button onClick={onConfirm} className="flex-1 rounded-full bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700">Hapus</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function BannersTab() {
   const [banners, setBanners] = useState<SiteBanner[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [listError, setListError] = useState('')
+  const [formError, setFormError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<SiteBanner | null>(null)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<SiteBanner | null>(null)
@@ -97,11 +120,19 @@ function BannersTab() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // ESC closes form modal
+  useEffect(() => {
+    if (!formOpen) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') resetForm() }
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [formOpen])
+
   const fetchBanners = () => {
     setLoading(true)
     bannerService.adminList()
       .then((res) => { if (res.success) setBanners(res.data ?? []) })
-      .catch(() => setError('Gagal memuat banner'))
+      .catch(() => setListError('Gagal memuat banner'))
       .finally(() => setLoading(false))
   }
 
@@ -110,18 +141,14 @@ function BannersTab() {
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     setUploading(true)
-    setError('')
+    setFormError('')
     try {
       const res = await bannerService.adminUploadImage(file)
-      if (res.success && res.data?.url) {
-        setImageURL(res.data.url)
-      } else {
-        setError(res.message || 'Gagal upload gambar')
-      }
+      if (res.success && res.data?.url) setImageURL(res.data.url)
+      else setFormError(res.message || 'Gagal upload gambar')
     } catch {
-      setError('Gagal upload gambar')
+      setFormError('Gagal upload gambar')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -129,71 +156,61 @@ function BannersTab() {
   }
 
   const openCreate = () => {
-    setEditing(null)
-    setTitle('')
-    setDescription('')
-    setImageURL('')
-    setLinkURL('')
-    setSortOrder(0)
-    setIsActive(true)
-    setError('')
+    setEditing(null); setTitle(''); setDescription(''); setImageURL('')
+    setLinkURL(''); setSortOrder(0); setIsActive(true); setFormError('')
     setFormOpen(true)
   }
 
   const openEdit = (b: SiteBanner) => {
-    setEditing(b)
-    setTitle(b.title)
-    setDescription(b.description || '')
-    setImageURL(b.image_url)
-    setLinkURL(b.link_url)
-    setSortOrder(b.sort_order)
-    setIsActive(b.is_active)
-    setFormOpen(true)
+    setEditing(b); setTitle(b.title); setDescription(b.description || '')
+    setImageURL(b.image_url); setLinkURL(b.link_url)
+    setSortOrder(b.sort_order); setIsActive(b.is_active)
+    setFormError(''); setFormOpen(true)
   }
 
-  const resetForm = () => {
-    setFormOpen(false)
-    setEditing(null)
-  }
+  const resetForm = () => { setFormOpen(false); setEditing(null); setFormError('') }
 
   const handleSave = async () => {
-    if (!title.trim() || !imageURL.trim()) {
-      setError('Judul dan gambar wajib diisi')
-      return
-    }
+    if (!title.trim() || !imageURL.trim()) { setFormError('Judul dan gambar wajib diisi'); return }
     setSaving(true)
-    setError('')
+    setFormError('')
     try {
       const payload = { title: title.trim(), description: description.trim(), image_url: imageURL.trim(), link_url: linkURL.trim(), sort_order: sortOrder, is_active: isActive }
       const res = editing
         ? await bannerService.adminUpdate(editing.id, payload)
         : await bannerService.adminCreate(payload)
-      if (res.success) {
-        resetForm()
-        fetchBanners()
-      } else {
-        setError(res.message || 'Gagal menyimpan')
-      }
+      if (res.success) { resetForm(); fetchBanners() }
+      else setFormError(res.message || 'Gagal menyimpan')
     } catch {
-      setError('Gagal menyimpan banner')
+      setFormError('Gagal menyimpan banner')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Hapus banner ini?')) return
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
     try {
-      const res = await bannerService.adminDelete(id)
+      const res = await bannerService.adminDelete(deleteTarget.id)
       if (res.success) fetchBanners()
-      else setError(res.message || 'Gagal menghapus')
+      else setListError(res.message || 'Gagal menghapus')
     } catch {
-      setError('Gagal menghapus banner')
+      setListError('Gagal menghapus banner')
+    } finally {
+      setDeleteTarget(null)
     }
   }
 
   return (
     <>
+      {deleteTarget && (
+        <ConfirmDelete
+          message={`Hapus banner "${deleteTarget.title}"?`}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-[#888]">Banner yang tampil di slider hero katalog DigiProduct.</p>
         <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-full bg-[#141414] px-4 py-2 text-xs font-bold text-white hover:bg-[#2A2A2A]">
@@ -201,8 +218,8 @@ function BannersTab() {
         </button>
       </div>
 
-      {error && (
-        <div className="rounded-xl bg-red-50 text-red-600 text-sm px-4 py-2.5 mb-4 font-medium">{error}</div>
+      {listError && (
+        <div className="rounded-xl bg-red-50 text-red-600 text-sm px-4 py-2.5 mb-4 font-medium">{listError}</div>
       )}
 
       {loading ? (
@@ -230,7 +247,7 @@ function BannersTab() {
                 <button onClick={() => openEdit(b)} className="rounded-lg border border-[#E5E5E5] px-3 py-1.5 text-[11px] font-semibold hover:bg-[#F7F7F5]">
                   Edit
                 </button>
-                <button onClick={() => handleDelete(b.id)} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] text-red-600 hover:bg-red-50">
+                <button onClick={() => setDeleteTarget(b)} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] text-red-600 hover:bg-red-50">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -243,6 +260,10 @@ function BannersTab() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" onClick={resetForm}>
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-extrabold">{editing ? 'Edit Banner' : 'Banner Baru'}</h2>
+
+            {formError && (
+              <div className="rounded-xl bg-red-50 text-red-600 text-sm px-4 py-2.5 font-medium">{formError}</div>
+            )}
 
             <label className="block text-xs font-bold text-[#555]">
               Judul
@@ -517,8 +538,10 @@ function FlashSaleTab() {
   const [items, setItems] = useState<SiteFlashSale[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [listError, setListError] = useState('')
+  const [formError, setFormError] = useState('')
   const [message, setMessage] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<SiteFlashSale | null>(null)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<SiteFlashSale | null>(null)
@@ -528,6 +551,14 @@ function FlashSaleTab() {
   const [sortOrder, setSortOrder] = useState(0)
   const [isActive, setIsActive] = useState(true)
 
+  // ESC closes form modal
+  useEffect(() => {
+    if (!formOpen) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') resetForm() }
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [formOpen])
+
   const fetchData = () => {
     setLoading(true)
     Promise.all([
@@ -535,8 +566,8 @@ function FlashSaleTab() {
       productService.list({ limit: 100 }),
     ]).then(([fsRes, prodRes]) => {
       if (fsRes.success) setItems(fsRes.data ?? [])
-      if (prodRes.success) setProducts(prodRes.data ?? [])
-    }).catch(() => setError('Gagal memuat data'))
+      if (prodRes.success) setProducts([...(prodRes.data ?? [])].sort((a, b) => a.name.localeCompare(b.name)))
+    }).catch(() => setListError('Gagal memuat data'))
       .finally(() => setLoading(false))
   }
 
@@ -549,40 +580,24 @@ function FlashSaleTab() {
   }
 
   const openCreate = () => {
-    setEditing(null)
-    setSelectedProductId('')
-    setDeadline('')
-    setSortOrder(items.length)
-    setIsActive(true)
+    setEditing(null); setSelectedProductId(''); setDeadline('')
+    setSortOrder(items.length); setIsActive(true); setFormError('')
     setFormOpen(true)
   }
 
   const openEdit = (item: SiteFlashSale) => {
-    setEditing(item)
-    setSelectedProductId(item.product_id)
+    setEditing(item); setSelectedProductId(item.product_id)
     setDeadline(toLocalDatetime(item.ends_at))
-    setSortOrder(item.sort_order)
-    setIsActive(item.is_active)
-    setFormOpen(true)
+    setSortOrder(item.sort_order); setIsActive(item.is_active)
+    setFormError(''); setFormOpen(true)
   }
 
-  const resetForm = () => {
-    setFormOpen(false)
-    setEditing(null)
-    setError('')
-  }
+  const resetForm = () => { setFormOpen(false); setEditing(null); setFormError('') }
 
   const handleSave = async () => {
-    if (!selectedProductId) {
-      setError('Pilih produk')
-      return
-    }
-    if (!deadline) {
-      setError('Atur deadline')
-      return
-    }
-    setSaving(true)
-    setError('')
+    if (!selectedProductId) { setFormError('Pilih produk'); return }
+    if (!deadline) { setFormError('Atur deadline'); return }
+    setSaving(true); setFormError('')
     try {
       const payload: Record<string, unknown> = {
         product_id: selectedProductId,
@@ -595,31 +610,20 @@ function FlashSaleTab() {
         : await flashSaleService.adminCreate(payload as Partial<SiteFlashSale>)
       if (res.success) {
         setMessage(editing ? 'Flash sale diperbarui' : 'Flash sale dibuat')
-        resetForm()
-        fetchData()
+        resetForm(); fetchData()
       } else {
-        setError(res.message || 'Gagal menyimpan')
+        setFormError(res.message || 'Gagal menyimpan')
       }
-    } catch {
-      setError('Gagal menyimpan flash sale')
-    } finally {
-      setSaving(false)
-    }
+    } catch { setFormError('Gagal menyimpan flash sale') } finally { setSaving(false) }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Hapus dari flash sale?')) return
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
     try {
-      const res = await flashSaleService.adminDelete(id)
-      if (res.success) {
-        setMessage('Dihapus dari flash sale')
-        fetchData()
-      } else {
-        setError(res.message || 'Gagal menghapus')
-      }
-    } catch {
-      setError('Gagal menghapus flash sale')
-    }
+      const res = await flashSaleService.adminDelete(deleteTarget.id)
+      if (res.success) { setMessage('Dihapus dari flash sale'); fetchData() }
+      else setListError(res.message || 'Gagal menghapus')
+    } catch { setListError('Gagal menghapus flash sale') } finally { setDeleteTarget(null) }
   }
 
   const getProductName = (productId: string) => {
@@ -632,6 +636,14 @@ function FlashSaleTab() {
 
   return (
     <div className="space-y-5">
+      {deleteTarget && (
+        <ConfirmDelete
+          message={`Hapus "${deleteTarget.product?.name || deleteTarget.product_id}" dari flash sale?`}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-xs text-[#888]">Produk yang tampil di section Flash Sale katalog DigiProduct.</p>
         <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-full bg-[#141414] px-4 py-2 text-xs font-bold text-white hover:bg-[#2A2A2A]">
@@ -639,8 +651,8 @@ function FlashSaleTab() {
         </button>
       </div>
 
-      {error && (
-        <div className="rounded-xl bg-red-50 text-red-600 text-sm px-4 py-2.5 font-medium">{error}</div>
+      {listError && (
+        <div className="rounded-xl bg-red-50 text-red-600 text-sm px-4 py-2.5 font-medium">{listError}</div>
       )}
       {message && (
         <div className="rounded-xl bg-emerald-50 text-emerald-700 text-sm px-4 py-2.5 font-medium">{message}</div>
@@ -682,7 +694,7 @@ function FlashSaleTab() {
                   <button onClick={() => openEdit(item)} className="rounded-lg border border-[#E5E5E5] px-3 py-1.5 text-[11px] font-semibold hover:bg-[#F7F7F5]">
                     Edit
                   </button>
-                  <button onClick={() => handleDelete(item.id)} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] text-red-600 hover:bg-red-50">
+                  <button onClick={() => setDeleteTarget(item)} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] text-red-600 hover:bg-red-50">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -696,6 +708,8 @@ function FlashSaleTab() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" onClick={resetForm}>
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-extrabold">{editing ? 'Edit Flash Sale' : 'Tambah Flash Sale'}</h2>
+
+            {formError && <div className="rounded-xl bg-red-50 text-red-600 text-sm px-4 py-2.5 font-medium">{formError}</div>}
 
             <label className="block text-xs font-bold text-[#555]">
               Produk
@@ -745,22 +759,12 @@ function FlashSaleTab() {
   )
 }
 
-const SOSMED_HERO_ICONS = [
-  { value: 'Sparkles', label: 'Sparkles' },
-  { value: 'Flame', label: 'Flame' },
-  { value: 'Megaphone', label: 'Megaphone' },
-  { value: 'Zap', label: 'Zap' },
-  { value: 'Star', label: 'Star' },
-  { value: 'Rocket', label: 'Rocket' },
-  { value: 'Crown', label: 'Crown' },
-  { value: 'TrendingUp', label: 'TrendingUp' },
-]
-
 function SosmedHeroTab() {
   const [slides, setSlides] = useState<SosmedHeroSlide[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<SosmedHeroSlide | null>(null)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<SosmedHeroSlide | null>(null)
@@ -769,10 +773,19 @@ function SosmedHeroTab() {
 
   const [imageURL, setImageURL] = useState('')
   const [linkHref, setLinkHref] = useState('')
+  const [featuredCodesInput, setFeaturedCodesInput] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
   const [formActive, setFormActive] = useState(true)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ESC closes form modal
+  useEffect(() => {
+    if (!formOpen) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') resetForm() }
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [formOpen])
 
   const fetchSlides = async () => {
     setLoading(true)
@@ -787,8 +800,9 @@ function SosmedHeroTab() {
   const resetForm = () => {
     setEditing(null); setFormOpen(false)
     setImageURL(''); setLinkHref('')
+    setFeaturedCodesInput('')
     setSortOrder(0); setFormActive(true)
-    setError(''); setSuccess('')
+    setError('')
   }
 
   const openCreate = () => { resetForm(); setFormOpen(true) }
@@ -797,8 +811,10 @@ function SosmedHeroTab() {
     setEditing(s)
     setImageURL(s.background_image_url || '')
     setLinkHref(s.cta_href || '')
+    setFeaturedCodesInput((s.featured_service_codes ?? []).join(','))
     setSortOrder(s.sort_order || 0)
     setFormActive(s.is_active ?? true)
+    setError('')
     setFormOpen(true)
   }
 
@@ -818,43 +834,51 @@ function SosmedHeroTab() {
 
   const handleSave = async () => {
     if (!imageURL.trim()) { setError('Gambar banner wajib diupload'); return }
-    setSaving(true); setError(''); setSuccess('')
+    setSaving(true); setError('')
     try {
-      // title wajib di BE, pakai placeholder internal
       const payload = {
         title: `Banner Sosmed ${sortOrder + 1}`,
         background_image_url: imageURL.trim(),
         cta_href: linkHref.trim(),
+        featured_service_codes: featuredCodesInput.split(',').map(c => c.trim()).filter(Boolean),
         sort_order: sortOrder,
         is_active: formActive,
       }
       const res = editing
         ? await sosmedHeroSlideService.adminUpdate(editing.id, payload)
         : await sosmedHeroSlideService.adminCreate(payload)
-      if (res.success) { resetForm(); fetchSlides(); setSuccess('Banner berhasil disimpan') }
+      if (res.success) { resetForm(); fetchSlides(); setSuccessMsg('Banner berhasil disimpan') }
       else setError(res.message || 'Gagal menyimpan')
     } catch { setError('Gagal menyimpan') } finally { setSaving(false) }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Hapus banner ini?')) return
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
     try {
-      const res = await sosmedHeroSlideService.adminDelete(id)
-      if (res.success) { fetchSlides(); setSuccess('Banner berhasil dihapus') }
+      const res = await sosmedHeroSlideService.adminDelete(deleteTarget.id)
+      if (res.success) { fetchSlides(); setSuccessMsg('Banner berhasil dihapus') }
       else setError(res.message || 'Gagal menghapus')
-    } catch { setError('Gagal menghapus') }
+    } catch { setError('Gagal menghapus') } finally { setDeleteTarget(null) }
   }
 
   return (
     <div className="space-y-4">
+      {deleteTarget && (
+        <ConfirmDelete
+          message="Hapus banner ini?"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-xs text-[#888]">Kelola banner gambar untuk halaman Sosmed. Gambar ditampilkan dalam rasio 3:1.</p>
-        <button onClick={openCreate} className="rounded-full bg-[#FF5733] px-4 py-2 text-xs font-bold text-white hover:bg-[#e64d2e] transition">
+        <button onClick={openCreate} className="rounded-full bg-[#141414] px-4 py-2 text-xs font-bold text-white hover:bg-[#2A2A2A] transition">
           <Plus className="h-3.5 w-3.5 inline mr-1 -mt-0.5" /> Tambah Banner
         </button>
       </div>
 
-      {success && <div className="rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-600">{success}</div>}
+      {successMsg && <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{successMsg}</div>}
       {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{error}</div>}
 
       {loading ? (
@@ -879,7 +903,7 @@ function SosmedHeroTab() {
               <div className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${s.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}`}>
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${s.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'}`}>
                       {s.is_active ? 'Aktif' : 'Nonaktif'}
                     </span>
                     <span className="text-[10px] text-[#888]">Urutan: {s.sort_order}</span>
@@ -888,7 +912,7 @@ function SosmedHeroTab() {
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button onClick={() => openEdit(s)} className="rounded-full border border-[#E5E5E5] px-3 py-1.5 text-[11px] font-semibold hover:bg-[#F7F7F5] transition">Edit</button>
-                  <button onClick={() => handleDelete(s.id)} className="rounded-full border border-red-200 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-50 transition">
+                  <button onClick={() => setDeleteTarget(s)} className="rounded-full border border-red-200 px-3 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-50 transition">
                     <Trash2 className="h-3 w-3 inline mr-0.5 -mt-0.5" />Hapus
                   </button>
                 </div>
@@ -960,6 +984,18 @@ function SosmedHeroTab() {
                 placeholder="/product/sosmed atau https://..."
                 className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]"
               />
+            </label>
+
+            {/* Produk Unggulan */}
+            <label className="block text-xs font-bold text-[#555]">
+              Produk Unggulan (kode layanan)
+              <input
+                value={featuredCodesInput}
+                onChange={(e) => setFeaturedCodesInput(e.target.value)}
+                placeholder="ig-followers,ig-likes,tiktok-views"
+                className="mt-1 w-full rounded-xl border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#FF5733]"
+              />
+              <span className="mt-1 block text-[10px] text-[#AAA]">Kode layanan dipisah koma. Produk ini akan tampil di section &quot;Produk Unggulan&quot; halaman Sosmed.</span>
             </label>
 
             <div className="grid grid-cols-2 gap-3 mt-3">
